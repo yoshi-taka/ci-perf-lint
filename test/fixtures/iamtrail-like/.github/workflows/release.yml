@@ -1,0 +1,27 @@
+on:
+  push:
+    tags:
+      - "202*"
+
+name: Create Release
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get changed files
+        id: getfile
+        run: |
+          PREVIOUS=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1))
+          DIFF=$(git diff --name-only ${{ github.ref_name }} "$PREVIOUS")
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$DIFF" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2

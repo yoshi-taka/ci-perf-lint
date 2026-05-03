@@ -1,0 +1,23 @@
+name: lint
+
+on:
+  pull_request:
+
+jobs:
+  oxlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: pnpm exec oxlint .
+
+  ruff:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: uvx ruff check .
+
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: actionlint

@@ -1,0 +1,16 @@
+name: test
+
+on:
+  pull_request:
+
+jobs:
+  jest_tuned:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: npx jest --maxWorkers=2
+
+  pytest_tuned:
+    runs-on: windows-latest
+    steps:
+      - run: pytest -n auto

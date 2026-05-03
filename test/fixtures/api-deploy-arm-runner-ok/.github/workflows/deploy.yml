@@ -1,0 +1,19 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  terraform_arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform apply -auto-approve
+
+  terraform_container:
+    runs-on: ubuntu-24.04
+    container: hashicorp/terraform:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: terraform apply -auto-approve

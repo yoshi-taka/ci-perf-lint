@@ -1,0 +1,15 @@
+name: changelog
+
+on:
+  workflow_dispatch:
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: orhun/git-cliff-action@v4
+        with:
+          args: --latest --output CHANGELOG.md

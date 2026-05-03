@@ -1,0 +1,21 @@
+name: publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-normal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+      - uses: ./.github/actions/bootstrap
+        with:
+          install-code-deps: true
+      - run: yarn release:publish
+      - run: yarn task --task=compile --start-from=compile --no-link
+      - run: |
+          git checkout next
+          git pull
+          yarn write-changelog

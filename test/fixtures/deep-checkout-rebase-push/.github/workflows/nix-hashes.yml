@@ -1,0 +1,24 @@
+name: nix-hashes
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-hashes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+      - uses: ./.github/actions/setup-git-committer
+      - run: git pull --rebase --autostash origin "$GITHUB_REF_NAME"
+      - run: |
+          git add nix/hashes.json
+          git commit -m "chore: update nix node_modules hashes"
+          git pull --rebase --autostash origin "$GITHUB_REF_NAME"
+          git push origin HEAD:"$GITHUB_REF_NAME"

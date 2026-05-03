@@ -1,0 +1,10 @@
+version: 2.1
+
+jobs:
+  release:
+    docker:
+      - image: cimg/node:18.0
+    steps:
+      - checkout:
+          method: full
+      - run: npx semantic-release

@@ -1,0 +1,27 @@
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  NODE_ENV: production
+
+build-app:
+  stage: build
+  image: node:20
+  script:
+    - npm ci
+    - npm run build
+  timeout: 30m
+
+test-app:
+  stage: test
+  script:
+    - npm test
+  timeout: 15m
+
+deploy-app:
+  stage: deploy
+  script:
+    - ./deploy.sh
+  timeout: 60m

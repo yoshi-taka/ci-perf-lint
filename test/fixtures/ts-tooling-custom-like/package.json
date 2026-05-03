@@ -1,0 +1,8 @@
+{
+  "name": "ts-tooling-custom-like",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "eslint-plugin-security": "^3.0.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "version": "18.0.0",
+  "artifacts": {
+    "MyStack": {
+      "type": "aws:cloudformation:stack",
+      "properties": {
+        "templateFile": "MyStack.template.json"
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "prettier-eslint-like",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "prettier-eslint": "^16.0.0"
+  }
+}

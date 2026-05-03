@@ -1,0 +1,13 @@
+{
+  "name": "npm-workspaces-like",
+  "private": true,
+  "packageManager": "npm@10.9.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "build": "npm run build -ws"
+  }
+}

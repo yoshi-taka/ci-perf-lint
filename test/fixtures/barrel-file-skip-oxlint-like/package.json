@@ -1,0 +1,11 @@
+{
+  "name": "barrel-file-skip-oxlint-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "oxlint src/index.js"
+  },
+  "devDependencies": {
+    "oxlint": "^1.60.0"
+  }
+}

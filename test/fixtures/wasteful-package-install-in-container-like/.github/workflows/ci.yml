@@ -1,0 +1,15 @@
+name: ci
+
+on:
+  push:
+
+jobs:
+  test:
+    container: node:20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: apt-get update && apt-get install -y jq
+      - name: Run tests
+        run: npm ci && npm test

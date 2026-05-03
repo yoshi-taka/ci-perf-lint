@@ -1,0 +1,24 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          sparse-checkout: |
+            .github/actions
+            script
+            packages/opencode
+      - uses: ./.github/actions/setup-bun
+      - run: ./script/release.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli
+          path: packages/opencode/dist/*

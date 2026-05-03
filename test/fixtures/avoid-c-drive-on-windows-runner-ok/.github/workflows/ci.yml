@@ -1,0 +1,23 @@
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      TEMP: D:\temp
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: D:\checkout
+      - run: echo build
+        working-directory: D:\build
+        env:
+          TMP: ${{ runner.temp }}
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+        working-directory: C:\build

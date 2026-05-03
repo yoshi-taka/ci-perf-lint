@@ -1,0 +1,25 @@
+steps:
+  - label: ":hammer: Tests"
+    command: |
+      npm ci
+      npm test
+    plugins:
+      - docker#v5.13.0:
+          image: "node:18"
+
+  - label: ":lint: Lint"
+    command: npm run lint
+    plugins:
+      - docker#v5.13.0:
+          image: "node:18"
+
+  - label: ":package: Build"
+    command: npm run build
+    timeout_in_minutes: 30
+
+  - wait
+
+  - label: ":rocket: Deploy"
+    command: ./deploy.sh
+    branches: "main"
+    timeout_in_minutes: 60

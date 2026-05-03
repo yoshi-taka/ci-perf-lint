@@ -1,0 +1,49 @@
+name: Terraform deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  terraform_plugin_cache_dir:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Configure Terraform plugin cache
+        run: |
+          echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >>"$GITHUB_ENV"
+          mkdir --parents "$HOME/.terraform.d/plugin-cache"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+          key: terraform-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+          restore-keys: |
+            terraform-${{ runner.os }}-
+      - run: terraform init
+      - run: terraform plan
+
+  terraform_providers_dir:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/cache@v4
+        with:
+          path: .terraform/providers
+          key: terraform-${{ runner.os }}-${{ hashFiles('.terraform.lock.hcl') }}
+      - run: terraform init
+
+  terraform_whole_dir:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/cache/restore@v4
+        with:
+          path: .terraform
+          key: terraform-cache
+      - run: terraform init
+      - uses: actions/cache/save@v4
+        with:
+          path: .terraform
+          key: terraform-cache

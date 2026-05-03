@@ -1,0 +1,5 @@
+name = "wrangler-toml-pip-like"
+compatibility_date = "2025-01-01"
+
+[build]
+command = "pip install -r requirements.txt"

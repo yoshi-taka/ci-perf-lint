@@ -1,0 +1,8 @@
+{
+  "name": "formatting-plugin-like",
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "prettier-plugin-tailwindcss": "^0.6.0"
+  }
+}

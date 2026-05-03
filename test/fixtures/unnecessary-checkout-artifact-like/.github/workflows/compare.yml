@@ -1,0 +1,17 @@
+name: Artifact Compare
+
+on:
+  pull_request:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-before
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-after
+      - run: diff <(tar tzf package-before.tgz) <(tar tzf package-after.tgz)

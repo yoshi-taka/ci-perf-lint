@@ -1,0 +1,45 @@
+name: macos xcode install
+
+on:
+  pull_request:
+
+jobs:
+  xcodes_install:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: xcodes install 16.4
+      - run: xcodebuild -scheme App build
+
+  xcversion_install:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: xcversion install 15.4
+      - run: xcodebuild -scheme App build
+
+  mise_install:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - run: mise install xcode@26.2
+      - run: xcodebuild -scheme App build
+
+  xip_download:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: curl -L https://example.com/Xcode_16.4.xip -o Xcode_16.4.xip
+      - run: xip --expand Xcode_16.4.xip
+
+  ubuntu_xcodes_install:
+    runs-on: ubuntu-latest
+    steps:
+      - run: xcodes install 16.4
+
+  macos_container:
+    runs-on: macos-15
+    container:
+      image: alpine:3.21
+    steps:
+      - run: xcodes install 16.4

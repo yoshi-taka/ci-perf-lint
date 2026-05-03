@@ -1,0 +1,37 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+
+const { frontmatter } = Astro.props;
+---
+<BaseLayout title={`${frontmatter.title} | CI Perf Lint`} description={frontmatter.title}>
+  <article class="rule-doc panel">
+    <slot />
+  </article>
+</BaseLayout>
+
+<style>
+  .rule-doc {
+    padding: 28px;
+  }
+
+  .rule-doc :global(h1) {
+    margin-top: 0;
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    line-height: 1.1;
+  }
+
+  .rule-doc :global(h2) {
+    margin-top: 2rem;
+    font-size: 1.35rem;
+  }
+
+  .rule-doc :global(p),
+  .rule-doc :global(li) {
+    color: var(--text);
+  }
+
+  .rule-doc :global(ul),
+  .rule-doc :global(ol) {
+    padding-left: 1.2rem;
+  }
+</style>

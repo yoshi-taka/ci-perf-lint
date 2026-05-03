@@ -1,0 +1,63 @@
+name: test
+on: pull_request
+
+jobs:
+  mysql_service_tmpfs:
+    services:
+      mysql:
+        image: mysql:8
+        options: --tmpfs /var/lib/mysql
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+
+  mysql_service_config:
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+        options: --health-cmd "mysqladmin ping" --innodb_flush_log_at_trx_commit=2
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+
+  postgres_service_tmpfs:
+    services:
+      postgres:
+        image: postgres:14
+        options: --tmpfs /var/lib/postgresql/data
+        env:
+          POSTGRES_PASSWORD: password
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+
+  postgres_service_config:
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: password
+          PGOPTIONS: "-c fsync=off"
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+
+  mysql_docker_run_tmpfs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start MySQL
+        run: docker run -d --tmpfs /var/lib/mysql -p 3306:3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=yes mysql:8
+
+  mysql_docker_run_config:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker run -d -p 3306:3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=yes mysql:8 --innodb_flush_log_at_trx_commit=2
+
+  postgres_docker_run_config:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password postgres:14 -c fsync=off

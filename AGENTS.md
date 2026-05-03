@@ -1,0 +1,170 @@
+# Agent Guide
+
+This repository is a Bun + TypeScript CLI for statically auditing GitHub Actions workflow performance.
+
+Read this file first when making AI-assisted edits. Keep changes scoped to the behavior area requested, and prefer existing helpers and rule patterns over new abstractions.
+
+## Main Entry Points
+
+- CLI wrapper: `src/cli.ts`
+- CLI parsing and command flow: `src/main.ts`
+- Repository analysis orchestration: `src/repo.ts`
+- Workflow parsing: `src/workflow.ts`
+- Report rendering: `src/reporters.ts`
+
+## Rule And Diagnostic Flow
+
+Workflow YAML rules:
+
+- Rule interface and execution: `src/rule-engine.ts`
+- Rule registry: `src/rules/index.ts`
+- Individual workflow rules: `src/rules/*.ts`
+- Workflow diagnostic builder: `src/rules/shared/diagnostics.ts`
+- Workflow helper families:
+  - `src/rules/shared/workflow-triggers.ts`
+  - `src/rules/shared/workflow-jobs.ts`
+  - `src/rules/shared/workflow-setup-actions.ts`
+  - `src/rules/shared/workflow-caches.ts`
+  - `src/rules/shared/workflows.ts` remains as a compatibility barrel
+
+Repository-wide diagnostics:
+
+- Collector registry and gates: `src/repository-diagnostics/index.ts`
+- Repository scan context: `src/repository-scan-context.ts`
+- Repository signals: `src/repository-signals.ts`
+- Repository signal types: `src/repository-signals-types.ts`
+- Repository diagnostic builder: `src/repository-diagnostics/diagnostics.ts`
+- Large current hotspots:
+  - `src/repository-tooling-signals.ts`
+  - `src/repository-diagnostics/dockerfile-instructions.ts`
+
+Shared output types live in `src/types.ts`.
+
+## Docs To Check
+
+- AI readability plan: `docs/ai-readability-priorities.md`
+- Rule addition guide: `docs/adding-a-rule.md`
+- Current refactoring order: `docs/refactoring-priorities.md`
+- Test and fixture policy: `docs/testing-policy.md`
+- Rule explainers and current registry notes: `docs/rules/README.md`
+
+## Adding Or Editing Rules
+
+Common registration checklist (most frequent blockers):
+
+- Add the rule module or collector module.
+- Register it in the correct index (`src/rules/index.ts` or `src/repository-diagnostics/index.ts`).
+- Create `docs/rules/{rule-id}.md`.
+- Update `docs/rules/README.md` so the rule appears in the registry list.
+- Add fixture paths to `test/fixtures.ts` when adding new fixtures.
+- Add focused tests in the appropriate `test/analyze-repository-*.test.ts`.
+- Preserve deterministic ordering: insert new `allRules` entries and collector entries near alphabetically adjacent existing entries.
+- Do not route new imports through `src/rules/shared/workflows.ts`; import the split helper directly.
+
+Shortcut commands available (do not replace the manual checklist above):
+
+- `bun run new-rule <rule-id>`: scaffolds `src/rules/{rule-id}.ts` and `docs/rules/{rule-id}.md`. Still requires manual registration in `src/rules/index.ts`.
+- `bun run generate-rule-docs`: regenerates the rule list in `docs/rules/README.md` from the current registries.
+
+For workflow rules:
+
+- Follow `docs/adding-a-rule.md`.
+- Add or edit a module under `src/rules/`.
+- Use `buildDiagnostic(...)` for findings.
+- Register new rules in `src/rules/index.ts`.
+- Add or update the matching explainer under `docs/rules/`.
+- Add focused tests and fixtures.
+
+For repository-wide diagnostics:
+
+- Follow `docs/adding-a-rule.md`.
+- Add or edit a collector under `src/repository-diagnostics/`.
+- Use `buildRepositoryDiagnostic(...)` where it fits.
+- Register new collectors in `src/repository-diagnostics/index.ts`.
+- Choose the narrowest applicable gate.
+- Add or update docs under `docs/rules/`.
+- Add focused repository analysis tests.
+
+## Cross-Platform Rules (Multiple CI Types)
+
+The tool supports 4 CI platforms: **GitHub Actions**, **Buildkite**, **CircleCI**, **GitLab CI**.
+Depot CI uses GitHub Actions syntax and is handled as a GitHub Actions document.
+
+When adding a rule whose evidence is purely shell command text (`npm install`, `docker build`, `make -j`),
+consider making it cross-platform. See `docs/adding-a-rule.md` → "Cross-Platform Rules" for the pattern.
+
+Key helpers:
+- `collectCommandEntries(doc)` in `src/rules/shared/any-step.ts` — flattens any CI document into
+  `{ text, node, jobName, stepName }` entries.
+- `detectXxxFromText()` variants in `src/rules/shared/tools.ts` — text-based command detectors.
+- `textDisablesDockerBuildCache` / `textRunsDockerBuild` in `src/rules/shared/docker.ts`.
+
+Registration: add the rule module to the `buildkite`, `gitlab-ci`, and `circleci` scope arrays
+in `src/rules/index.ts` (GitHub Actions is automatic when no explicit `scope` is set).
+
+Reference implementations:
+- `src/rules/prefer-node-run-over-npm-run.ts` — direct type-dispatch pattern
+- `src/rules/redundant-npx-or-bootstrap.ts` — `collectCommandEntries` pattern
+- `src/rules/docker-build-cache-disabled-in-ci.ts` — text-based helper pattern
+
+## Dual-Source Rules (package.json + workflow YAML)
+
+Some rules need to audit both `package.json` scripts and GitHub Actions workflow YAML. Current pattern:
+
+- **Workflow YAML rule**: `src/rules/{rule-id}.ts` → registered in `src/rules/index.ts` → uses `buildDiagnostic(...)`
+- **package.json collector**: `src/repository-diagnostics/package-json-{slug}.ts` → registered in `src/repository-diagnostics/index.ts` → uses `buildRepositoryDiagnostic(...)`
+- **Both share the same `id`** in their `RuleMeta` so findings group under one rule in reports
+- **Both share the same `docsPath`** pointing to a single explainer under `docs/rules/`
+
+Reference implementation: `prefer-node-run-over-npm-run`
+- `src/rules/prefer-node-run-over-npm-run.ts` (workflow YAML)
+- `src/repository-diagnostics/package-json-node-run.ts` (package.json)
+- Both use `id: "prefer-node-run-over-npm-run"` and `docsPath: "docs/rules/prefer-node-run-over-npm-run.md"`
+
+When adding a new dual-source rule:
+- Create both modules and register in both indices
+- Extract shared logic (matchers, replacement generators) to `src/rules/shared/` if duplication grows
+- Add tests covering both surfaces
+
+## Test Locations
+
+- Repository analysis behavior: `test/analyze-repository-*.test.ts`
+- Reporter output entrypoint: `test/reporters.test.ts`
+- Reporter rendering details: `test/reporters-render-report.test.ts`
+- Reporter aggregation details: `test/reporters-aggregation.test.ts`
+- CLI behavior: `test/cli.test.ts`
+- Shared fixtures list: `test/fixtures.ts`
+- Shared test helpers: `test/helpers.ts`
+- Scenario fixtures: `test/fixtures/`
+
+Fixture names generally use:
+
+- `*-like` for cases expected to trigger a finding.
+- `*-ok` for cases expected not to trigger that finding.
+
+## Verification
+
+Run lint + knip + tests after completing work, not incrementally during work.
+
+```sh
+bun run lint
+bun run knip
+bun test --parallel
+```
+
+For narrow test iteration, prefer a specific Bun test file before the full suite.
+
+- `bun run fallow` is the default repo signal pass and runs `fallow --production` to avoid test and fixture noise.
+- `bun run fallow:full` keeps the broader whole-repo pass available when the task is specifically about tests or fixtures.
+- `bun run unused` runs `knip` plus production `fallow dead-code` when checking both unused-code tools together.
+
+## Editing Notes
+
+- Keep behavior-preserving refactors separate from rule behavior changes.
+- Prefer editing the split helper modules directly instead of routing new work through `src/rules/shared/workflows.ts`.
+- Avoid broad edits in `src/repository-diagnostics/imports.ts` and large fixture-heavy test files unless the task targets them.
+- Preserve deterministic output ordering when changing registries or collectors.
+- Do not change reporter output casually; small text changes can affect many assertions.
+
+すべてのやり取り、計画、において、極端に簡潔にし、簡潔さのために文法を犠牲にすること。
+tweet size以下を目指す

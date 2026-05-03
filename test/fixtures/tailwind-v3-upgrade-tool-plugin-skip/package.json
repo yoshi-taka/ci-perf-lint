@@ -1,0 +1,12 @@
+{
+  "name": "tailwind-v3-upgrade-tool-plugin-skip",
+  "private": true,
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "vite": "^7.0.0",
+    "tailwindcss": "^3.4.17",
+    "@tailwindcss/forms": "^0.5.10"
+  }
+}

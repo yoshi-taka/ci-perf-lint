@@ -1,0 +1,6 @@
+service: my-app
+
+custom:
+  datadog:
+    extensionLayerVersion: 84
+    site: datadoghq.com

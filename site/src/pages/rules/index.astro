@@ -1,0 +1,151 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { listRuleDocs } from "../../lib/rules";
+import { withBase } from "../../lib/urls";
+
+const rules = await listRuleDocs();
+---
+<BaseLayout title="Rules | CI Perf Lint" description="CI Perf Lint rule documentation.">
+  <section class="intro">
+    <p class="eyebrow">Rule documentation</p>
+    <h1>Rules</h1>
+    <p class="lead">
+      Current explainers for workflow and repository-wide findings. These docs describe what gets
+      flagged, why it matters, and how to verify improvements.
+    </p>
+  </section>
+
+  <section class="stats panel">
+    <div>
+      <strong>{rules.length}</strong>
+      <span>Total rules</span>
+    </div>
+    <p>
+      Repository-wide and workflow findings. Open a rule to see what gets flagged, suggested
+      action, and verification guidance.
+    </p>
+  </section>
+
+  <section class="list">
+    {rules.map((rule) => (
+      <a class="item panel" href={withBase(`/rules/${rule.slug}/`)}>
+        <div>
+          <div class="title-row">
+            <h2>{rule.title}</h2>
+            <code>{rule.slug}</code>
+          </div>
+          <p>{rule.summary}</p>
+        </div>
+      </a>
+    ))}
+  </section>
+</BaseLayout>
+
+<style>
+  .intro {
+    padding: 12px 0 20px;
+  }
+
+  .eyebrow {
+    margin: 0 0 10px;
+    color: var(--accent);
+    font-size: 0.9rem;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2.4rem, 5vw, 3.4rem);
+    line-height: 1.04;
+  }
+
+  .lead {
+    max-width: 760px;
+    margin: 14px 0 0;
+    color: var(--muted);
+  }
+
+  .stats {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 0 0 18px;
+    padding: 16px 18px;
+  }
+
+  .stats div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stats strong {
+    font-size: 1.3rem;
+    line-height: 1;
+  }
+
+  .stats span,
+  .stats p {
+    color: var(--muted);
+  }
+
+  .stats p {
+    margin: 0;
+    max-width: 720px;
+    font-size: 0.95rem;
+  }
+
+  .list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .item {
+    display: block;
+    padding: 16px 18px;
+    text-decoration: none;
+    transition: background-color 120ms ease, border-color 120ms ease;
+  }
+
+  .item:hover {
+    background: var(--panel-2);
+    border-color: #31405e;
+  }
+
+  .title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .item h2 {
+    margin: 0 0 6px;
+    color: var(--text);
+    font-size: 1rem;
+  }
+
+  .item p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.94rem;
+  }
+
+  .item code {
+    color: var(--accent);
+    font-size: 0.85rem;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  @media (max-width: 700px) {
+    .stats,
+    .title-row {
+      flex-direction: column;
+    }
+
+    .item code {
+      white-space: normal;
+    }
+  }
+</style>

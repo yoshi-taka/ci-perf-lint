@@ -1,0 +1,9 @@
+{
+  "name": "swc-babel-skip-legacy-targets",
+  "private": true,
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0"
+  },
+  "browserslist": ["ie 11", "chrome 60"]
+}

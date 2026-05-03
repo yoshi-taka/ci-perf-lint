@@ -1,0 +1,14 @@
+{
+  "name": "lucide-dynamic-icon-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src/icons.js"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

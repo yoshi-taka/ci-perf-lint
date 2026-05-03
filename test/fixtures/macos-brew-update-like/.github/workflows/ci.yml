@@ -1,0 +1,31 @@
+name: macos brew update
+
+on:
+  pull_request:
+
+jobs:
+  ios_build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew update
+      - run: xcodebuild -scheme App -destination 'platform=iOS Simulator,name=iPhone 16' test
+
+  mac_build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew upgrade
+      - run: xcodebuild -scheme App build
+
+  ubuntu_brew:
+    runs-on: ubuntu-latest
+    steps:
+      - run: brew update
+
+  macos_container:
+    runs-on: macos-15
+    container:
+      image: alpine:3.21
+    steps:
+      - run: brew update

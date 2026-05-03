@@ -1,0 +1,12 @@
+name: macos brew ok
+
+on:
+  pull_request:
+
+jobs:
+  ios_build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install swiftlint
+      - run: xcodebuild -scheme App -destination 'platform=iOS Simulator,name=iPhone 16' test

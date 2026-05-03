@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "ignorePatterns": ["dist/**", "site/**", "test/fixtures/**", "profile-*.ts"],
+  "ignoreDependencies": ["bun"],
+  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts"],
+  "health": {
+    "maxCyclomatic": 25,
+    "maxCognitive": 20,
+    "maxCrap": 50
+  },
+  "duplicates": {
+    "mode": "weak",
+    "minLines": 8,
+    "minTokens": 80
+  },
+  "usedClassMembers": ["clear"],
+  "ignoreExports": [
+    { "file": "src/repo.ts", "exports": ["isActionsFinding", "findingIncludedInMode", "promoteStrictFallbackSuggestions", "compareFindings", "applyLimitedActionsPriority"] },
+    { "file": "src/reporters-render.ts", "exports": ["affectedLocationLimit", "renderBacktickedListWithRemainder"] },
+    { "file": "src/cli-option-resolver.ts", "exports": ["similarFlagDistanceLimit", "levenshteinDistance"] },
+    { "file": "src/finding-grouping.ts", "exports": ["normalizeWorkflowText"] },
+    { "file": "src/repository-diagnostics/index.ts", "exports": ["repositoryDiagnosticCollectors"] },
+    { "file": "src/rules/scheduled-heavy-workflow-without-throttling.ts", "exports": ["estimateScheduleMinutes"] }
+  ]
+}

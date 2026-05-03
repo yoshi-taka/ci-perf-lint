@@ -1,0 +1,11 @@
+name: CI
+on:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1000
+      - run: git log --oneline -10

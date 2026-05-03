@@ -1,0 +1,7 @@
+{
+  "name": "typescript-milestone-59-like",
+  "private": true,
+  "devDependencies": {
+    "typescript": "5.8.2"
+  }
+}

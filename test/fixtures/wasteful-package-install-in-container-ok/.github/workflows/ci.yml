@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+
+jobs:
+  test:
+    container: node:20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: apt-get update && apt-get install -y jq
+      - name: Parse config with jq
+        run: jq '.version' package.json
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install curl
+        run: sudo apt-get install -y curl
+      - name: Fetch data
+        run: curl https://example.com

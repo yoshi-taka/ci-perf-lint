@@ -1,0 +1,8 @@
+{
+  "name": "native-build-risk-like",
+  "private": true,
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "sharp": "^0.34.0"
+  }
+}

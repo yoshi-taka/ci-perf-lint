@@ -1,0 +1,13 @@
+name: Terraform deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+      - run: terraform plan --parallelism=50
+      - run: terraform apply -auto-approve --parallelism=50

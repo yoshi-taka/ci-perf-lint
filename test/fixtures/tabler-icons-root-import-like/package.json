@@ -1,0 +1,15 @@
+{
+  "name": "tabler-icons-root-import-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@tabler/icons-react": "^3.31.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "typescript": "^5.0.0"
+  }
+}

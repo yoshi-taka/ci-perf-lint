@@ -1,0 +1,9 @@
+[project]
+name = "example"
+version = "0.1.0"
+dependencies = [
+    "requests",
+]
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.0.0"

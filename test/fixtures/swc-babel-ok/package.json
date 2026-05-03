@@ -1,0 +1,7 @@
+{
+  "name": "swc-babel-ok",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

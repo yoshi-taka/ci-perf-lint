@@ -1,0 +1,13 @@
+dist/
+.fixture-cache/
+.profile/
+CPU.*.cpuprofile
+CPU.*.md
+.DS_Store
+.fallow
+.stryker-tmp
+node_modules
+docs/internal
+site/.astro
+site/dist
+site/src/pages/rules/*.md

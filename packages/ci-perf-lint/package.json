@@ -1,0 +1,21 @@
+{
+  "name": "ci-perf-lint",
+  "version": "0.0.1-alpha.10",
+  "description": "Static analysis tool for CI workflow performance",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "ci-perf-lint": "cli.mjs"
+  },
+  "dependencies": {
+    "@yoshi-taka/ci-perf-lint": "0.0.1-alpha.10"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yoshi-taka/ci-perf-lint.git"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md"
+  ]
+}

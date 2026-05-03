@@ -1,0 +1,15 @@
+name: prepare patch release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - run: git fetch --depth=2000 origin next
+      - run: yarn release:pick-patches

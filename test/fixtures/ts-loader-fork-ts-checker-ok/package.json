@@ -1,0 +1,11 @@
+{
+  "name": "ts-loader-fork-ts-checker-ok",
+  "private": true,
+  "devDependencies": {
+    "webpack": "^5.88.0",
+    "webpack-cli": "^5.1.0",
+    "ts-loader": "^9.4.0",
+    "typescript": "^5.0.0",
+    "fork-ts-checker-webpack-plugin": "^9.0.0"
+  }
+}

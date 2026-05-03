@@ -1,0 +1,9 @@
+{
+  "name": "swc-babel-skip-custom-plugins",
+  "private": true,
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0",
+    "babel-plugin-custom-transform": "^1.0.0"
+  }
+}

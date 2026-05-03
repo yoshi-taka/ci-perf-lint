@@ -1,0 +1,16 @@
+{
+  "name": "mui-barrel-import-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src/App.js"
+  },
+  "dependencies": {
+    "@mui/icons-material": "^6.0.0",
+    "@mui/material": "^6.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+}

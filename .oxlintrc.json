@@ -1,0 +1,77 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "typescript"],
+  "rules": {
+    "typescript/consistent-type-imports": "error",
+    "typescript/prefer-optional-chain": "error",
+    "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-find": "error",
+    "unicorn/throw-new-error": "error",
+    "typescript/consistent-type-exports": "error",
+    "import/no-duplicates": "error",
+    "eslint/prefer-template": "error",
+    "typescript/prefer-includes": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "unicorn/prefer-node-protocol": "error",
+    "typescript/require-await": "error",
+    "typescript/no-unnecessary-condition": "error",
+    "typescript/prefer-for-of": "error",
+    "eslint/no-constant-condition": "error",
+    "eslint/no-shadow": "error",
+    "typescript/prefer-reduce-type-parameter": "error",
+    "eslint/max-params": ["error", { "max": 5 }],
+    "unicorn/prefer-array-flat-map": "error",
+    "unicorn/prefer-set-has": "error",
+    "oxc/no-accumulating-spread": "error",
+    "typescript/array-type": "error",
+    "typescript/no-inferrable-types": "error",
+    "unicorn/no-useless-undefined": "error",
+    "unicorn/prefer-array-some": "error",
+    "typescript/no-unnecessary-template-expression": "error",
+    "typescript/prefer-function-type": "error",
+    "unicorn/prefer-date-now": "error",
+    "unicorn/prefer-string-replace-all": "error",
+    "unicorn/no-typeof-undefined": "error",
+    "eslint/prefer-object-spread": "error",
+    "unicorn/error-message": "error",
+    "unicorn/prefer-at": "error",
+    "typescript/return-await": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "unicorn/no-instanceof-builtins": "error",
+    "unicorn/catch-error-name": "error",
+    "unicorn/prefer-negative-index": "error",
+    "unicorn/prefer-optional-catch-binding": "error",
+    "eslint/no-useless-computed-key": "error",
+    "oxc/no-map-spread": "error",
+    "typescript/prefer-readonly": "error",
+    "typescript/dot-notation": "error",
+    "typescript/consistent-indexed-object-style": "error",
+    "eslint/curly": "error",
+    "typescript/consistent-type-assertions": "error",
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/prefer-return-this-type": "error",
+    "unicorn/no-length-as-slice-end": "error",
+    "unicorn/no-useless-promise-resolve-reject": "error",
+    "eslint/no-unneeded-ternary": "error",
+    "eslint/no-useless-concat": "error",
+    "eslint/no-var": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-interface": "error",
+    "eslint/no-useless-call": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.*", "**/*.spec.*"],
+      "rules": {
+        "import/no-cycle": "off"
+      }
+    },
+    {
+      "files": ["test/fixtures/**"],
+      "rules": {
+        "typescript/ban-ts-comment": "off"
+      }
+    }
+  ]
+}

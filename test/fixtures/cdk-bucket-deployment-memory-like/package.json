@@ -1,0 +1,6 @@
+{
+  "name": "cdk-bucket-deployment-memory-like",
+  "dependencies": {
+    "aws-cdk-lib": "^2.0.0"
+  }
+}

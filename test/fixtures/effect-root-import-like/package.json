@@ -1,0 +1,16 @@
+{
+  "name": "effect-root-import-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@effect/schema": "^0.75.0",
+    "effect": "^3.14.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "typescript": "^5.0.0"
+  }
+}

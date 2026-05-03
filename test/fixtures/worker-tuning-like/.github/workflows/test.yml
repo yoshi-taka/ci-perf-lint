@@ -1,0 +1,22 @@
+name: test
+
+on:
+  pull_request:
+
+jobs:
+  jest_default:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: npx jest
+
+  playwright_tuned:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: npx playwright test --workers=2
+
+  self_hosted_skip:
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - run: npx jest

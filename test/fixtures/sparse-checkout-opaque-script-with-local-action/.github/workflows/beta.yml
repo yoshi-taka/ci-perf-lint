@@ -1,0 +1,16 @@
+name: beta
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-git-committer
+      - run: bun script/beta.ts

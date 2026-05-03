@@ -1,0 +1,11 @@
+{
+  "name": "barrel-file-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src/index.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

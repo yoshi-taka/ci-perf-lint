@@ -1,0 +1,65 @@
+name: System Tests
+
+on:
+  pull_request:
+  push:
+    branches: [master, mq-working-branch-master-*]
+  workflow_dispatch:
+  schedule:
+    - cron: 0 4 * * *
+
+concurrency:
+  # this ensures that only one workflow runs at a time for a given branch on pull requests
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  build-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dd-trace-js
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: dd-trace-js
+      - name: Pack dd-trace-js
+        run: mkdir -p ./binaries && echo /binaries/$(npm pack --silent --pack-destination ./binaries ./dd-trace-js) > ./binaries/nodejs-load-from-npm
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: system_tests_binaries
+          path: ./binaries/**/*
+
+  get-credentials:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    outputs:
+      api_key: ${{ steps.dd-sts.outputs.api_key }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout: .github/actions/dd-sts-api-key
+      - uses: ./.github/actions/dd-sts-api-key
+        id: dd-sts
+
+  main:
+    needs:
+      - build-artifacts
+      - get-credentials
+    uses: DataDog/system-tests/.github/workflows/system-tests.yml@main
+    secrets:
+      TEST_OPTIMIZATION_API_KEY: ${{ needs.get-credentials.outputs.api_key }}
+      DD_API_KEY: ${{ needs.get-credentials.outputs.api_key }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    with:
+      library: nodejs
+      binaries_artifact: system_tests_binaries
+      desired_execution_time: 300 # 5 minutes
+      scenarios_groups: tracer-release
+      excluded_scenarios: APM_TRACING_E2E_OTEL,APM_TRACING_E2E_SINGLE_SPAN # require AWS and datadog credentials
+      parametric_job_count: 8
+      skip_empty_scenarios: true
+      push_to_test_optimization: ${{ github.actor != 'dependabot[bot]' }}

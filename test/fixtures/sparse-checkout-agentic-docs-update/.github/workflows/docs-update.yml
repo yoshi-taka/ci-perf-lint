@@ -1,0 +1,24 @@
+name: docs-update
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-bun
+      - name: Get recent commits
+        run: git log --since="4 hours ago" --pretty=format:"- %h %s"
+      - name: Run opencode
+        uses: sst/opencode/github@latest
+        with:
+          agent: docs
+          prompt: |
+            Review recent commits and read the changed files to understand new features.
+            Update packages/web/src/content/docs/* when user-facing documentation is missing.
+            If a new documentation file is created, update packages/web/astro.config.mjs too.

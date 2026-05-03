@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  pull_request:
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y build-essential clang protobuf-compiler ninja-build
+      - run: npm run build
+
+  light_tooling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y jq tree
+      - run: echo done

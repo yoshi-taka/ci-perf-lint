@@ -1,0 +1,12 @@
+{
+  "name": "npm-workspaces-ok",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}

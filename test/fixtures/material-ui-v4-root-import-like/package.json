@@ -1,0 +1,16 @@
+{
+  "name": "material-ui-v4-root-import-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@material-ui/core": "^4.12.4",
+    "@material-ui/icons": "^4.11.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+name: AAA - Policy Validation
+
+concurrency:
+  group: policy-validation
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: AWS Access Analyzer - Policy Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python3 -m pip install -r ./automation/requirements.txt
+      - run: python3 ./automation/validate-batch.py

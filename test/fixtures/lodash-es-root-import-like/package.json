@@ -1,0 +1,14 @@
+{
+  "name": "lodash-es-root-import-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "lodash-es": "^4.17.21"
+  },
+  "devDependencies": {
+    "jest": "^28.1.3"
+  }
+}

@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+
+jobs:
+  danger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Danger
+        uses: docker://ghcr.io/danger/danger-js
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/local-action
+      - name: Lint
+        run: npm run lint

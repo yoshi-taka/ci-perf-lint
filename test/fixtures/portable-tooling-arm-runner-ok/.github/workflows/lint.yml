@@ -1,0 +1,25 @@
+name: lint
+
+on:
+  pull_request:
+
+jobs:
+  already_arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - run: oxlint .
+
+  containerized:
+    runs-on: ubuntu-24.04
+    container: node:24
+    steps:
+      - uses: actions/checkout@v4
+      - run: oxlint .
+
+  mixed_with_typecheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: oxlint .
+      - run: tsc --noEmit

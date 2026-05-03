@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  pull_request:
+
+jobs:
+  test_in_alpine:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-alpine
+    steps:
+      - uses: actions/checkout@v5
+      - run: npm ci
+      - run: npx jest
+
+  noop_in_alpine:
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.21
+    steps:
+      - run: echo hello

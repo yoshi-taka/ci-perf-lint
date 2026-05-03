@@ -1,0 +1,8 @@
+{
+  "name": "webpack5-rspack-skip-hooks",
+  "private": true,
+  "devDependencies": {
+    "webpack": "^5.88.0",
+    "webpack-cli": "^5.1.0"
+  }
+}

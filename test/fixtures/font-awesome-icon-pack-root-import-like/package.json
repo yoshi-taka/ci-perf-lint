@@ -1,0 +1,17 @@
+{
+  "name": "font-awesome-icon-pack-root-import-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@fortawesome/angular-fontawesome": "^0.15.0",
+    "@fortawesome/free-regular-svg-icons": "^6.7.0",
+    "@fortawesome/free-solid-svg-icons": "^6.7.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "typescript": "^5.0.0"
+  }
+}

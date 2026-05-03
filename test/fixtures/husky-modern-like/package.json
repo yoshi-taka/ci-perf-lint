@@ -1,0 +1,8 @@
+{
+  "name": "husky-modern-like",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "husky": "9.1.7"
+  }
+}

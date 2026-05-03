@@ -1,0 +1,18 @@
+name: Apply Patches
+
+on:
+  workflow_dispatch:
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: patches
+      - run: git apply patches/*.patch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: applied
+          path: .

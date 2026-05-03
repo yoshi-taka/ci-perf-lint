@@ -1,0 +1,10 @@
+[project]
+name = "my-project"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.env]
+requires = []

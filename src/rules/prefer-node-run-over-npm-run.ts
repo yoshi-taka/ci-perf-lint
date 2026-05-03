@@ -1,0 +1,270 @@
+import type { Diagnostic, RuleMeta } from "../types.ts";
+import type { RuleContext } from "../rule-engine.ts";
+import type { RepositorySignals } from "../repository-signals-types.ts";
+import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
+import type { PipelineDocument } from "../buildkite-workflow.ts";
+import type { CircleCiDocument } from "../circleci-workflow.ts";
+import type { GitlabCiDocument } from "../gitlab-ci-workflow.ts";
+import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
+
+const meta = {
+  id: "prefer-node-run-over-npm-run",
+  severity: "warning",
+  confidence: "medium",
+  docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
+} satisfies RuleMeta;
+
+interface NpmRunScript {
+  script: string;
+  replacement: string;
+}
+
+const npmRunMatcher =
+  /^\s*npm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)((?:\s+--[^\s]+)*)((?:\s+--(?:\s+.*)?)?)\s*$/;
+
+function detectSimpleNpmRunFromText(text: string): NpmRunScript | undefined {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.includes("\n")) {
+    return undefined;
+  }
+  const match = trimmed.match(npmRunMatcher);
+  const script = match?.[1];
+  if (!script) {
+    return undefined;
+  }
+  const passthrough = match[3]?.trim() ?? "";
+  return {
+    script,
+    replacement: passthrough ? `node --run ${script} ${passthrough}` : `node --run ${script}`,
+  };
+}
+
+function parseVisibleNodeMajor(version: unknown): number | undefined {
+  if (typeof version === "number" && Number.isInteger(version)) {
+    return version;
+  }
+  if (typeof version !== "string") {
+    return undefined;
+  }
+  const trimmed = version.trim();
+  if (trimmed.startsWith("${{")) {
+    return undefined;
+  }
+  const match = trimmed.match(/^(?:v)?(\d+)(?:\.|$|x)/i);
+  return match?.[1] ? Number.parseInt(match[1], 10) : undefined;
+}
+
+function stepTargetsNodeRunCapableVersion(step: WorkflowStep): boolean {
+  if (getSetupActionKind(step) !== "node") {
+    return false;
+  }
+  const major = parseVisibleNodeMajor(step.with?.["node-version"]);
+  return typeof major === "number" && major >= 22;
+}
+
+function npmCompatibilityEvidence(repository: RepositorySignals, script: string): string {
+  const evidence: string[] = [];
+  const lifecycleHooks = [`pre${script}`, `post${script}`].filter((hook) =>
+    repository.npm.lifecycleHookScripts.includes(hook),
+  );
+
+  if (lifecycleHooks.length > 0) {
+    evidence.push(`lifecycle hooks ${lifecycleHooks.join("/")}`);
+  }
+
+  if (repository.npm.npmrcRelevantSettings.length > 0) {
+    evidence.push(
+      `npmrc settings ${repository.npm.npmrcRelevantSettings.map((setting) => `\`${setting}\``).join(", ")}`,
+    );
+  } else if (repository.npm.npmrcFiles.length > 0) {
+    evidence.push(
+      `npmrc files ${repository.npm.npmrcFiles.map((file) => `\`${file}\``).join(", ")}`,
+    );
+  }
+
+  if (repository.npm.packageScriptEnvReferences.length > 0) {
+    evidence.push(
+      `package scripts reference npm-provided env in ${repository.npm.packageScriptEnvReferences.map((name) => `"${name}"`).join(", ")}`,
+    );
+  }
+
+  if (repository.npm.workflowEnvReferences.length > 0) {
+    evidence.push(
+      `workflows reference npm-related env in ${repository.npm.workflowEnvReferences.map((file) => `\`${file}\``).join(", ")}`,
+    );
+  }
+
+  return evidence.length > 0
+    ? `Visible npm-specific compatibility evidence: ${evidence.join("; ")}.`
+    : "Repository scan found no visible .npmrc file, matching pre/post lifecycle script, or npm-specific environment reference.";
+}
+
+function isCircleCiDoc(doc: unknown): doc is CircleCiDocument {
+  return (
+    typeof doc === "object" &&
+    doc !== null &&
+    "kind" in doc &&
+    (doc as Record<string, unknown>).kind === "circleci"
+  );
+}
+
+function isGitlabCiDoc(doc: unknown): doc is GitlabCiDocument {
+  return (
+    typeof doc === "object" &&
+    doc !== null &&
+    "kind" in doc &&
+    (doc as Record<string, unknown>).kind === "gitlab-ci"
+  );
+}
+
+function isPipelineDoc(doc: unknown): doc is PipelineDocument {
+  return typeof doc === "object" && doc !== null && "steps" in doc && !("jobs" in doc);
+}
+
+function checkGithubActions(workflow: WorkflowDocument, context: RuleContext): Diagnostic[] {
+  const findings: Diagnostic[] = [];
+
+  for (const job of workflow.jobs) {
+    if (!job.steps.some((step) => stepTargetsNodeRunCapableVersion(step))) {
+      continue;
+    }
+
+    for (const step of job.steps) {
+      const npmRun = detectSimpleNpmRunFromText(step.run ?? "");
+      if (!npmRun) {
+        continue;
+      }
+
+      findings.push(
+        buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
+          message: `Job "${job.id}" runs package script "${npmRun.script}" through npm run.`,
+          why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
+          suggestion:
+            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
+          measurementHint:
+            "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" step running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
+          score: 38,
+        }),
+      );
+    }
+  }
+
+  return findings;
+}
+
+function checkBuildkite(pipeline: PipelineDocument, context: RuleContext): Diagnostic[] {
+  const findings: Diagnostic[] = [];
+
+  for (const step of pipeline.steps) {
+    if (step.isWait || step.isBlock || step.isTrigger || step.isGroup) {
+      continue;
+    }
+
+    const commandTexts: string[] = [];
+    if (step.command) {
+      commandTexts.push(step.command);
+    }
+    if (Array.isArray(step.commands)) {
+      commandTexts.push(...step.commands);
+    }
+
+    for (const cmd of commandTexts) {
+      const npmRun = detectSimpleNpmRunFromText(cmd);
+      if (!npmRun) {
+        continue;
+      }
+
+      findings.push(
+        buildDiagnostic(pipeline, meta, step.commandNode ?? step.node, {
+          message: `Step "${step.label ?? "unnamed"}" runs package script "${npmRun.script}" through npm run.`,
+          why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
+          suggestion:
+            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
+          measurementHint:
+            "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          aiHandoff: `Review ${pipeline.relativePath} step "${step.label ?? "unnamed"}" running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
+          score: 38,
+        }),
+      );
+    }
+  }
+
+  return findings;
+}
+
+function checkCircleCi(doc: CircleCiDocument, context: RuleContext): Diagnostic[] {
+  const findings: Diagnostic[] = [];
+
+  for (const job of doc.jobs) {
+    for (const step of job.steps) {
+      const npmRun = detectSimpleNpmRunFromText(step.command ?? "");
+      if (!npmRun) {
+        continue;
+      }
+
+      findings.push(
+        buildDiagnostic(doc, meta, step.commandNode ?? step.node, {
+          message: `Job "${job.name}" step "${step.name ?? "unnamed"}" runs package script "${npmRun.script}" through npm run.`,
+          why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
+          suggestion:
+            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
+          measurementHint:
+            "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          aiHandoff: `Review ${doc.relativePath} job "${job.name}" step running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
+          score: 38,
+        }),
+      );
+    }
+  }
+
+  return findings;
+}
+
+function checkGitlabCi(doc: GitlabCiDocument, context: RuleContext): Diagnostic[] {
+  const findings: Diagnostic[] = [];
+
+  for (const job of doc.jobs) {
+    for (const cmd of job.script ?? []) {
+      const npmRun = detectSimpleNpmRunFromText(cmd);
+      if (!npmRun) {
+        continue;
+      }
+
+      findings.push(
+        buildDiagnostic(doc, meta, job.scriptNode ?? job.node, {
+          message: `Job "${job.name}" runs package script "${npmRun.script}" through npm run.`,
+          why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
+          suggestion:
+            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
+          measurementHint:
+            "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          aiHandoff: `Review ${doc.relativePath} job "${job.name}" running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
+          score: 38,
+        }),
+      );
+    }
+  }
+
+  return findings;
+}
+
+export const preferNodeRunOverNpmRunRule = {
+  meta,
+  check(
+    workflow: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
+    context: RuleContext,
+  ): Diagnostic[] {
+    if (isCircleCiDoc(workflow)) {
+      return checkCircleCi(workflow, context);
+    }
+    if (isGitlabCiDoc(workflow)) {
+      return checkGitlabCi(workflow, context);
+    }
+    if (isPipelineDoc(workflow)) {
+      return checkBuildkite(workflow, context);
+    }
+    return checkGithubActions(workflow, context);
+  },
+};

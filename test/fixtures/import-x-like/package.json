@@ -1,0 +1,8 @@
+{
+  "name": "import-x-like",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "eslint-plugin-import-x": "^4.6.1"
+  }
+}

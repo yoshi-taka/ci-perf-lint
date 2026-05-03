@@ -1,0 +1,13 @@
+{
+  "name": "tailwind-v3-upgrade-tool-like",
+  "private": true,
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.0.0",
+    "tailwindcss": "^3.4.17"
+  },
+  "devDependencies": {}
+}

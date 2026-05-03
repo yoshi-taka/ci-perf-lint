@@ -1,0 +1,7 @@
+{
+  "name": "cdk-config-recommended-skip",
+  "dependencies": {
+    "aws-cdk-lib": "^2.0.0",
+    "@aws-cdk/core": "^1.0.0"
+  }
+}

@@ -1,0 +1,19 @@
+name: docs-locale-sync
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - packages/web/src/content/docs/*.mdx
+
+jobs:
+  sync-locales:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-bun
+      - run: opencode run --agent docs --model opencode/gpt-5.3-codex

@@ -1,0 +1,17 @@
+name: docs-update
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git log --format=%s -n 20
+      - uses: sst/opencode/github@latest
+        with:
+          prompt: |
+            Review changed files and update packages/web/src/content/docs/* when user-facing documentation is missing.

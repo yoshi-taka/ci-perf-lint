@@ -1,0 +1,181 @@
+name: cli
+
+on:
+  pull_request:
+
+jobs:
+  aws_job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install awscli
+      - run: aws sts get-caller-identity
+
+  gh_job:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get install gh
+      - run: gh issue list
+
+  jq_job:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get install jq
+      - run: jq '.name' package.json
+
+  yq_job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: snap install yq
+      - run: yq '.name' config.yaml
+
+  pinned_aws_job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: curl -sSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.17.40.zip -o awscliv2.zip
+      - run: aws sts get-caller-identity
+
+  macos_job:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install jq
+      - run: jq '.name' package.json
+
+  macos_aws_job:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install awscli
+      - run: aws sts get-caller-identity
+
+  ubuntu_az_job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install azure-cli
+      - run: az version
+
+  ubuntu_helm_job:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - run: helm version
+
+  ubuntu_kubectl_job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: curl -LO "https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl"
+      - run: kubectl version --client
+
+  macos_az_job:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install azure-cli
+      - run: az version
+
+  macos_azcopy_job:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install azcopy
+      - run: azcopy --help
+
+  macos_yq_job:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install yq
+      - run: yq '.name' config.yaml
+
+  macos_helm_job:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install helm
+      - run: helm version
+
+  macos_kubectl_job:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install kubectl
+      - run: kubectl version --client
+
+  container_job:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:24.04
+    steps:
+      - run: apt-get update && apt-get install -y gh
+      - run: gh issue list
+
+  windows_aws_job:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: pip install awscli
+      - run: aws sts get-caller-identity
+
+  windows_az_job:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+      - run: choco install azure-cli -y
+      - run: az version
+
+  windows_azcopy_job:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: choco install azcopy10 -y
+      - run: azcopy --help
+
+  windows_gh_job:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: winget install --id GitHub.cli -e
+      - run: gh issue list
+
+  windows_helm_job:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - run: choco install kubernetes-helm -y
+      - run: helm version
+
+  windows_jq_job:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: scoop install jq
+      - run: jq '.name' package.json
+
+  windows_kubectl_job:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+      - run: choco install kubernetes-cli -y
+      - run: kubectl version --client
+
+  pinned_windows_gh_job:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: choco install gh --version 2.89.0 -y
+      - run: gh issue list
+
+  self_hosted_windows_job:
+    runs-on: [self-hosted, windows]
+    steps:
+      - uses: actions/checkout@v5
+      - run: choco install jq -y
+      - run: jq '.name' package.json

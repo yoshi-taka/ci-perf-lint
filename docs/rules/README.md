@@ -1,0 +1,172 @@
+# Rule Docs
+
+Each rule has:
+
+- a dedicated implementation module under `src/rules/` (workflow rules) or `src/repository-diagnostics/` (repository-wide diagnostics)
+- a dedicated explainer under `docs/rules/`
+
+Current rule registry:
+
+- `async-test-uses-sync-testclient`
+- `avoid-brew-update-on-hosted-macos`
+- `avoid-broad-upload-artifact`
+- `avoid-c-drive-on-windows-runner`
+- `avoid-docker-image-via-uses`
+- `avoid-eslint-plugin-prettier`
+- `avoid-lucide-angular-icons-registry`
+- `avoid-lucide-dynamic-icon`
+- `avoid-mui-barrel-imports`
+- `avoid-mypy-production-bundle`
+- `avoid-prettier-eslint`
+- `avoid-svg-component-imports`
+- `avoid-xcode-install-on-hosted-macos`
+- `cache-terraform-providers`
+- `cargo-build-before-test`
+- `cdk-asset-waste-files`
+- `cdk-bucket-deployment-memory-unconfigured`
+- `cdk-duplicate-asset-hash`
+- `circleci-checkout-uses-full-clone`
+- `collapse-multiple-go-builds-in-job`
+- `consider-caching-os-packages-or-using-a-custom-image`
+- `consider-filter-blob-none-for-release-metadata`
+- `consider-slim-over-alpine-for-ci`
+- `db-io-reduce`
+- `deep-checkout-excessive-depth`
+- `deep-checkout-without-need`
+- `detected-large-barrel-file`
+- `detected-large-files`
+- `docker-bake-file-unused-in-ci`
+- `docker-build-cache-disabled-in-ci`
+- `docker-build-load-true-unnecessary`
+- `docker-build-without-layer-cache`
+- `duplicate-checkout-in-same-workflow`
+- `duplicate-install-or-lint`
+- `elixir-otp-version-performance`
+- `go-build-before-race-test`
+- `go-test-broad-package-serial-p-one`
+- `go-test-repeats-vet-after-go-vet`
+- `hatch-without-uv-installer`
+- `large-jest-snapshot`
+- `matrix-test-job-without-test-sharding`
+- `missing-angular-cli-cache`
+- `missing-concurrency`
+- `missing-dependency-cache`
+- `missing-gradle-build-cache`
+- `missing-make-j-flag`
+- `missing-next-build-cache`
+- `missing-path-ignore-for-non-code`
+- `missing-paths-filter`
+- `missing-release-downstream-success-guard`
+- `missing-test-worker-tuning-for-standard-runner`
+- `missing-timeout-in-minutes-buildkite`
+- `missing-timeout-in-minutes-gitlab-ci`
+- `missing-timeout-minutes`
+- `missing-turbo-cache`
+- `native-dependency-may-fall-back-to-source-build`
+- `nox-without-uv-backend`
+- `npm-ci-over-npm-install`
+- `outdated-datadog-lambda-extension`
+- `outdated-husky-version`
+- `outdated-setup-action-without-cache`
+- `pdm-without-use-uv`
+- `prefer-buildx-bake-for-multiple-images`
+- `prefer-buildx-build-over-docker-build`
+- `prefer-direct-angular-material-imports`
+- `prefer-direct-ant-design-icons-imports`
+- `prefer-direct-antd-imports`
+- `prefer-direct-date-fns-imports`
+- `prefer-direct-effect-imports`
+- `prefer-direct-font-awesome-imports`
+- `prefer-direct-headlessui-float-react-imports`
+- `prefer-direct-headlessui-react-imports`
+- `prefer-direct-heroicons-imports`
+- `prefer-direct-lodash-es-imports`
+- `prefer-direct-material-ui-v4-imports`
+- `prefer-direct-mui-core-imports`
+- `prefer-direct-ramda-imports`
+- `prefer-direct-react-bootstrap-imports`
+- `prefer-direct-react-icons-imports`
+- `prefer-direct-react-use-imports`
+- `prefer-direct-recharts-imports`
+- `prefer-direct-rxjs-imports`
+- `prefer-direct-tabler-icons-imports`
+- `prefer-direct-tremor-imports`
+- `prefer-direct-upload-for-compressed-artifacts`
+- `prefer-direct-visx-imports`
+- `prefer-dorny-paths-filter-for-scoped-jobs`
+- `prefer-eslint-plugin-import-x`
+- `prefer-explicit-import-extensions`
+- `prefer-jest-30-for-jest-29`
+- `prefer-lefthook-for-complex-git-hooks`
+- `prefer-mypy-performance-milestone`
+- `prefer-native-arm-runner-over-qemu`
+- `prefer-next-typescript-performance-milestone`
+- `prefer-nextest-for-heavy-rust-tests`
+- `prefer-nextjs-12-minor-performance-milestone`
+- `prefer-nextjs-13-minor-performance-milestone`
+- `prefer-nextjs-14-minor-performance-milestone`
+- `prefer-node-run-over-npm-run`
+- `prefer-oxfmt-over-prettier`
+- `prefer-oxlint-over-eslint`
+- `prefer-pydantic-v2`
+- `prefer-ruff-format-over-black`
+- `prefer-ruff-import-sorting-over-isort`
+- `prefer-setup-bun-for-lightweight-node-tooling`
+- `prefer-setup-uv-for-lightweight-python-tooling`
+- `prefer-sparse-checkout-for-scoped-workflow`
+- `prefer-standard-arm-runner-for-api-cli`
+- `prefer-standard-arm-runner-for-portable-tooling`
+- `prefer-storybook-6-minor-performance-milestone`
+- `prefer-storybook-7-minor-performance-milestone`
+- `prefer-tailwind-v4-upgrade-tool`
+- `prefer-turborepo-over-npm-workspaces`
+- `prefer-uv-pip-over-pip`
+- `prefer-zstd-compression-for-pushed-docker-images`
+- `pyramid-config-scan-unrestricted`
+- `python-top-level-heavy-client-init`
+- `pytest-norecursedirs-override`
+- `pytest-testpaths-unconfigured`
+- `recommend-rspack-over-webpack`
+- `recommend-swc-over-babel`
+- `recommend-webpack-4-latest-patch`
+- `recommend-webpack-5-latest-patch`
+- `redundant-bootstrap-in-husky-hook`
+- `redundant-install-for-preinstalled-cli`
+- `redundant-manual-cache-with-setup-action`
+- `redundant-npx-or-bootstrap`
+- `renovate-aws-sdk-grouping`
+- `renovate-cdk-deps-grouping`
+- `renovate-rebase-when-unconfigured`
+- `repeated-build-in-same-workflow`
+- `repeated-install-in-same-job`
+- `repeated-lint-in-same-workflow`
+- `scheduled-heavy-workflow-without-throttling`
+- `setup-node-cache-dependency-path-unset`
+- `tailwind-content-config`
+- `terraform-github-app-auth`
+- `terraform-github-parallel-requests`
+- `terraform-github-slow-resources`
+- `terraform-lockfile-missing`
+- `terraform-pagerduty-team-membership-version`
+- `terraform-parallelism-unconfigured`
+- `tox-without-tox-uv`
+- `ts-loader-fork-ts-checker`
+- `ungated-heavy-job`
+- `unnecessary-app-install-for-lint-job`
+- `unnecessary-checkout-when-only-using-artifacts`
+- `wasteful-npm-global-install`
+- `wasteful-package-install-in-container`
+
+Notes:
+
+- Some rules are advisory `suggestion` rules and may be hidden from default CLI output.
+- `ungated-heavy-job` is a `suggestion` rule, is repository-aware, and is intended to be conservative on smaller repositories and manual-only workflows.
+- Some rules are repository-aware `warning` rules. They intentionally use repo config plus workflow evidence together, rather than claiming that workflow YAML alone proves the issue.
+- Repo-aware replacement warnings can come from root config, package metadata, or source scans rather than a workflow file. Output should label these as `repository-wide source/tooling` so users do not assume the fix belongs in a workflow.
+- CLI default `--top` is `5`.
+- There is no global score threshold. `strict` keeps only `warning` findings, `exploratory` also keeps `suggestion` findings, and output then shows the top N findings by score.
+- Tool-migration rules are split by severity. Direct Python consolidation candidates such as `black -> ruff format` and `isort -> ruff` can be `warning`, while broader ecosystem swaps such as `flake8 -> ruff` should stay `suggestion` unless compatibility is very clear.
+- `eslint -> oxlint` is also split this way: it can stay `warning` when visible plugin usage maps to Oxlint built-ins, but should fall back to `suggestion` when unsupported plugins or custom rule wiring are visible.
+- `prettier -> oxfmt` follows the same idea: it can stay `warning` when no visible Prettier plugin dependency is involved, but should fall back to `suggestion` when plugin compatibility needs review.
+- `eslint-plugin-import -> eslint-plugin-import-x` is currently treated as a repository-aware `warning` only when direct repository evidence is visible, because shared presets can hide the actual plugin choice.
+- `husky/lint-staged -> lefthook` is intentionally only a `suggestion`, and only for more complex hook setups. A single lightweight pre-commit command should not trigger migration advice.

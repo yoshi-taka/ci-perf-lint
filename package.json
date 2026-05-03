@@ -1,0 +1,72 @@
+{
+  "name": "@yoshi-taka/ci-perf-lint",
+  "version": "0.0.1-alpha.10",
+  "description": "Static analysis tool for CI workflow performance",
+  "bin": {
+    "ci-perf-lint": "./dist/cli.js"
+  },
+  "workspaces": [
+    "packages/ci-perf-lint"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yoshi-taka/ci-perf-lint.git"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "docs/rules"
+  ],
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "docs:sync": "bun run scripts/sync-docs-site.ts",
+    "docs:dev": "bun run docs:sync && astro dev --root site",
+    "docs:build": "bun run docs:sync && astro build --root site",
+    "docs:preview": "astro preview --root site",
+    "test": "bun test --parallel",
+    "test:changed": "bun test --changed",
+    "test:isolate": "bun test --isolate",
+    "test:mutation:helper": "stryker run stryker.helper.config.mjs",
+    "test:mutation:core": "stryker run stryker.core.config.mjs",
+    "lint": "oxlint --type-aware --type-check src test",
+    "format": "oxfmt --write src test/*.ts scripts/*.ts",
+    "format:check": "oxfmt --check src test/*.ts scripts/*.ts",
+    "build": "bun build ./src/cli.ts --outdir ./dist --target node --external yaml --external dockerfile-ast --external oxlint",
+    "prepack": "bun run build",
+    "cache:fixtures": "bun run scripts/cache-fixtures.ts",
+    "new-rule": "bun run scripts/new-rule.ts",
+    "generate-rule-docs": "bun run scripts/generate-rule-docs.ts",
+    "knip": "knip",
+    "fallow": "fallow --production --skip health --skip dupes",
+    "fallow:full": "fallow --production",
+    "fallow:dead-code": "fallow dead-code --production",
+    "unused": "bun run knip && bun run fallow:dead-code",
+    "audit:static": "bun run knip && bun run fallow",
+    "release:alpha": "npm version prerelease --preid=alpha --no-git-tag-version && V=$(node -p \"require('./package.json').version\") && npm pkg set version=\"$V\" dependencies.@yoshi-taka/ci-perf-lint=\"$V\" -w packages/ci-perf-lint && npm publish --access public --tag alpha && npm publish -w packages/ci-perf-lint --tag alpha",
+    "release:stable": "npm version patch --no-git-tag-version && V=$(node -p \"require('./package.json').version\") && npm pkg set version=\"$V\" dependencies.@yoshi-taka/ci-perf-lint=\"$V\" -w packages/ci-perf-lint && npm publish --access public && npm publish -w packages/ci-perf-lint",
+    "perf:bench": "hyperfine --warmup 3 'bun run src/cli.ts'",
+    "perf:flame": "bun --profile src/cli.ts",
+    "perf:profile": "bun --cpu-prof --cpu-prof-dir .profile src/cli.ts",
+    "perf:mem": "bun --heap-prof --heap-prof-dir .profile src/cli.ts"
+  },
+  "dependencies": {
+    "dockerfile-ast": "^0.7.1",
+    "oxlint": "^1.62.0",
+    "yaml": "^2.8.3"
+  },
+  "devDependencies": {
+    "@astrojs/sitemap": "^3.7.2",
+    "astro": "^6.2.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "bun-types": "^1.3.13",
+    "fallow": "2.61.0",
+    "fast-check": "^4.7.0",
+    "knip": "^6.11.0",
+    "oxfmt": "^0.47.0",
+    "oxlint-tsgolint": "^0.22.1",
+    "typescript": "^6.0.3"
+  }
+}

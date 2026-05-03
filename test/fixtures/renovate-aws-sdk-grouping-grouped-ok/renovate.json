@@ -1,0 +1,9 @@
+{
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["^@aws-sdk/"],
+      "groupName": "aws-sdk-dependencies",
+      "groupSlug": "aws-sdk"
+    }
+  ]
+}

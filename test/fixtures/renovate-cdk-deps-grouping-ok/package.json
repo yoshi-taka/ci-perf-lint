@@ -1,0 +1,6 @@
+{
+  "name": "cdk-deps-grouping-ok",
+  "dependencies": {
+    "aws-cdk-lib": "^2.0.0"
+  }
+}

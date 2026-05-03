@@ -1,0 +1,11 @@
+{
+  "name": "swc-babel-skip-corejs",
+  "private": true,
+  "dependencies": {
+    "core-js": "^3.33.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0"
+  }
+}

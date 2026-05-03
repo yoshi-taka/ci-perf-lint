@@ -1,0 +1,7 @@
+{
+  "name": "formatting-like",
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.0.0"
+  }
+}

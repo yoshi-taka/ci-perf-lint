@@ -1,0 +1,14 @@
+name: release
+
+on:
+  push:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install -g npm@latest
+      - run: yarn install --frozen-lockfile
+      - run: npm ci
+      - run: yarn lint

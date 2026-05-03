@@ -1,0 +1,49 @@
+name: test
+on: pull_request
+
+jobs:
+  mysql_service:
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 10 && npm test
+
+  postgres_service:
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: password
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 10 && npm test
+
+  mysql_docker_run:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker run -d -p 3306:3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=yes mysql:8
+
+  postgres_docker_run:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password postgres:14
+
+  mysql_bitnami_service:
+    services:
+      mysql:
+        image: bitnami/mysql:8.0
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+
+  postgres_bitnami_service:
+    services:
+      postgres:
+        image: bitnami/postgresql:14
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test

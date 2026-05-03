@@ -1,0 +1,10 @@
+{
+  "name": "tailwind-content-node-modules-like",
+  "private": true,
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}

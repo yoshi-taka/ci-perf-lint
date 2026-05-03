@@ -1,0 +1,9 @@
+{
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["^aws-cdk-lib$", "^@aws-cdk/", "^constructs$"],
+      "groupName": "cdk-dependencies",
+      "groupSlug": "cdk"
+    }
+  ]
+}

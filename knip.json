@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["test/fixtures/**", ".astro/**"],
+  "ignoreDependencies": [],
+  "ignoreBinaries": ["hyperfine"],
+  "ignoreIssues": {
+    "src/rules/shared/tools.ts": ["exports"],
+    "src/rules/shared/any-step.ts": ["exports", "types"]
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "stryker.core.config.mjs",
+        "stryker.helper.config.mjs",
+        "site/astro.config.mjs",
+        "site/src/pages/index.astro",
+        "site/src/pages/rules/index.astro",
+        "site/src/layouts/RuleLayout.astro"
+      ]
+    }
+  }
+}

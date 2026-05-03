@@ -1,0 +1,12 @@
+{
+  "name": "storybook-10-minor-ok",
+  "private": true,
+  "scripts": {
+    "build-storybook": "storybook build"
+  },
+  "devDependencies": {
+    "@storybook/react": "^10.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

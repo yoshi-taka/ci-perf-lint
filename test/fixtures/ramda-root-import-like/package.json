@@ -1,0 +1,14 @@
+{
+  "name": "ramda-root-import-like",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "ramda": "^0.29.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

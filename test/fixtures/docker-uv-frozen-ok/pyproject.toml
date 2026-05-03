@@ -1,0 +1,4 @@
+[project]
+name = "docker-uv-frozen-ok"
+version = "0.1.0"
+dependencies = []
