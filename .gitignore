@@ -6,6 +6,8 @@ CPU.*.md
 .DS_Store
 .fallow
 .stryker-tmp
+.cifuzz-corpus
+artifacts
 node_modules
 docs/internal
 site/.astro

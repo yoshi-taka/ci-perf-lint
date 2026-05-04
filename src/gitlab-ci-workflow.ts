@@ -19,6 +19,9 @@ const yamlMapPairIndexCache = new WeakMap<
   YAMLMap<unknown, unknown>,
   Map<string, Pair<unknown, unknown>>
 >();
+const MAX_GITLAB_SOURCE_BYTES = 5_000_000;
+const MAX_GITLAB_JOBS = 500;
+const MAX_GITLAB_STEPS_PER_JOB = 2_000;
 
 function parseTimingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
@@ -238,6 +241,10 @@ export function parseGitlabCi(
   repoRoot: string,
   source: string,
 ): GitlabCiDocument {
+  if (source.length > MAX_GITLAB_SOURCE_BYTES) {
+    throw new Error(`GitLab CI source too large: ${fullPath}`);
+  }
+
   const relativePath = path.relative(repoRoot, fullPath) || path.basename(fullPath);
   const startedAt = performance.now();
   const lineCounter = new LineCounter();
@@ -271,6 +278,10 @@ export function parseGitlabCi(
 
   const jobs: GitlabCiJob[] = [];
   for (const item of root.items) {
+    if (jobs.length >= MAX_GITLAB_JOBS) {
+      throw new Error(`GitLab CI job limit exceeded in ${relativePath}`);
+    }
+
     const key = getScalarString(item.key);
     if (!key || RESERVED_GLOBAL_KEYS.has(key)) {
       continue;
@@ -279,7 +290,11 @@ export function parseGitlabCi(
       continue;
     }
 
-    jobs.push(parseJob(item.value, key));
+    const job = parseJob(item.value, key);
+    if ((job.script?.length ?? 0) > MAX_GITLAB_STEPS_PER_JOB) {
+      throw new Error(`GitLab CI script step limit exceeded in ${relativePath} job ${key}`);
+    }
+    jobs.push(job);
   }
 
   if (parseTimingsEnabled()) {

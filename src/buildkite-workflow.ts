@@ -19,6 +19,8 @@ const yamlMapPairIndexCache = new WeakMap<
   YAMLMap<unknown, unknown>,
   Map<string, Pair<unknown, unknown>>
 >();
+const MAX_PIPELINE_SOURCE_BYTES = 5_000_000;
+const MAX_PIPELINE_STEPS = 5_000;
 
 function parseTimingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
@@ -297,6 +299,10 @@ export function parsePipeline(
   repoRoot: string,
   source: string,
 ): PipelineDocument {
+  if (source.length > MAX_PIPELINE_SOURCE_BYTES) {
+    throw new Error(`Pipeline source too large: ${fullPath}`);
+  }
+
   const relativePath = path.relative(repoRoot, fullPath) || path.basename(fullPath);
   const startedAt = performance.now();
   const lineCounter = new LineCounter();
@@ -335,6 +341,9 @@ export function parsePipeline(
 
   const getParsed = root ? lazyNodeRecord(root) : () => ({});
   const steps = parseSteps(stepsNode);
+  if (steps.length > MAX_PIPELINE_STEPS) {
+    throw new Error(`Pipeline step limit exceeded in ${relativePath}`);
+  }
   const nameNode = root ? getNode(root, "name") : undefined;
   const envNode = root ? getMap(getNode(root, "env")) : undefined;
   const agentsNode = root ? getMap(getNode(root, "agents")) : undefined;

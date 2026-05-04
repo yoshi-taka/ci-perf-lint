@@ -84,7 +84,7 @@ Examples:
   bunx ci-perf-lint . --format json --top 5`);
 }
 
-function parseArgs(args: string[]): CliOptions | null {
+export function parseArgs(args: string[]): CliOptions | null {
   const options: CliOptions = {
     targetPath: ".",
     format: "handoff",

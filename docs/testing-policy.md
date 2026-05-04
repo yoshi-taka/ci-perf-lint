@@ -64,6 +64,22 @@
 - Do not create one test file per rule unless the rule needs substantial dedicated setup.
 - Do not duplicate large fixture path lists across multiple test files.
 
+## Fuzzing
+
+- Use `fast-check` first for parser, CLI, and renderer invariants.
+- Put Bun property tests in `test/fuzz-*.test.ts`.
+- Use `jazzer.js` only for isolated coverage-guided targets under `fuzz/*.fuzz.mjs`.
+- Keep `jazzer.js` out of the default `bun test` path.
+- Prefer parser/renderer entrypoints with explicit allowed-error filtering.
+- Build standalone fuzz targets with `bun run build:fuzz-targets`.
+- Quick checks:
+  - `bun run test:fuzz:fast`
+  - `bun run test:fuzz:jazzer -max_total_time=2`
+- If adding a new fuzz target:
+  - add one `fuzz/*.fuzz.mjs` file
+  - keep input coercion local to that file
+  - register any new standalone entry in `knip.json` if needed
+
 ## `analysisWarnings` map
 
 `ReportData.analysisWarnings` is internal scan telemetry, not primary user-facing output.

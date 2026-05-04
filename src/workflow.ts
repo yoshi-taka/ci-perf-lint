@@ -77,6 +77,9 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 const CACHE_THRESHOLD = 5;
+const MAX_WORKFLOW_SOURCE_BYTES = 5_000_000;
+const MAX_WORKFLOW_JOBS = 500;
+const MAX_WORKFLOW_STEPS_PER_JOB = 2_000;
 
 function getPair(map: YAMLMap<unknown, unknown>, key: string): Pair<unknown, unknown> | undefined {
   if (map.items.length <= CACHE_THRESHOLD) {
@@ -262,6 +265,10 @@ export function parseWorkflow(
   repoRoot: string,
   source: string,
 ): WorkflowDocument {
+  if (source.length > MAX_WORKFLOW_SOURCE_BYTES) {
+    throw new Error(`Workflow source too large: ${fullPath}`);
+  }
+
   const relativePath = path.relative(repoRoot, fullPath) || path.basename(fullPath);
   const startedAt = performance.now();
   const lineCounter = new LineCounter();
@@ -293,6 +300,10 @@ export function parseWorkflow(
   const jobs: WorkflowJob[] = [];
 
   for (const item of jobsNode?.items ?? []) {
+    if (jobs.length >= MAX_WORKFLOW_JOBS) {
+      throw new Error(`Workflow job limit exceeded in ${relativePath}`);
+    }
+
     const jobId = getScalarString(item.key);
     if (!jobId || !item.value || !isMap(item.value)) {
       continue;
@@ -304,6 +315,10 @@ export function parseWorkflow(
     const ifNode = getNode(node, "if");
     const usesNode = getNode(node, "uses");
     const jobConcurrencyNode = getNode(node, "concurrency");
+    const steps = parseSteps(stepsNode);
+    if (steps.length > MAX_WORKFLOW_STEPS_PER_JOB) {
+      throw new Error(`Workflow step limit exceeded in ${relativePath} job ${jobId}`);
+    }
     jobs.push({
       id: jobId,
       idNode: isNode(item.key) ? item.key : undefined,
@@ -311,7 +326,7 @@ export function parseWorkflow(
       get raw() {
         return getRaw();
       },
-      steps: parseSteps(stepsNode),
+      steps,
       hasIf: Boolean(getScalarString(ifNode)),
       ifNode,
       usesReusableWorkflow: Boolean(getScalarString(usesNode)),

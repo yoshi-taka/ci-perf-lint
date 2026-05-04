@@ -19,6 +19,9 @@ const yamlMapPairIndexCache = new WeakMap<
   YAMLMap<unknown, unknown>,
   Map<string, Pair<unknown, unknown>>
 >();
+const MAX_CIRCLECI_SOURCE_BYTES = 5_000_000;
+const MAX_CIRCLECI_JOBS = 500;
+const MAX_CIRCLECI_STEPS_PER_JOB = 2_000;
 
 const KNOWN_STEP_TYPES = new Set([
   "checkout",
@@ -315,6 +318,10 @@ export function parseCircleCi(
   repoRoot: string,
   source: string,
 ): CircleCiDocument {
+  if (source.length > MAX_CIRCLECI_SOURCE_BYTES) {
+    throw new Error(`CircleCI source too large: ${fullPath}`);
+  }
+
   const relativePath = path.relative(repoRoot, fullPath) || path.basename(fullPath);
   const lineCounter = new LineCounter();
   let yamlDocument: Document.Parsed;
@@ -346,6 +353,10 @@ export function parseCircleCi(
 
   const jobs: CircleCiJob[] = [];
   for (const item of jobsNode?.items ?? []) {
+    if (jobs.length >= MAX_CIRCLECI_JOBS) {
+      throw new Error(`CircleCI job limit exceeded in ${relativePath}`);
+    }
+
     const jobName = getScalarString(item.key);
     if (!jobName || !item.value || !isMap(item.value)) {
       continue;
@@ -377,6 +388,10 @@ export function parseCircleCi(
 
     const parallelismValue = getScalarString(parallelismNode);
     const parallelismNum = parallelismValue ? parseInt(parallelismValue, 10) : undefined;
+    const steps = parseSteps(stepsNode);
+    if (steps.length > MAX_CIRCLECI_STEPS_PER_JOB) {
+      throw new Error(`CircleCI step limit exceeded in ${relativePath} job ${jobName}`);
+    }
 
     jobs.push({
       node,
@@ -389,7 +404,7 @@ export function parseCircleCi(
       parallelismNode,
       environment: environmentNode ? getPlainRecord(environmentNode) : undefined,
       environmentNode,
-      steps: parseSteps(stepsNode),
+      steps,
     });
   }
 
