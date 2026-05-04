@@ -10,7 +10,7 @@ For documentation, usage examples, and rule docs, see:
 Quick start:
 
 ```sh
-bunx ci-perf-lint .
+bunx ci-perf-lint
 # or
-npx ci-perf-lint .
+npx ci-perf-lint
 ```

@@ -14,18 +14,18 @@ Run once against a repository:
 
 ```sh
 # recommended (faster startup)
-bunx ci-perf-lint .
+bunx ci-perf-lint
 # or
-npx ci-perf-lint .
+npx ci-perf-lint
 ```
 
 Pipe directly into AI tools:
 
 ```sh
-bunx ci-perf-lint . | opencode
-bunx ci-perf-lint . | claude -p "Apply the findings above to fix workflows"
-bunx ci-perf-lint . | gemini
-bunx ci-perf-lint . | codex exec
+bunx ci-perf-lint | opencode
+bunx ci-perf-lint | claude -p "Apply the findings above to fix workflows"
+bunx ci-perf-lint | gemini
+bunx ci-perf-lint | codex exec
 ```
 
 Install globally for repeated use:
