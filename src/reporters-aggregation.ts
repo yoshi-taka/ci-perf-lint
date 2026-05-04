@@ -154,6 +154,25 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
     workflowGrouped.set(workflowFindingKey(finding.workflow, finding.ruleId), existing);
   });
 
+  for (const [repoKey, repoEntry] of repositoryGrouped) {
+    for (const wfEntry of workflowGrouped.values()) {
+      if (wfEntry.ruleId !== repoEntry.ruleId) {
+        continue;
+      }
+
+      mergeUniqueValues(wfEntry.workflows, repoEntry.workflows);
+      mergeUniqueValues(wfEntry.locations, repoEntry.locations);
+      mergeUniqueValues(wfEntry.messages, repoEntry.messages);
+      wfEntry.aiHandoffs ??= [];
+      repoEntry.aiHandoffs ??= [];
+      mergeUniqueValues(wfEntry.aiHandoffs, repoEntry.aiHandoffs);
+      mergeUniqueValues(wfEntry.jobs, repoEntry.jobs);
+      wfEntry.memberFindings.push(...repoEntry.memberFindings);
+      repositoryGrouped.delete(repoKey);
+      break;
+    }
+  }
+
   const grouped = [...repositoryGrouped.values(), ...workflowGrouped.values()];
 
   const merged = mergeCrossWorkflowAggregatedFindings(
