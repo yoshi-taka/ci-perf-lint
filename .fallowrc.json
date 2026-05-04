@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-  "ignorePatterns": ["dist/**", "site/**", "test/fixtures/**", "profile-*.ts"],
+  "ignorePatterns": ["dist/**", "site/**", "test/fixtures/**", "fuzz/**", "profile-*.ts"],
   "ignoreDependencies": ["bun"],
   "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts"],
   "health": {
@@ -20,6 +20,7 @@
     { "file": "src/cli-option-resolver.ts", "exports": ["similarFlagDistanceLimit", "levenshteinDistance"] },
     { "file": "src/finding-grouping.ts", "exports": ["normalizeWorkflowText"] },
     { "file": "src/repository-diagnostics/index.ts", "exports": ["repositoryDiagnosticCollectors"] },
-    { "file": "src/rules/scheduled-heavy-workflow-without-throttling.ts", "exports": ["estimateScheduleMinutes"] }
+    { "file": "src/rules/scheduled-heavy-workflow-without-throttling.ts", "exports": ["estimateScheduleMinutes"] },
+    { "file": "src/main.ts", "exports": ["parseArgs"] }
   ]
 }

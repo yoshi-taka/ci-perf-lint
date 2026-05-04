@@ -148,7 +148,7 @@ Run lint + knip + tests after completing work, not incrementally during work.
 
 ```sh
 bun run lint
-bun run knip
+bun run audit:static
 bun test --parallel
 ```
 
