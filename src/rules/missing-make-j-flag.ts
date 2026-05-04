@@ -1,9 +1,18 @@
 import { isMap, type Node } from "yaml";
+import { readFileSync, existsSync } from "node:fs";
+import path from "node:path";
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { getNode, getScalarString } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import type { ParsedMakefile } from "./shared/makefile-parser.ts";
+import {
+  parseMakefile,
+  extractMakeTarget,
+  collectRecipeChain,
+  detectInternalParallelTool,
+} from "./shared/makefile-parser.ts";
 
 const meta = {
   id: "missing-make-j-flag",
@@ -16,6 +25,68 @@ const MAKE_LIKE = /^\s*(?:make|gmake)\b/;
 const CMAKE_BUILD = /^\s*cmake\s+--build\b/;
 const HAS_PARALLEL_FLAG = /(?:^|\s)(?:-j\s*\d*|--jobs(?:\s*=\s*\d+)?|--parallel)\b/;
 const HAS_NINJA = /\b[Nn]inja\b/;
+
+function getRepoRoot(workflow: WorkflowDocument): string {
+  const relDir = path.dirname(workflow.relativePath);
+  const upCount = relDir === "." ? 0 : relDir.split("/").length;
+  const parts = Array.from({ length: upCount }, () => "..");
+  return path.resolve(path.dirname(workflow.path), ...parts);
+}
+
+function stepTargetIsInternalParallel(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  step: WorkflowStep,
+): boolean {
+  const run = step.run?.trim();
+  if (!run) {
+    return false;
+  }
+
+  const target = extractMakeTarget(run);
+  if (!target) {
+    return false;
+  }
+
+  const repoRoot = getRepoRoot(workflow);
+  const jobWd = getScalarString(getNode(job.node, "working-directory"));
+  const workingDir = step.workingDirectory ?? jobWd ?? undefined;
+  const dir = workingDir ? path.resolve(repoRoot, workingDir) : repoRoot;
+
+  let parsed: ParsedMakefile | null = null;
+  for (const name of ["GNUmakefile", "makefile", "Makefile"]) {
+    const fp = path.resolve(dir, name);
+    if (existsSync(fp)) {
+      const source = readFileSync(fp, "utf8");
+      parsed = parseMakefile(source);
+      break;
+    }
+  }
+  if (!parsed) {
+    return false;
+  }
+
+  for (const inc of parsed.includes) {
+    const incPath = path.resolve(dir, inc.trim());
+    if (existsSync(incPath)) {
+      const incContent = readFileSync(incPath, "utf8");
+      const incParsed = parseMakefile(incContent);
+      for (const [k, v] of incParsed.targets) {
+        if (!parsed.targets.has(k)) {
+          parsed.targets.set(k, v);
+        }
+      }
+      for (const [k, v] of incParsed.variables) {
+        if (!parsed.variables.has(k)) {
+          parsed.variables.set(k, v);
+        }
+      }
+    }
+  }
+
+  const recipes = collectRecipeChain(target, parsed.targets, parsed.variables);
+  return detectInternalParallelTool(recipes, parsed.variables) !== null;
+}
 
 function hasParallelFlagInCommand(run: string): boolean {
   return HAS_PARALLEL_FLAG.test(run);
@@ -110,6 +181,9 @@ function collectDelinquentSteps(workflow: WorkflowDocument, job: WorkflowJob): D
       continue;
     }
     if (hasParallelEnv(workflow, job, step)) {
+      continue;
+    }
+    if (kind === "make" && stepTargetIsInternalParallel(workflow, job, step)) {
       continue;
     }
     if (kind === "cmake" && jobUsesNinja(job)) {
