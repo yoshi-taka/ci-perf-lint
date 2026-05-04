@@ -27,6 +27,9 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     });
 
     const ruleIds = report.findings.map((finding) => finding.ruleId);
+    const missingConcurrencyFinding = report.findings.find(
+      (finding) => finding.ruleId === "missing-concurrency",
+    );
 
     expect(report.workflowCount).toBe(2);
     expect(ruleIds).toContain("missing-concurrency");
@@ -35,10 +38,8 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     expect(ruleIds).toContain("deep-checkout-without-need");
     expect(ruleIds).toContain("missing-path-ignore-for-non-code");
     expect(ruleIds).not.toContain("ungated-heavy-job");
-    expect(report.findings[0]?.docsPath).toBe("docs/rules/missing-concurrency.md");
-    expect(
-      report.findings.find((finding) => finding.ruleId === "missing-concurrency")?.location.line,
-    ).toBe(4);
+    expect(missingConcurrencyFinding?.docsPath).toBe("docs/rules/missing-concurrency.md");
+    expect(missingConcurrencyFinding?.location.line).toBe(4);
   });
 
   test("analyzes the dd-trace-js workflow fixture", async () => {

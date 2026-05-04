@@ -179,12 +179,13 @@ describe("analyzeRepository repo-aware and tooling rules: repository diagnostics
       (candidate) => candidate.ruleId === "prefer-explicit-import-extensions",
     );
     expect(findings).toHaveLength(1);
-    expect(findings[0]?.scope).toBe("repository");
-    expect(findings[0]?.severity).toBe("warning");
-    expect(findings[0]?.confidence).toBe("medium");
-    expect(findings[0]?.docsPath).toBe("docs/rules/prefer-explicit-import-extensions.md");
-    expect(findings[0]?.location.path).toBe("src/App.ts");
-    expect(findings[0]?.message).toContain("extensionless import");
+    const [finding] = findings;
+    expect(finding?.scope).toBe("repository");
+    expect(finding?.severity).toBe("warning");
+    expect(finding?.confidence).toBe("medium");
+    expect(finding?.docsPath).toBe("docs/rules/prefer-explicit-import-extensions.md");
+    expect(finding?.location.path).toBe("src/App.ts");
+    expect(finding?.message).toContain("extensionless import");
   });
 
   test("suggests the Tailwind v4 upgrade tool for simple v3 projects on Node 20+", async () => {

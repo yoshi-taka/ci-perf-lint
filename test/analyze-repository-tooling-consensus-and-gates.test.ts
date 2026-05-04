@@ -269,9 +269,10 @@ describe("analyzeRepository repo-aware and tooling rules: consensus and gates", 
         candidate.workflow === ".github/workflows/ci-b.yml",
     );
     expect(findings).toHaveLength(1);
-    expect(findings[0]?.workflow).toBe(".github/workflows/ci-b.yml");
-    expect(findings[0]?.message).toContain('Job "build"');
-    expect(findings[0]?.why).toContain(
+    const [finding] = findings;
+    expect(finding?.workflow).toBe(".github/workflows/ci-b.yml");
+    expect(finding?.message).toContain('Job "build"');
+    expect(finding?.why).toContain(
       "similar heavy jobs already define job-level timeout-minutes",
     );
   });

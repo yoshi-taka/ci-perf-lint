@@ -165,10 +165,11 @@ describe("import diagnostics: utility, component, and svg imports", () => {
       (candidate) => candidate.ruleId === "avoid-lucide-dynamic-icon",
     );
     expect(findings).toHaveLength(1);
-    expect(findings[0]?.scope).toBe("repository");
-    expect(findings[0]?.severity).toBe("suggestion");
-    expect(findings[0]?.location.path).toBe("src/icons.js");
-    expect(findings[0]?.docsPath).toBe("docs/rules/avoid-lucide-dynamic-icon.md");
-    expect(findings[0]?.message).toContain("Lucide dynamic icon import");
+    const [finding] = findings;
+    expect(finding?.scope).toBe("repository");
+    expect(finding?.severity).toBe("suggestion");
+    expect(finding?.location.path).toBe("src/icons.js");
+    expect(finding?.docsPath).toBe("docs/rules/avoid-lucide-dynamic-icon.md");
+    expect(finding?.message).toContain("Lucide dynamic icon import");
   });
 });
