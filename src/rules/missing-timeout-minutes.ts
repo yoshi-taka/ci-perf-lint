@@ -87,8 +87,8 @@ export const missingTimeoutMinutesRule = {
                 (workflowLooksReleaseLike(workflow, job) ||
                   workflowLooksAgenticLike(workflow, job)) &&
                 !jobHasHeavyStepTimeout(job)
-                  ? 36
-                  : 30,
+                  ? 34
+                  : 28,
             }),
             _context,
             workflow.relativePath,

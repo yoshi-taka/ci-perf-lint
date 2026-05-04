@@ -113,7 +113,7 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     });
     const scoreByRule = new Map(report.findings.map((finding) => [finding.ruleId, finding.score]));
 
-    expect(scoreByRule.get("missing-concurrency")).toBe(60);
+    expect(scoreByRule.get("missing-concurrency")).toBe(58);
     expect(scoreByRule.get("missing-paths-filter")).toBe(125);
     expect(scoreByRule.get("missing-path-ignore-for-non-code")).toBe(120);
     expect(scoreByRule.get("outdated-setup-action-without-cache")).toBe(115);
@@ -280,7 +280,7 @@ describe("analyzeRepository workflow and execution rules: general", () => {
       (candidate) => candidate.ruleId === "missing-paths-filter",
     );
 
-    expect(concurrencyFinding?.score).toBe(100);
+    expect(concurrencyFinding?.score).toBe(98);
     expect(concurrencyFinding?.why).toContain("stacked diffs");
     expect(concurrencyFinding?.why).toContain(".graphite directory");
     expect(concurrencyFinding?.aiHandoff).toContain("required-check semantics");
@@ -398,7 +398,7 @@ describe("analyzeRepository workflow and execution rules: general", () => {
       (candidate) => candidate.ruleId === "missing-concurrency",
     );
 
-    expect(concurrencyFinding?.score).toBe(100);
+    expect(concurrencyFinding?.score).toBe(98);
     expect(concurrencyFinding?.why).toContain("GitHub gh-stack evidence");
     expect(concurrencyFinding?.why).toContain("pull_request_template.md");
   });
@@ -440,7 +440,7 @@ describe("analyzeRepository workflow and execution rules: general", () => {
       (candidate) => candidate.ruleId === "missing-concurrency",
     );
 
-    expect(concurrencyFinding?.score).toBe(100);
+    expect(concurrencyFinding?.score).toBe(98);
     expect(concurrencyFinding?.why).toContain("ghstack evidence");
     expect(concurrencyFinding?.why).toContain("mentions ghstack workflow");
   });
