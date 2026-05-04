@@ -17,8 +17,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE",
-    "docs/rules"
+    "LICENSE"
   ],
   "scripts": {
     "dev": "bun run src/cli.ts",
