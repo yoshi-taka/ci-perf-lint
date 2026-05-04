@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { bench, describe } from "vitest";
+import { Bench } from "tinybench";
 import { parseWorkflow } from "../src/workflow.ts";
 import { evaluateRules } from "../src/rule-engine.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
@@ -33,12 +33,14 @@ const sampleRepoParsed = parseWorkflow(
   sampleRepoSource,
 );
 
-describe("evaluateRules", () => {
-  bench("workflow with findings (workflow-efficiency-like)", async () => {
-    await evaluateRules(parsed, { repository: emptyRepository });
-  });
+const bench = new Bench();
 
-  bench("simple workflow (sample-repo)", async () => {
+bench
+  .add("evaluateRules > workflow with findings (workflow-efficiency-like)", async () => {
+    await evaluateRules(parsed, { repository: emptyRepository });
+  })
+  .add("evaluateRules > simple workflow (sample-repo)", async () => {
     await evaluateRules(sampleRepoParsed, { repository: emptyRepository });
   });
-});
+
+export { bench };

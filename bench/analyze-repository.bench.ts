@@ -1,11 +1,13 @@
 import path from "node:path";
-import { bench, describe } from "vitest";
+import { Bench } from "tinybench";
 import { analyzeRepository } from "../src/repo.ts";
 
 const fixturesDir = path.resolve(import.meta.dirname, "../test/fixtures");
 
-describe("analyzeRepository", () => {
-  bench("sample-repo (workflow-only)", async () => {
+const bench = new Bench();
+
+bench
+  .add("analyzeRepository > sample-repo (workflow-only)", async () => {
     await analyzeRepository({
       cwd: fixturesDir,
       targetPath: path.join(fixturesDir, "sample-repo"),
@@ -13,9 +15,8 @@ describe("analyzeRepository", () => {
       mode: "strict",
       workflowOnly: true,
     });
-  });
-
-  bench("workflow-efficiency-like (workflow-only)", async () => {
+  })
+  .add("analyzeRepository > workflow-efficiency-like (workflow-only)", async () => {
     await analyzeRepository({
       cwd: fixturesDir,
       targetPath: path.join(fixturesDir, "workflow-efficiency-like"),
@@ -23,9 +24,8 @@ describe("analyzeRepository", () => {
       mode: "strict",
       workflowOnly: true,
     });
-  });
-
-  bench("dd-trace-js (workflow-only)", async () => {
+  })
+  .add("analyzeRepository > dd-trace-js (workflow-only)", async () => {
     await analyzeRepository({
       cwd: fixturesDir,
       targetPath: path.join(fixturesDir, "dd-trace-js"),
@@ -33,27 +33,24 @@ describe("analyzeRepository", () => {
       mode: "strict",
       workflowOnly: true,
     });
-  });
-
-  bench("opencode (full)", async () => {
+  })
+  .add("analyzeRepository > opencode (full)", async () => {
     await analyzeRepository({
       cwd: "/tmp/ts-target",
       targetPath: ".",
       topCount: 5,
       mode: "strict",
     });
-  });
-
-  bench("oxc (full)", async () => {
+  })
+  .add("analyzeRepository > oxc (full)", async () => {
     await analyzeRepository({
       cwd: "/tmp/rs-target",
       targetPath: ".",
       topCount: 5,
       mode: "strict",
     });
-  });
-
-  bench("pytorch (full)", async () => {
+  })
+  .add("analyzeRepository > pytorch (full)", async () => {
     await analyzeRepository({
       cwd: "/tmp/py-target",
       targetPath: ".",
@@ -61,4 +58,5 @@ describe("analyzeRepository", () => {
       mode: "strict",
     });
   });
-});
+
+export { bench };

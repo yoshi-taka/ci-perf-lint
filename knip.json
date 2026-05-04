@@ -17,6 +17,7 @@
         "site/src/pages/rules/index.astro",
         "site/src/layouts/RuleLayout.astro",
         "bench/**/*.bench.ts",
+        "bench/run.ts",
         "fuzz/**/*.mjs"
       ]
     }

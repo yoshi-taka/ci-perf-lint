@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "ignorePatterns": ["dist/**", "site/**", "test/fixtures/**", "fuzz/**", "profile-*.ts"],
   "ignoreDependencies": ["bun"],
-  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts"],
+  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts"],
   "health": {
     "maxCyclomatic": 25,
     "maxCognitive": 20,

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { bench, describe } from "vitest";
+import { Bench } from "tinybench";
 import { parseWorkflow } from "../src/workflow.ts";
 
 const fixturesDir = path.resolve(import.meta.dirname, "../test/fixtures");
@@ -23,16 +23,17 @@ const largeWorkflowPath = path.join(
 );
 const largeWorkflowSource = readFileSync(largeWorkflowPath, "utf8");
 
-describe("parseWorkflow", () => {
-  bench("small workflow (sample-repo ci.yml)", () => {
+const bench = new Bench();
+
+bench
+  .add("parseWorkflow > small workflow (sample-repo ci.yml)", () => {
     parseWorkflow(smallWorkflowPath, fixturesDir, smallWorkflowSource);
-  });
-
-  bench("medium workflow (workflow-efficiency-like ci.yml)", () => {
+  })
+  .add("parseWorkflow > medium workflow (workflow-efficiency-like ci.yml)", () => {
     parseWorkflow(mediumWorkflowPath, fixturesDir, mediumWorkflowSource);
-  });
-
-  bench("large workflow (dd-trace-js test-optimization.yml)", () => {
+  })
+  .add("parseWorkflow > large workflow (dd-trace-js test-optimization.yml)", () => {
     parseWorkflow(largeWorkflowPath, fixturesDir, largeWorkflowSource);
   });
-});
+
+export { bench };
