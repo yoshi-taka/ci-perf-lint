@@ -1,0 +1,38 @@
+[
+  {
+    "ruleId": "docker-build-without-layer-cache",
+    "severity": "warning",
+    "confidence": "high",
+    "docsPath": "docs/rules/docker-build-without-layer-cache.md",
+    "workflow": ".github/workflows/docker.yml",
+    "location": {
+      "path": ".github/workflows/docker.yml",
+      "line": 11,
+      "column": 15
+    },
+    "message": "Job \"docker\" uses docker/build-push-action without cache-from and cache-to configuration.",
+    "why": "Without layer caching, every CI run rebuilds all Docker layers from scratch, adding minutes per build. docker/build-push-action supports cache-from and cache-to natively; the simplest setup uses the GitHub Actions cache backend.",
+    "suggestion": "Add cache-from and cache-to to the docker/build-push-action step. For example: `cache-from: type=gha` and `cache-to: type=gha,mode=max`.",
+    "measurementHint": "Compare Docker build wall-clock time before and after adding layer caching. A multi-minute reduction is common for images with several layers.",
+    "aiHandoff": "Review job \"docker\" in .github/workflows/docker.yml and add `cache-from: type=gha` and `cache-to: type=gha,mode=max` to the docker/build-push-action step unless `no-cache: true` is intentional.",
+    "score": 108
+  },
+  {
+    "ruleId": "missing-concurrency",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-concurrency.md",
+    "workflow": ".github/workflows/docker.yml",
+    "location": {
+      "path": ".github/workflows/docker.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "The workflow has no workflow-level or job-level concurrency setting.",
+    "why": "Older runs can continue burning runner time after newer commits arrive on the same PR or branch.",
+    "suggestion": "Add concurrency with cancel-in-progress for pull_request or branch-scoped runs.",
+    "measurementHint": "Push multiple commits to the same PR and confirm only the latest run continues.",
+    "aiHandoff": "Add safe concurrency to .github/workflows/docker.yml, ideally scoped by workflow and ref, and keep existing behavior intact.",
+    "score": 88
+  }
+]

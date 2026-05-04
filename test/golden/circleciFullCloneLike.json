@@ -1,0 +1,20 @@
+[
+  {
+    "ruleId": "circleci-checkout-uses-full-clone",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/circleci-checkout-uses-full-clone.md",
+    "workflow": ".circleci/config.yml",
+    "location": {
+      "path": ".circleci/config.yml",
+      "line": 9,
+      "column": 19
+    },
+    "message": "Job \"build\" uses full checkout clone but does not need git history.",
+    "why": "CircleCI defaults to blobless clone, which is faster and uses less data. Explicitly requesting a full clone is only necessary when the job accesses git history (e.g. git log, git describe, commitlint, semantic-release).",
+    "suggestion": "Remove checkout or set checkout method to blobless (or omit method, as blobless is the default).",
+    "measurementHint": "Full clones fetch all git history, which increases checkout time and storage.",
+    "aiHandoff": "Review .circleci/config.yml job \"build\" - the checkout uses method: full but no step commands require git history.",
+    "score": 90
+  }
+]

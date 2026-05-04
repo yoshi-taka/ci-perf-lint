@@ -114,8 +114,6 @@ export function parseMakefile(source: string): ParsedMakefile {
   return { targets, variables, includes };
 }
 
-
-
 export function extractMakeTarget(run: string): string | null {
   const parts = run.trim().split(/\s+/);
   for (let i = 1; i < parts.length; i++) {

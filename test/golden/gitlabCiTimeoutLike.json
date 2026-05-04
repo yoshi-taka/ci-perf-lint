@@ -1,0 +1,38 @@
+[
+  {
+    "ruleId": "missing-timeout-in-minutes-gitlab-ci",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-timeout-in-minutes-gitlab-ci.md",
+    "workflow": ".gitlab-ci.yml",
+    "location": {
+      "path": ".gitlab-ci.yml",
+      "line": 10,
+      "column": 3
+    },
+    "message": "Job \"build-app\" does not define timeout.",
+    "why": "GitLab CI uses a project-level default timeout (60 minutes). Heavy jobs should explicitly declare a timeout to prevent runaway builds and wasted CI minutes.",
+    "suggestion": "Add a timeout to the job, e.g. timeout: 30m.",
+    "measurementHint": "Monitor the job's typical duration and set timeout to a value that allows for normal variance but catches hangs.",
+    "aiHandoff": "Review .gitlab-ci.yml job \"build-app\" and add a sensible timeout value.",
+    "score": 95
+  },
+  {
+    "ruleId": "prefer-node-run-over-npm-run",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/prefer-node-run-over-npm-run.md",
+    "workflow": ".gitlab-ci.yml",
+    "location": {
+      "path": ".gitlab-ci.yml",
+      "line": 13,
+      "column": 5
+    },
+    "message": "Job \"build-app\" runs package script \"build\" through npm run.",
+    "why": "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
+    "suggestion": "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
+    "measurementHint": "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+    "aiHandoff": "Review .gitlab-ci.yml job \"build-app\" running `npm run build`. Only replace it with `node --run build` after checking the collected compatibility evidence: Repository scan found no visible .npmrc file, matching pre/post lifecycle script, or npm-specific environment reference.",
+    "score": 68
+  }
+]

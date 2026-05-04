@@ -7,6 +7,7 @@ CPU.*.md
 .fallow
 .stryker-tmp
 .cifuzz-corpus
+.rule-coverage-matrix.json
 artifacts
 node_modules
 docs/internal

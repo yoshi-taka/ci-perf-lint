@@ -182,7 +182,7 @@ describe("makefile-parser", () => {
     test("follows TARGET= variable to find go test chain", () => {
       const makefile = [
         "gotest:",
-        "\t@$(MAKE) for-all-target TARGET=\"test\"",
+        '\t@$(MAKE) for-all-target TARGET="test"',
         "",
         "for-all-target: $(GOMODULES)",
         "",
@@ -266,7 +266,7 @@ describe("makefile-parser", () => {
           "",
           ".PHONY: gotest",
           "gotest:",
-          "\t@$(MAKE) for-all-target TARGET=\"test\"",
+          '\t@$(MAKE) for-all-target TARGET="test"',
           "",
           ".PHONY: for-all-target",
           "for-all-target: $(GOMODULES)",
@@ -334,12 +334,7 @@ describe("makefile-parser", () => {
 
       await writeFile(
         path.join(tmpDir, "Makefile"),
-        [
-          ".PHONY: all",
-          "all:",
-          "\tgcc -o prog main.c util.c",
-          "",
-        ].join("\n"),
+        [".PHONY: all", "all:", "\tgcc -o prog main.c util.c", ""].join("\n"),
       );
 
       const yaml = [

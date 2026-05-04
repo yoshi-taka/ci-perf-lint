@@ -272,9 +272,7 @@ describe("analyzeRepository repo-aware and tooling rules: consensus and gates", 
     const [finding] = findings;
     expect(finding?.workflow).toBe(".github/workflows/ci-b.yml");
     expect(finding?.message).toContain('Job "build"');
-    expect(finding?.why).toContain(
-      "similar heavy jobs already define job-level timeout-minutes",
-    );
+    expect(finding?.why).toContain("similar heavy jobs already define job-level timeout-minutes");
   });
 
   test("does not add similar-workflow consensus when there are not enough peers", async () => {

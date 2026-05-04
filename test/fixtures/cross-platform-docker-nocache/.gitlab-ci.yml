@@ -1,0 +1,4 @@
+build:
+  image: docker:28
+  script:
+    - docker build --no-cache .

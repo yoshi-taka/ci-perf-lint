@@ -32,7 +32,7 @@ describe("renderReport", () => {
 
     expect(markdown).toContain("# GitHub Actions Performance Lint");
     expect(markdown).toContain("## AI Handoff");
-    expect(markdown).toContain("missing-concurrency");
+    expect(markdown).toContain("missing-paths-filter");
   });
 
   test("renders consolidated handoff output", async () => {

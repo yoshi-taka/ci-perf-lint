@@ -1,0 +1,128 @@
+[
+  {
+    "ruleId": "missing-paths-filter",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-paths-filter.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.",
+    "why": "Docs-only and unrelated changes are more likely to trigger the same expensive workflow. This repository already uses trigger path filters in `.github/workflows/docs.yml`.",
+    "suggestion": "Add paths or paths-ignore to focus runs on code changes that actually need this workflow. If branch protection requires this workflow check, prefer keeping the workflow runnable and gating only the heavy jobs inside it.",
+    "measurementHint": "Open a docs-only PR and confirm either the workflow no longer runs unnecessarily or the heavy jobs skip without leaving required checks pending.",
+    "aiHandoff": "Review trigger filters in .github/workflows/ci.yml. If required checks would become pending, keep the workflow runnable and gate only the heavy jobs that do not need docs-only changes. Use an existing paths/paths-ignore pattern from this repository as the starting point if it matches this workflow.",
+    "score": 125
+  },
+  {
+    "ruleId": "missing-path-ignore-for-non-code",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-path-ignore-for-non-code.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "No docs or markdown-oriented paths-ignore rule was found for push/pull_request.",
+    "why": "Small documentation-only changes can still trigger expensive CI. This repository already ignores obvious non-code changes in `.github/workflows/docs.yml`.",
+    "suggestion": "Consider paths-ignore entries for docs, markdown, and other clearly non-code files. If branch protection requires this workflow check, prefer keeping the workflow runnable and skipping only the heavy jobs.",
+    "measurementHint": "Create a docs-only change and confirm either the heavy workflow is skipped or the expensive jobs are skipped without leaving required checks pending.",
+    "aiHandoff": "Add safe non-code paths-ignore patterns to .github/workflows/ci.yml only if docs-only changes do not need full CI and required checks will not remain pending. Otherwise keep the workflow runnable and gate the heavy jobs inside it. Use an existing non-code paths-ignore pattern from this repository as the starting point if it matches this workflow.",
+    "score": 120
+  },
+  {
+    "ruleId": "outdated-setup-action-without-cache",
+    "severity": "warning",
+    "confidence": "high",
+    "docsPath": "docs/rules/outdated-setup-action-without-cache.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 16,
+      "column": 15
+    },
+    "message": "actions/setup-node@v2 is old and no cache configuration is visible.",
+    "why": "The performance win is not the version bump by itself; it is using a current setup action to enable the package-manager cache close to the language setup step. Without visible cache configuration, dependency downloads and installs are more likely to be paid again on each run.",
+    "suggestion": "Upgrade to a current setup action major and enable its built-in cache for the package manager or language dependency path used by this job.",
+    "measurementHint": "Re-run the workflow after updating setup and compare setup, cache restore, and dependency install duration.",
+    "aiHandoff": "Review .github/workflows/ci.yml and upgrade actions/setup-node@v2 to a current major version together with cache enablement.",
+    "score": 115
+  },
+  {
+    "ruleId": "deep-checkout-without-need",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/deep-checkout-without-need.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 15,
+      "column": 11
+    },
+    "message": "actions/checkout uses fetch-depth: 0 in job \"test\", but no history-dependent command was detected.",
+    "why": "Full history checkout (fetch-depth: 0) increases clone time and network usage. In many cases a bounded depth such as 100 or 1000 is sufficient, optionally combined with `fetch-tags: true` for versioning or changelog workflows. This rule only reports when the same job does not visibly run history-dependent git operations, commit-range tooling such as commitlint, release/version/tag logic, opaque repository scripts, or write-capable repository mutation steps. This repository already keeps checkout shallow in `.github/workflows/docs.yml:docs`.",
+    "suggestion": "Confirm whether full history is required. If not, use the default shallow checkout. If this was added for tag-based versioning or changelog generation, prefer `fetch-tags: true` with a bounded `fetch-depth` such as 100 or 1000 where possible. If recent history is required, consider a bounded depth such as 100 or 1000. If history is required but file contents are not needed eagerly, keep the history depth and consider `filter: blob:none` instead.",
+    "measurementHint": "Compare checkout duration before and after the change, and verify any tag/version/changelog step still produces the same result.",
+    "aiHandoff": "Inspect .github/workflows/ci.yml job \"test\" and evaluate whether fetch-depth: 0 can be replaced with a bounded depth (e.g. 100 or 1000) or fetch-tags: true with a shallower checkout. Use one of the repository's existing shallow-checkout jobs as the baseline unless this job truly needs full history.",
+    "score": 70
+  },
+  {
+    "ruleId": "missing-concurrency",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-concurrency.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "The workflow has no workflow-level or job-level concurrency setting.",
+    "why": "Older runs can continue burning runner time after newer commits arrive on the same PR or branch.",
+    "suggestion": "Add concurrency with cancel-in-progress for pull_request or branch-scoped runs.",
+    "measurementHint": "Push multiple commits to the same PR and confirm only the latest run continues.",
+    "aiHandoff": "Add safe concurrency to .github/workflows/ci.yml, ideally scoped by workflow and ref, and keep existing behavior intact.",
+    "score": 58
+  },
+  {
+    "ruleId": "missing-dependency-cache",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-dependency-cache.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 16,
+      "column": 15
+    },
+    "message": "actions/setup-node@v2 is used without visible dependency caching in job \"test\".",
+    "why": "Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths.",
+    "suggestion": "If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.",
+    "measurementHint": "Compare total job duration, not just install duration, before and after enabling cache.",
+    "aiHandoff": "Review .github/workflows/ci.yml job \"test\" and test whether dependency caching for actions/setup-node@v2 actually improves total job time on this CI path before keeping the change.",
+    "score": 43
+  },
+  {
+    "ruleId": "missing-timeout-minutes",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-timeout-minutes.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 10,
+      "column": 3
+    },
+    "message": "Job \"test\" does not define job-level timeout-minutes.",
+    "why": "Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.",
+    "suggestion": "Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.",
+    "measurementHint": "Force or simulate a hung run and confirm the job is terminated at the configured timeout.",
+    "aiHandoff": "Review .github/workflows/ci.yml job \"test\" and add a sensible timeout-minutes value without breaking legitimate long-running work.",
+    "score": 28
+  }
+]

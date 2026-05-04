@@ -22,16 +22,19 @@ describe("fuzz: parsePipeline", () => {
     );
 
     fc.assert(
-      fc.property(fc.record({ steps: fc.array(stepArbitrary, { maxLength: 20 }) }), (pipelineObj) => {
-        const yamlString = YAML.stringify(pipelineObj);
-        try {
-          const doc = parsePipeline("/fuzz/pipeline.yml", "/fuzz", yamlString);
-          expect(doc.relativePath).toBe("pipeline.yml");
-          expect(Array.isArray(doc.steps)).toBe(true);
-        } catch (error) {
-          expect(error).toBeInstanceOf(Error);
-        }
-      }),
+      fc.property(
+        fc.record({ steps: fc.array(stepArbitrary, { maxLength: 20 }) }),
+        (pipelineObj) => {
+          const yamlString = YAML.stringify(pipelineObj);
+          try {
+            const doc = parsePipeline("/fuzz/pipeline.yml", "/fuzz", yamlString);
+            expect(doc.relativePath).toBe("pipeline.yml");
+            expect(Array.isArray(doc.steps)).toBe(true);
+          } catch (error) {
+            expect(error).toBeInstanceOf(Error);
+          }
+        },
+      ),
       { numRuns: 300, interruptAfterTimeLimit: 10000 },
     );
   }, 15000);

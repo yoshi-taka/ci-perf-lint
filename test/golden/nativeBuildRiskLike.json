@@ -1,0 +1,110 @@
+[
+  {
+    "ruleId": "missing-paths-filter",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-paths-filter.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.",
+    "why": "Docs-only and unrelated changes are more likely to trigger the same expensive workflow.",
+    "suggestion": "Add paths or paths-ignore to focus runs on code changes that actually need this workflow. If branch protection requires this workflow check, prefer keeping the workflow runnable and gating only the heavy jobs inside it.",
+    "measurementHint": "Open a docs-only PR and confirm either the workflow no longer runs unnecessarily or the heavy jobs skip without leaving required checks pending.",
+    "aiHandoff": "Review trigger filters in .github/workflows/ci.yml. If required checks would become pending, keep the workflow runnable and gate only the heavy jobs that do not need docs-only changes.",
+    "score": 125
+  },
+  {
+    "ruleId": "missing-path-ignore-for-non-code",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-path-ignore-for-non-code.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "No docs or markdown-oriented paths-ignore rule was found for push/pull_request.",
+    "why": "Small documentation-only changes can still trigger expensive CI.",
+    "suggestion": "Consider paths-ignore entries for docs, markdown, and other clearly non-code files. If branch protection requires this workflow check, prefer keeping the workflow runnable and skipping only the heavy jobs.",
+    "measurementHint": "Create a docs-only change and confirm either the heavy workflow is skipped or the expensive jobs are skipped without leaving required checks pending.",
+    "aiHandoff": "Add safe non-code paths-ignore patterns to .github/workflows/ci.yml only if docs-only changes do not need full CI and required checks will not remain pending. Otherwise keep the workflow runnable and gate the heavy jobs inside it.",
+    "score": 120
+  },
+  {
+    "ruleId": "missing-concurrency",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-concurrency.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "The workflow has no workflow-level or job-level concurrency setting.",
+    "why": "Older runs can continue burning runner time after newer commits arrive on the same PR or branch.",
+    "suggestion": "Add concurrency with cancel-in-progress for pull_request or branch-scoped runs.",
+    "measurementHint": "Push multiple commits to the same PR and confirm only the latest run continues.",
+    "aiHandoff": "Add safe concurrency to .github/workflows/ci.yml, ideally scoped by workflow and ref, and keep existing behavior intact.",
+    "score": 88
+  },
+  {
+    "ruleId": "native-dependency-may-fall-back-to-source-build",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/native-dependency-may-fall-back-to-source-build.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 1,
+      "column": 1
+    },
+    "message": "Repository uses native-heavy packages and the workflow also shows install conditions that may bypass wheels or prebuilt binaries.",
+    "why": "Visible native-heavy packages (Node: esbuild, sharp) overlap with workflow-level source-build smells (explicit native build path, native build toolchain install, optional dependency bypass). That can mean unexpected fallbacks to source builds instead of using a wheel or prebuilt binary.",
+    "suggestion": "Check install logs for wheel or prebuilt usage before changing anything. If this path is falling back to source builds by accident, simplify the install flags, reduce unnecessary build toolchain setup, or use a more compatible base environment.",
+    "measurementHint": "Compare total install time and inspect logs for signs such as `building wheel`, `node-gyp`, or other native build output before and after any change.",
+    "aiHandoff": "Review package-manager logs and workflow setup together, confirm whether native-heavy dependencies are unexpectedly falling back to source builds, and only simplify flags, toolchain setup, or base environment after verifying the actual install path.",
+    "score": 35
+  },
+  {
+    "ruleId": "missing-timeout-minutes",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-timeout-minutes.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 7,
+      "column": 3
+    },
+    "message": "Job \"build_native\" does not define job-level timeout-minutes.",
+    "why": "Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.",
+    "suggestion": "Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.",
+    "measurementHint": "Force or simulate a hung run and confirm the job is terminated at the configured timeout.",
+    "aiHandoff": "Review .github/workflows/ci.yml job \"build_native\" and add a sensible timeout-minutes value without breaking legitimate long-running work.",
+    "score": 28
+  },
+  {
+    "ruleId": "consider-caching-os-packages-or-using-a-custom-image",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/consider-caching-os-packages-or-using-a-custom-image.md",
+    "workflow": ".github/workflows/ci.yml",
+    "location": {
+      "path": ".github/workflows/ci.yml",
+      "line": 7,
+      "column": 3
+    },
+    "message": "Job \"build_native\" installs OS packages at runtime without visible package caching or a prebuilt image strategy.",
+    "why": "Runtime OS package installs can add avoidable setup time on repeated CI paths, especially when the same package set is rebuilt often.",
+    "suggestion": "If this install path is slow enough to matter, consider caching OS package artifacts or moving the package set into a custom or prebuilt image, and keep the change only if total job time improves.",
+    "measurementHint": "Compare package-install wall-clock time, cache restore/save time if added, and total job duration before and after introducing OS package caching or a custom image.",
+    "aiHandoff": "Review .github/workflows/ci.yml job \"build_native\" and measure whether repeated OS package installs are a meaningful cost. If they are, test package-archive caching or a custom image and keep the change only when total CI time improves.",
+    "score": 27
+  }
+]

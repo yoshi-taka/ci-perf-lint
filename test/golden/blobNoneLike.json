@@ -1,0 +1,20 @@
+[
+  {
+    "ruleId": "consider-filter-blob-none-for-release-metadata",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/consider-filter-blob-none-for-release-metadata.md",
+    "workflow": ".github/workflows/release-notes.yml",
+    "location": {
+      "path": ".github/workflows/release-notes.yml",
+      "line": 14,
+      "column": 11
+    },
+    "message": "Job \"notes\" keeps enough git history for metadata work, but checkout still downloads file blobs eagerly.",
+    "why": "fetch-depth controls how many commits and trees are fetched; blobs are the file contents attached to those commits. This job appears to focus on commit, tag, version, or release metadata, so `filter: blob:none` can keep the same history depth while avoiding most file-content transfer until a file is actually read.",
+    "suggestion": "If this job mostly needs commit history, tags, and release metadata rather than repository file contents, keep the same depth and test checkout with `filter: blob:none`.",
+    "measurementHint": "Compare checkout duration, transferred data, lazy blob fetches, and total job time before and after adding `filter: blob:none` with the same fetch depth.",
+    "aiHandoff": "Review .github/workflows/release-notes.yml job \"notes\" and test whether checkout can use filter: blob:none while preserving its commit, tag, release-notes, or versioning behavior.",
+    "score": 104
+  }
+]

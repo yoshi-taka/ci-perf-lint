@@ -1,0 +1,38 @@
+[
+  {
+    "ruleId": "missing-release-downstream-success-guard",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-release-downstream-success-guard.md",
+    "workflow": ".github/workflows/release.yml",
+    "location": {
+      "path": ".github/workflows/release.yml",
+      "line": 19,
+      "column": 9
+    },
+    "message": "Release-like downstream job \"publish\" depends on upstream jobs without an explicit success guard.",
+    "why": "This job already overrides default dependency behavior with a status-based `if:` condition, so release intent is easier to reason about when it also explicitly gates on upstream success and avoids partial follow-up work after failure or cancellation.",
+    "suggestion": "If this downstream release job really needs a status-based `if:`, confirm which upstream jobs must succeed, preserve any intentional skip-allowing branches, and only then add explicit success checks together with `!failure() && !cancelled()`.",
+    "measurementHint": "Simulate an upstream failure or cancellation and confirm the downstream release job is skipped instead of partially running.",
+    "aiHandoff": "Review .github/workflows/release.yml job \"publish\" and confirm which upstream jobs truly must succeed versus which may be intentionally skipped before tightening its release downstream guard.",
+    "score": 103
+  },
+  {
+    "ruleId": "missing-timeout-minutes",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-timeout-minutes.md",
+    "workflow": ".github/workflows/release.yml",
+    "location": {
+      "path": ".github/workflows/release.yml",
+      "line": 17,
+      "column": 3
+    },
+    "message": "Job \"publish\" does not define job-level timeout-minutes.",
+    "why": "Without a job-level timeout, a hung release-like job falls back to the platform default timeout and can keep holding runner capacity and deployment-critical locks much longer than intended. This repository already uses job-level timeout-minutes in `.github/workflows/release.yml:build`.",
+    "suggestion": "Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.",
+    "measurementHint": "Force or simulate a hung run and confirm the job is terminated at the configured timeout.",
+    "aiHandoff": "Review .github/workflows/release.yml job \"publish\" and add a sensible timeout-minutes value without breaking legitimate long-running work. Use an existing timeout pattern in this repository as a starting point if it matches this job.",
+    "score": 64
+  }
+]

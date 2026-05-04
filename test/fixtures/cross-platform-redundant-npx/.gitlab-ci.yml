@@ -1,0 +1,5 @@
+lint:
+  image: node:22
+  script:
+    - npm ci
+    - npx eslint

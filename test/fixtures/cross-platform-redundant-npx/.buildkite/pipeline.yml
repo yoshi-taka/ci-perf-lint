@@ -1,0 +1,5 @@
+steps:
+  - label: lint
+    command: npm ci
+  - label: lint
+    command: npx eslint

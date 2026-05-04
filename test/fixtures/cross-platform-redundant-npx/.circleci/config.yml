@@ -1,0 +1,14 @@
+version: 2.1
+jobs:
+  lint:
+    docker:
+      - image: cimg/node:22
+    steps:
+      - checkout
+      - run: npm ci
+      - run: npx eslint
+workflows:
+  version: 2
+  all:
+    jobs:
+      - lint

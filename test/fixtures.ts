@@ -312,6 +312,8 @@ const fixtureNames = {
   wranglerTomlPipLike: "wrangler-toml-pip-like",
   amplifyYmlLike: "amplify-yml-like",
   amplifyYmlOk: "amplify-yml-ok",
+  crossPlatformRedundantNpx: "cross-platform-redundant-npx",
+  crossPlatformDockerNocache: "cross-platform-docker-nocache",
 } as const;
 
 const cache = new Map<string, string>();

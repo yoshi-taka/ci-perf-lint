@@ -1,0 +1,74 @@
+[
+  {
+    "ruleId": "missing-paths-filter",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-paths-filter.md",
+    "workflow": ".github/workflows/claude-review.yml",
+    "location": {
+      "path": ".github/workflows/claude-review.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.",
+    "why": "Docs-only and unrelated changes are more likely to trigger the same expensive workflow.",
+    "suggestion": "Add paths or paths-ignore to focus runs on code changes that actually need this workflow. If branch protection requires this workflow check, prefer keeping the workflow runnable and gating only the heavy jobs inside it.",
+    "measurementHint": "Open a docs-only PR and confirm either the workflow no longer runs unnecessarily or the heavy jobs skip without leaving required checks pending.",
+    "aiHandoff": "Review trigger filters in .github/workflows/claude-review.yml. If required checks would become pending, keep the workflow runnable and gate only the heavy jobs that do not need docs-only changes.",
+    "score": 125
+  },
+  {
+    "ruleId": "missing-path-ignore-for-non-code",
+    "severity": "suggestion",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-path-ignore-for-non-code.md",
+    "workflow": ".github/workflows/claude-review.yml",
+    "location": {
+      "path": ".github/workflows/claude-review.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "No docs or markdown-oriented paths-ignore rule was found for push/pull_request.",
+    "why": "Small documentation-only changes can still trigger expensive CI.",
+    "suggestion": "Consider paths-ignore entries for docs, markdown, and other clearly non-code files. If branch protection requires this workflow check, prefer keeping the workflow runnable and skipping only the heavy jobs.",
+    "measurementHint": "Create a docs-only change and confirm either the heavy workflow is skipped or the expensive jobs are skipped without leaving required checks pending.",
+    "aiHandoff": "Add safe non-code paths-ignore patterns to .github/workflows/claude-review.yml only if docs-only changes do not need full CI and required checks will not remain pending. Otherwise keep the workflow runnable and gate the heavy jobs inside it.",
+    "score": 120
+  },
+  {
+    "ruleId": "missing-concurrency",
+    "severity": "warning",
+    "confidence": "high",
+    "docsPath": "docs/rules/missing-concurrency.md",
+    "workflow": ".github/workflows/claude-review.yml",
+    "location": {
+      "path": ".github/workflows/claude-review.yml",
+      "line": 4,
+      "column": 3
+    },
+    "message": "The workflow has no workflow-level or job-level concurrency setting.",
+    "why": "Agentic and AI-assisted runs are often long-lived, so older runs can keep burning runner time after newer commits or comments arrive on the same PR or branch.",
+    "suggestion": "Add concurrency with cancel-in-progress for pull_request or branch-scoped runs.",
+    "measurementHint": "Push multiple commits to the same PR and confirm only the latest run continues.",
+    "aiHandoff": "Add safe concurrency to .github/workflows/claude-review.yml, ideally scoped by workflow and ref, and keep existing behavior intact.",
+    "score": 92
+  },
+  {
+    "ruleId": "missing-timeout-minutes",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-timeout-minutes.md",
+    "workflow": ".github/workflows/claude-review.yml",
+    "location": {
+      "path": ".github/workflows/claude-review.yml",
+      "line": 10,
+      "column": 3
+    },
+    "message": "Job \"review_agent\" does not define job-level timeout-minutes.",
+    "why": "Without a job-level timeout, a hung agentic or AI-assisted job falls back to the platform default timeout and can keep consuming runner capacity for much longer than intended.",
+    "suggestion": "Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.",
+    "measurementHint": "Force or simulate a hung run and confirm the job is terminated at the configured timeout.",
+    "aiHandoff": "Review .github/workflows/claude-review.yml job \"review_agent\" and add a sensible timeout-minutes value without breaking legitimate long-running work.",
+    "score": 34
+  }
+]
