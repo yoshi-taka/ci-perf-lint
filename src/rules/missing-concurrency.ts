@@ -66,7 +66,7 @@ export const missingConcurrencyRule = {
               measurementHint:
                 "Push multiple commits to the same PR and confirm only the latest run continues.",
               aiHandoff: `Add safe concurrency to ${workflow.relativePath}, ideally scoped by workflow and ref, and keep existing behavior intact.`,
-              score: agentic ? 104 : 100,
+              score: agentic ? 64 : 60,
             }),
             _context,
             workflow.relativePath,
