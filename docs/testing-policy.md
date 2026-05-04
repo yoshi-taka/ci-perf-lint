@@ -63,3 +63,24 @@
 - Do not add new tests back into a single catch-all `main.test.ts`.
 - Do not create one test file per rule unless the rule needs substantial dedicated setup.
 - Do not duplicate large fixture path lists across multiple test files.
+
+## `analysisWarnings` map
+
+`ReportData.analysisWarnings` is internal scan telemetry, not primary user-facing output.
+
+| Source area | File | Example warning shape | Notes |
+| --- | --- | --- | --- |
+| Workflow parse | `src/repo.ts` | `Failed to parse workflow: ...` | Emitted when one workflow file cannot be parsed. |
+| Rule execution | `src/rule-engine.ts` | `Rule <id> failed: ...` | Per-rule failure guardrail. |
+| Repository signal orchestration | `src/repository-signals.ts` | `<label> failed: ...` | Collector-family failure wrapper. |
+| Repository file read / JSON parse | `src/repository-scan-context.ts` | `Failed to read file while collecting repository signals: ...` / `Failed to parse JSON while collecting repository signals: ...` | Common source for malformed `package.json` cases. |
+| Repository diagnostics collector wrapper | `src/repository-diagnostics/index.ts` | `Collector <id> failed: ...` | Per-collector failure guardrail. |
+| Docker build target fallback | `src/repository-diagnostics/docker-build-targets.ts` | collector-specific `context.warn(...)` | Narrow helper warning path. |
+| Embedded Oxlint runtime | `src/repository-diagnostics/embedded-oxlint-runner.ts` | `Embedded Oxlint ...` | Binary missing, stderr, bad JSON, exit-without-json, runtime failure. |
+
+### Test guidance for `analysisWarnings`
+
+- Assert membership, not position.
+- Prefer `some(...)` or filtered matches over `analysisWarnings[0]`.
+- Treat fire-and-forget prewarm work as non-observable. Background cache warmup should not mutate report warnings.
+- Do not expose `analysisWarnings` in default `text`, `markdown`, or `handoff` output unless the output contract is intentionally changing.

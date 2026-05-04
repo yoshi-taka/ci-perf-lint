@@ -165,6 +165,7 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 - Avoid broad edits in `src/repository-diagnostics/imports.ts` and large fixture-heavy test files unless the task targets them.
 - Preserve deterministic output ordering when changing registries or collectors.
 - Do not change reporter output casually; small text changes can affect many assertions.
+- Treat `ReportData.analysisWarnings` as internal telemetry, not ordered user-facing output. Test membership, not index position. Background prewarm work must not mutate report warnings.
 
 ## CodSpeed Benchmarks
 

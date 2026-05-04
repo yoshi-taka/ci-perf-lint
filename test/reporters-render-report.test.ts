@@ -560,12 +560,21 @@ describe("renderReport", () => {
       mode: "strict",
     });
     const text = renderReport(report, "text");
+    const packageJsonWarning = report.analysisWarnings.find(
+      (warning) =>
+        warning.source === path.join(fixtureRoot, "package.json") &&
+        warning.message.includes("Failed to parse JSON while collecting repository signals"),
+    );
 
     expect(report.analysisWarnings.length).toBeGreaterThan(0);
-    expect(report.analysisWarnings[0]?.source).toBe(path.join(fixtureRoot, "package.json"));
-    expect(report.analysisWarnings[0]?.message).toContain(
-      "Failed to parse JSON while collecting repository signals",
-    );
+    expect(packageJsonWarning).toBeDefined();
+    expect(
+      report.analysisWarnings.filter(
+        (warning) =>
+          warning.source === path.join(fixtureRoot, "package.json") &&
+          warning.message.includes("Failed to parse JSON while collecting repository signals"),
+      ),
+    ).toHaveLength(1);
     expect(text).toContain("No actionable GitHub Actions findings in the current scan mode.");
     expect(text).not.toContain("analysisWarnings");
   });

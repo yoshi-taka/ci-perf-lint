@@ -290,7 +290,8 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   if ((await scanContext.pathExists(scanContext.resolve("package.json"))) && !workflowOnly) {
     const { collectEmbeddedOxlintImportJsonDiagnostics } =
       await import("./repository-diagnostics/embedded-oxlint.ts");
-    void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot, analysisWarnings);
+    // Prewarm only. Keep report warnings tied to awaited analysis work, not background cache fills.
+    void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot);
   }
   timer.mark("embedded-oxlint-prewarm");
 
