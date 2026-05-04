@@ -11,9 +11,9 @@ import { getCheckoutStep } from "./shared/workflow-analysis.ts";
 const wideRepoAccessPattern =
   /(find\s+\.\b|rg\s+(?:--files\b|\.)|fd\s+\.\b|git\s+grep\b|ls\s+-r\b|du\s+-|turbo\s+run\b|nx\s+affected\b|lerna\b)/;
 const heavyBuildOrInstallPattern =
-  /(\bnpm\s+(?:ci|install|run\s+build)\b|\bpnpm\s+(?:install|build)\b|\byarn\s+(?:install|build)\b|\bbun\s+(?:install|run\s+build)\b|\bpytest\b|\bjest\b|\bvitest\b|\bcargo\s+build\b|\bgradle\b|\bmvn\b|tauri|electron-builder|docker build)/;
+  /(\bnpm\b\s+(?:\S+\s+)*?(?:ci\b|install\b|run\s+build\b)|\b(?:pnpm|yarn)\b\s+(?:\S+\s+)*?(?:install\b|build\b)|\bbun\b\s+(?:\S+\s+)*?(?:install\b|run\s+build\b)|\bpytest\b|\bjest\b|\bvitest\b|\bcargo\s+(?:build|check|clippy|test|bench|doc|package|publish|install|b|c|t|ck|br|cl|rr)\b|\bgradle\b|\bmvn\b|tauri|electron-builder|docker build)/;
 const blobHungryReleasePattern =
-  /(install-code-deps["']?\s*:\s*(?:["']?true|true)|\brelease:publish\b|changeset\s+version\b|\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|compile|pack|publish)\b|\byarn\s+task\b[\s\S]*\bcompile\b)/;
+  /(install-code-deps["']?\s*:\s*(?:["']?true|true)|\brelease:publish\b|changeset\s+version\b|\b(?:npm|pnpm|yarn|bun)\b\s+(?:\S+\s+)*?(?:run\s+)?(?:build\b|compile\b|pack\b|publish\b)|\byarn\s+task\b[\s\S]*\bcompile\b)/;
 const gitCheckoutPublishBuildPattern = /\bgit\s+(?:checkout|pull|merge)\b/;
 const publishCompileBuildPattern = /\b(?:publish|compile|build)\b/;
 const agenticToolPattern =

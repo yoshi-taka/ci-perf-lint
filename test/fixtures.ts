@@ -19,6 +19,7 @@ const fixtureNames = {
   barrelFileLike: "barrel-file-like",
   barrelFileSkipOxlintLike: "barrel-file-skip-oxlint-like",
   blobNoneAgenticDocsEditLike: "blob-none-agentic-docs-edit-like",
+  blobNoneBuildWithFlagsLike: "blob-none-build-with-flags-like",
   blobNoneChangelogActionLike: "blob-none-changelog-action-like",
   blobNoneGhReleaseLike: "blob-none-gh-release-like",
   blobNoneHeavyPublishLike: "blob-none-heavy-publish-like",

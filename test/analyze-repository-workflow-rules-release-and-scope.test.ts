@@ -528,6 +528,20 @@ describe("analyzeRepository workflow and execution rules: release and scope", ()
     ).toBe(false);
   });
 
+  test("does not suggest blob:none when build commands use pnpm --filter flags", async () => {
+    const report = await getFixtureReport(fixtures.blobNoneBuildWithFlagsLike, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "consider-filter-blob-none-for-release-metadata",
+      ),
+    ).toBe(false);
+  });
+
   test("keeps blob:none guidance for prepare release jobs with explicit depth fetches", async () => {
     const report = await getFixtureReport(fixtures.blobNonePrepareFetchLike, {
       targetPath: ".",
