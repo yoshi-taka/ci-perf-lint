@@ -2,7 +2,7 @@
 
 [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/yoshi-taka/ci-perf-lint?utm_source=badge)
 
-Repository-first CI audit for GitHub Actions.
+Repository-first CI audit across major CI platforms.
 
 CI Perf Lint scans workflows plus repository context, prioritizes CI waste, and produces a shareable improvement plan with measurement hints and AI-ready handoff instructions.
 
@@ -161,7 +161,7 @@ AI becomes more reliable when given structured constraints.
 Default run:
 
 ```sh
-ci-perf-lint .
+ci-perf-lint
 ```
 
 Render AI handoff:
