@@ -34,4 +34,31 @@ describe("analyzeRepository", () => {
       workflowOnly: true,
     });
   });
+
+  bench("opencode (full)", async () => {
+    await analyzeRepository({
+      cwd: "/tmp/ts-target",
+      targetPath: ".",
+      topCount: 5,
+      mode: "strict",
+    });
+  });
+
+  bench("oxc (full)", async () => {
+    await analyzeRepository({
+      cwd: "/tmp/rs-target",
+      targetPath: ".",
+      topCount: 5,
+      mode: "strict",
+    });
+  });
+
+  bench("pytorch (full)", async () => {
+    await analyzeRepository({
+      cwd: "/tmp/py-target",
+      targetPath: ".",
+      topCount: 5,
+      mode: "strict",
+    });
+  });
 });

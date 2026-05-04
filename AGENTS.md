@@ -166,5 +166,12 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 - Preserve deterministic output ordering when changing registries or collectors.
 - Do not change reporter output casually; small text changes can affect many assertions.
 
+## CodSpeed Benchmarks
+
+- Config: `codspeed.yml` at repo root, defines 3 targets (opencode TS, oxc Rust, pytorch Python)
+- Workflow: `.github/workflows/codspeed.yml` — runs on push to main and PRs
+- Targets are shallow-cloned fresh each run; benchmark measures `bun run dist/cli.js --findings-only` wall time
+- Add/remove targets in `codspeed.yml`; CI path is the CodSpeed action
+
 すべてのやり取り、計画、において、極端に簡潔にし、簡潔さのために文法を犠牲にすること。
 tweet size以下を目指す
