@@ -95,17 +95,26 @@ function anyWorkflowHasSparseCheckout(workflows: WorkflowDocument[]): boolean {
   return workflows.some((w) => w.source!.includes("sparse-checkout"));
 }
 
+const gitTrackedFilesCache = new Map<string, string[] | null>();
+
 function getGitTrackedFiles(repoRoot: string): string[] | null {
+  const cached = gitTrackedFilesCache.get(repoRoot);
+  if (cached !== undefined) {
+    return cached;
+  }
   try {
     const proc = spawnSync("git", ["-C", repoRoot, "ls-files", "-z"], {
       stdio: ["ignore", "pipe", "pipe"],
       encoding: "utf8",
     });
-    if (proc.status !== 0 || proc.error) {
-      return null;
-    }
-    return proc.stdout ? proc.stdout.split("\0").filter(Boolean) : [];
+    const result: string[] | null =
+      proc.status !== 0 || proc.error || !proc.stdout
+        ? null
+        : proc.stdout.split("\0").filter(Boolean);
+    gitTrackedFilesCache.set(repoRoot, result);
+    return result;
   } catch {
+    gitTrackedFilesCache.set(repoRoot, null);
     return null;
   }
 }
