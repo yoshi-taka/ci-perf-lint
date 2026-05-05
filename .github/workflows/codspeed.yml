@@ -2,15 +2,8 @@ name: CodSpeed
 
 on:
   push:
-    branches:
-      - main
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
-  pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
+    tags:
+      - "v*"
   workflow_dispatch:
 
 concurrency:
