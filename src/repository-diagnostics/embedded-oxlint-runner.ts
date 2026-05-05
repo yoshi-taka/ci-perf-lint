@@ -247,10 +247,14 @@ function embeddedOxlintLabel(kind: EmbeddedOxlintScanKind): string {
   return kind === "import" ? "embedded-oxlint-import" : "embedded-oxlint-non-import";
 }
 
+let cachedOxlintBinPath: string | undefined;
+
 export async function bundledOxlintBinPath(
   accessSync?: (p: string) => void,
   resolvePackage?: (spec: string) => string | URL | Promise<string | URL>,
 ): Promise<string | undefined> {
+  if (cachedOxlintBinPath !== undefined) { return cachedOxlintBinPath; }
+
   const binaryName = process.platform === "win32" ? "oxlint.exe" : "oxlint";
   const startDir = (import.meta as { dir?: string }).dir ?? path.dirname(fileURLToPath(import.meta.url));
   const fsAccess = accessSync ?? require("node:fs").accessSync;
@@ -261,6 +265,7 @@ export async function bundledOxlintBinPath(
     const pkgRoot = path.dirname(fileURLToPath(pkgUrl instanceof URL ? pkgUrl : new URL(pkgUrl)));
     const binPath = path.resolve(pkgRoot, "bin", binaryName);
     fsAccess(binPath);
+    cachedOxlintBinPath = binPath;
     return binPath;
   } catch {
     // fallback: walk up from startDir
@@ -271,6 +276,7 @@ export async function bundledOxlintBinPath(
     const candidate = path.resolve(dir, "node_modules", ".bin", binaryName);
     try {
       fsAccess(candidate);
+      cachedOxlintBinPath = candidate;
       return candidate;
     } catch {
       const parent = path.dirname(dir);
@@ -280,6 +286,7 @@ export async function bundledOxlintBinPath(
       dir = parent;
     }
   }
+  cachedOxlintBinPath = undefined;
   return undefined;
 }
 
