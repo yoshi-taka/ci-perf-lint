@@ -6,7 +6,6 @@ on:
       - "v*"
     paths-ignore:
       - "docs/**"
-      - "site/**"
       - "**/*.md"
   workflow_dispatch:
 
