@@ -16,8 +16,19 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   }
 }
 
+const hasNpm = (() => {
+  try {
+    require("node:child_process").execSync("npm --version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+const e2eTest = hasNpm ? test : test.skip;
+
 describe("e2e: packaged CLI with oxlint", () => {
-  test("detects barrel files when run from npm pack install", async () => {
+  e2eTest("detects barrel files when run from npm pack install", async () => {
     await withTempDir(async (tmpDir) => {
       const installDir = path.join(tmpDir, "project");
       await mkdir(installDir, { recursive: true });
