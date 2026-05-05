@@ -13,6 +13,8 @@
 | **Pairwise / combinatorial** | `test/pairwise-cluster-*.test.ts` | All-pairs interaction coverage across rule clusters |
 | **Reporter rendering** | `test/reporters-render-report.test.ts` | Text / JSON / markdown / handoff output format |
 | **Reporter aggregation** | `test/reporters-aggregation.test.ts` | Grouped findings, deduplication |
+| **Metamorphic / differential** | `test/boundary-metamorphic.test.ts` | Oracle-less invariant verification |
+| **Mutation** | `stryker/stryker.*.config.mjs` | Stryker mutation testing (opt-in, slow) |
 
 ## Goals
 
@@ -136,6 +138,51 @@ paramsDef → ParamSpec[] → generatePairwise() → combinations[]
 - Prefer `mode: "exploratory"` when testing `suggestion`-severity rules.
 - Assert no crash + expected rule IDs present + no unexpected cluster rule IDs.
 - Do not assert total finding count (other clusters' rules may fire incidentally).
+
+## Mutation Testing (Stryker)
+
+- Mutation testing via Stryker for targeted source files where correctness is critical.
+- Configs: `stryker/stryker.{core,helper,repo,renderer}.config.mjs`.
+- Run: `bun run test:slow:mutation` (not in default `bun test` path; intentionally slow).
+- Covered modules:
+  - `src/finding-grouping.ts`, `src/repository-package-helpers.ts`, `src/cli-option-resolver.ts`
+  - `src/reporters.ts`, `src/reporters-render.ts`, `src/rule-engine.ts`
+  - `src/repo.ts`, `src/repository-signals.ts`, `src/rules/*.ts`
+- Add a new Stryker config when adding a new module whose mutation coverage should be tracked.
+- Use `command` test runner with a focused test command to keep per-config runs fast.
+
+## Metamorphic / Differential Testing
+
+- Metamorphic relations (oracle-less differential testing) verify invariants that should
+  hold across semantically equivalent transformations.
+- File: `test/boundary-metamorphic.test.ts`.
+- Verified relations:
+
+| Relation | What it tests |
+|---|---|
+| **Partition completeness** | `workflow-only` + `repository-only` findings partition matches full-report findings |
+| **YAML presentation invariance** | Comments, blank lines, key reordering do not change findings |
+| **Aggregation commutativity** | Aggregated findings are independent of input finding order |
+| **Render encapsulation** | `findingsOnly` output depends only on `report.findings`, not on other `ReportData` fields |
+| **JSON semantic stability** | JSON output is semantically equivalent across different render options after normalization |
+
+### When to add a metamorphic test
+
+- The behavior has a clear invariant that should hold under transformation, reordering,
+  or reformatting.
+- No oracle exists (you cannot list every expected finding), but a relational property
+  between two outputs is provable (e.g., A ∪ B = C).
+- The property would break if a regression introduces non-determinism or coupling to
+  irrelevant input.
+
+### Guidelines
+
+- Prefer comparisons of normalized structures over raw string equality.
+- Use `toEqual` for structural equality after normalization.
+- Keep metamorphic tests in `test/boundary-metamorphic.test.ts`. Add new relations
+  as new `test()` blocks in the existing `describe("metamorphic relations")` block.
+- Avoid re-testing individual rule logic. Metamorphic tests target cross-cutting
+  pipeline invariants (partitioning, ordering, rendering), not rule correctness.
 
 ## `analysisWarnings` map
 
