@@ -9,14 +9,19 @@ function wait(ms: number): Promise<void> {
 const SHORT_TIMEOUT = 200;
 
 describe("bundledOxlintBinPath", () => {
-  test("resolves to a valid path from source (Bun)", () => {
-    const p = bundledOxlintBinPath();
+  test("resolves to a valid path via import.meta.resolve", async () => {
+    const p = await bundledOxlintBinPath();
     expect(p).toBeTruthy();
-    expect(() => accessSync(p)).not.toThrow();
+    expect(() => accessSync(p!)).not.toThrow();
     expect(p).toEndWith("oxlint");
   });
 
-
+  test("falls back to directory walk when resolve fails", async () => {
+    const fakeResolve = () => { throw new Error("not found"); };
+    const fakeAccess = () => { throw new Error("not found"); };
+    const p = await bundledOxlintBinPath(fakeAccess, fakeResolve);
+    expect(p).toBeUndefined();
+  });
 });
 
 describe("Bun.spawn with timeout", () => {

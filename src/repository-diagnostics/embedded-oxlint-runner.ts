@@ -247,14 +247,30 @@ function embeddedOxlintLabel(kind: EmbeddedOxlintScanKind): string {
   return kind === "import" ? "embedded-oxlint-import" : "embedded-oxlint-non-import";
 }
 
-export function bundledOxlintBinPath(): string {
+export async function bundledOxlintBinPath(
+  accessSync?: (p: string) => void,
+  resolvePackage?: (spec: string) => string | URL | Promise<string | URL>,
+): Promise<string | undefined> {
   const binaryName = process.platform === "win32" ? "oxlint.exe" : "oxlint";
   const startDir = (import.meta as { dir?: string }).dir ?? path.dirname(fileURLToPath(import.meta.url));
+  const fsAccess = accessSync ?? require("node:fs").accessSync;
+  const pkgResolve = resolvePackage ?? ((spec: string) => import.meta.resolve(spec));
+
+  try {
+    const pkgUrl = await pkgResolve("oxlint/package.json");
+    const pkgRoot = path.dirname(fileURLToPath(pkgUrl instanceof URL ? pkgUrl : new URL(pkgUrl)));
+    const binPath = path.resolve(pkgRoot, "bin", binaryName);
+    fsAccess(binPath);
+    return binPath;
+  } catch {
+    // fallback: walk up from startDir
+  }
+
   let dir = startDir;
   for (let i = 0; i < 10; i++) {
     const candidate = path.resolve(dir, "node_modules", ".bin", binaryName);
     try {
-      require("node:fs").accessSync(candidate);
+      fsAccess(candidate);
       return candidate;
     } catch {
       const parent = path.dirname(dir);
@@ -264,7 +280,7 @@ export function bundledOxlintBinPath(): string {
       dir = parent;
     }
   }
-  return path.resolve(startDir, "..", "..", "node_modules", ".bin", binaryName);
+  return undefined;
 }
 
 function bundledOxlintJsPath(binPath: string): string {
@@ -329,8 +345,8 @@ export async function runEmbeddedOxlint(
     const localWarnings: AnalysisWarning[] = [];
     const context = new RepositoryScanContext(repoRoot, localWarnings);
     const source = embeddedOxlintLabel(kind);
-    const oxlintPath = bundledOxlintBinPath();
-    if (!(await context.pathExists(oxlintPath))) {
+    const oxlintPath = await bundledOxlintBinPath();
+    if (!oxlintPath || !(await context.pathExists(oxlintPath))) {
       context.warn(
         source,
         `Oxlint binary not found at ${oxlintPath}. Skipping oxlint-based diagnostics.`,
