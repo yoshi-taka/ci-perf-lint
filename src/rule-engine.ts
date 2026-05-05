@@ -1,5 +1,6 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "./types.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
+import type { RepositoryScanContext } from "./repository-scan-context.ts";
 import type { WorkflowDocument } from "./workflow.ts";
 import type { PipelineDocument } from "./buildkite-workflow.ts";
 import type { GitlabCiDocument } from "./gitlab-ci-workflow.ts";
@@ -18,31 +19,32 @@ async function getRulesByScope(): Promise<Record<string, readonly AnyRuleModule[
 
 export interface RuleContext {
   repository: RepositorySignals;
+  scanContext?: RepositoryScanContext;
 }
 
 interface RuleModule {
   meta: RuleMeta;
-  check: (workflow: WorkflowDocument, context: RuleContext) => Diagnostic[];
+  check: (workflow: WorkflowDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface BuildkiteRuleModule {
   meta: RuleMeta;
-  check: (pipeline: PipelineDocument, context: RuleContext) => Diagnostic[];
+  check: (pipeline: PipelineDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface GitlabCiRuleModule {
   meta: RuleMeta;
-  check: (doc: GitlabCiDocument, context: RuleContext) => Diagnostic[];
+  check: (doc: GitlabCiDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface CircleCiRuleModule {
   meta: RuleMeta;
-  check: (doc: CircleCiDocument, context: RuleContext) => Diagnostic[];
+  check: (doc: CircleCiDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface BothRuleModule {
   meta: RuleMeta;
-  check: (workflow: WorkflowDocument | PipelineDocument, context: RuleContext) => Diagnostic[];
+  check: (workflow: WorkflowDocument | PipelineDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 export type AnyRuleModule =
@@ -78,6 +80,7 @@ export async function evaluateRules(
   workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
   context: RuleContext,
   warnings?: AnalysisWarning[],
+  findingCounts?: Map<string, number>,
 ): Promise<Diagnostic[]> {
   prewarmStepAnalysisCaches(workflow);
   const isBuildkite = isPipelineDocument(workflow);
@@ -99,23 +102,30 @@ export async function evaluateRules(
   const ruleResults: Diagnostic[] = [];
 
   for (const rule of applicableRules) {
+    const { maxFindings } = rule.meta;
+    if (maxFindings !== undefined && findingCounts && (findingCounts.get(rule.meta.id) ?? 0) >= maxFindings) {
+      continue;
+    }
+
+    const prevLen = ruleResults.length;
+
     try {
       const ruleScope = rule.meta.scope ?? "github-actions";
       if (ruleScope === "both") {
         const bothRule = rule as BothRuleModule;
-        ruleResults.push(...bothRule.check(workflow as WorkflowDocument | PipelineDocument, context));
+        ruleResults.push(...(await bothRule.check(workflow as WorkflowDocument | PipelineDocument, context)));
       } else if (isBuildkite) {
         const buildkiteRule = rule as BuildkiteRuleModule;
-        ruleResults.push(...buildkiteRule.check(workflow, context));
+        ruleResults.push(...(await buildkiteRule.check(workflow, context)));
       } else if (isGitlab) {
         const gitlabCiRule = rule as GitlabCiRuleModule;
-        ruleResults.push(...gitlabCiRule.check(workflow, context));
+        ruleResults.push(...(await gitlabCiRule.check(workflow, context)));
       } else if (isCircle) {
         const circleCiRule = rule as CircleCiRuleModule;
-        ruleResults.push(...circleCiRule.check(workflow, context));
+        ruleResults.push(...(await circleCiRule.check(workflow, context)));
       } else {
         const githubRule = rule as RuleModule;
-        ruleResults.push(...githubRule.check(workflow, context));
+        ruleResults.push(...(await githubRule.check(workflow, context)));
       }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -124,6 +134,13 @@ export async function evaluateRules(
           source: workflow.relativePath,
           message: `Rule ${rule.meta.id} failed: ${detail}`,
         });
+      }
+    }
+
+    if (findingCounts) {
+      const added = ruleResults.length - prevLen;
+      if (added > 0) {
+        findingCounts.set(rule.meta.id, (findingCounts.get(rule.meta.id) ?? 0) + added);
       }
     }
   }

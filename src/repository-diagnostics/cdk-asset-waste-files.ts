@@ -130,45 +130,53 @@ export async function collectCdkAssetWasteFilesDiagnostics(
     const wasteFiles: WasteFileEntry[] = [];
     let totalWasteSize = 0;
 
+    const candidates: { relativePath: string; lower: string; assetRelativePath: string }[] = [];
     try {
       for await (const relativePath of context.walkFilesIter(`cdk.out/${assetPath}`, {
         ignoredDirectories: ignoredAssetDirs,
       })) {
         const lower = relativePath.toLowerCase();
         const assetRelativePath = relativePath.replace(`cdk.out/${assetPath}/`, "");
-
-        if (isWasteByName(assetRelativePath)) {
-          const absolutePath = context.resolve(relativePath);
-          try {
-            const stats = await stat(absolutePath);
-            if (stats.isFile()) {
-              wasteFiles.push({ path: relativePath, size: stats.size, reason: "waste-name" });
-              totalWasteSize += stats.size;
-            }
-          } catch {
-            // skip files that can't be stat'd
-          }
-          continue;
-        }
-
-        if (looksLikeDataOrDocFile(assetRelativePath)) {
-          const absolutePath = context.resolve(relativePath);
-          try {
-            const stats = await stat(absolutePath);
-            if (stats.isFile() && stats.size > SIZE_THRESHOLD) {
-              const reason = largeBinaryExtensions.some((ext) => lower.endsWith(ext))
-                ? "large-binary"
-                : "large-data";
-              wasteFiles.push({ path: relativePath, size: stats.size, reason });
-              totalWasteSize += stats.size;
-            }
-          } catch {
-            // skip files that can't be stat'd
-          }
+        if (isWasteByName(assetRelativePath) || looksLikeDataOrDocFile(assetRelativePath)) {
+          candidates.push({ relativePath, lower, assetRelativePath });
         }
       }
     } catch {
       continue;
+    }
+
+    const CHUNK = 64;
+    for (let i = 0; i < candidates.length; i += CHUNK) {
+      const chunk = candidates.slice(i, i + CHUNK);
+      const results = await Promise.all(
+        chunk.map(async ({ relativePath, lower, assetRelativePath }) => {
+          try {
+            const stats = await stat(context.resolve(relativePath));
+            if (!stats.isFile()) { return null; }
+
+            if (isWasteByName(assetRelativePath)) {
+              return { path: relativePath, size: stats.size, reason: "waste-name" as const };
+            }
+
+            if (stats.size > SIZE_THRESHOLD && looksLikeDataOrDocFile(assetRelativePath)) {
+              const reason = largeBinaryExtensions.some((ext) => lower.endsWith(ext))
+                ? ("large-binary" as const)
+                : ("large-data" as const);
+              return { path: relativePath, size: stats.size, reason };
+            }
+
+            return null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      for (const r of results) {
+        if (r) {
+          wasteFiles.push(r);
+          totalWasteSize += r.size;
+        }
+      }
     }
 
     if (wasteFiles.length > 0) {

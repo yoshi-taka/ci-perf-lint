@@ -1,8 +1,8 @@
 import { isMap, type Node } from "yaml";
-import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
+import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { getNode, getScalarString } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -33,11 +33,14 @@ function getRepoRoot(workflow: WorkflowDocument): string {
   return path.resolve(path.dirname(workflow.path), ...parts);
 }
 
-function stepTargetIsInternalParallel(
+async function stepTargetIsInternalParallel(
   workflow: WorkflowDocument,
   job: WorkflowJob,
   step: WorkflowStep,
-): boolean {
+  scanContext?: RepositoryScanContext,
+): Promise<boolean> {
+  if (!scanContext) { return false; }
+
   const run = step.run?.trim();
   if (!run) {
     return false;
@@ -56,8 +59,8 @@ function stepTargetIsInternalParallel(
   let parsed: ParsedMakefile | null = null;
   for (const name of ["GNUmakefile", "makefile", "Makefile"]) {
     const fp = path.resolve(dir, name);
-    if (existsSync(fp)) {
-      const source = readFileSync(fp, "utf8");
+    const source = await scanContext.readTextFileOrWarn(fp);
+    if (source !== undefined) {
       parsed = parseMakefile(source);
       break;
     }
@@ -68,18 +71,18 @@ function stepTargetIsInternalParallel(
 
   for (const inc of parsed.includes) {
     const incPath = path.resolve(dir, inc.trim());
-    if (existsSync(incPath)) {
-      const incContent = readFileSync(incPath, "utf8");
-      const incParsed = parseMakefile(incContent);
-      for (const [k, v] of incParsed.targets) {
-        if (!parsed.targets.has(k)) {
-          parsed.targets.set(k, v);
-        }
+    const incContent = await scanContext.readTextFileOrWarn(incPath);
+    if (incContent === undefined) { continue; }
+
+    const incParsed = parseMakefile(incContent);
+    for (const [k, v] of incParsed.targets) {
+      if (!parsed.targets.has(k)) {
+        parsed.targets.set(k, v);
       }
-      for (const [k, v] of incParsed.variables) {
-        if (!parsed.variables.has(k)) {
-          parsed.variables.set(k, v);
-        }
+    }
+    for (const [k, v] of incParsed.variables) {
+      if (!parsed.variables.has(k)) {
+        parsed.variables.set(k, v);
       }
     }
   }
@@ -159,7 +162,11 @@ interface DelinquentStep {
   kind: "make" | "cmake";
 }
 
-function collectDelinquentSteps(workflow: WorkflowDocument, job: WorkflowJob): DelinquentStep[] {
+async function collectDelinquentSteps(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  scanContext?: RepositoryScanContext,
+): Promise<DelinquentStep[]> {
   const result: DelinquentStep[] = [];
   for (const step of job.steps) {
     const run = step.run?.trim();
@@ -183,7 +190,7 @@ function collectDelinquentSteps(workflow: WorkflowDocument, job: WorkflowJob): D
     if (hasParallelEnv(workflow, job, step)) {
       continue;
     }
-    if (kind === "make" && stepTargetIsInternalParallel(workflow, job, step)) {
+    if (kind === "make" && (await stepTargetIsInternalParallel(workflow, job, step, scanContext))) {
       continue;
     }
     if (kind === "cmake" && jobUsesNinja(job)) {
@@ -215,11 +222,12 @@ function formatSuggestion(delinquent: DelinquentStep[]): string {
 
 export const missingMakeJFlagRule = {
   meta,
-  check(workflow: WorkflowDocument, _context: RuleContext) {
-    const findings = [];
+  async check(workflow: WorkflowDocument, context: RuleContext) {
+    const findings: Diagnostic[] = [];
+    const { scanContext } = context;
 
     for (const job of workflow.jobs) {
-      const delinquent = collectDelinquentSteps(workflow, job);
+      const delinquent = await collectDelinquentSteps(workflow, job, scanContext);
       if (delinquent.length === 0) {
         continue;
       }

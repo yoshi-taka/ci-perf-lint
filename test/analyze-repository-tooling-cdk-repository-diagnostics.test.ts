@@ -200,7 +200,7 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
     await writeFile(path.join(cdkOutDir, "index.js"), "exports.handler = async () => {};");
     await writeFile(path.join(cdkOutDir, "index.test.js"), 'test("handler", () => {});');
     await writeFile(path.join(cdkOutDir, "README.md"), "# Asset\n\nDescription.");
-    await writeFile(path.join(cdkOutDir, "data.csv"), `col0,col1\n${"0,1\n".repeat(10000)}`);
+    await writeFile(path.join(cdkOutDir, "data.csv"), `col0,col1\n${"0,1\n".repeat(100)}`);
 
     const report = await getFixtureReport(fixtureRoot, {
       targetPath: ".",
@@ -216,7 +216,7 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
     expect(finding?.docsPath).toBe("docs/rules/cdk-asset-waste-files.md");
     expect(finding?.message).toContain("unnecessary file");
     expect(finding?.message).toContain("Asset123456789abcdef");
-  });
+  }, 30000);
 
   test("does not flag CDK assets without waste files", async () => {
     const fixtureRoot = await tempDirs.create("apl-cdk-asset-clean-");

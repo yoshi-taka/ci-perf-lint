@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
@@ -95,28 +95,35 @@ function anyWorkflowHasSparseCheckout(workflows: WorkflowDocument[]): boolean {
   return workflows.some((w) => w.source!.includes("sparse-checkout"));
 }
 
-const gitTrackedFilesCache = new Map<string, string[] | null>();
+const gitTrackedFilesCache = new Map<string, Promise<string[] | null>>();
 
-function getGitTrackedFiles(repoRoot: string): string[] | null {
+async function getGitTrackedFiles(repoRoot: string): Promise<string[] | null> {
   const cached = gitTrackedFilesCache.get(repoRoot);
   if (cached !== undefined) {
     return cached;
   }
-  try {
-    const proc = spawnSync("git", ["-C", repoRoot, "ls-files", "-z"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      encoding: "utf8",
-    });
-    const result: string[] | null =
-      proc.status !== 0 || proc.error || !proc.stdout
+  const promise = (async (): Promise<string[] | null> => {
+    try {
+      const proc = spawn("git", ["-C", repoRoot, "ls-files", "-z"], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      const chunks: Buffer[] = [];
+      for await (const chunk of proc.stdout) {
+        chunks.push(chunk);
+      }
+      const stdout = Buffer.concat(chunks).toString("utf8");
+      const exitCode = await new Promise<number>((resolve) => {
+        proc.on("close", resolve);
+      });
+      return exitCode !== 0 || !stdout
         ? null
-        : proc.stdout.split("\0").filter(Boolean);
-    gitTrackedFilesCache.set(repoRoot, result);
-    return result;
-  } catch {
-    gitTrackedFilesCache.set(repoRoot, null);
-    return null;
-  }
+        : stdout.split("\0").filter(Boolean);
+    } catch {
+      return null;
+    }
+  })();
+  gitTrackedFilesCache.set(repoRoot, promise);
+  return promise;
 }
 
 export async function collectLargeFileDiagnostics(
@@ -134,7 +141,7 @@ export async function collectLargeFileDiagnostics(
 
   const isLargeFile = (p: string) => largeFileSuffixes.some((s) => p.toLowerCase().endsWith(s));
 
-  const gitFiles = getGitTrackedFiles(repoRoot);
+  const gitFiles = await getGitTrackedFiles(repoRoot);
   let candidates: string[] = gitFiles
     ? gitFiles.filter(isLargeFile)
     : await ctx.walkFiles(".", {
@@ -150,19 +157,25 @@ export async function collectLargeFileDiagnostics(
   }
 
   const scanned: ScannedFile[] = [];
+  const CHUNK = 64;
 
-  for (const file of candidates) {
-    try {
-      const stats = await stat(ctx.resolve(file));
-      if (stats.isFile() && stats.size > 0) {
-        scanned.push({
-          path: file,
-          size: stats.size,
-          isCsvData: isCsvDataFile(file),
-        });
-      }
-    } catch {
-      // skip files that can't be stat'd
+  for (let i = 0; i < candidates.length; i += CHUNK) {
+    const chunk = candidates.slice(i, i + CHUNK);
+    const results = await Promise.all(
+      chunk.map(async (file) => {
+        try {
+          const stats = await stat(ctx.resolve(file));
+          if (stats.isFile() && stats.size > 0) {
+            return { path: file, size: stats.size, isCsvData: isCsvDataFile(file) } satisfies ScannedFile;
+          }
+        } catch {
+          // skip files that can't be stat'd
+        }
+        return null;
+      }),
+    );
+    for (const r of results) {
+      if (r) { scanned.push(r); }
     }
   }
 

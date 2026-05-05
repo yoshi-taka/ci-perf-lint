@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { evaluateRules, type RuleContext } from "../src/rule-engine.ts";
+import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 import { parseWorkflow } from "../src/workflow.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
 import {
@@ -318,7 +319,7 @@ describe("makefile-parser", () => {
       const filePath = path.join(workflowDir, "test.yml");
       await writeFile(filePath, yaml);
       const workflow = parseWorkflow(filePath, tmpDir, yaml);
-      const context: RuleContext = { repository: createSignals() };
+      const context: RuleContext = { repository: createSignals(), scanContext: new RepositoryScanContext(tmpDir, []) };
       const result = await evaluateRules(workflow, context);
 
       const makeFindings = result.filter((d) => d.ruleId === "missing-make-j-flag");
@@ -350,7 +351,7 @@ describe("makefile-parser", () => {
       const filePath = path.join(workflowDir, "test.yml");
       await writeFile(filePath, yaml);
       const workflow = parseWorkflow(filePath, tmpDir, yaml);
-      const context: RuleContext = { repository: createSignals() };
+      const context: RuleContext = { repository: createSignals(), scanContext: new RepositoryScanContext(tmpDir, []) };
       const result = await evaluateRules(workflow, context);
 
       const makeFindings = result.filter((d) => d.ruleId === "missing-make-j-flag");
@@ -377,7 +378,7 @@ describe("makefile-parser", () => {
       const filePath = path.join(workflowDir, "test.yml");
       await writeFile(filePath, yaml);
       const workflow = parseWorkflow(filePath, tmpDir, yaml);
-      const context: RuleContext = { repository: createSignals() };
+      const context: RuleContext = { repository: createSignals(), scanContext: new RepositoryScanContext(tmpDir, []) };
       const result = await evaluateRules(workflow, context);
 
       const makeFindings = result.filter((d) => d.ruleId === "missing-make-j-flag");

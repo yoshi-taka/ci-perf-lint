@@ -1,6 +1,6 @@
 import type { Dirent } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { spawn, spawnSync as nodeSpawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { dependencySectionsOf } from "./repository-package-helpers.ts";
 import { hasBun } from "./bun.ts";
@@ -116,18 +116,32 @@ export class RepositoryScanContext {
 
   async estimatedFileCount(): Promise<number | null> {
     try {
-      const useBun = hasBun;
-      const proc = useBun
-        ? Bun.spawnSync(["git", "-C", this.repoRoot, "ls-files"], {
-            stdio: ["ignore", "pipe", "pipe"],
-          })
-        : nodeSpawnSync("git", ["-C", this.repoRoot, "ls-files"], {
-            stdio: ["ignore", "pipe", "pipe"],
-          });
-      const exitCode = "exitCode" in proc ? proc.exitCode : proc.status;
-      if (exitCode === 0) {
-        const stdout = proc.stdout.toString();
-        return stdout === "" ? 0 : stdout.trimEnd().split("\n").length;
+      if (hasBun) {
+        const proc = Bun.spawn(["git", "-C", this.repoRoot, "ls-files"], {
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        const [exitCode, stdout] = await Promise.all([
+          proc.exited,
+          new Response(proc.stdout).text(),
+        ]);
+        if (exitCode === 0) {
+          return stdout === "" ? 0 : stdout.trimEnd().split("\n").length;
+        }
+      } else {
+        const proc = spawn("git", ["-C", this.repoRoot, "ls-files"], {
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        const chunks: string[] = [];
+        for await (const chunk of proc.stdout) {
+          chunks.push(chunk.toString());
+        }
+        const stdout = chunks.join("");
+        const exitCode = await new Promise<number>((resolve) => {
+          proc.on("close", resolve);
+        });
+        if (exitCode === 0) {
+          return stdout === "" ? 0 : stdout.trimEnd().split("\n").length;
+        }
       }
     } catch {
       // git not available
@@ -321,24 +335,43 @@ export class RepositoryScanContext {
     return this.#rgFileListPromise;
   }
 
-  static #resolveRgPath(): string | null {
+  static async #resolveRgPath(): Promise<string | null> {
     if (this.#rgPath !== undefined) {
       return this.#rgPath;
     }
 
     try {
-      const result = hasBun
-        ? Bun.spawnSync(["which", "rg"], { stdio: ["ignore", "pipe", "pipe"] })
-        : nodeSpawnSync("which", ["rg"], { stdio: ["ignore", "pipe", "pipe"] });
-      const exitCode = "exitCode" in result ? result.exitCode : result.status;
-      if (exitCode !== 0) {
-        this.#rgPath = null;
-        return null;
+      if (hasBun) {
+        const proc = Bun.spawn(["which", "rg"], { stdio: ["ignore", "pipe", "pipe"] });
+        const [exitCode, stdout] = await Promise.all([
+          proc.exited,
+          new Response(proc.stdout).text(),
+        ]);
+        if (exitCode !== 0) {
+          this.#rgPath = null;
+          return null;
+        }
+        const resolved = stdout.trim();
+        this.#rgPath = resolved.length > 0 ? resolved : null;
+        return this.#rgPath;
+      } else {
+        const proc = spawn("which", ["rg"], { stdio: ["ignore", "pipe", "pipe"] });
+        const chunks: string[] = [];
+        for await (const chunk of proc.stdout) {
+          chunks.push(chunk.toString());
+        }
+        const stdout = chunks.join("");
+        const exitCode = await new Promise<number>((resolve) => {
+          proc.on("close", resolve);
+        });
+        if (exitCode !== 0) {
+          this.#rgPath = null;
+          return null;
+        }
+        const resolved = stdout.trim();
+        this.#rgPath = resolved.length > 0 ? resolved : null;
+        return this.#rgPath;
       }
-
-      const resolved = result.stdout.toString().trim();
-      this.#rgPath = resolved.length > 0 ? resolved : null;
-      return this.#rgPath;
     } catch {
       this.#rgPath = null;
       return null;
@@ -347,7 +380,7 @@ export class RepositoryScanContext {
 
   async #doRgFileList(): Promise<string[] | null> {
     try {
-      const rgPath = RepositoryScanContext.#resolveRgPath();
+      const rgPath = await RepositoryScanContext.#resolveRgPath();
       if (rgPath === null) {
         return null;
       }

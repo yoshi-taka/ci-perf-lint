@@ -298,9 +298,15 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   }
   timer.mark("embedded-oxlint-prewarm");
 
-  const parsedWorkflowResults = await Promise.allSettled(
-    allWorkflowFiles.map((workflowPath) => parseWorkflowFile(workflowPath, target.repoRoot)),
-  );
+  const parsedWorkflowResults: PromiseSettledResult<ParsedWorkflowDocument>[] = [];
+  const CONCURRENCY = 32;
+  for (let i = 0; i < allWorkflowFiles.length; i += CONCURRENCY) {
+    const chunk = allWorkflowFiles.slice(i, i + CONCURRENCY);
+    const results = await Promise.allSettled(
+      chunk.map((workflowPath) => parseWorkflowFile(workflowPath, target.repoRoot)),
+    );
+    parsedWorkflowResults.push(...results);
+  }
   timer.mark("parse-workflows");
 
   const parsedWorkflows: (
@@ -334,38 +340,35 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   analysisWarnings.push(...repositoryAnalysis.warnings);
   const ruleContext = {
     repository: repositoryAnalysis.signals,
+    scanContext,
   };
 
   const allFindings: Diagnostic[] = [];
+  const ruleFindingCounts = new Map<string, number>();
 
-  const workflowResults = await Promise.all(
-    parsedWorkflows.map((workflow) =>
-      evaluateRules(workflow, ruleContext, analysisWarnings).then((findings) =>
-        findings.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
+  const [wfFindings, repoDiagnostics] = await Promise.all([
+    Promise.all(
+      parsedWorkflows.map((workflow) =>
+        evaluateRules(workflow, ruleContext, analysisWarnings, ruleFindingCounts).then((findings) =>
+          findings.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
+        ),
       ),
-    ),
-  );
+    ).then((results) => results.flat()),
+    !workflowOnly
+      ? collectRepositoryDiagnostics({
+          repoRoot: target.repoRoot,
+          repository: ruleContext.repository,
+          workflows: githubWorkflows,
+          warnings: analysisWarnings,
+          scanContext,
+        }).then((diags) =>
+            diags.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
+          )
+      : Promise.resolve([] as Diagnostic[]),
+  ]);
 
-  for (const findings of workflowResults) {
-    allFindings.push(...findings);
-  }
-  timer.mark("evaluate-workflow-rules");
-
-  if (!workflowOnly) {
-    const repositoryDiagnostics = await collectRepositoryDiagnostics({
-      repoRoot: target.repoRoot,
-      repository: ruleContext.repository,
-      workflows: githubWorkflows,
-      warnings: analysisWarnings,
-      scanContext,
-    });
-    for (const finding of repositoryDiagnostics) {
-      if (findingIncludedInScope(finding, workflowOnly, repositoryOnly)) {
-        allFindings.push(finding);
-      }
-    }
-  }
-  timer.mark("collect-repository-diagnostics");
+  allFindings.push(...wfFindings, ...repoDiagnostics);
+  timer.mark("evaluate-rules-and-diagnostics");
 
   scanContext.clearCaches();
 

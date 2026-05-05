@@ -221,26 +221,47 @@ Completed tenth slice:
 
 Current rough sizes:
 
-- `src/repository-tooling-signals.ts`: about 514 lines
-- `src/repository-diagnostics/dockerfile-instructions.ts`: about 529 lines
-- `src/repository-diagnostics/docker-build-targets.ts`: about 465 lines
-- `src/repository-diagnostics/embedded-oxlint-runner.ts`: about 417 lines
-- `src/repository-similar-workflows.ts`: about 333 lines
-- `src/repository-signals.ts`: about 269 lines
-- `src/repository-diagnostics/embedded-oxlint.ts`: about 258 lines
-- `src/reporters.ts`: about 2 lines
-- `src/rules/shared/similar-workflow-consensus.ts`: about 22 lines
-- `test/analyze-repository-workflow-rules-docker-build-context.test.ts`: about 1443 lines
-- `test/analyze-repository-tooling-cache-and-runtime.test.ts`: about 1318 lines
-- `test/analyze-repository-workflow-rules-general.test.ts`: about 1083 lines
-- `test/analyze-repository-workflow-rules-general-context.test.ts`: about 1036 lines
-- `test/analyze-repository-tooling-python-repository-diagnostics.test.ts`: about 756 lines
-- `test/analyze-repository-tooling-python-package-repository-diagnostics.test.ts`: about 703 lines
-- `test/analyze-repository-tooling-consensus-and-gates.test.ts`: about 528 lines
-- `test/analyze-repository-tooling-javascript-repository-diagnostics.test.ts`: about 415 lines
-- `src/repository-diagnostics/index.ts`: about 52 lines
-- `src/repository-diagnostics/imports.ts`: now thin
-- `src/repository-diagnostics/docker.ts`: now a thin orchestrator
+Implementation modules:
+- `src/repository-tooling-signals.ts`: 596 lines
+- `src/repository-diagnostics/dockerfile-instructions.ts`: 529 lines
+- `src/repository-diagnostics/docker-build-targets.ts`: 461 lines
+- `src/repository-diagnostics/docker-build-context-diagnostics.ts`: 360 lines
+- `src/repository-diagnostics/embedded-oxlint-runner.ts`: 416 lines
+- `src/repository-signals.ts`: 289 lines
+- `src/repository-similar-workflows.ts`: 288 lines
+- `src/repository-diagnostics/imports-shared.ts`: 226 lines
+- `src/repository-diagnostics/docker-image-diagnostics.ts`: 172 lines
+- `src/repository-diagnostics/imports-metadata.ts`: 158 lines
+- `src/repository-diagnostics/imports.ts`: 124 lines
+- `src/repository-diagnostics/imports-direct-import-diagnostics.ts`: 95 lines
+- `src/repository-diagnostics/embedded-oxlint.ts`: 240 lines
+- `src/repository-diagnostics/index.ts`: 81 lines
+- `src/repository-diagnostics/docker.ts`: 38 lines
+- `src/reporters.ts`: 2 lines
+- `src/rules/shared/similar-workflow-consensus.ts`: 22 lines
+- `src/rules/shared/workflows.ts`: 4 lines
+
+Test files:
+- `test/analyze-repository-workflow-rules-docker-build-context.test.ts`: 633 lines (was 1443, split)
+- `test/analyze-repository-workflow-rules-docker-build-patterns.test.ts`: 329 lines (new)
+- `test/analyze-repository-workflow-rules-docker-go-rules.test.ts`: 229 lines (new)
+- `test/analyze-repository-workflow-rules-docker-misc.test.ts`: 294 lines (new)
+- `test/analyze-repository-tooling-cache-and-runtime.test.ts`: 435 lines (was 1097, split)
+- `test/analyze-repository-tooling-repeated-install-diagnostics.test.ts`: 430 lines (new)
+- `test/analyze-repository-tooling-lint-only-job-diagnostics.test.ts`: 260 lines (new)
+- `test/analyze-repository-workflow-rules-general-context.test.ts`: 216 lines (split)
+- `test/analyze-repository-workflow-rules-general-context-heavy-jobs.test.ts`: 359 lines (new)
+- `test/analyze-repository-workflow-rules-general-context-upload-artifact.test.ts`: 527 lines (new)
+- `test/analyze-repository-workflow-rules-general.test.ts`: 267 lines (split)
+- `test/analyze-repository-workflow-rules-general-consensus-context.test.ts`: 631 lines (new)
+- `test/analyze-repository-workflow-rules-general-stacked-diff-context.test.ts`: 213 lines (new)
+- `test/analyze-repository-workflow-rules-release-and-scope.test.ts`: 772 lines
+- `test/analyze-repository-tooling-python-repository-diagnostics.test.ts`: 329 lines (was 763, split)
+- `test/analyze-repository-tooling-python-package-repository-diagnostics.test.ts`: 580 lines (was 703, split)
+- `test/analyze-repository-tooling-python-heavy-init-pyramid-diagnostics.test.ts`: 441 lines (new)
+- `test/analyze-repository-tooling-python-uv-installer-diagnostics.test.ts`: 130 lines (new)
+- `test/analyze-repository-tooling-consensus-and-gates.test.ts`: 527 lines
+- `test/analyze-repository-tooling-javascript-repository-diagnostics.test.ts`: 295 lines
 
 Verification for the completed slices:
 
@@ -276,22 +297,17 @@ Learnings:
 
 ## Priority 3: Split Python Package Repository Diagnostics Tests
 
-Status: pending, still relevant.
+Status: done.
 
-The largest remaining test-side hotspot is the Python package diagnostics cluster.
+The original largest remaining test-side hotspot was the Python diagnostics cluster (763 + 703 lines).
+It is now split into four files:
 
-Suggested split:
+- `test/analyze-repository-tooling-python-repository-diagnostics.test.ts`: 329 lines (pytest only)
+- `test/analyze-repository-tooling-python-heavy-init-pyramid-diagnostics.test.ts`: 441 lines (heavy client init + pyramid config.scan)
+- `test/analyze-repository-tooling-python-package-repository-diagnostics.test.ts`: 580 lines (mypy + pydantic)
+- `test/analyze-repository-tooling-python-uv-installer-diagnostics.test.ts`: 130 lines (tox/hatch/pdm/nox uv installer)
 
-- `pytest` and `pyramid`
-- `mypy` and `pydantic`
-
-Keep fixture wiring and assertion wording unchanged.
-
-Expected benefit:
-
-- Python config-scan tests stay separate from package-version and dependency-bundle tests.
-- Search cost drops when editing Python repository rules.
-- Future Python rule additions have a clearer destination.
+Each file follows existing describe-block boundaries. All 43 Python tests pass deterministically.
 
 ## Priority 4: Re-evaluate The Next Implementation Hotspot
 
@@ -304,16 +320,26 @@ Result:
 - implementation hotspots were re-evaluated from current facts
 - already-thin orchestration files are no longer priority targets
 
-Current likely next targets:
+Current likely next targets (sorted by current line count):
 
-- `test/analyze-repository-tooling-python-package-repository-diagnostics.test.ts`
-- `test/analyze-repository-tooling-consensus-and-gates.test.ts`
-- `test/analyze-repository-tooling-python-repository-diagnostics.test.ts`
-- `test/analyze-repository-workflow-rules-docker-build-context.test.ts`
-- `test/analyze-repository-tooling-cache-and-runtime.test.ts`
-- `src/repository-tooling-signals.ts`
-- `src/repository-diagnostics/dockerfile-instructions.ts`
-- `src/repository-diagnostics/embedded-oxlint-runner.ts`
+- `test/analyze-repository-workflow-rules-docker-build-context.test.ts`: 633 lines (was 1443, split)
+- `test/analyze-repository-workflow-rules-docker-build-patterns.test.ts`: 329 lines
+- `test/analyze-repository-workflow-rules-docker-go-rules.test.ts`: 229 lines
+- `test/analyze-repository-workflow-rules-docker-misc.test.ts`: 294 lines
+- `test/analyze-repository-tooling-cache-and-runtime.test.ts`: 1097 lines
+- `test/analyze-repository-workflow-rules-general.test.ts`: 267 lines (was 1084, split)
+- `test/analyze-repository-workflow-rules-general-context.test.ts`: 216 lines (was 1070, split)
+- `test/analyze-repository-workflow-rules-release-and-scope.test.ts`: 772 lines
+- `test/analyze-repository-tooling-python-repository-diagnostics.test.ts`: 329 lines (was 763, split)
+- `test/analyze-repository-tooling-python-package-repository-diagnostics.test.ts`: 580 lines (was 703, split)
+- `test/analyze-repository-tooling-python-heavy-init-pyramid-diagnostics.test.ts`: 441 lines (new)
+- `test/analyze-repository-tooling-python-uv-installer-diagnostics.test.ts`: 130 lines (new)
+- `test/analyze-repository-tooling-consensus-and-gates.test.ts`: 527 lines
+- `src/repository-tooling-signals.ts`: 596 lines
+- `src/repository-diagnostics/dockerfile-instructions.ts`: 529 lines
+- `src/repository-diagnostics/docker-build-targets.ts`: 461 lines
+- `src/repository-diagnostics/embedded-oxlint-runner.ts`: 416 lines
+- `src/repository-diagnostics/docker-build-context-diagnostics.ts`: 360 lines
 
 ## Priority 5: Split Workflow Shared Helpers by Responsibility
 
@@ -408,11 +434,13 @@ Start with stale-map cleanup:
 
 Then prefer large test-file splits over implementation churn:
 
-1. Split the remaining Python diagnostics test clusters.
-2. Split `test/analyze-repository-workflow-rules-docker-build-context.test.ts` by behavior family.
-3. Split `test/analyze-repository-tooling-cache-and-runtime.test.ts` by rule family or runtime family.
-4. Re-check actual file sizes before touching implementation modules again.
-5. Only then choose between `dockerfile-instructions.ts`, `repository-tooling-signals.ts`, or `embedded-oxlint-runner.ts`.
+1. ~~Split `test/analyze-repository-workflow-rules-general.test.ts` (1084 lines) by rule family.~~ done.
+2. ~~Split `test/analyze-repository-workflow-rules-general-context.test.ts` (1070 lines) by context area.~~ done.
+3. ~~Split the remaining Python diagnostics test clusters (763 + 703 lines).~~ done.
+4. ~~Split `test/analyze-repository-workflow-rules-docker-build-context.test.ts` (1443 lines) by behavior family.~~ done.
+5. ~~Split `test/analyze-repository-tooling-cache-and-runtime.test.ts` (1097 lines) by rule family or runtime family.~~ done.
+6. Re-check actual file sizes before touching implementation modules again.
+7. Only then choose between `dockerfile-instructions.ts`, `repository-tooling-signals.ts`, or `embedded-oxlint-runner.ts`.
 
 Run after each slice:
 

@@ -78,4 +78,5 @@ export interface RuleMeta {
   confidence: Confidence;
   docsPath: string;
   scope?: "github-actions" | "buildkite" | "gitlab-ci" | "circleci" | "both";
+  maxFindings?: number;
 }

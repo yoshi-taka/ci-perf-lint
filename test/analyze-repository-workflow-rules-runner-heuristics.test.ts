@@ -11,6 +11,20 @@ afterEach(async () => {
   await tempDirs.cleanup();
 });
 
+type SimpleRunnerCase = {
+  name: string;
+  fixture: string;
+  ruleId: string;
+  mode: "exploratory" | "strict";
+  expectFinding: boolean;
+  severity?: "error" | "warning" | "suggestion";
+  messageContains?: string[];
+  suggestionContains?: string;
+};
+
+const baseOptions = (mode: "exploratory" | "strict") =>
+  ({ targetPath: ".", topCount: 20, mode }) as const;
+
 describe("analyzeRepository workflow and execution rules: docker and runner heuristics", () => {
   test("suggests reconsidering Alpine or musl images for real CI execution paths", async () => {
     const report = await memoizedAnalyzeRepository({
@@ -37,88 +51,42 @@ describe("analyzeRepository workflow and execution rules: docker and runner heur
     ).toBe(false);
   });
 
-  test("warns when an ARM-only Docker build relies on QEMU emulation", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.qemuArmLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
+  describe("simple positive and negative cases", () => {
+    const simpleCases: SimpleRunnerCase[] = [
+      { name: "warns when an ARM-only Docker build relies on QEMU emulation", fixture: fixtures.qemuArmLike, ruleId: "prefer-native-arm-runner-over-qemu", mode: "strict", expectFinding: true, severity: "warning", messageContains: ['Job "docker" uses QEMU', "linux/arm64"], suggestionContains: "native arm64 runner" },
+      { name: "keeps QEMU guidance advisory for mixed amd64 and arm64 Docker builds", fixture: fixtures.qemuMultiPlatformLike, ruleId: "prefer-native-arm-runner-over-qemu", mode: "exploratory", expectFinding: true, severity: "suggestion", messageContains: ["linux/amd64, linux/arm64"], suggestionContains: "multiple native Buildx nodes" },
+      { name: "does not flag QEMU when the visible Docker build does not target ARM", fixture: fixtures.qemuUnusedLike, ruleId: "prefer-native-arm-runner-over-qemu", mode: "exploratory", expectFinding: false },
+      { name: "does not flag QEMU when the job already runs on a visible ARM runner", fixture: fixtures.qemuArmNativeRunnerOk, ruleId: "prefer-native-arm-runner-over-qemu", mode: "exploratory", expectFinding: false },
+      { name: "detects shell-based docker buildx ARM targets too", fixture: fixtures.qemuShellBuildxLike, ruleId: "prefer-native-arm-runner-over-qemu", mode: "exploratory", expectFinding: true, severity: "suggestion", messageContains: ["linux/amd64, linux/arm64"] },
+      { name: "does not recommend arm64 API CLI runners when already arm64 or containerized", fixture: fixtures.apiDeployArmRunnerOk, ruleId: "prefer-standard-arm-runner-for-api-cli", mode: "exploratory", expectFinding: false },
+      { name: "does not recommend arm64 portable tooling runners when already arm64, containerized, or mixed with typecheck", fixture: fixtures.portableToolingArmRunnerOk, ruleId: "prefer-standard-arm-runner-for-portable-tooling", mode: "strict", expectFinding: false },
+      { name: "does not flag D:\\ drive paths, expressions, or non-Windows runners", fixture: fixtures.avoidCDriveOnWindowsRunnerOk, ruleId: "avoid-c-drive-on-windows-runner", mode: "strict", expectFinding: false },
+      { name: "does not flag slim Debian-based container images", fixture: fixtures.slimCiLike, ruleId: "consider-slim-over-alpine-for-ci", mode: "exploratory", expectFinding: false },
+      { name: "warns when cargo build precedes cargo test with identical conditions", fixture: fixtures.cargoBuildBeforeTestLike, ruleId: "cargo-build-before-test", mode: "strict", expectFinding: true, severity: "warning", messageContains: ['Job "test"', "cargo build", "cargo test"] },
+      { name: "does not flag cargo build before cargo test when build conditions differ", fixture: fixtures.cargoBuildBeforeTestOk, ruleId: "cargo-build-before-test", mode: "strict", expectFinding: false },
+    ];
+
+    test.each(simpleCases)("$name", async ({ fixture, ruleId, mode, expectFinding, severity, messageContains, suggestionContains }) => {
+      const report = await memoizedAnalyzeRepository({ cwd: fixture, ...baseOptions(mode) });
+
+      if (!expectFinding) {
+        expect(report.findings.some((c) => c.ruleId === ruleId)).toBe(false);
+        return;
+      }
+
+      const finding = report.findings.find((c) => c.ruleId === ruleId);
+      expect(finding).toBeDefined();
+      expect(report.workflowCount).toBe(1);
+      expect(finding!.severity).toBe(severity!);
+      if (messageContains) {
+        for (const msg of messageContains) {
+          expect(finding!.message).toContain(msg);
+        }
+      }
+      if (suggestionContains) {
+        expect(finding!.suggestion).toContain(suggestionContains);
+      }
     });
-
-    const finding = report.findings.find(
-      (candidate) => candidate.ruleId === "prefer-native-arm-runner-over-qemu",
-    );
-
-    expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("warning");
-    expect(finding?.message).toContain('Job "docker" uses QEMU');
-    expect(finding?.message).toContain("linux/arm64");
-    expect(finding?.suggestion).toContain("native arm64 runner");
-  });
-
-  test("keeps QEMU guidance advisory for mixed amd64 and arm64 Docker builds", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.qemuMultiPlatformLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    const finding = report.findings.find(
-      (candidate) => candidate.ruleId === "prefer-native-arm-runner-over-qemu",
-    );
-
-    expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("suggestion");
-    expect(finding?.message).toContain("linux/amd64, linux/arm64");
-    expect(finding?.suggestion).toContain("multiple native Buildx nodes");
-  });
-
-  test("does not flag QEMU when the visible Docker build does not target ARM", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.qemuUnusedLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "prefer-native-arm-runner-over-qemu",
-      ),
-    ).toBe(false);
-  });
-
-  test("does not flag QEMU when the job already runs on a visible ARM runner", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.qemuArmNativeRunnerOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "prefer-native-arm-runner-over-qemu",
-      ),
-    ).toBe(false);
-  });
-
-  test("detects shell-based docker buildx ARM targets too", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.qemuShellBuildxLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    const finding = report.findings.find(
-      (candidate) => candidate.ruleId === "prefer-native-arm-runner-over-qemu",
-    );
-
-    expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("suggestion");
-    expect(finding?.message).toContain("linux/amd64, linux/arm64");
   });
 
   test("recommends standard arm64 runners for API-bound CLI commands", async () => {
@@ -151,21 +119,6 @@ describe("analyzeRepository workflow and execution rules: docker and runner heur
     expect(pulumiFinding?.suggestion).toContain("ubuntu-22.04-arm");
   });
 
-  test("does not recommend arm64 API CLI runners when already arm64 or containerized", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.apiDeployArmRunnerOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "prefer-standard-arm-runner-for-api-cli",
-      ),
-    ).toBe(false);
-  });
-
   test("recommends standard arm64 runners for portable fast tooling", async () => {
     const report = await memoizedAnalyzeRepository({
       cwd: fixtures.portableToolingArmRunnerLike,
@@ -193,21 +146,6 @@ describe("analyzeRepository workflow and execution rules: docker and runner heur
     expect(actionlintFinding?.severity).toBe("warning");
   });
 
-  test("does not recommend arm64 portable tooling runners when already arm64, containerized, or mixed with typecheck", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.portableToolingArmRunnerOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "prefer-standard-arm-runner-for-portable-tooling",
-      ),
-    ).toBe(false);
-  });
-
   test("warns when Windows runners hardcode C:\\ drive paths", async () => {
     const report = await memoizedAnalyzeRepository({
       cwd: fixtures.avoidCDriveOnWindowsRunnerLike,
@@ -227,32 +165,6 @@ describe("analyzeRepository workflow and execution rules: docker and runner heur
     expect(findings.some((f) => f.message.includes('env "TMP"'))).toBe(true);
     expect(findings.some((f) => f.message.includes('"path" input'))).toBe(true);
     expect(findings.some((f) => f.message.includes("sets working-directory"))).toBe(true);
-  });
-
-  test("does not flag D:\\ drive paths, expressions, or non-Windows runners", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.avoidCDriveOnWindowsRunnerOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "avoid-c-drive-on-windows-runner"),
-    ).toBe(false);
-  });
-
-  test("does not flag slim Debian-based container images", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.slimCiLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "consider-slim-over-alpine-for-ci"),
-    ).toBe(false);
   });
 
   test("finds workflow-local cache, timeout, checkout, and build repetition hints", async () => {
@@ -378,39 +290,6 @@ describe("analyzeRepository workflow and execution rules: docker and runner heur
           finding.ruleId === "duplicate-checkout-in-same-workflow" ||
           finding.ruleId === "repeated-build-in-same-workflow",
       ),
-    ).toBe(false);
-  });
-
-  test("warns when cargo build precedes cargo test with identical conditions", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.cargoBuildBeforeTestLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const finding = report.findings.find(
-      (candidate) => candidate.ruleId === "cargo-build-before-test",
-    );
-
-    expect(report.workflowCount).toBe(1);
-    expect(finding).toBeDefined();
-    expect(finding?.severity).toBe("warning");
-    expect(finding?.message).toContain('Job "test"');
-    expect(finding?.message).toContain("cargo build");
-    expect(finding?.message).toContain("cargo test");
-  });
-
-  test("does not flag cargo build before cargo test when build conditions differ", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.cargoBuildBeforeTestOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "cargo-build-before-test"),
     ).toBe(false);
   });
 

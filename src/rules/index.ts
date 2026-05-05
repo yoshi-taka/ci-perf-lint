@@ -59,11 +59,15 @@ import { preferJest30ForJest29Rule } from "./prefer-jest-30-for-jest-29.ts";
 import { preferRuffFormatOverBlackRule } from "./prefer-ruff-format-over-black.ts";
 import { preferOxlintOverEslintRule } from "./prefer-oxlint-over-eslint.ts";
 import { preferOxfmtOverPrettierRule } from "./prefer-oxfmt-over-prettier.ts";
-import { preferNextjs12MinorPerformanceMilestoneRule } from "./prefer-nextjs-12-minor-performance-milestone.ts";
-import { preferNextjs13MinorPerformanceMilestoneRule } from "./prefer-nextjs-13-minor-performance-milestone.ts";
-import { preferNextjs14MinorPerformanceMilestoneRule } from "./prefer-nextjs-14-minor-performance-milestone.ts";
-import { preferStorybook6MinorPerformanceMilestoneRule } from "./prefer-storybook-6-minor-performance-milestone.ts";
-import { preferStorybook7MinorPerformanceMilestoneRule } from "./prefer-storybook-7-minor-performance-milestone.ts";
+import {
+  preferNextjs12MinorPerformanceMilestoneRule,
+  preferNextjs13MinorPerformanceMilestoneRule,
+  preferNextjs14MinorPerformanceMilestoneRule,
+} from "./prefer-nextjs-minor-performance-milestone.ts";
+import {
+  preferStorybook6MinorPerformanceMilestoneRule,
+  preferStorybook7MinorPerformanceMilestoneRule,
+} from "./prefer-storybook-minor-performance-milestone.ts";
 import { preferTailwindV4UpgradeToolRule } from "./prefer-tailwind-v4-upgrade-tool.ts";
 import { preferNativeArmRunnerOverQemuRule } from "./prefer-native-arm-runner-over-qemu.ts";
 import { preferNodeRunOverNpmRunRule } from "./prefer-node-run-over-npm-run.ts";

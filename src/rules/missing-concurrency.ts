@@ -24,6 +24,7 @@ const meta = {
   severity: "suggestion",
   confidence: "high",
   docsPath: "docs/rules/missing-concurrency.md",
+  maxFindings: 3,
 } satisfies RuleMeta;
 
 export const missingConcurrencyRule = {

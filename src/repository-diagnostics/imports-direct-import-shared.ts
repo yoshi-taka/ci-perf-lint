@@ -99,7 +99,7 @@ export function createMuiBarrelImportContent(
   };
 }
 
-interface MakeContentOptions {
+export interface MakeContentOptions {
   defaultContextText: string;
   flaggedDescription: string;
   why: string;

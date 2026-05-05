@@ -37,8 +37,22 @@ Repository-wide diagnostics:
 - Repository signal types: `src/repository-signals-types.ts`
 - Repository diagnostic builder: `src/repository-diagnostics/diagnostics.ts`
 - Large current hotspots:
-  - `src/repository-tooling-signals.ts`
-  - `src/repository-diagnostics/dockerfile-instructions.ts`
+  - `src/repository-diagnostics/dockerfile-instructions.ts` (529 lines)
+  - `src/repository-diagnostics/docker-build-targets.ts` (461 lines)
+  - `src/repository-diagnostics/embedded-oxlint-runner.ts` (416 lines)
+  - `src/repository-tooling-signals.ts` is now a thin re-export barrel (14 lines); signal collectors split across:
+    - `src/repository-tooling-signals-tailwind-ts.ts` (167 lines)
+    - `src/repository-tooling-signals-python.ts` (155 lines)
+    - `src/repository-tooling-signals-js-tools.ts` (234 lines)
+    - `src/repository-tooling-signals-other.ts` (70 lines)
+- Large test hotspots (AI navigation risk):
+  - `test/analyze-repository-workflow-rules-docker-build-context.test.ts` (633 lines, was 1443)
+  - `test/analyze-repository-tooling-cache-and-runtime.test.ts` (1097 lines)
+  - `test/analyze-repository-workflow-rules-docker-misc.test.ts` (294 lines)
+  - `test/analyze-repository-workflow-rules-general-consensus-context.test.ts` (631 lines)
+  - `test/analyze-repository-workflow-rules-general-context-upload-artifact.test.ts` (527 lines)
+  - `test/analyze-repository-workflow-rules-release-and-scope.test.ts` (772 lines)
+- Large Python test files (split into 4, biggest remaining):
 
 Shared output types live in `src/types.ts`.
 

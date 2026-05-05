@@ -11,6 +11,7 @@ const meta = {
   severity: "suggestion",
   confidence: "medium",
   docsPath: "docs/rules/duplicate-checkout-in-same-workflow.md",
+  maxFindings: 3,
 } satisfies RuleMeta;
 
 interface CheckoutOccurrence {

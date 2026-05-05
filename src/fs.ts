@@ -1,3 +1,4 @@
+import type { Stats } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
@@ -65,14 +66,17 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   const parentName = path.basename(path.dirname(normalizedPath));
   const grandparentName = path.basename(path.dirname(path.dirname(normalizedPath)));
 
+  let stats: Stats;
   try {
-    await stat(normalizedPath);
+    stats = await stat(normalizedPath);
   } catch {
     throw new Error(`Target path not found: ${normalizedPath}`);
   }
+  const targetIsDir = stats.isDirectory();
+  const targetIsFile = stats.isFile();
 
   // GitHub Actions: workflows directory
-  if (baseName === "workflows" && (await isDirectory(normalizedPath))) {
+  if (baseName === "workflows" && targetIsDir) {
     return {
       repoRoot: path.dirname(path.dirname(normalizedPath)),
       workflowDirs: [normalizedPath],
@@ -80,7 +84,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   }
 
   // GitHub Actions: .github directory
-  if (baseName === ".github" && (await isDirectory(normalizedPath))) {
+  if (baseName === ".github" && targetIsDir) {
     return {
       repoRoot: path.dirname(normalizedPath),
       workflowDirs: [path.join(normalizedPath, "workflows")],
@@ -92,7 +96,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
     parentName === "workflows" &&
     grandparentName === ".github" &&
     /\.(ya?ml)$/i.test(baseName) &&
-    (await isFile(normalizedPath))
+    targetIsFile
   ) {
     return {
       repoRoot: path.dirname(path.dirname(path.dirname(normalizedPath))),
@@ -102,7 +106,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   }
 
   // Buildkite: .buildkite directory
-  if (baseName === ".buildkite" && (await isDirectory(normalizedPath))) {
+  if (baseName === ".buildkite" && targetIsDir) {
     return {
       repoRoot: path.dirname(normalizedPath),
       workflowDirs: [normalizedPath],
@@ -110,7 +114,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   }
 
   // Buildkite: buildkite directory (non-hidden)
-  if (baseName === "buildkite" && (await isDirectory(normalizedPath))) {
+  if (baseName === "buildkite" && targetIsDir) {
     return {
       repoRoot: path.dirname(normalizedPath),
       workflowDirs: [normalizedPath],
@@ -121,7 +125,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   if (
     (parentName === ".buildkite" || parentName === "buildkite") &&
     /pipeline\.(ya?ml|json)$/i.test(baseName) &&
-    (await isFile(normalizedPath))
+    targetIsFile
   ) {
     return {
       repoRoot: path.dirname(path.dirname(normalizedPath)),
@@ -131,7 +135,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   }
 
   // Depot CI: .depot/workflows directory
-  if (baseName === "workflows" && parentName === ".depot" && (await isDirectory(normalizedPath))) {
+  if (baseName === "workflows" && parentName === ".depot" && targetIsDir) {
     return {
       repoRoot: path.dirname(path.dirname(normalizedPath)),
       workflowDirs: [normalizedPath],
@@ -139,7 +143,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   }
 
   // Depot CI: .depot directory
-  if (baseName === ".depot" && (await isDirectory(normalizedPath))) {
+  if (baseName === ".depot" && targetIsDir) {
     return {
       repoRoot: path.dirname(normalizedPath),
       workflowDirs: [path.join(normalizedPath, "workflows")],
@@ -151,7 +155,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
     parentName === "workflows" &&
     grandparentName === ".depot" &&
     /\.(ya?ml)$/i.test(baseName) &&
-    (await isFile(normalizedPath))
+    targetIsFile
   ) {
     return {
       repoRoot: path.dirname(path.dirname(path.dirname(normalizedPath))),
@@ -164,7 +168,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   if (
     (baseName === "config.yml" || baseName === "config.yaml") &&
     parentName === ".circleci" &&
-    (await isFile(normalizedPath))
+    targetIsFile
   ) {
     return {
       repoRoot: path.dirname(path.dirname(normalizedPath)),
@@ -174,7 +178,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   }
 
   // CircleCI: .circleci directory
-  if (baseName === ".circleci" && (await isDirectory(normalizedPath))) {
+  if (baseName === ".circleci" && targetIsDir) {
     const configYml = path.join(normalizedPath, "config.yml");
     const configYaml = path.join(normalizedPath, "config.yaml");
     const [hasYml, hasYaml] = await Promise.all([isFile(configYml), isFile(configYaml)]);
@@ -193,7 +197,7 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
   }
 
   // GitLab CI: specific .gitlab-ci.yml file
-  if (/\.gitlab-ci\.(ya?ml)$/i.test(baseName) && (await isFile(normalizedPath))) {
+  if (/\.gitlab-ci\.(ya?ml)$/i.test(baseName) && targetIsFile) {
     return {
       repoRoot: path.dirname(normalizedPath),
       workflowDirs: [],

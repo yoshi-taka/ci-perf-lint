@@ -11,6 +11,13 @@ afterEach(async () => {
   await tempDirs.cleanup();
 });
 
+function getFixtureReport(
+  cwd: string,
+  options: Omit<Parameters<typeof memoizedAnalyzeRepository>[0], "cwd">,
+) {
+  return memoizedAnalyzeRepository({ cwd, ...options });
+}
+
 describe("analyzeRepository repo-aware and tooling rules: cache and runtime", () => {
   test("finds duplicated lint and npx bootstrap patterns", async () => {
     const report = await memoizedAnalyzeRepository({
@@ -316,1037 +323,113 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
     ).toBe(false);
   });
 
-  test("warns when Next.js builds run without a visible .next/cache strategy", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.nextCacheLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
+  describe("build cache warnings", () => {
+    const defaultOptions = { targetPath: ".", topCount: 20, mode: "strict" as const };
 
-    const finding = report.findings.find(
-      (candidate) => candidate.ruleId === "missing-next-build-cache",
-    );
+    type BuildCacheCase = {
+      name: string;
+      fixture: string;
+      ruleId: string;
+      message?: string;
+      expectAbsent?: boolean;
+    };
 
-    expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("warning");
-    expect(finding?.message).toContain(".next/cache");
-  });
+    const buildCacheCases: BuildCacheCase[] = [
+      { name: "Next.js: warns when .next/cache is not persisted", fixture: fixtures.nextCacheLike, ruleId: "missing-next-build-cache", message: ".next/cache" },
+      { name: "Next.js: does not warn when .next/cache is persisted", fixture: fixtures.nextCacheOk, ruleId: "missing-next-build-cache", expectAbsent: true as const },
+      { name: "Turbo: warns when cache is not wired", fixture: fixtures.turboCacheLike, ruleId: "missing-turbo-cache", message: "Turbo tasks" },
+      { name: "Turbo: does not warn when cache is wired", fixture: fixtures.turboCacheOk, ruleId: "missing-turbo-cache", expectAbsent: true as const },
+      { name: "Gradle: warns when build cache is not configured", fixture: fixtures.gradleCacheLike, ruleId: "missing-gradle-build-cache", message: "Gradle tasks" },
+      { name: "Gradle: does not warn when build cache is configured", fixture: fixtures.gradleCacheOk, ruleId: "missing-gradle-build-cache", expectAbsent: true as const },
+      { name: "Angular CLI: warns when cache is not wired for CI", fixture: fixtures.angularCacheLike, ruleId: "missing-angular-cli-cache", message: "Angular CLI" },
+      { name: "Angular CLI: does not warn when cache is wired", fixture: fixtures.angularCacheOk, ruleId: "missing-angular-cli-cache", expectAbsent: true },
+    ];
 
-  test("does not flag Next.js builds when .next/cache is visibly persisted", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.nextCacheOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
+    test.each(buildCacheCases.map((tc) => [tc.name, tc] as const))(
+      "%s",
+      async (_name, tc) => {
+        const report = await getFixtureReport(tc.fixture, defaultOptions);
 
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "missing-next-build-cache"),
-    ).toBe(false);
-  });
-
-  test("warns when Turbo tasks run without visible local or remote cache wiring", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.turboCacheLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const finding = report.findings.find((candidate) => candidate.ruleId === "missing-turbo-cache");
-
-    expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("warning");
-    expect(finding?.message).toContain("Turbo tasks");
-  });
-
-  test("does not flag Turbo tasks when local cache or remote cache wiring is visible", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.turboCacheOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(report.findings.some((candidate) => candidate.ruleId === "missing-turbo-cache")).toBe(
-      false,
+        if (tc.expectAbsent) {
+          expect(report.findings.some((f) => f.ruleId === tc.ruleId)).toBe(false);
+        } else {
+          const finding = report.findings.find((f) => f.ruleId === tc.ruleId);
+          expect(finding).toBeDefined();
+          expect(finding!.severity).toBe("warning");
+          expect(finding!.message).toContain(tc.message!);
+          expect(report.workflowCount).toBe(1);
+        }
+      },
     );
   });
 
-  test("warns when Gradle tasks run without visible repository build cache configuration", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.gradleCacheLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
+  describe("terraform rules", () => {
+    type TerraformCase = {
+      name: string;
+      fixture: string;
+      ruleId: string;
+      mode: "strict" | "exploratory";
+      severity?: "error" | "warning" | "suggestion";
+      confidence?: "high" | "medium";
+      locationPath?: string;
+      message?: string;
+      count?: number;
+      expectAbsent?: boolean;
+    };
 
-    const finding = report.findings.find(
-      (candidate) => candidate.ruleId === "missing-gradle-build-cache",
+    const terraformCases: TerraformCase[] = [
+      { name: "flags terraform init jobs missing provider caching", fixture: fixtures.terraformCacheLike, ruleId: "cache-terraform-providers", mode: "exploratory", severity: "warning", message: "terraform init", count: 1 },
+      { name: "does not flag terraform init jobs with provider caching", fixture: fixtures.terraformCacheOk, ruleId: "cache-terraform-providers", mode: "exploratory" as const, expectAbsent: true as const },
+      { name: "flags missing terraform lock file", fixture: fixtures.terraformLockfileMissing, ruleId: "terraform-lockfile-missing", mode: "strict" as const, severity: "warning" as const, message: ".terraform.lock.hcl", count: 1 },
+      { name: "does not flag missing lock file when lock file exists", fixture: fixtures.terraformLockfileOk, ruleId: "terraform-lockfile-missing", mode: "strict" as const, expectAbsent: true as const },
+      { name: "flags repo-wide when no --parallelism in any terraform workflow", fixture: fixtures.terraformParallelismMissing, ruleId: "terraform-parallelism-unconfigured", mode: "exploratory" as const, severity: "suggestion" as const, message: "--parallelism", count: 1 },
+      { name: "does not flag when --parallelism is in command text", fixture: fixtures.terraformParallelismOk, ruleId: "terraform-parallelism-unconfigured", mode: "exploratory" as const, expectAbsent: true as const },
+      { name: "does not flag when TF_CLI_ARGS env var sets parallelism", fixture: fixtures.terraformParallelismOkEnv, ruleId: "terraform-parallelism-unconfigured", mode: "exploratory" as const, expectAbsent: true as const },
+      { name: "flags provider github blocks without app_auth", fixture: fixtures.terraformGitHubAppAuthLike, ruleId: "terraform-github-app-auth", mode: "exploratory" as const, severity: "suggestion" as const, confidence: "high" as const, locationPath: "main.tf", message: "app_auth", count: 2 },
+      { name: "does not flag when app_auth is present", fixture: fixtures.terraformGitHubAppAuthOk, ruleId: "terraform-github-app-auth", mode: "exploratory" as const, expectAbsent: true as const },
+      { name: "flags GHE provider without parallel_requests", fixture: fixtures.terraformGitHubParallelRequestsLike, ruleId: "terraform-github-parallel-requests", mode: "exploratory" as const, severity: "suggestion" as const, confidence: "high" as const, locationPath: "main.tf", message: "parallel_requests", count: 2 },
+      { name: "does not flag GHE provider with parallel_requests enabled", fixture: fixtures.terraformGitHubParallelRequestsOk, ruleId: "terraform-github-parallel-requests", mode: "exploratory" as const, expectAbsent: true as const },
+      { name: "flags resources with unnecessary data.github_repository lookups", fixture: fixtures.terraformGitHubSlowResourcesLike, ruleId: "terraform-github-slow-resources", mode: "strict" as const, severity: "warning" as const, confidence: "high" as const, locationPath: "main.tf", message: "data.github_repository", count: 3 },
+      { name: "does not flag when resources use direct attributes", fixture: fixtures.terraformGitHubSlowResourcesOk, ruleId: "terraform-github-slow-resources", mode: "strict" as const, expectAbsent: true as const },
+      { name: "flags pagerduty_team_membership with provider below v3.32.2", fixture: fixtures.terraformPagerDutyTeamMembershipVersionLike, ruleId: "terraform-pagerduty-team-membership-version", mode: "strict" as const, severity: "warning" as const, confidence: "high" as const, locationPath: "main.tf", message: "PagerDuty", count: 2 },
+      { name: "does not flag pagerduty_team_membership with provider >= 3.32.2", fixture: fixtures.terraformPagerDutyTeamMembershipVersionOk, ruleId: "terraform-pagerduty-team-membership-version", mode: "strict" as const, expectAbsent: true },
+    ];
+
+    test.each(terraformCases.map((tc) => [tc.name, tc] as const))(
+      "%s",
+      async (_name, tc) => {
+        const report = await getFixtureReport(tc.fixture, {
+          targetPath: ".",
+          topCount: 20,
+          mode: tc.mode,
+        });
+
+        if (tc.expectAbsent) {
+          expect(report.findings.some((f) => f.ruleId === tc.ruleId)).toBe(false);
+          return;
+        }
+
+        const findings = report.findings.filter((f) => f.ruleId === tc.ruleId);
+
+        if (tc.count !== undefined) {
+          expect(findings).toHaveLength(tc.count);
+        }
+
+        for (const finding of findings) {
+          expect(finding.severity).toBe(tc.severity!);
+          if (tc.confidence) {
+            expect(finding.confidence).toBe(tc.confidence);
+          }
+          if (tc.locationPath) {
+            expect(finding.location.path).toBe(tc.locationPath);
+          }
+          if (tc.message) {
+            expect(finding.message).toContain(tc.message);
+          }
+        }
+      },
     );
-
-    expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("warning");
-    expect(finding?.message).toContain("Gradle tasks");
   });
 
-  test("does not flag Gradle tasks when repository build cache configuration is visible", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.gradleCacheOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
 
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "missing-gradle-build-cache"),
-    ).toBe(false);
-  });
-
-  test("warns when Angular CLI cache is not fully wired for CI", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.angularCacheLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const finding = report.findings.find(
-      (candidate) => candidate.ruleId === "missing-angular-cli-cache",
-    );
-
-    expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("warning");
-    expect(finding?.message).toContain("Angular CLI");
-  });
-
-  test("does not flag Angular CLI tasks when cache is enabled for CI and visibly persisted", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.angularCacheOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "missing-angular-cli-cache"),
-    ).toBe(false);
-  });
-
-  test("flags terraform init jobs missing provider caching", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformCacheLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "cache-terraform-providers",
-    );
-
-    expect(report.workflowCount).toBe(1);
-    expect(findings).toHaveLength(1);
-    const finding = findings[0]!;
-    expect(finding.severity).toBe("warning");
-    expect(finding.message).toContain("terraform_plan");
-    expect(finding.message).toContain("terraform init");
-  });
-
-  test("does not flag terraform init jobs with provider caching", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformCacheOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "cache-terraform-providers"),
-    ).toBe(false);
-  });
-
-  test("flags missing terraform lock file when terraform init is used", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformLockfileMissing,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "terraform-lockfile-missing",
-    );
-
-    expect(findings).toHaveLength(1);
-    expect(findings[0]!.severity).toBe("warning");
-    expect(findings[0]!.message).toContain(".terraform.lock.hcl");
-    expect(findings[0]!.message).toContain("terraform init");
-  });
-
-  test("does not flag missing lock file when lock file exists", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformLockfileOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "terraform-lockfile-missing"),
-    ).toBe(false);
-  });
-
-  test("flags repo-wide when no --parallelism found in any terraform workflow", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformParallelismMissing,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "terraform-parallelism-unconfigured",
-    );
-
-    expect(findings).toHaveLength(1);
-    expect(findings[0]!.severity).toBe("suggestion");
-    expect(findings[0]!.message).toContain("--parallelism");
-    expect(findings[0]!.message).toContain("TF_CLI_ARGS");
-  });
-
-  test("does not flag when --parallelism is in command text", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformParallelismOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "terraform-parallelism-unconfigured",
-      ),
-    ).toBe(false);
-  });
-
-  test("does not flag when TF_CLI_ARGS env var sets parallelism", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformParallelismOkEnv,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "terraform-parallelism-unconfigured",
-      ),
-    ).toBe(false);
-  });
-
-  test("flags provider github blocks without app_auth", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformGitHubAppAuthLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "terraform-github-app-auth",
-    );
-
-    expect(findings).toHaveLength(2);
-    for (const finding of findings) {
-      expect(finding.severity).toBe("suggestion");
-      expect(finding.confidence).toBe("high");
-      expect(finding.location.path).toBe("main.tf");
-      expect(finding.message).toContain("app_auth");
-    }
-  });
-
-  test("does not flag when app_auth is present", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformGitHubAppAuthOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "terraform-github-app-auth"),
-    ).toBe(false);
-  });
-
-  test("flags GHE provider without parallel_requests", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformGitHubParallelRequestsLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "terraform-github-parallel-requests",
-    );
-
-    expect(findings).toHaveLength(2);
-    for (const finding of findings) {
-      expect(finding.severity).toBe("suggestion");
-      expect(finding.confidence).toBe("high");
-      expect(finding.location.path).toBe("main.tf");
-      expect(finding.message).toContain("parallel_requests");
-    }
-  });
-
-  test("does not flag GHE provider with parallel_requests enabled", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformGitHubParallelRequestsOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "terraform-github-parallel-requests",
-      ),
-    ).toBe(false);
-  });
-
-  test("flags resources with unnecessary data.github_repository lookups", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformGitHubSlowResourcesLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "terraform-github-slow-resources",
-    );
-
-    expect(findings).toHaveLength(3);
-    for (const finding of findings) {
-      expect(finding.severity).toBe("warning");
-      expect(finding.confidence).toBe("high");
-      expect(finding.location.path).toBe("main.tf");
-      expect(finding.message).toContain("data.github_repository");
-    }
-  });
-
-  test("does not flag when resources use direct attributes instead of data lookups", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformGitHubSlowResourcesOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "terraform-github-slow-resources"),
-    ).toBe(false);
-  });
-
-  test("flags pagerduty_team_membership with provider below v3.32.2", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformPagerDutyTeamMembershipVersionLike,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "terraform-pagerduty-team-membership-version",
-    );
-
-    expect(findings).toHaveLength(2);
-    for (const finding of findings) {
-      expect(finding.severity).toBe("warning");
-      expect(finding.confidence).toBe("high");
-      expect(finding.location.path).toBe("main.tf");
-      expect(finding.message).toContain("PagerDuty");
-    }
-  });
-
-  test("does not flag pagerduty_team_membership with provider >= 3.32.2", async () => {
-    const report = await memoizedAnalyzeRepository({
-      cwd: fixtures.terraformPagerDutyTeamMembershipVersionOk,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "terraform-pagerduty-team-membership-version",
-      ),
-    ).toBe(false);
-  });
-
-  test("flags repeated install commands within the same job", async () => {
-    const fixtureRoot = await tempDirs.create("apl-repeated-install-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-        "      - run: npm ci",
-        "      - run: npm test",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "repeated-install-in-same-job",
-    );
-
-    expect(findings).toHaveLength(1);
-    expect(findings[0]!.severity).toBe("warning");
-    expect(findings[0]!.message).toContain('Job "build"');
-    expect(findings[0]!.message).toContain("npm install 2 times");
-  });
-
-  test("flags repeated pnpm install commands within the same job", async () => {
-    const fixtureRoot = await tempDirs.create("apl-repeated-pnpm-install-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: pnpm install",
-        "      - run: pnpm lint",
-        "      - run: pnpm install",
-        "      - run: pnpm test",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "repeated-install-in-same-job",
-    );
-
-    expect(findings).toHaveLength(1);
-    expect(findings[0]!.message).toContain("pnpm install 2 times");
-  });
-
-  test("does not flag when install runs only once in a job", async () => {
-    const fixtureRoot = await tempDirs.create("apl-single-install-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-        "      - run: npm test",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "repeated-install-in-same-job"),
-    ).toBe(false);
-  });
-
-  test("does not flag repeated installs in reusable workflow jobs", async () => {
-    const fixtureRoot = await tempDirs.create("apl-reusable-install-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  build:",
-        "    uses: ./.github/workflows/reusable-build.yml",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "repeated-install-in-same-job"),
-    ).toBe(false);
-  });
-
-  test("flags repeated install via different managers separately", async () => {
-    const fixtureRoot = await tempDirs.create("apl-mixed-install-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: pip install -r requirements.txt",
-        "      - run: pip install -r requirements-dev.txt",
-        "      - run: pip install -e .",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "repeated-install-in-same-job",
-    );
-
-    expect(findings).toHaveLength(1);
-    expect(findings[0]!.message).toContain("pip install 3 times");
-  });
-
-  test("does not flag bun install with lockfile-only as repeated install", async () => {
-    const fixtureRoot = await tempDirs.create("apl-lockfile-only-install-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  finalize:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: bun install --frozen-lockfile",
-        "      - run: bun run some-script.ts",
-        "      - run: bun install --lockfile-only --ignore-scripts",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "repeated-install-in-same-job"),
-    ).toBe(false);
-  });
-
-  test("does not flag frozen lockfile install followed by plain install (upgrade workflow pattern)", async () => {
-    const fixtureRoot = await tempDirs.create("apl-frozen-then-plain-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: Upgrade",
-        "on: schedule",
-        "jobs:",
-        "  upgrade:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: yarn install --frozen-lockfile",
-        "      - run: ncu -u",
-        "      - run: yarn install",
-        "      - run: yarn upgrade",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "repeated-install-in-same-job"),
-    ).toBe(false);
-  });
-
-  test("does not flag npm install with package-lock-only as repeated install", async () => {
-    const fixtureRoot = await tempDirs.create("apl-npm-lockfile-install-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  finalize:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run some-script.ts",
-        "      - run: npm install --package-lock-only",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "repeated-install-in-same-job"),
-    ).toBe(false);
-  });
-
-  test("does not flag repeated install with different working-directory", async () => {
-    const fixtureRoot = await tempDirs.create("apl-diff-wd-install-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  benchmark:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: pnpm install --frozen-lockfile",
-        "        working-directory: head",
-        "      - run: pnpm build",
-        "        working-directory: head",
-        "      - run: pnpm install --frozen-lockfile",
-        "        working-directory: base",
-        "      - run: pnpm build",
-        "        working-directory: base",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "repeated-install-in-same-job"),
-    ).toBe(false);
-  });
-
-  test("does not flag npm install -g of different packages as duplicate", async () => {
-    const fixtureRoot = await tempDirs.create("apl-global-pkg-diff-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm install -g verdaccio --registry http://localhost",
-        "      - run: npm install -g gatsby-cli --registry http://localhost",
-        "      - run: npm install -g @angular/cli --registry http://localhost",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "repeated-install-in-same-job"),
-    ).toBe(false);
-  });
-
-  test("flags npm install -g of the same package twice", async () => {
-    const fixtureRoot = await tempDirs.create("apl-global-pkg-same-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm install -g verdaccio --registry http://localhost",
-        "      - run: npm install -g verdaccio --registry http://other-registry",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "repeated-install-in-same-job",
-    );
-
-    expect(findings).toHaveLength(1);
-    expect(findings[0]!.message).toContain("npm install 2 times");
-  });
-
-  test("does not flag pnpm install with --ignore-workspace as duplicate of workspace install", async () => {
-    const fixtureRoot = await tempDirs.create("apl-pnpm-ignore-workspace-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: Validate Stats",
-        "on: push",
-        "jobs:",
-        "  validate:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: pnpm install --frozen-lockfile",
-        "      - run: |",
-        "          for PKG in packages/starter-* packages/app-*; do",
-        '            (cd "$PKG" && pnpm install --frozen-lockfile --ignore-workspace)',
-        "          done",
-        "      - run: pnpm --filter @framework-tracker/stats-generator run:ssr $PKG",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some((candidate) => candidate.ruleId === "repeated-install-in-same-job"),
-    ).toBe(false);
-  });
-
-  test("flags lint-only job that unnecessarily installs app dependencies", async () => {
-    const fixtureRoot = await tempDirs.create("apl-unnecessary-install-lint-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  lint:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npx eslint .",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    const findings = report.findings.filter(
-      (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
-    );
-
-    expect(findings).toHaveLength(1);
-    expect(findings[0]!.severity).toBe("warning");
-    expect(findings[0]!.message).toContain('Job "lint"');
-  });
-
-  test("does not flag when lint job also builds", async () => {
-    const fixtureRoot = await tempDirs.create("apl-lint-and-build-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  lint:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run lint",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
-      ),
-    ).toBe(false);
-  });
-
-  test("does not flag job without install even if lint-only", async () => {
-    const fixtureRoot = await tempDirs.create("apl-no-install-lint-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  lint:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npx eslint .",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
-      ),
-    ).toBe(false);
-  });
-
-  test("does not flag lint-only job when pnpm install is followed by test", async () => {
-    const fixtureRoot = await tempDirs.create("apl-install-test-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: pnpm install",
-        "      - run: pnpm test",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
-      ),
-    ).toBe(false);
-  });
-
-  test("does not flag lint-only job in reusable workflow", async () => {
-    const fixtureRoot = await tempDirs.create("apl-reusable-lint-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  lint:",
-        "    uses: ./.github/workflows/reusable-lint.yml",
-      ].join("\n"),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
-      ),
-    ).toBe(false);
-  });
-
-  test("does not flag eslint job when eslint config exists", async () => {
-    const fixtureRoot = await tempDirs.create("apl-eslint-config-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  lint:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npx eslint .",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".eslintrc.json"),
-      JSON.stringify({ extends: ["eslint:recommended"] }),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
-      ),
-    ).toBe(false);
-  });
-
-  test("does not flag prettier job when prettier plugins are used", async () => {
-    const fixtureRoot = await tempDirs.create("apl-prettier-plugin-ok-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  format:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npx prettier --check .",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, "package.json"),
-      JSON.stringify({
-        name: "test",
-        devDependencies: { "prettier-plugin-tailwindcss": "^0.7.0" },
-      }),
-    );
-
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
-
-    expect(
-      report.findings.some(
-        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
-      ),
-    ).toBe(false);
-  });
 });

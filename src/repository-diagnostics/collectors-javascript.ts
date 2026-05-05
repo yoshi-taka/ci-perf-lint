@@ -15,13 +15,17 @@ import { collectPreferEslintPluginImportXDiagnostics } from "./prefer-eslint-plu
 import { collectPreferJest30ForJest29Diagnostics } from "./prefer-jest-30-for-jest-29.ts";
 import { collectPreferLefthookForComplexGitHooksDiagnostics } from "./prefer-lefthook-for-complex-git-hooks.ts";
 import { collectPreferNextestForHeavyRustTestsDiagnostics } from "./prefer-nextest-for-heavy-rust-tests.ts";
-import { collectPreferNextjs12MinorPerformanceMilestoneDiagnostics } from "./prefer-nextjs-12-minor-performance-milestone.ts";
-import { collectPreferNextjs13MinorPerformanceMilestoneDiagnostics } from "./prefer-nextjs-13-minor-performance-milestone.ts";
-import { collectPreferNextjs14MinorPerformanceMilestoneDiagnostics } from "./prefer-nextjs-14-minor-performance-milestone.ts";
+import {
+  collectPreferNextjs12MinorPerformanceMilestoneDiagnostics,
+  collectPreferNextjs13MinorPerformanceMilestoneDiagnostics,
+  collectPreferNextjs14MinorPerformanceMilestoneDiagnostics,
+} from "./prefer-nextjs-minor-performance-milestone.ts";
 import { collectPreferOxlintOverEslintDiagnostics } from "./prefer-oxlint-over-eslint.ts";
 import { collectPreferOxfmtOverPrettierDiagnostics } from "./prefer-oxfmt-over-prettier.ts";
-import { collectPreferStorybook6MinorPerformanceMilestoneDiagnostics } from "./prefer-storybook-6-minor-performance-milestone.ts";
-import { collectPreferStorybook7MinorPerformanceMilestoneDiagnostics } from "./prefer-storybook-7-minor-performance-milestone.ts";
+import {
+  collectPreferStorybook6MinorPerformanceMilestoneDiagnostics,
+  collectPreferStorybook7MinorPerformanceMilestoneDiagnostics,
+} from "./prefer-storybook-minor-performance-milestone.ts";
 import { collectPreferTailwindV4UpgradeToolDiagnostics } from "./prefer-tailwind-v4-upgrade-tool.ts";
 import { collectPreferTurborepoOverNpmWorkspacesDiagnostics } from "./prefer-turborepo-over-npm-workspaces.ts";
 import { collectOutdatedHuskyVersionDiagnostics } from "./outdated-husky-version.ts";

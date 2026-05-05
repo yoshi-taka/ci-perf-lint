@@ -5,7 +5,7 @@ import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { hasBun } from "../bun.ts";
-import { spawnSync as nodeSpawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 
 const meta = {
   id: "cdk-bucket-deployment-memory-unconfigured",
@@ -68,65 +68,58 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
   let sourceFiles: string[];
   try {
+    const rgArgs = [
+      "-l",
+      "--hidden",
+      "--glob",
+      "!**/.git/**",
+      "--glob",
+      "!**/node_modules/**",
+      "--glob",
+      "!**/cdk.out/**",
+      "--glob",
+      "!fixtures",
+      "--glob",
+      "*.ts",
+      "--glob",
+      "*.tsx",
+      "--glob",
+      "*.js",
+      "--glob",
+      "*.jsx",
+      "BucketDeployment",
+      repoRoot,
+    ];
     const result = hasBun
-      ? Bun.spawnSync(
-          [
-            "rg",
-            "-l",
-            "--hidden",
-            "--glob",
-            "!**/.git/**",
-            "--glob",
-            "!**/node_modules/**",
-            "--glob",
-            "!**/cdk.out/**",
-            "--glob",
-            "!fixtures",
-            "--glob",
-            "*.ts",
-            "--glob",
-            "*.tsx",
-            "--glob",
-            "*.js",
-            "--glob",
-            "*.jsx",
-            "BucketDeployment",
-            repoRoot,
-          ],
-          { stdio: ["ignore", "pipe", "pipe"] },
-        )
-      : nodeSpawnSync(
-          "rg",
-          [
-            "-l",
-            "--hidden",
-            "--glob",
-            "!**/.git/**",
-            "--glob",
-            "!**/node_modules/**",
-            "--glob",
-            "!**/cdk.out/**",
-            "--glob",
-            "!fixtures",
-            "--glob",
-            "*.ts",
-            "--glob",
-            "*.tsx",
-            "--glob",
-            "*.js",
-            "--glob",
-            "*.jsx",
-            "BucketDeployment",
-            repoRoot,
-          ],
-          { stdio: ["ignore", "pipe", "pipe"] },
-        );
-    const exitCode = "exitCode" in result ? result.exitCode : result.status;
-    if (exitCode === 1) {
+      ? await (async () => {
+          const proc = Bun.spawn(["rg", ...rgArgs], {
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+          const [exitCode, stdout] = await Promise.all([
+            proc.exited,
+            new Response(proc.stdout).text(),
+          ]);
+          return { exitCode, stdout };
+        })()
+      : await (async () => {
+          const proc = spawn("rg", rgArgs, {
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+          const chunks: string[] = [];
+          for await (const chunk of proc.stdout) {
+            chunks.push(chunk.toString());
+          }
+          const stdout = chunks.join("");
+          const exitCode = await new Promise<number>((resolve) => {
+            proc.on("close", resolve);
+          });
+          return { exitCode, stdout };
+        })();
+    if (result.exitCode === 1) {
       return [];
     }
-    if (exitCode === 0) {
-      sourceFiles = result.stdout.toString().trim().split("\n").filter(Boolean);
+    if (result.exitCode === 0) {
+      sourceFiles = result.stdout.trim().split("\n").filter(Boolean);
     } else {
       sourceFiles = [];
     }
