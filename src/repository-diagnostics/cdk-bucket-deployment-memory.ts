@@ -69,22 +69,26 @@ async function findBucketDeploymentFiles(repoRoot: string): Promise<string[]> {
     "BucketDeployment",
     repoRoot,
   ];
-  if (hasBun) {
-    const proc = Bun.spawn(["rg", ...args], { stdio: ["ignore", "pipe", "pipe"] });
-    const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
-    if (exitCode === 0) { return stdout.trim().split("\n").filter(Boolean); }
-    return [];
-  }
+  try {
+    if (hasBun) {
+      const proc = Bun.spawn(["rg", ...args], { stdio: ["ignore", "pipe", "pipe"] });
+      const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
+      if (exitCode === 0) { return stdout.trim().split("\n").filter(Boolean); }
+      return [];
+    }
 
-  let resolveExit: (code: number) => void;
-  const exitPromise = new Promise<number>((resolve) => { resolveExit = resolve; });
-  const proc = spawn("rg", args, { stdio: ["ignore", "pipe", "pipe"] });
-  proc.on("error", () => resolveExit!(1));
-  proc.on("close", resolveExit!);
-  const chunks: Buffer[] = [];
-  proc.stdout.on("data", (c: Buffer) => chunks.push(c));
-  const exitCode = await exitPromise;
-  if (exitCode === 0) { return Buffer.concat(chunks).toString().trim().split("\n").filter(Boolean); }
+    let resolveExit: (code: number) => void;
+    const exitPromise = new Promise<number>((resolve) => { resolveExit = resolve; });
+    const proc = spawn("rg", args, { stdio: ["ignore", "pipe", "pipe"] });
+    proc.on("error", () => resolveExit!(1));
+    proc.on("close", resolveExit!);
+    const chunks: Buffer[] = [];
+    proc.stdout.on("data", (c: Buffer) => chunks.push(c));
+    const exitCode = await exitPromise;
+    if (exitCode === 0) { return Buffer.concat(chunks).toString().trim().split("\n").filter(Boolean); }
+  } catch {
+    // rg not available
+  }
   return [];
 }
 
