@@ -41,7 +41,7 @@ function timingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
 }
 
-export type SpawnedProcess = {
+type SpawnedProcess = {
   stdout: Promise<string>;
   stderr: Promise<string>;
   exited: Promise<number>;
@@ -84,7 +84,7 @@ export function spawnOxlintProcess(
     let size = 0;
     proc.stdout.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size <= MAX_STDOUT_BUFFER_SIZE) chunks.push(chunk);
+      if (size <= MAX_STDOUT_BUFFER_SIZE) { chunks.push(chunk); }
     });
     proc.on("close", () => resolve(Buffer.concat(chunks).toString()));
   });
@@ -93,7 +93,7 @@ export function spawnOxlintProcess(
     let size = 0;
     proc.stderr.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size <= MAX_STDERR_BUFFER_SIZE) chunks.push(chunk);
+      if (size <= MAX_STDERR_BUFFER_SIZE) { chunks.push(chunk); }
     });
     proc.on("close", () => resolve(Buffer.concat(chunks).toString()));
   });
@@ -360,7 +360,7 @@ export async function runEmbeddedOxlint(
     const { stdout, stderr, exited } = spawnOxlintProcess(cmd, repoRoot);
     const [stdoutText, stderrText, exitCode] = await Promise.all([stdout, stderr, exited]);
 
-    if (exitCode === -1 || (exitCode !== 0 && exitCode !== null && exitCode > 128)) {
+    if (exitCode === -1 || (exitCode !== 0 && exitCode > 128)) {
       const skipped = kind === "import" ? "import restriction and extension checks" : "barrel file and snapshot checks";
       process.stderr.write(
         `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,

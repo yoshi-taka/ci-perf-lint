@@ -21,6 +21,7 @@
     { "file": "src/finding-grouping.ts", "exports": ["normalizeWorkflowText"] },
     { "file": "src/repository-diagnostics/index.ts", "exports": ["repositoryDiagnosticCollectors"] },
     { "file": "src/rules/scheduled-heavy-workflow-without-throttling.ts", "exports": ["estimateScheduleMinutes"] },
+    { "file": "src/repository-diagnostics/embedded-oxlint-runner.ts", "exports": ["spawnOxlintProcess"] },
     { "file": "src/main.ts", "exports": ["parseArgs"] }
   ]
 }

@@ -17,7 +17,7 @@ describe("spawnOxlintProcess - Bun path", () => {
   });
 
   test("captures stderr output", async () => {
-    const { stdout, stderr, exited } = spawnOxlintProcess(
+    const { stderr, exited } = spawnOxlintProcess(
       ["bash", "-c", "echo errmsg >&2"],
       process.cwd(),
     );
@@ -27,7 +27,7 @@ describe("spawnOxlintProcess - Bun path", () => {
   });
 
   test("resolves exited with non-zero when timeout fires (Bun sends SIGTERM → 143)", async () => {
-    const { stdout, stderr, exited } = spawnOxlintProcess(
+    const { exited } = spawnOxlintProcess(
       ["sleep", "30"],
       process.cwd(),
       false,
@@ -54,7 +54,7 @@ describe("spawnOxlintProcess - Node fallback path", () => {
   });
 
   test("captures stderr output", async () => {
-    const { stdout, stderr, exited } = spawnOxlintProcess(
+    const { stderr, exited } = spawnOxlintProcess(
       ["bash", "-c", "echo errmsg >&2"],
       process.cwd(),
       true,
@@ -65,7 +65,7 @@ describe("spawnOxlintProcess - Node fallback path", () => {
   });
 
   test("kills process on timeout (SIGTERM → SIGKILL)", async () => {
-    const { stdout, stderr, exited } = spawnOxlintProcess(
+    const { exited } = spawnOxlintProcess(
       ["sleep", "30"],
       process.cwd(),
       true,
