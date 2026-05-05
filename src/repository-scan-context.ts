@@ -405,17 +405,19 @@ export class RepositoryScanContext {
       }
 
       const lines: string[] = [];
+      let resolveExit: (code: number) => void;
+      const exitPromise = new Promise<number>((resolve) => { resolveExit = resolve; });
       const proc = spawn(rgPath, ["--files", "--hidden", repoRoot], {
         stdio: ["ignore", "pipe", "pipe"],
       });
+      proc.on("error", () => resolveExit!(1));
+      proc.on("close", resolveExit!);
 
       for await (const chunk of proc.stdout) {
         lines.push(chunk.toString());
       }
 
-      const exitCode = await new Promise<number>((resolve) => {
-        proc.on("close", resolve);
-      });
+      const exitCode = await exitPromise;
       if (exitCode !== 0) {
         return null;
       }
