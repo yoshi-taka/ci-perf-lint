@@ -91,6 +91,46 @@ describe("RepositoryScanContext", () => {
     expect(firstEntries.map((entry) => entry.name)).not.toContain("second.txt");
   });
 
+  test("walkFiles filters by subdirectory prefix correctly", async () => {
+    const repoRoot = await tempDirs.create("actions-perf-context-subdir-");
+    await mkdir(path.join(repoRoot, "src"), { recursive: true });
+    await mkdir(path.join(repoRoot, "src", "lib"), { recursive: true });
+    await mkdir(path.join(repoRoot, "test"), { recursive: true });
+    await writeFile(path.join(repoRoot, "README.md"), "root\n");
+    await writeFile(path.join(repoRoot, "src", "index.ts"), "export {};\n");
+    await writeFile(path.join(repoRoot, "src", "lib", "util.ts"), "export {};\n");
+    await writeFile(path.join(repoRoot, "test", "index.test.ts"), "test;\n");
+
+    const context = new RepositoryScanContext(repoRoot, []);
+    const rootFiles = await context.walkFiles(".");
+    const srcFiles = await context.walkFiles("src");
+    const srcLibFiles = await context.walkFiles("src/lib");
+
+    expect(rootFiles.sort()).toEqual([
+      "README.md",
+      "src/index.ts",
+      "src/lib/util.ts",
+      "test/index.test.ts",
+    ]);
+    expect(srcFiles.sort()).toEqual(["src/index.ts", "src/lib/util.ts"]);
+    expect(srcLibFiles.sort()).toEqual(["src/lib/util.ts"]);
+  });
+
+  test("walkFiles subdirectory results are cached", async () => {
+    const repoRoot = await tempDirs.create("actions-perf-context-subdir-cache-");
+    await mkdir(path.join(repoRoot, "src"), { recursive: true });
+    await writeFile(path.join(repoRoot, "src", "index.ts"), "export {};\n");
+
+    const context = new RepositoryScanContext(repoRoot, []);
+
+    const first = await context.walkFiles("src");
+    await writeFile(path.join(repoRoot, "src", "added.ts"), "export {};\n");
+    const second = await context.walkFiles("src");
+
+    expect(first).toBe(second);
+    expect(first).toEqual(["src/index.ts"]);
+  });
+
   test("caches walkFiles results by explicit cache key within a scan", async () => {
     const repoRoot = await tempDirs.create("actions-perf-context-walk-cache-");
     await writeFile(path.join(repoRoot, "first.snap"), "one\n");

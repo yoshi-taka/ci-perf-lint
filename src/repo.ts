@@ -15,6 +15,10 @@ import type {
   WorkflowSummary,
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
+import { collectEmbeddedOxlintImportJsonDiagnostics } from "./repository-diagnostics/embedded-oxlint.ts";
+import { collectRepositorySignals } from "./repository-signals.ts";
+import { evaluateRules } from "./rule-engine.ts";
+import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 
 const buildkitePattern = /(?:^|\/)\.buildkite\//i;
 const buildkiteAltPattern = /(?:^|\/)buildkite\//i;
@@ -107,11 +111,12 @@ async function parseWorkflowFile(
   workflowPath: string,
   repoRoot: string,
 ): Promise<ParsedWorkflowDocument> {
-  const source = await readFile(workflowPath, "utf8");
   const cached = parsedWorkflowCache.get(workflowPath);
-  if (cached?.source === source) {
+  if (cached) {
     return cached.parsedWorkflow;
   }
+
+  const source = await readFile(workflowPath, "utf8");
 
   // eslint-disable-next-line typescript-eslint/require-await
   const parsedWorkflow = (async () => {
@@ -288,9 +293,6 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     }
   }
   if ((await scanContext.pathExists(scanContext.resolve("package.json"))) && !workflowOnly) {
-    const { collectEmbeddedOxlintImportJsonDiagnostics } =
-      await import("./repository-diagnostics/embedded-oxlint.ts");
-    // Prewarm only. Keep report warnings tied to awaited analysis work, not background cache fills.
     void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot);
   }
   timer.mark("embedded-oxlint-prewarm");
@@ -322,7 +324,6 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     (w): w is WorkflowDocument => "jobs" in w && !("kind" in w),
   );
 
-  const { collectRepositorySignals } = await import("./repository-signals.ts");
   const repositoryAnalysis = await collectRepositorySignals(
     target.repoRoot,
     githubWorkflows,
@@ -336,7 +337,6 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
 
   const allFindings: Diagnostic[] = [];
 
-  const { evaluateRules } = await import("./rule-engine.ts");
   for (const workflow of parsedWorkflows) {
     const workflowFindings = (await evaluateRules(workflow, ruleContext, analysisWarnings)).filter(
       (finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly),
@@ -349,7 +349,6 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   timer.mark("evaluate-workflow-rules");
 
   if (!workflowOnly) {
-    const { collectRepositoryDiagnostics } = await import("./repository-diagnostics/index.ts");
     const repositoryDiagnostics = await collectRepositoryDiagnostics({
       repoRoot: target.repoRoot,
       repository: ruleContext.repository,

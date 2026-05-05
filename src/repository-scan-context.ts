@@ -223,11 +223,16 @@ export class RepositoryScanContext {
     const include = options.include ?? (() => true);
 
     const rgFiles = await this.#getRgFileList();
-    if (rgFiles !== null && relativeDir === ".") {
+    if (rgFiles !== null) {
+      const prefix = relativeDir === "." ? "" : `${relativeDir}/`;
       for (const relativePath of rgFiles) {
-        const firstSegment = relativePath.split("/")[0];
-        if (firstSegment !== undefined && ignoredDirectories.has(firstSegment)) {
-          continue;
+        if (!relativePath.startsWith(prefix)) { continue; }
+
+        if (prefix === "") {
+          const firstSegment = relativePath.split("/")[0];
+          if (firstSegment !== undefined && ignoredDirectories.has(firstSegment)) {
+            continue;
+          }
         }
 
         if (include(relativePath)) {

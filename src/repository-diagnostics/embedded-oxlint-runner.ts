@@ -6,24 +6,15 @@ import type { AnalysisWarning } from "../types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { fontAwesomeIconPackRoots } from "./direct-import-roots.ts";
 
-interface OxlintJsonDiagnostic {
-  message?: string;
-  code?: string;
-  severity?: string;
-  help?: string;
-  note?: string;
-  filename?: string;
-  labels?: {
-    label?: string;
-    span?: {
-      line?: number;
-      column?: number;
-    };
-  }[];
-}
+const OXLINE_RE = /^(.+?):(\d+):(\d+):\s*(.+?)\s*\[(\w+)\/([^\]]+)\]/;
 
-interface OxlintJsonOutput {
-  diagnostics?: OxlintJsonDiagnostic[];
+export interface OxlintDiagnostic {
+  filename: string;
+  line: number;
+  column: number;
+  message: string;
+  severity: string;
+  code: string;
 }
 
 export type EmbeddedOxlintScanKind = "import" | "non-import";
@@ -53,20 +44,39 @@ function spawnProcess(
   cmd: string[],
   cwd: string,
 ): {
-  stdout: Promise<string>;
+  stdout: AsyncIterable<string>;
   stderr: Promise<string>;
   exited: Promise<number>;
   kill: (signal?: number) => void;
 } {
   if (typeof Bun !== "undefined") {
     const proc = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "pipe" });
+    const decoder = new TextDecoder();
     return {
-      stdout: new Response(proc.stdout).text(),
+      stdout: {
+        async *[Symbol.asyncIterator]() {
+          const reader = proc.stdout.getReader();
+          let leftover = "";
+          try {
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) { break; }
+              const text = leftover + decoder.decode(value, { stream: true });
+              const lines = text.split("\n");
+              leftover = lines.pop() ?? "";
+              for (const line of lines) {
+                if (line) { yield line; }
+              }
+            }
+            if (leftover) { yield leftover; }
+          } finally {
+            reader.releaseLock();
+          }
+        },
+      },
       stderr: new Response(proc.stderr).text(),
       exited: proc.exited,
-      kill: (signal) => {
-        proc.kill(signal);
-      },
+      kill: (signal) => { proc.kill(signal); },
     };
   }
 
@@ -74,10 +84,8 @@ function spawnProcess(
     cwd,
     stdio: ["inherit", "pipe", "pipe"],
   });
-  const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
   let stderrSize = 0;
-  proc.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
   proc.stderr.on("data", (chunk: Buffer) => {
     if (stderrSize < MAX_STDERR_BUFFER_SIZE) {
       stderrChunks.push(chunk);
@@ -85,18 +93,28 @@ function spawnProcess(
     }
   });
   return {
-    stdout: new Promise<string>((resolve) => {
-      proc.on("close", () => resolve(Buffer.concat(stdoutChunks).toString()));
-    }),
+    stdout: {
+      async *[Symbol.asyncIterator]() {
+        const rl = proc.stdout.setEncoding("utf8");
+        let leftover = "";
+        for await (const chunk of rl) {
+          const text = leftover + chunk;
+          const lines = text.split("\n");
+          leftover = lines.pop() ?? "";
+          for (const line of lines) {
+            if (line) { yield line; }
+          }
+        }
+        if (leftover) { yield leftover; }
+      },
+    },
     stderr: new Promise<string>((resolve) => {
       proc.on("close", () => resolve(Buffer.concat(stderrChunks).toString()));
     }),
     exited: new Promise<number>((resolve) => {
       proc.on("close", (code) => resolve(code ?? 1));
     }),
-    kill: (signal) => {
-      proc.kill(signal);
-    },
+    kill: (signal) => { proc.kill(signal); },
   };
 }
 
@@ -240,12 +258,17 @@ function bundledOxlintPath(): string {
   return path.resolve(import.meta.dir, "..", "..", "node_modules", ".bin", binaryName);
 }
 
-function parseOxlintJson(stdout: string): OxlintJsonOutput | undefined {
-  try {
-    return JSON.parse(stdout) as OxlintJsonOutput;
-  } catch {
-    return undefined;
-  }
+function parseOxlintLine(line: string): OxlintDiagnostic | undefined {
+  const match = OXLINE_RE.exec(line);
+  if (!match) { return undefined; }
+  return {
+    filename: match[1]!,
+    line: Number(match[2]!),
+    column: Number(match[3]!),
+    message: match[4]!,
+    severity: match[5]!,
+    code: match[6]!,
+  };
 }
 
 async function writeEmbeddedOxlintConfig(kind: EmbeddedOxlintScanKind): Promise<string> {
@@ -286,7 +309,7 @@ export async function runEmbeddedOxlint(
   repoRoot: string,
   kind: EmbeddedOxlintScanKind,
   warnings?: AnalysisWarning[],
-): Promise<OxlintJsonDiagnostic[] | undefined> {
+): Promise<OxlintDiagnostic[] | undefined> {
   try {
     const startedAt = performance.now();
     const localWarnings: AnalysisWarning[] = [];
@@ -323,7 +346,7 @@ export async function runEmbeddedOxlint(
             "-c",
             configPath,
             "-f",
-            "json",
+            "unix",
             "--no-error-on-unmatched-pattern",
             "--disable-nested-config",
             ...ignorePatternFlags,
@@ -343,42 +366,39 @@ export async function runEmbeddedOxlint(
             "-c",
             configPath,
             "-f",
-            "json",
+            "unix",
             "--no-error-on-unmatched-pattern",
             "--disable-nested-config",
             ...ignorePatternFlags,
             ".",
           ];
     const { stdout, stderr, exited, kill } = spawnProcess(cmd, repoRoot);
-    let timedOut = false;
+    const timeoutResult = Symbol("timed-out");
     const timeoutHandle = setTimeout(() => {
-      timedOut = true;
       kill(9);
     }, EMBEDDED_OXLINT_TIMEOUT_MS);
 
-    const FORCE_RESOLVE_AFTER_KILL_MS = 2_000;
-    const forceResolve = new Promise<[string, string, number]>((resolve) => {
-      setTimeout(
-        () => resolve(["", "", 1]),
-        EMBEDDED_OXLINT_TIMEOUT_MS + FORCE_RESOLVE_AFTER_KILL_MS,
-      );
-    });
-    const [stdoutText, stderrText, exitCode] = await Promise.race([
-      Promise.all([stdout, stderr, exited]),
-      forceResolve,
+    const raceResult = await Promise.race([
+      exited.then((code) => ({ code })),
+      new Promise<{ code: number; timedOut: typeof timeoutResult }>((resolve) => {
+        setTimeout(
+          () => resolve({ code: 1, timedOut: timeoutResult }),
+          EMBEDDED_OXLINT_TIMEOUT_MS + 2_000,
+        );
+      }),
     ]);
     clearTimeout(timeoutHandle);
 
-    // oxlint-disable-next-line no-unnecessary-condition
-    if (timedOut) {
+    if ("timedOut" in raceResult) {
       process.stderr.write(
         `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. Barrel file detection, import restriction, and snapshot diagnostics were skipped for ${repoRoot}.\n`,
       );
       return [];
     }
 
-    const spawnElapsed = performance.now() - spawnStartedAt;
+    const exitCode = raceResult.code;
 
+    const stderrText = await stderr;
     if (stderrText.trim().length > 0) {
       context.warn(
         source,
@@ -386,43 +406,34 @@ export async function runEmbeddedOxlint(
       );
     }
 
-    if (exitCode !== 0 && stdoutText.trim().length === 0) {
+    const diagnostics: OxlintDiagnostic[] = [];
+    let lineCount = 0;
+    for await (const line of stdout) {
+      lineCount++;
+      const parsed = parseOxlintLine(line);
+      if (parsed) {
+        diagnostics.push(parsed);
+      }
+    }
+
+    if (exitCode !== 0 && diagnostics.length === 0 && lineCount === 0) {
       context.warn(
         source,
-        `Embedded Oxlint exited with code ${exitCode} and produced no JSON output while scanning ${repoRoot}.`,
+        `Embedded Oxlint exited with code ${exitCode} and produced no output while scanning ${repoRoot}.`,
       );
       warnings?.push(...localWarnings);
       return [];
     }
 
-    const parsed = parseOxlintJson(stdoutText);
-    if (!parsed) {
-      if (stdoutText.trim().length > 0) {
-        context.warn(
-          source,
-          `Embedded Oxlint produced unreadable JSON output while scanning ${repoRoot}.`,
-        );
-      }
-      warnings?.push(...localWarnings);
-      return [];
-    }
-    if (!parsed.diagnostics?.length) {
-      if (timingsEnabled()) {
-        process.stderr.write(
-          `[timing] ${source} spawn=${spawnElapsed.toFixed(1)}ms diagnostics=0 total=${(performance.now() - startedAt).toFixed(1)}ms\n`,
-        );
-      }
-      warnings?.push(...localWarnings);
-      return [];
-    }
+    const spawnElapsed = performance.now() - spawnStartedAt;
 
     if (timingsEnabled()) {
       process.stderr.write(
-        `[timing] ${source} spawn=${spawnElapsed.toFixed(1)}ms diagnostics=${parsed.diagnostics.length} total=${(performance.now() - startedAt).toFixed(1)}ms\n`,
+        `[timing] ${source} spawn=${spawnElapsed.toFixed(1)}ms diagnostics=${diagnostics.length} total=${(performance.now() - startedAt).toFixed(1)}ms\n`,
       );
     }
     warnings?.push(...localWarnings);
-    return parsed.diagnostics;
+    return diagnostics;
   } catch (error) {
     const localWarnings: AnalysisWarning[] = [];
     const context = new RepositoryScanContext(repoRoot, localWarnings);

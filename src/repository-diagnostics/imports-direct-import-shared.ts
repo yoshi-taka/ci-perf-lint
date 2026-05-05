@@ -28,16 +28,13 @@ export function buildRestrictedImportDiagnostic(
   entry: EmbeddedOxlintDiagnostic,
   content: RestrictedImportRuleContent,
 ): Diagnostic {
-  const label = entry.diagnostic.labels?.[0];
-  const line = label?.span?.line ?? 1;
-  const column = label?.span?.column ?? 1;
-  const contextText = entry.diagnostic.message ?? content.defaultContextText;
+  const contextText = entry.diagnostic.message;
 
   return buildRepositoryDiagnostic(repository, meta, {
     location: {
       path: entry.relativePath,
-      line,
-      column,
+      line: entry.diagnostic.line,
+      column: entry.diagnostic.column,
     },
     message: content.message(entry.relativePath, contextText),
     why: content.why,

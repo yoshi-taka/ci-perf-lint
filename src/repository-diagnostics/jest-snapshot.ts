@@ -163,18 +163,13 @@ export async function collectLargeJestSnapshotDiagnostics(
   }
 
   const inlineSnapshotDiagnostics = snapshotDiagnostics.map(({ diagnostic, relativePath }) => {
-    const label = diagnostic.labels?.[0];
-    const line = label?.span?.line ?? 1;
-    const column = label?.span?.column ?? 1;
-    const contextText = [diagnostic.message, diagnostic.help, diagnostic.note]
-      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-      .join(" ");
+    const contextText = diagnostic.message;
 
     return buildRepositoryDiagnostic(repository, largeJestSnapshotMeta, {
       location: {
         path: relativePath,
-        line,
-        column,
+        line: diagnostic.line,
+        column: diagnostic.column,
       },
       message: `Embedded Oxlint scan flagged a large Jest snapshot in ${relativePath}. ${contextText}`,
       why: "Large Jest snapshots are slow to review and easy to rubber-stamp. They also add parsing, transform, diff, and output work to test runs when failures occur.",

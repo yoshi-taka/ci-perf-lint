@@ -83,29 +83,22 @@ export async function collectLargeBarrelFileDiagnostics(
 
   const results = await Promise.allSettled(
     barrelDiagnostics.map(async ({ diagnostic, relativePath }) => {
-      const label = diagnostic.labels?.[0];
-      const line = label?.span?.line ?? 1;
-      const column = label?.span?.column ?? 1;
-      const contextText =
-        diagnostic.message ?? "Large barrel file detected by embedded Oxlint scan.";
+      const contextText = diagnostic.message;
       const fileContent = (await context.readTextFileOrWarn(context.resolve(relativePath))) ?? "";
       const generated = barrelFileLooksGenerated(fileContent);
       const advisoryOnly = generated || relativePath.endsWith(".d.ts");
       const why =
         "Embedded Oxlint `oxc/no-barrel-file` detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.";
       const suggestion = buildBarrelSuggestion(relativePath, generated);
-      const extraContext = [diagnostic.help, diagnostic.note]
-        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-        .join(" ");
 
       return buildRepositoryDiagnostic(repository, barrelFileMeta, {
         location: {
           path: relativePath,
-          line,
-          column,
+          line: diagnostic.line,
+          column: diagnostic.column,
         },
         severity: advisoryOnly ? "suggestion" : undefined,
-        message: `Embedded Oxlint scan flagged ${relativePath} as a large barrel file. ${contextText}${extraContext ? ` ${extraContext}` : ""}`,
+        message: `Embedded Oxlint scan flagged ${relativePath} as a large barrel file. ${contextText}`,
         why,
         suggestion,
         measurementHint:

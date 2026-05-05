@@ -4,27 +4,12 @@ import { LruMap } from "../repository-scan-context.ts";
 import {
   cleanupEmbeddedOxlintTempConfigFiles,
   type EmbeddedOxlintScanKind,
+  type OxlintDiagnostic,
   runEmbeddedOxlint,
 } from "./embedded-oxlint-runner.ts";
 
-interface OxlintJsonDiagnostic {
-  message?: string;
-  code?: string;
-  severity?: string;
-  help?: string;
-  note?: string;
-  filename?: string;
-  labels?: {
-    label?: string;
-    span?: {
-      line?: number;
-      column?: number;
-    };
-  }[];
-}
-
 export interface EmbeddedOxlintDiagnostic {
-  diagnostic: OxlintJsonDiagnostic;
+  diagnostic: OxlintDiagnostic;
   relativePath: string;
 }
 
@@ -34,11 +19,11 @@ interface IndexedRestrictedImportDiagnostic extends EmbeddedOxlintDiagnostic {
 
 const embeddedOxlintImportScanCache = new LruMap<
   string,
-  Promise<OxlintJsonDiagnostic[] | undefined>
+  Promise<OxlintDiagnostic[] | undefined>
 >(64, 300_000);
 const embeddedOxlintNonImportScanCache = new LruMap<
   string,
-  Promise<OxlintJsonDiagnostic[] | undefined>
+  Promise<OxlintDiagnostic[] | undefined>
 >(64, 300_000);
 const embeddedOxlintDiagnosticsByCodeCache = new LruMap<
   string,
@@ -94,7 +79,7 @@ async function collectEmbeddedOxlintJsonDiagnostics(
   repoRoot: string,
   kind: EmbeddedOxlintScanKind,
   warnings?: AnalysisWarning[],
-): Promise<OxlintJsonDiagnostic[] | undefined> {
+): Promise<OxlintDiagnostic[] | undefined> {
   const scanCache = embeddedOxlintScanCacheForKind(kind);
   const cached = scanCache.get(repoRoot);
   if (cached) {
@@ -112,7 +97,7 @@ async function collectEmbeddedOxlintJsonDiagnostics(
 export async function collectEmbeddedOxlintImportJsonDiagnostics(
   repoRoot: string,
   warnings?: AnalysisWarning[],
-): Promise<OxlintJsonDiagnostic[] | undefined> {
+): Promise<OxlintDiagnostic[] | undefined> {
   return collectEmbeddedOxlintJsonDiagnostics(repoRoot, "import", warnings);
 }
 
@@ -148,10 +133,7 @@ export async function collectEmbeddedOxlintDiagnosticsByCode(
         continue;
       }
 
-      const label = diagnostic.labels?.[0];
-      const line = label?.span?.line ?? 1;
-      const column = label?.span?.column ?? 1;
-      const key = `${relativePath}:${line}:${column}:${diagnostic.message ?? ""}`;
+      const key = `${relativePath}:${diagnostic.line}:${diagnostic.column}:${diagnostic.message}`;
       matchingDiagnostics.set(key, { diagnostic, relativePath });
     }
 
@@ -161,8 +143,8 @@ export async function collectEmbeddedOxlintDiagnosticsByCode(
   return diagnosticsLoad;
 }
 
-function restrictedImportSource(diagnostic: OxlintJsonDiagnostic): string | undefined {
-  const message = diagnostic.message ?? "";
+function restrictedImportSource(diagnostic: OxlintDiagnostic): string | undefined {
+  const message = diagnostic.message;
   return (
     /^'([^']+)' import is restricted/.exec(message)?.[1] ??
     /^'[^']+' import from '([^']+)' is restricted/.exec(message)?.[1]
