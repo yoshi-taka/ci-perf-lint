@@ -346,7 +346,7 @@ export async function runEmbeddedOxlint(
       kill(9);
     }, EMBEDDED_OXLINT_TIMEOUT_MS);
 
-    const FORCE_RESOLVE_AFTER_KILL_MS = 2_000;
+    const FORCE_RESOLVE_AFTER_KILL_MS = 500;
     const timeoutPromise = new Promise<[string, string, number]>((resolve) => {
       setTimeout(
         () => resolve(["", "", -1]),

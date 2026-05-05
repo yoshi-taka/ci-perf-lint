@@ -15,7 +15,7 @@ import type {
   WorkflowSummary,
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
-import { collectEmbeddedOxlintImportJsonDiagnostics } from "./repository-diagnostics/embedded-oxlint.ts";
+import { collectEmbeddedOxlintImportJsonDiagnostics, collectEmbeddedOxlintDiagnosticsByCode } from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
 import { evaluateRules } from "./rule-engine.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
@@ -294,6 +294,7 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   }
   if ((await scanContext.pathExists(scanContext.resolve("package.json"))) && !workflowOnly) {
     void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot);
+    void collectEmbeddedOxlintDiagnosticsByCode(target.repoRoot, "oxc(no-barrel-file)");
   }
   timer.mark("embedded-oxlint-prewarm");
 
