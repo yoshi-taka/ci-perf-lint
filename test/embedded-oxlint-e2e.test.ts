@@ -17,6 +17,11 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 
 describe("e2e: bundled CLI with oxlint", () => {
   test("detects barrel files via node dist/cli.js", async () => {
+    // ensure dist is built
+    const distCliJs = path.join(repoRoot, "dist", "cli.js");
+    if (!require("node:fs").existsSync(distCliJs)) {
+      spawnSync("bun", ["run", "build"], { cwd: repoRoot, stdio: "pipe" });
+    }
     await withTempDir(async (tmpDir) => {
       const fixtureDir = path.join(tmpDir, "fixture");
       const fixtureRoot = path.join(repoRoot, "test", "fixtures", "barrel-file-like");
