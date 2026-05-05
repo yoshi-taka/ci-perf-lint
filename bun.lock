@@ -27,7 +27,7 @@
     },
     "packages/ci-perf-lint": {
       "name": "ci-perf-lint",
-      "version": "0.0.2",
+      "version": "0.0.4-alpha.1",
       "bin": {
         "ci-perf-lint": "cli.mjs",
       },
