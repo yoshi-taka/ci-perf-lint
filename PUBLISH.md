@@ -3,11 +3,12 @@
 ## Flow
 
 ```
-main push → CI (lint + audit + test)
-tag push → publish (lint + audit + test → build → npm publish)
+commit → push main → CI (lint + audit + test)
+bump + [skip ci] → push main → CI skip (version only)
+tag v0.0.x → publish (build → npm publish only)
 ```
 
-Main and tag are pushed separately. Main first, tag when ready.
+No duplicate test runs. CI tests the code. Publish trusts CI.
 
 ## Steps
 
@@ -17,26 +18,26 @@ Main and tag are pushed separately. Main first, tag when ready.
 bun run lint && bun run audit:static && bun test --parallel --timeout 120000
 ```
 
-### 2. Bump and push main
+### 2. Bump and push
 
 ```sh
 npm version --no-git-tag-version 0.0.x
 npm pkg set version="0.0.x" dependencies.@yoshi-taka/ci-perf-lint="*" -w packages/ci-perf-lint
 bun install
-git add -A && git commit -m "0.0.x"
+git add -A && git commit -m "0.0.x [skip ci]"
 git push
 ```
 
-### 3. Wait for CI to pass
+### 3. Tag and publish
 
-### 4. Tag and publish
+After CI passes on the preceding work commits:
 
 ```sh
 git tag v0.0.x -m "v0.0.x"
 git push origin v0.0.x
 ```
 
-Publish workflow runs lint + audit + test → build → npm publish.
+Publish workflow: build → npm publish. No lint/audit/test (already passed in CI).
 
 ## Alpha / Prerelease
 
@@ -47,7 +48,7 @@ Publish workflow detects hyphen and uses npm dist-tag `alpha`.
 
 Go to Actions → Publish → Run workflow.
 - dist-tag: `alpha` or `latest`
-- bump_version: auto-increment and publish
+- bump_version: auto-increment, verify, then publish
 
 ## Notes
 
