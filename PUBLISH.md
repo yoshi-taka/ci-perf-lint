@@ -1,12 +1,13 @@
 # Publish
 
-## Process
+## Flow
 
 ```
-main push → CI (lint + audit + test) → tag push → publish (build + npm publish only)
+main push → CI (lint + audit + test)
+tag push → publish (lint + audit + test → build → npm publish)
 ```
 
-Ci passes first. Tag never pushed before CI is green.
+Main and tag are pushed separately. Main first, tag when ready.
 
 ## Steps
 
@@ -26,29 +27,29 @@ git add -A && git commit -m "0.0.x"
 git push
 ```
 
-### 3. Wait for CI
-
-Check https://github.com/yoshi-taka/ci-perf-lint/actions
+### 3. Wait for CI to pass
 
 ### 4. Tag and publish
 
 ```sh
 git tag v0.0.x -m "v0.0.x"
-git push origin v0.0.x     # triggers publish workflow
+git push origin v0.0.x
 ```
+
+Publish workflow runs lint + audit + test → build → npm publish.
 
 ## Alpha / Prerelease
 
-Use version with hyphen (e.g. `0.0.4-alpha.1`). Same process as above.
-The publish workflow detects the hyphen and uses npm dist-tag `alpha`.
+Use version with hyphen (e.g. `0.0.4-alpha.1`). Same steps.
+Publish workflow detects hyphen and uses npm dist-tag `alpha`.
 
 ## workflow_dispatch
 
-Go to Actions → Publish → Run workflow. Set dist-tag (`alpha` or `latest`).
-Optionally enable bump_version to auto-increment.
+Go to Actions → Publish → Run workflow.
+- dist-tag: `alpha` or `latest`
+- bump_version: auto-increment and publish
 
 ## Notes
 
 - `packages/ci-perf-lint` depends on `@yoshi-taka/ci-perf-lint` with `"*"` so it always pulls the latest from npm at install time.
-- Publish workflow does NOT re-run lint/audit/test. CI already passed.
-- Stable tags (`v0.0.2`) auto-create a GitHub Release. Prerelease tags do not.
+- Stable tags auto-create a GitHub Release. Prerelease tags do not.
