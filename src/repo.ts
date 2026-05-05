@@ -15,7 +15,7 @@ import type {
   WorkflowSummary,
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
-import { collectEmbeddedOxlintImportJsonDiagnostics, skipEmbeddedOxlint, clearEmbeddedOxlintSkip } from "./repository-diagnostics/embedded-oxlint.ts";
+import { collectEmbeddedOxlintImportJsonDiagnostics } from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
 import { evaluateRules } from "./rule-engine.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
@@ -32,7 +32,6 @@ type ParsedWorkflowDocument =
   | CircleCiDocument;
 
 const HUGE_REPO_FILE_THRESHOLD = 80_000;
-const OXLINT_FILE_THRESHOLD = 10_000;
 
 const parsedWorkflowCache = new LruMap<
   string,
@@ -294,15 +293,7 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     }
   }
   if ((await scanContext.pathExists(scanContext.resolve("package.json"))) && !workflowOnly) {
-    const fileCount = await scanContext.estimatedFileCount();
-    if (fileCount !== null && fileCount > OXLINT_FILE_THRESHOLD) {
-      skipEmbeddedOxlint(target.repoRoot);
-      process.stderr.write(
-        `[repo] Large repository detected (~${(fileCount / 1000).toFixed(0)}k files). Skipping embedded oxlint scans to avoid timeout.\n`,
-      );
-    } else {
-      void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot);
-    }
+    void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot);
   }
   timer.mark("embedded-oxlint-prewarm");
 
@@ -374,7 +365,6 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   timer.mark("collect-repository-diagnostics");
 
   scanContext.clearCaches();
-  clearEmbeddedOxlintSkip();
 
   const findings =
     mode === "strict"

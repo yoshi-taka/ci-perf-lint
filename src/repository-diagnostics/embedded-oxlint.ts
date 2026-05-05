@@ -17,16 +17,6 @@ interface IndexedRestrictedImportDiagnostic extends EmbeddedOxlintDiagnostic {
   source?: string;
 }
 
-const oxlintSkippedRepos = new Set<string>();
-
-export function skipEmbeddedOxlint(repoRoot: string): void {
-  oxlintSkippedRepos.add(repoRoot);
-}
-
-export function clearEmbeddedOxlintSkip(): void {
-  oxlintSkippedRepos.clear();
-}
-
 const embeddedOxlintImportScanCache = new LruMap<
   string,
   Promise<OxlintDiagnostic[] | undefined>
@@ -90,10 +80,6 @@ async function collectEmbeddedOxlintJsonDiagnostics(
   kind: EmbeddedOxlintScanKind,
   warnings?: AnalysisWarning[],
 ): Promise<OxlintDiagnostic[] | undefined> {
-  if (oxlintSkippedRepos.has(repoRoot)) {
-    return undefined;
-  }
-
   const scanCache = embeddedOxlintScanCacheForKind(kind);
   const cached = scanCache.get(repoRoot);
   if (cached) {
