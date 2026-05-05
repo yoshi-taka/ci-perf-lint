@@ -32,29 +32,32 @@ describe("e2e: packaged CLI with oxlint", () => {
         JSON.stringify({ name: "e2e-test", private: true }),
       );
 
-      // Pack the tool
-      const packResult = spawnSync("npm", ["pack", "--pack-destination", tmpDir], {
+      // Pre-build so prepack doesn't pollute stdout
+      spawnSync("bun", ["run", "build"], { cwd: repoRoot, stdio: "pipe" });
+      const packResult = spawnSync("bun", ["pm", "pack", "--quiet", "--ignore-scripts"], {
         cwd: repoRoot,
         stdio: "pipe",
       });
       if (packResult.status !== 0) {
-        throw new Error(`npm pack failed: ${packResult.stderr.toString()}`);
+        throw new Error(`bun pm pack failed: ${packResult.stderr.toString()}`);
       }
-      const outLines = packResult.stdout.toString().trim().split("\n");
-      const tarballName = outLines.filter((l) => l.endsWith(".tgz")).pop();
+      const tarballName = packResult.stdout.toString().trim().split("\n").filter((l) => l.endsWith(".tgz")).pop();
       if (!tarballName) {
-        throw new Error(`no .tgz in npm pack output: ${packResult.stdout.toString()}`);
+        throw new Error(`no .tgz in pack output: ${packResult.stdout.toString()}`);
       }
-      const tarballPath = path.join(tmpDir, tarballName);
+      const srcTarball = path.join(repoRoot, tarballName);
+      const dstTarball = path.join(tmpDir, tarballName);
+      await cp(srcTarball, dstTarball);
+      await rm(srcTarball);
 
       // Install the packed tool + its deps into the e2e project
-      const installResult = spawnSync("npm", ["install", tarballPath, "oxlint"], {
+      const installResult = spawnSync("bun", ["add", dstTarball, "oxlint"], {
         cwd: installDir,
         stdio: "pipe",
         encoding: "utf-8",
       });
       if (installResult.status !== 0) {
-        throw new Error(`npm install failed with exit ${installResult.status}: ${installResult.stderr}`);
+        throw new Error(`bun add failed with exit ${installResult.status}: ${installResult.stderr}`);
       }
 
       // Run the installed CLI
