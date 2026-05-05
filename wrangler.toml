@@ -1,6 +1,0 @@
-name = "ci-perf-lint"
-pages_build_output_dir = "site/dist"
-build_command = "bun run docs:build"
-
-[build]
-ignore = "git diff --quiet HEAD~1 -- site/ docs/ *.md"
