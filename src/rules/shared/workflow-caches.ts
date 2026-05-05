@@ -5,6 +5,9 @@ import {
   isSetupActionRelevantForDependencyFamily,
 } from "./workflow-setup-actions.ts";
 
+const isManualCacheStepCache = new WeakMap<WorkflowStep, boolean>();
+const hasDependencyCacheConfigCache = new WeakMap<WorkflowStep, boolean>();
+
 const manualCachePathMatchers = {
   npm: /(^|\n|\/)\.npm(\/|$)|npm-cache/,
   pnpm: /\.pnpm-store|pnpm-store|store\/v3/,
@@ -40,27 +43,45 @@ function getCachePathText(step: WorkflowStep): string {
 }
 
 export function hasDependencyCacheConfig(step: WorkflowStep): boolean {
+  const cached = hasDependencyCacheConfigCache.get(step);
+  if (cached !== undefined) {
+    return cached;
+  }
+  if (hasDependencyCacheConfigCache.has(step)) {
+    return false;
+  }
+
   if (!step.uses || !step.with) {
+    hasDependencyCacheConfigCache.set(step, false);
     return false;
   }
 
   const cacheValue = step.with.cache;
   const cacheDependencyPath = step.with["cache-dependency-path"];
 
-  if (typeof cacheValue === "string" && cacheValue.trim().length > 0) {
-    return true;
-  }
-
-  return typeof cacheDependencyPath === "string" && cacheDependencyPath.trim().length > 0;
+  const result =
+    (typeof cacheValue === "string" && cacheValue.trim().length > 0) ||
+    (typeof cacheDependencyPath === "string" && cacheDependencyPath.trim().length > 0);
+  hasDependencyCacheConfigCache.set(step, result);
+  return result;
 }
 
 export function isManualCacheStep(step: WorkflowStep): boolean {
+  const cached = isManualCacheStepCache.get(step);
+  if (cached !== undefined) {
+    return cached;
+  }
+  if (isManualCacheStepCache.has(step)) {
+    return false;
+  }
+
   const uses = step.uses?.toLowerCase() ?? "";
-  return (
+  const result =
     uses.startsWith("actions/cache@") ||
     uses.startsWith("actions/cache/restore@") ||
-    uses.startsWith("actions/cache/save@")
-  );
+    uses.startsWith("actions/cache/save@");
+  isManualCacheStepCache.set(step, result);
+  return result;
 }
 
 export function manualCacheStepMatchesDependencyFamily(

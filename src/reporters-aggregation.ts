@@ -154,24 +154,28 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
     workflowGrouped.set(workflowFindingKey(finding.workflow, finding.ruleId), existing);
   });
 
-  for (const [repoKey, repoEntry] of repositoryGrouped) {
-    for (const wfEntry of workflowGrouped.values()) {
-      if (wfEntry.ruleId !== repoEntry.ruleId || wfEntry.docsPath !== repoEntry.docsPath) {
-        continue;
-      }
-
-      mergeUniqueValues(wfEntry.workflows, repoEntry.workflows);
-      mergeUniqueValues(wfEntry.locations, repoEntry.locations);
-      mergeUniqueValues(wfEntry.messages, repoEntry.messages);
-      wfEntry.aiHandoffs ??= [];
-      repoEntry.aiHandoffs ??= [];
-      mergeUniqueValues(wfEntry.aiHandoffs, repoEntry.aiHandoffs);
-      mergeUniqueValues(wfEntry.jobs, repoEntry.jobs);
-      wfEntry.memberFindings.push(...repoEntry.memberFindings);
-      wfEntry.firstIndex = Math.min(wfEntry.firstIndex, repoEntry.firstIndex);
-      repositoryGrouped.delete(repoKey);
-      break;
+  const workflowByRuleDocs = new Map<string, MutableAggregatedFinding>();
+  for (const wfEntry of workflowGrouped.values()) {
+    const key = `${wfEntry.ruleId}\n${wfEntry.docsPath}`;
+    if (!workflowByRuleDocs.has(key)) {
+      workflowByRuleDocs.set(key, wfEntry);
     }
+  }
+
+  for (const [repoKey, repoEntry] of repositoryGrouped) {
+    const wfEntry = workflowByRuleDocs.get(`${repoEntry.ruleId}\n${repoEntry.docsPath}`);
+    if (!wfEntry) { continue; }
+
+    mergeUniqueValues(wfEntry.workflows, repoEntry.workflows);
+    mergeUniqueValues(wfEntry.locations, repoEntry.locations);
+    mergeUniqueValues(wfEntry.messages, repoEntry.messages);
+    wfEntry.aiHandoffs ??= [];
+    repoEntry.aiHandoffs ??= [];
+    mergeUniqueValues(wfEntry.aiHandoffs, repoEntry.aiHandoffs);
+    mergeUniqueValues(wfEntry.jobs, repoEntry.jobs);
+    wfEntry.memberFindings.push(...repoEntry.memberFindings);
+    wfEntry.firstIndex = Math.min(wfEntry.firstIndex, repoEntry.firstIndex);
+    repositoryGrouped.delete(repoKey);
   }
 
   const grouped = [...repositoryGrouped.values(), ...workflowGrouped.values()];

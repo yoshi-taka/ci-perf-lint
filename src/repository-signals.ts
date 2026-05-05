@@ -36,13 +36,9 @@ function timingsEnabled(): boolean {
 }
 
 function workflowFingerprint(workflows: WorkflowDocument[]): string {
-  return JSON.stringify(
-    workflows.map((workflow) => [
-      workflow.relativePath,
-      workflow.source ?? "",
-      workflow.jobs.length,
-    ]),
-  );
+  return workflows
+    .map((w) => `${w.relativePath}:${w.jobs.length}:${(w.source ?? "").length}`)
+    .join("|");
 }
 
 export async function collectRepositorySignals(

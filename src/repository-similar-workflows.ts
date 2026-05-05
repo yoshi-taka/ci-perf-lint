@@ -108,20 +108,16 @@ export function collectSimilarWorkflowSignals(
 
   for (const [summaryIndex, summary] of workflowSummaries.entries()) {
     const peers = workflowPeerIndexes[summaryIndex] ?? [];
-    if (
-      peers.length >= minimumPeerCount &&
-      summary.eligibleForConcurrency &&
-      !summary.hasConcurrency
-    ) {
-      const eligiblePeerCount = countMatchingPeers(
-        peers,
-        workflowSummaries,
-        (peer) => peer.eligibleForConcurrency,
-      );
+    if (peers.length < minimumPeerCount) { continue; }
+
+    if (summary.eligibleForConcurrency && !summary.hasConcurrency) {
       const eligibleWithConcurrencyCount = countMatchingPeers(
-        peers,
-        workflowSummaries,
+        peers, workflowSummaries,
         (peer) => peer.eligibleForConcurrency && peer.hasConcurrency,
+      );
+      const eligiblePeerCount = countMatchingPeers(
+        peers, workflowSummaries,
+        (peer) => peer.eligibleForConcurrency,
       );
       if (
         eligibleWithConcurrencyCount >= minimumPeerCount &&
@@ -132,9 +128,56 @@ export function collectSimilarWorkflowSignals(
           workflowPath: summary.workflow.relativePath,
           peerCount: eligibleWithConcurrencyCount,
           peerWorkflowPaths: collectPeerLabels(
-            peers,
-            workflowSummaries,
+            peers, workflowSummaries,
             (peer) => peer.eligibleForConcurrency && peer.hasConcurrency,
+            (peer) => peer.workflow.relativePath,
+          ),
+        });
+      }
+    }
+
+    if (
+      !workflowHasNonCodeIgnore(summary.workflow) &&
+      !workflowHasTriggerPathFilter(summary.workflow) &&
+      isHeavyWorkflow(summary.workflow) &&
+      !workflowLooksMetaCheckLike(summary.workflow)
+    ) {
+      const peersWithIgnoreCount = countMatchingPeers(peers, workflowSummaries, (peer) =>
+        workflowHasNonCodeIgnore(peer.workflow),
+      );
+      if (
+        peersWithIgnoreCount >= minimumPeerCount &&
+        peersWithIgnoreCount / peers.length >= minimumConsensusRatio
+      ) {
+        nonCodeIgnore.push({
+          workflowPath: summary.workflow.relativePath,
+          peerCount: peersWithIgnoreCount,
+          peerWorkflowPaths: collectPeerLabels(
+            peers, workflowSummaries,
+            (peer) => workflowHasNonCodeIgnore(peer.workflow),
+            (peer) => peer.workflow.relativePath,
+          ),
+        });
+      }
+    }
+
+    if (
+      !workflowHasTriggerPathFilter(summary.workflow) &&
+      isHeavyWorkflow(summary.workflow)
+    ) {
+      const peersWithFilterCount = countMatchingPeers(peers, workflowSummaries, (peer) =>
+        workflowHasTriggerPathFilter(peer.workflow),
+      );
+      if (
+        peersWithFilterCount >= minimumPeerCount &&
+        peersWithFilterCount / peers.length >= minimumConsensusRatio
+      ) {
+        pathsFilter.push({
+          workflowPath: summary.workflow.relativePath,
+          peerCount: peersWithFilterCount,
+          peerWorkflowPaths: collectPeerLabels(
+            peers, workflowSummaries,
+            (peer) => workflowHasTriggerPathFilter(peer.workflow),
             (peer) => peer.workflow.relativePath,
           ),
         });
@@ -142,174 +185,86 @@ export function collectSimilarWorkflowSignals(
     }
   }
 
-  for (const [summaryIndex, summary] of workflowSummaries.entries()) {
-    const peers = workflowPeerIndexes[summaryIndex] ?? [];
-    if (
-      peers.length < minimumPeerCount ||
-      workflowHasNonCodeIgnore(summary.workflow) ||
-      workflowHasTriggerPathFilter(summary.workflow) ||
-      !isHeavyWorkflow(summary.workflow) ||
-      workflowLooksMetaCheckLike(summary.workflow)
-    ) {
-      continue;
-    }
-
-    const peersWithIgnoreCount = countMatchingPeers(peers, workflowSummaries, (peer) =>
-      workflowHasNonCodeIgnore(peer.workflow),
-    );
-    if (
-      peersWithIgnoreCount >= minimumPeerCount &&
-      peersWithIgnoreCount / peers.length >= minimumConsensusRatio
-    ) {
-      nonCodeIgnore.push({
-        workflowPath: summary.workflow.relativePath,
-        peerCount: peersWithIgnoreCount,
-        peerWorkflowPaths: collectPeerLabels(
-          peers,
-          workflowSummaries,
-          (peer) => workflowHasNonCodeIgnore(peer.workflow),
-          (peer) => peer.workflow.relativePath,
-        ),
-      });
-    }
-  }
-
-  for (const [summaryIndex, summary] of workflowSummaries.entries()) {
-    const peers = workflowPeerIndexes[summaryIndex] ?? [];
-    if (
-      peers.length < minimumPeerCount ||
-      workflowHasTriggerPathFilter(summary.workflow) ||
-      !isHeavyWorkflow(summary.workflow)
-    ) {
-      continue;
-    }
-
-    const peersWithFilterCount = countMatchingPeers(peers, workflowSummaries, (peer) =>
-      workflowHasTriggerPathFilter(peer.workflow),
-    );
-    if (
-      peersWithFilterCount >= minimumPeerCount &&
-      peersWithFilterCount / peers.length >= minimumConsensusRatio
-    ) {
-      pathsFilter.push({
-        workflowPath: summary.workflow.relativePath,
-        peerCount: peersWithFilterCount,
-        peerWorkflowPaths: collectPeerLabels(
-          peers,
-          workflowSummaries,
-          (peer) => workflowHasTriggerPathFilter(peer.workflow),
-          (peer) => peer.workflow.relativePath,
-        ),
-      });
-    }
-  }
-
   for (const [summaryIndex, summary] of jobSummaries.entries()) {
-    if (!summary.isTimeoutCandidate || summary.hasTimeout) {
-      continue;
-    }
-
     const peers = jobPeerIndexes[summaryIndex] ?? [];
-    const timeoutCandidatePeerCount = countMatchingPeers(
-      peers,
-      jobSummaries,
-      (peer) => peer.isTimeoutCandidate,
-    );
-    const timeoutPeerCount = countMatchingPeers(
-      peers,
-      jobSummaries,
-      (peer) => peer.isTimeoutCandidate && peer.hasTimeout,
-    );
-    if (
-      timeoutCandidatePeerCount < minimumPeerCount ||
-      timeoutPeerCount / timeoutCandidatePeerCount < minimumConsensusRatio
-    ) {
-      continue;
-    }
 
-    timeoutMinutes.push({
-      workflowPath: summary.workflow.relativePath,
-      jobId: summary.job.id,
-      peerCount: timeoutPeerCount,
-      peerJobLabels: collectPeerLabels(
-        peers,
-        jobSummaries,
+    if (summary.isTimeoutCandidate && !summary.hasTimeout) {
+      const timeoutCandidatePeerCount = countMatchingPeers(
+        peers, jobSummaries,
+        (peer) => peer.isTimeoutCandidate,
+      );
+      const timeoutPeerCount = countMatchingPeers(
+        peers, jobSummaries,
         (peer) => peer.isTimeoutCandidate && peer.hasTimeout,
-        (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
-      ),
-    });
-  }
-
-  for (const [summaryIndex, summary] of jobSummaries.entries()) {
-    if (!summary.isCacheCandidate || summary.hasDependencyCache) {
-      continue;
+      );
+      if (
+        timeoutCandidatePeerCount >= minimumPeerCount &&
+        timeoutPeerCount / timeoutCandidatePeerCount >= minimumConsensusRatio
+      ) {
+        timeoutMinutes.push({
+          workflowPath: summary.workflow.relativePath,
+          jobId: summary.job.id,
+          peerCount: timeoutPeerCount,
+          peerJobLabels: collectPeerLabels(
+            peers, jobSummaries,
+            (peer) => peer.isTimeoutCandidate && peer.hasTimeout,
+            (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
+          ),
+        });
+      }
     }
 
-    const peers = jobPeerIndexes[summaryIndex] ?? [];
-    const cacheCandidatePeerCount = countMatchingPeers(
-      peers,
-      jobSummaries,
-      (peer) => peer.isCacheCandidate,
-    );
-    const cachePeerCount = countMatchingPeers(
-      peers,
-      jobSummaries,
-      (peer) => peer.isCacheCandidate && peer.hasDependencyCache,
-    );
-    if (
-      cacheCandidatePeerCount < minimumPeerCount ||
-      cachePeerCount / cacheCandidatePeerCount < minimumConsensusRatio
-    ) {
-      continue;
-    }
-
-    dependencyCache.push({
-      workflowPath: summary.workflow.relativePath,
-      jobId: summary.job.id,
-      peerCount: cachePeerCount,
-      peerJobLabels: collectPeerLabels(
-        peers,
-        jobSummaries,
+    if (summary.isCacheCandidate && !summary.hasDependencyCache) {
+      const cacheCandidatePeerCount = countMatchingPeers(
+        peers, jobSummaries,
+        (peer) => peer.isCacheCandidate,
+      );
+      const cachePeerCount = countMatchingPeers(
+        peers, jobSummaries,
         (peer) => peer.isCacheCandidate && peer.hasDependencyCache,
-        (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
-      ),
-    });
-  }
-
-  for (const [summaryIndex, summary] of jobSummaries.entries()) {
-    if (!summary.isDeepCheckoutCandidate || !summary.usesDeepCheckout) {
-      continue;
+      );
+      if (
+        cacheCandidatePeerCount >= minimumPeerCount &&
+        cachePeerCount / cacheCandidatePeerCount >= minimumConsensusRatio
+      ) {
+        dependencyCache.push({
+          workflowPath: summary.workflow.relativePath,
+          jobId: summary.job.id,
+          peerCount: cachePeerCount,
+          peerJobLabels: collectPeerLabels(
+            peers, jobSummaries,
+            (peer) => peer.isCacheCandidate && peer.hasDependencyCache,
+            (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
+          ),
+        });
+      }
     }
 
-    const peers = jobPeerIndexes[summaryIndex] ?? [];
-    const deepCheckoutCandidatePeerCount = countMatchingPeers(
-      peers,
-      jobSummaries,
-      (peer) => peer.isDeepCheckoutCandidate,
-    );
-    const shallowCheckoutPeerCount = countMatchingPeers(
-      peers,
-      jobSummaries,
-      (peer) => peer.isDeepCheckoutCandidate && !peer.usesDeepCheckout,
-    );
-    if (
-      deepCheckoutCandidatePeerCount < minimumPeerCount ||
-      shallowCheckoutPeerCount / deepCheckoutCandidatePeerCount < minimumConsensusRatio
-    ) {
-      continue;
-    }
-
-    deepCheckout.push({
-      workflowPath: summary.workflow.relativePath,
-      jobId: summary.job.id,
-      peerCount: shallowCheckoutPeerCount,
-      peerJobLabels: collectPeerLabels(
-        peers,
-        jobSummaries,
+    if (summary.isDeepCheckoutCandidate && summary.usesDeepCheckout) {
+      const deepCheckoutCandidatePeerCount = countMatchingPeers(
+        peers, jobSummaries,
+        (peer) => peer.isDeepCheckoutCandidate,
+      );
+      const shallowCheckoutPeerCount = countMatchingPeers(
+        peers, jobSummaries,
         (peer) => peer.isDeepCheckoutCandidate && !peer.usesDeepCheckout,
-        (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
-      ),
-    });
+      );
+      if (
+        deepCheckoutCandidatePeerCount >= minimumPeerCount &&
+        shallowCheckoutPeerCount / deepCheckoutCandidatePeerCount >= minimumConsensusRatio
+      ) {
+        deepCheckout.push({
+          workflowPath: summary.workflow.relativePath,
+          jobId: summary.job.id,
+          peerCount: shallowCheckoutPeerCount,
+          peerJobLabels: collectPeerLabels(
+            peers, jobSummaries,
+            (peer) => peer.isDeepCheckoutCandidate && !peer.usesDeepCheckout,
+            (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
+          ),
+        });
+      }
+    }
   }
 
   return {

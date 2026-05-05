@@ -58,7 +58,6 @@ export class LruMap<K, V> extends Map<K, V> {
       const timestamp = this.#timestamps.get(key);
       if (timestamp !== undefined && Date.now() - timestamp > this.#ttl) {
         this.delete(key);
-        this.#timestamps.delete(key);
         return undefined;
       }
     }
@@ -73,7 +72,6 @@ export class LruMap<K, V> extends Map<K, V> {
       const firstKey = this.keys().next().value;
       if (firstKey !== undefined) {
         this.delete(firstKey);
-        this.#timestamps.delete(firstKey);
       }
     }
     super.set(key, value);

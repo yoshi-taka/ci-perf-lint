@@ -1,5 +1,11 @@
 import type { WorkflowStep } from "../../workflow.ts";
 
+const detectInstallCommandCache = new WeakMap<WorkflowStep, string | undefined>();
+const detectLintToolCache = new WeakMap<WorkflowStep, string | undefined>();
+const detectBuildToolCache = new WeakMap<WorkflowStep, string | undefined>();
+const detectPythonToolCache = new WeakMap<WorkflowStep, string | undefined>();
+const detectRedundantBootstrapToolCache = new WeakMap<WorkflowStep, string | undefined>();
+
 const lintToolMatchers = [
   ["eslint", /(?:^|\s)(?:npx\s+)?eslint(?:\s|$)|--eslint(?:\s|$)/i],
   ["prettier", /(?:^|\s)(?:npx\s+)?prettier(?:\s|$)|--prettier(?:\s|$)/i],
@@ -105,18 +111,26 @@ function detectInstallCommandFromText(run: string): string | undefined {
 }
 
 export function detectInstallCommand(step: WorkflowStep): string | undefined {
+  const cached = detectInstallCommandCache.get(step);
+  if (cached !== undefined || detectInstallCommandCache.has(step)) {
+    return cached;
+  }
+
   const manager = detectInstallCommandFromText(step.run ?? "");
   if (manager) {
+    detectInstallCommandCache.set(step, manager);
     return manager;
   }
 
   const uses = step.uses?.toLowerCase() ?? "";
   for (const [family, prefixes] of KNOWN_INSTALLER_ACTIONS) {
     if (prefixes.some((prefix) => uses.startsWith(prefix))) {
+      detectInstallCommandCache.set(step, family);
       return family;
     }
   }
 
+  detectInstallCommandCache.set(step, undefined);
   return undefined;
 }
 
@@ -133,7 +147,14 @@ function detectLintToolFromText(stepName: string, run: string): string | undefin
 }
 
 export function detectLintTool(step: WorkflowStep): string | undefined {
-  return detectLintToolFromText(step.name ?? "", step.run ?? "");
+  const cached = detectLintToolCache.get(step);
+  if (cached !== undefined || detectLintToolCache.has(step)) {
+    return cached;
+  }
+
+  const result = detectLintToolFromText(step.name ?? "", step.run ?? "");
+  detectLintToolCache.set(step, result);
+  return result;
 }
 
 function detectBuildToolFromText(stepName: string, run: string): string | undefined {
@@ -149,7 +170,14 @@ function detectBuildToolFromText(stepName: string, run: string): string | undefi
 }
 
 export function detectBuildTool(step: WorkflowStep): string | undefined {
-  return detectBuildToolFromText(step.name ?? "", step.run ?? "");
+  const cached = detectBuildToolCache.get(step);
+  if (cached !== undefined || detectBuildToolCache.has(step)) {
+    return cached;
+  }
+
+  const result = detectBuildToolFromText(step.name ?? "", step.run ?? "");
+  detectBuildToolCache.set(step, result);
+  return result;
 }
 
 function detectPythonToolFromText(stepName: string, run: string): string | undefined {
@@ -165,7 +193,14 @@ function detectPythonToolFromText(stepName: string, run: string): string | undef
 }
 
 export function detectPythonTool(step: WorkflowStep): string | undefined {
-  return detectPythonToolFromText(step.name ?? "", step.run ?? "");
+  const cached = detectPythonToolCache.get(step);
+  if (cached !== undefined || detectPythonToolCache.has(step)) {
+    return cached;
+  }
+
+  const result = detectPythonToolFromText(step.name ?? "", step.run ?? "");
+  detectPythonToolCache.set(step, result);
+  return result;
 }
 
 export function normalizeRunCommand(run: string | undefined): string {
@@ -212,5 +247,12 @@ export function detectRedundantBootstrapToolFromText(run: string): string | unde
 }
 
 export function detectRedundantBootstrapTool(step: WorkflowStep): string | undefined {
-  return detectRedundantBootstrapToolFromText(step.run ?? "");
+  const cached = detectRedundantBootstrapToolCache.get(step);
+  if (cached !== undefined || detectRedundantBootstrapToolCache.has(step)) {
+    return cached;
+  }
+
+  const result = detectRedundantBootstrapToolFromText(step.run ?? "");
+  detectRedundantBootstrapToolCache.set(step, result);
+  return result;
 }

@@ -4,7 +4,7 @@ import type { WorkflowDocument } from "./workflow.ts";
 import type { PipelineDocument } from "./buildkite-workflow.ts";
 import type { GitlabCiDocument } from "./gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "./circleci-workflow.ts";
-import { getWorkflowAnalysis } from "./rules/shared/workflow-analysis.ts";
+import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
 
 let _rulesByScope: Record<string, readonly AnyRuleModule[]> | null = null;
 
@@ -79,7 +79,7 @@ export async function evaluateRules(
   context: RuleContext,
   warnings?: AnalysisWarning[],
 ): Promise<Diagnostic[]> {
-  void getWorkflowAnalysis(workflow);
+  prewarmStepAnalysisCaches(workflow);
   const isBuildkite = isPipelineDocument(workflow);
   const isGitlab = isGitlabCiDocument(workflow);
   const isCircle = isCircleCiDocument(workflow);
@@ -96,27 +96,27 @@ export async function evaluateRules(
     applicableRules = [...(rulesByScope["github-actions"] ?? []), ...(rulesByScope.both ?? [])];
   }
 
-  const ruleResults = applicableRules.map((rule) => {
+  const ruleResults: Diagnostic[] = [];
+
+  for (const rule of applicableRules) {
     try {
       const ruleScope = rule.meta.scope ?? "github-actions";
       if (ruleScope === "both") {
         const bothRule = rule as BothRuleModule;
-        return bothRule.check(workflow as WorkflowDocument | PipelineDocument, context);
-      }
-      if (isBuildkite) {
+        ruleResults.push(...bothRule.check(workflow as WorkflowDocument | PipelineDocument, context));
+      } else if (isBuildkite) {
         const buildkiteRule = rule as BuildkiteRuleModule;
-        return buildkiteRule.check(workflow, context);
-      }
-      if (isGitlab) {
+        ruleResults.push(...buildkiteRule.check(workflow, context));
+      } else if (isGitlab) {
         const gitlabCiRule = rule as GitlabCiRuleModule;
-        return gitlabCiRule.check(workflow, context);
-      }
-      if (isCircle) {
+        ruleResults.push(...gitlabCiRule.check(workflow, context));
+      } else if (isCircle) {
         const circleCiRule = rule as CircleCiRuleModule;
-        return circleCiRule.check(workflow, context);
+        ruleResults.push(...circleCiRule.check(workflow, context));
+      } else {
+        const githubRule = rule as RuleModule;
+        ruleResults.push(...githubRule.check(workflow, context));
       }
-      const githubRule = rule as RuleModule;
-      return githubRule.check(workflow, context);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       if (warnings) {
@@ -125,9 +125,8 @@ export async function evaluateRules(
           message: `Rule ${rule.meta.id} failed: ${detail}`,
         });
       }
-      return [];
     }
-  });
+  }
 
-  return ruleResults.flat();
+  return ruleResults;
 }

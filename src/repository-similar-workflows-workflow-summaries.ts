@@ -1,4 +1,5 @@
 import type { WorkflowDocument } from "./workflow.ts";
+import { getWorkflowAnalysis } from "./rules/shared/workflow-analysis.ts";
 import {
   isHeavyWorkflow,
   isHeavyJob,
@@ -36,13 +37,9 @@ interface WorkflowSummary {
 
 function buildWorkflowFeatureSet(workflow: WorkflowDocument): Set<string> {
   const features = new Set<string>();
-  const workflowText = workflow.jobs
-    .flatMap((job) => [
-      job.id,
-      ...job.steps.flatMap((step) => [step.name ?? "", step.uses ?? "", step.run ?? ""]),
-    ])
-    .join(" ")
-    .toLowerCase();
+  const loweredBlob = getWorkflowAnalysis(workflow).loweredStepTextBlob;
+  const jobIds = workflow.jobs.map((job) => job.id.toLowerCase()).join(" ");
+  const workflowText = `${jobIds} ${loweredBlob}`;
 
   if (workflowHasPullRequestTrigger(workflow)) {
     features.add("trigger:pull_request");

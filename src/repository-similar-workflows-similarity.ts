@@ -49,10 +49,10 @@ function countSharedFeatures(left: FeatureComparable, right: FeatureComparable):
   return countBits(left.featureMask & right.featureMask);
 }
 
-function jaccardSimilarity(left: FeatureComparable, right: FeatureComparable): number {
-  const sharedCount = countSharedFeatures(left, right);
-  const unionCount = left.featureCount + right.featureCount - sharedCount;
-  return unionCount === 0 ? 0 : sharedCount / unionCount;
+function jaccardSimilarity(left: FeatureComparable, right: FeatureComparable, sharedCount?: number): number {
+  const shared = sharedCount ?? countSharedFeatures(left, right);
+  const unionCount = left.featureCount + right.featureCount - shared;
+  return unionCount === 0 ? 0 : shared / unionCount;
 }
 
 export function collectPeerIndexes<T extends FeatureComparable>(
@@ -100,7 +100,7 @@ export function collectPeerIndexes<T extends FeatureComparable>(
         continue;
       }
 
-      if (jaccardSimilarity(summary, candidate) >= minimumSimilarity) {
+      if (jaccardSimilarity(summary, candidate, sharedFeatureCount) >= minimumSimilarity) {
         peerIndexes.push(candidateIndex);
       }
     }

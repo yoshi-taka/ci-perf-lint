@@ -41,6 +41,7 @@ interface JobAnalysis {
   looksAgenticLike: boolean;
   lintTools: ReadonlySet<string>;
   pythonTools: ReadonlySet<string>;
+  loweredStepTextBlob: string;
 }
 
 interface WorkflowAnalysis {
@@ -109,6 +110,7 @@ export function getJobAnalysis(job: WorkflowJob): JobAnalysis {
   let looksAgenticLike = false;
   const lintTools = new Set<string>();
   const pythonTools = new Set<string>();
+  const loweredStepTexts: string[] = [];
 
   for (const step of job.steps) {
     if (!checkoutStep && usesSetupAction(step.uses, "actions/checkout@")) {
@@ -120,6 +122,7 @@ export function getJobAnalysis(job: WorkflowJob): JobAnalysis {
     foundSetupUvStep ||= usesSetupAction(step.uses, "astral-sh/setup-uv@");
 
     const loweredStepText = getLoweredWorkflowStepText(step);
+    loweredStepTexts.push(loweredStepText);
     const stepText = getWorkflowStepText(step);
     const loweredRunNameText = `${step.name ?? ""} ${step.run ?? ""}`.toLowerCase();
     const run = step.run ?? "";
@@ -158,6 +161,7 @@ export function getJobAnalysis(job: WorkflowJob): JobAnalysis {
     looksAgenticLike: agenticIdPattern.test(loweredId) || looksAgenticLike,
     lintTools,
     pythonTools,
+    loweredStepTextBlob: loweredStepTexts.join("\n"),
   } satisfies JobAnalysis;
   jobAnalysisCache.set(job, analysis);
   return analysis;
@@ -201,9 +205,7 @@ export function getWorkflowAnalysis(
     for (const pythonTool of jobAnalysis.pythonTools) {
       pythonTools.add(pythonTool);
     }
-    for (const step of job.steps) {
-      loweredStepTexts.push(getLoweredWorkflowStepText(step));
-    }
+    loweredStepTexts.push(jobAnalysis.loweredStepTextBlob);
   }
 
   const analysis = {

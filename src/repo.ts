@@ -338,14 +338,16 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
 
   const allFindings: Diagnostic[] = [];
 
-  for (const workflow of parsedWorkflows) {
-    const workflowFindings = (await evaluateRules(workflow, ruleContext, analysisWarnings)).filter(
-      (finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly),
-    );
+  const workflowResults = await Promise.all(
+    parsedWorkflows.map((workflow) =>
+      evaluateRules(workflow, ruleContext, analysisWarnings).then((findings) =>
+        findings.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
+      ),
+    ),
+  );
 
-    for (const finding of workflowFindings) {
-      allFindings.push(finding);
-    }
+  for (const findings of workflowResults) {
+    allFindings.push(...findings);
   }
   timer.mark("evaluate-workflow-rules");
 
