@@ -156,7 +156,7 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
 
   for (const [repoKey, repoEntry] of repositoryGrouped) {
     for (const wfEntry of workflowGrouped.values()) {
-      if (wfEntry.ruleId !== repoEntry.ruleId) {
+      if (wfEntry.ruleId !== repoEntry.ruleId || wfEntry.docsPath !== repoEntry.docsPath) {
         continue;
       }
 
@@ -168,6 +168,7 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
       mergeUniqueValues(wfEntry.aiHandoffs, repoEntry.aiHandoffs);
       mergeUniqueValues(wfEntry.jobs, repoEntry.jobs);
       wfEntry.memberFindings.push(...repoEntry.memberFindings);
+      wfEntry.firstIndex = Math.min(wfEntry.firstIndex, repoEntry.firstIndex);
       repositoryGrouped.delete(repoKey);
       break;
     }

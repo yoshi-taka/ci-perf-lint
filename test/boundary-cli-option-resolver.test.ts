@@ -63,9 +63,68 @@ describe("resolveOptionFlag similar flags boundary", () => {
   });
 
   test("max 6 similar flags in output", () => {
-    // use a flag far from all known ones to get few suggestions
     const fn = () => resolveOptionFlag("--mmmmmmm", knownFlags);
     expect(fn).toThrow();
+  });
+
+  test("shows suggestions when best distance equals distance limit", () => {
+    const fn = () => resolveOptionFlag("--foramt", knownFlags);
+    expect(fn).toThrow("The most similar options are");
+    expect(fn).toThrow("--format");
+  });
+
+  test("caps similar flag suggestions at 6 when many are similar", () => {
+    const manyFlags = [
+      "--flag-01",
+      "--flag-02",
+      "--flag-03",
+      "--flag-04",
+      "--flag-05",
+      "--flag-06",
+      "--flag-07",
+      "--flag-08",
+      "--flag-09",
+    ];
+    const fn = () => resolveOptionFlag("--flag-00", manyFlags);
+    expect(fn).toThrow("The most similar options are");
+    expect(fn).toThrow("--flag-01");
+    expect(fn).toThrow("--flag-06");
+    expect(fn).not.toThrow("--flag-07");
+  });
+
+  test("filters flags beyond similarity threshold", () => {
+    const variedFlags = [
+      "--abc",
+      "--bcd",
+      "--cde",
+      "--abdc",
+      "--aaaaaa",
+    ];
+    const fn = () => resolveOptionFlag("--ace", variedFlags);
+    expect(fn).toThrow("The most similar options are");
+    expect(fn).toThrow("--abc");
+    expect(fn).toThrow("--bcd");
+    expect(fn).toThrow("--cde");
+    expect(fn).toThrow("--abdc");
+    expect(fn).not.toThrow("--aaaaaa");
+  });
+
+  test("matches flags via suffix-based variants", () => {
+    const fn = () => resolveOptionFlag("--findigns", knownFlags);
+    expect(fn).toThrow("The most similar options are");
+    expect(fn).toThrow("--findings-only");
+  });
+
+  test("matches --show-all-locations via -locations suffix variant", () => {
+    const fn = () => resolveOptionFlag("--show-alx", knownFlags);
+    expect(fn).toThrow("The most similar options are");
+    expect(fn).toThrow("--show-all-locations");
+  });
+
+  test("matches --show-workflows via -workflows suffix variant", () => {
+    const fn = () => resolveOptionFlag("--show-wx", knownFlags);
+    expect(fn).toThrow("The most similar options are");
+    expect(fn).toThrow("--show-workflows");
   });
 });
 

@@ -507,6 +507,45 @@ describe("aggregateFindings and grouped reporter output", () => {
     );
   });
 
+  test("preserves earliest firstIndex when repository and workflow findings merge", () => {
+    const findings: Diagnostic[] = [
+      {
+        ruleId: "prefer-node-run-over-npm-run",
+        severity: "warning",
+        confidence: "medium",
+        scope: "repository",
+        docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
+        workflow: ".github/workflows/ci.yml",
+        location: { path: "package.json", line: 1, column: 1 },
+        message: "Repository-wide finding.",
+        why: "Reason.",
+        suggestion: "Use `bun x`.",
+        measurementHint: "Measure it.",
+        aiHandoff: "Handoff.",
+        score: 80,
+      },
+      {
+        ruleId: "prefer-node-run-over-npm-run",
+        severity: "warning",
+        confidence: "medium",
+        docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
+        workflow: ".github/workflows/ci.yml",
+        location: { path: ".github/workflows/ci.yml", line: 10, column: 3 },
+        message: 'Job "build" has an issue.',
+        why: "Reason.",
+        suggestion: "Use `bun x`.",
+        measurementHint: "Measure it.",
+        aiHandoff: 'Handoff.',
+        score: 70,
+      },
+    ];
+
+    const aggregated = aggregateFindingsWithMembers(findings).aggregatedFindings;
+
+    expect(aggregated).toHaveLength(1);
+    expect(aggregated[0]?.firstIndex).toBe(0);
+  });
+
   test("merges timeout findings across workflows with unique jobs and workflow lists", () => {
     fc.assert(
       fc.property(

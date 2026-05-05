@@ -4,6 +4,8 @@ This repository is a Bun + TypeScript CLI for statically auditing GitHub Actions
 
 Read this file first when making AI-assisted edits. Keep changes scoped to the behavior area requested, and prefer existing helpers and rule patterns over new abstractions.
 
+Use `bun` not `npm` for package management and script execution.
+
 ## Main Entry Points
 
 - CLI wrapper: `src/cli.ts`
