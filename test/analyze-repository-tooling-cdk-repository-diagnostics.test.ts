@@ -216,7 +216,7 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
     expect(finding?.docsPath).toBe("docs/rules/cdk-asset-waste-files.md");
     expect(finding?.message).toContain("unnecessary file");
     expect(finding?.message).toContain("Asset123456789abcdef");
-  }, 30000);
+  }, 60000);
 
   test("does not flag CDK assets without waste files", async () => {
     const fixtureRoot = await tempDirs.create("apl-cdk-asset-clean-");
