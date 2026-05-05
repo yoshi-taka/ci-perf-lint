@@ -346,10 +346,18 @@ export async function runEmbeddedOxlint(
     const context = new RepositoryScanContext(repoRoot, localWarnings);
     const source = embeddedOxlintLabel(kind);
     const oxlintPath = await bundledOxlintBinPath();
-    if (!oxlintPath || !(await context.pathExists(oxlintPath))) {
+    if (!oxlintPath) {
       context.warn(
         source,
-        `Oxlint binary not found at ${oxlintPath}. Skipping oxlint-based diagnostics.`,
+        "Oxlint package not found via module resolution. Skipping oxlint-based diagnostics. Install oxlint or ensure the package is available in node_modules.",
+      );
+      warnings?.push(...localWarnings);
+      return undefined;
+    }
+    if (!(await context.pathExists(oxlintPath))) {
+      context.warn(
+        source,
+        `Oxlint binary not found at resolved path: ${oxlintPath}. Skipping oxlint-based diagnostics.`,
       );
       warnings?.push(...localWarnings);
       return undefined;
