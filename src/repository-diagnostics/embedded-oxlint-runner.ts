@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
 import type { AnalysisWarning } from "../types.ts";
@@ -246,9 +247,10 @@ function embeddedOxlintLabel(kind: EmbeddedOxlintScanKind): string {
   return kind === "import" ? "embedded-oxlint-import" : "embedded-oxlint-non-import";
 }
 
-function bundledOxlintBinPath(): string {
+export function bundledOxlintBinPath(): string {
   const binaryName = process.platform === "win32" ? "oxlint.exe" : "oxlint";
-  let dir = import.meta.dir;
+  const startDir = (import.meta as { dir?: string }).dir ?? path.dirname(fileURLToPath(import.meta.url));
+  let dir = startDir;
   for (let i = 0; i < 10; i++) {
     const candidate = path.resolve(dir, "node_modules", ".bin", binaryName);
     try {
@@ -262,7 +264,7 @@ function bundledOxlintBinPath(): string {
       dir = parent;
     }
   }
-  return path.resolve(import.meta.dir, "..", "..", "node_modules", ".bin", binaryName);
+  return path.resolve(startDir, "..", "..", "node_modules", ".bin", binaryName);
 }
 
 function bundledOxlintJsPath(binPath: string): string {

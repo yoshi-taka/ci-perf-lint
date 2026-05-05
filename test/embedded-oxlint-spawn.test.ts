@@ -1,10 +1,23 @@
 import { describe, expect, test } from "bun:test";
+import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
+import { accessSync } from "node:fs";
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 const SHORT_TIMEOUT = 200;
+
+describe("bundledOxlintBinPath", () => {
+  test("resolves to a valid path from source (Bun)", () => {
+    const p = bundledOxlintBinPath();
+    expect(p).toBeTruthy();
+    expect(() => accessSync(p)).not.toThrow();
+    expect(p).toEndWith("oxlint");
+  });
+
+
+});
 
 describe("Bun.spawn with timeout", () => {
   test("captures stdout on clean exit", async () => {

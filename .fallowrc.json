@@ -22,6 +22,7 @@
     { "file": "src/repository-diagnostics/index.ts", "exports": ["repositoryDiagnosticCollectors"] },
     { "file": "src/rules/scheduled-heavy-workflow-without-throttling.ts", "exports": ["estimateScheduleMinutes"] },
 
-    { "file": "src/main.ts", "exports": ["parseArgs"] }
+    { "file": "src/main.ts", "exports": ["parseArgs"] },
+    { "file": "src/repository-diagnostics/embedded-oxlint-runner.ts", "exports": ["bundledOxlintBinPath"] }
   ]
 }
