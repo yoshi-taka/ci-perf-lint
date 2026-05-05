@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["test/fixtures/**", ".astro/**"],
+  "ignore": ["test/fixtures/**", "test/arbitraries/index.ts", ".astro/**"],
   "ignoreDependencies": [],
   "ignoreBinaries": ["hyperfine"],
   "ignoreIssues": {
@@ -20,7 +20,8 @@
         "site/src/layouts/RuleLayout.astro",
         "bench/**/*.bench.ts",
         "bench/run.ts",
-        "fuzz/**/*.mjs"
+        "fuzz/**/*.mjs",
+        "test/**/*.test.ts"
       ]
     }
   }
