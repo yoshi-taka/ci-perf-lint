@@ -1,5 +1,19 @@
 # Testing Policy
 
+## Testing approaches overview
+
+| Approach | Files | Purpose |
+|---|---|---|
+| **Boundary / unit** | `test/boundary-*.test.ts` | BVA/EP on individual functions |
+| **Integration (fixture)** | `test/analyze-repository-*.test.ts` | End-to-end with mini-repo fixtures |
+| **CLI surface** | `test/cli.test.ts` | Argument parsing, exit codes, flags |
+| **Golden regression** | `test/golden.test.ts` | Snapshot JSON output comparison |
+| **Cross-platform invariance** | `test/cross-platform-invariance.test.ts` | Same rule fires identically across CI types |
+| **Fuzzing** | `test/fuzz-*.test.ts` | Property-based invariant testing (fast-check) |
+| **Pairwise / combinatorial** | `test/pairwise-cluster-*.test.ts` | All-pairs interaction coverage across rule clusters |
+| **Reporter rendering** | `test/reporters-render-report.test.ts` | Text / JSON / markdown / handoff output format |
+| **Reporter aggregation** | `test/reporters-aggregation.test.ts` | Grouped findings, deduplication |
+
 ## Goals
 
 - Keep tests easy to scan when adding new rules.
@@ -79,6 +93,49 @@
   - add one `fuzz/*.fuzz.mjs` file
   - keep input coercion local to that file
   - register any new standalone entry in `knip.json` if needed
+
+## Pairwise / Combinatorial Testing
+
+- Use pairwise (all-pairs) for rule interaction clusters where full Cartesian space is large
+  but 2-way interactions between parameters are the primary risk.
+- Each cluster tests a set of rules that share overlapping signals (trigger, runner OS,
+  checkout depth, cache strategy, etc.).
+- Test file: `test/pairwise-cluster-{id}.test.ts`.
+- Combinator: `test/pairwise-utils.ts` exports `generatePairwise(specs)` using an
+  In-Parameter-Order (IPO) greedy algorithm.
+
+### When to add a pairwise test
+
+- The full combinatorial space exceeds ~50 cases.
+- Multiple rules inspect overlapping workflow features with different skip conditions.
+- The interaction between parameters is non-trivial (rule A skips on signal X, rule B
+  fires on signal X but skips when Y is also present).
+
+### Structure
+
+```
+paramsDef → ParamSpec[] → generatePairwise() → combinations[]
+                                                      ↓
+                                              test.each(combinations)
+                                                      ↓
+                                          generateWorkflowYAML(params)
+                                          setupFixture() → analyzeRepository()
+                                          expectedClusterXRules(params) ↔ findings
+```
+
+### Guidelines
+
+- Each test case generates a workflow YAML from parameters, writes it to a temp
+  directory, runs `analyzeRepository`, and compares findings against a pure-function
+  expected-rules oracle.
+- The oracle (`expectedClusterXRules`) mirrors rule source logic. Discrepancies
+  between oracle and actual findings indicate either a bug in rules or incomplete
+  parameter modeling.
+- Keep parameters focused on the cluster's signals. Use `test/pairwise-utils.ts`
+  for the combinator; do not duplicate it per file.
+- Prefer `mode: "exploratory"` when testing `suggestion`-severity rules.
+- Assert no crash + expected rule IDs present + no unexpected cluster rule IDs.
+- Do not assert total finding count (other clusters' rules may fire incidentally).
 
 ## `analysisWarnings` map
 
