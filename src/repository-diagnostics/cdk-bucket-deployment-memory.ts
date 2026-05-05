@@ -1,4 +1,3 @@
-import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
@@ -59,18 +58,7 @@ function positionAt(content: string, index: number): { line: number; column: num
   return { line, column: index - lineStart + 1 };
 }
 
-const CDK_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx"]);
-const CDK_SKIP_DIRS = new Set([".git", "node_modules", "cdk.out"]);
-
 async function findBucketDeploymentFiles(repoRoot: string): Promise<string[]> {
-  try {
-    return await findViaRg(repoRoot);
-  } catch {
-    return findViaFs(repoRoot);
-  }
-}
-
-async function findViaRg(repoRoot: string): Promise<string[]> {
   const args = [
     "-l", "--hidden",
     "--glob", "!**/.git/**",
@@ -98,32 +86,6 @@ async function findViaRg(repoRoot: string): Promise<string[]> {
   const exitCode = await exitPromise;
   if (exitCode === 0) { return Buffer.concat(chunks).toString().trim().split("\n").filter(Boolean); }
   return [];
-}
-
-async function findViaFs(repoRoot: string): Promise<string[]> {
-  const results: string[] = [];
-  async function walk(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (!CDK_SKIP_DIRS.has(entry.name) && entry.name !== "fixtures") {
-          await walk(fullPath);
-        }
-      } else if (entry.isFile() && CDK_EXTENSIONS.has(path.extname(entry.name))) {
-        try {
-          const content = await readFile(fullPath, "utf8");
-          if (content.includes("BucketDeployment")) {
-            results.push(fullPath);
-          }
-        } catch {
-          // skip unreadable files
-        }
-      }
-    }
-  }
-  await walk(repoRoot);
-  return results;
 }
 
 export async function collectCdkBucketDeploymentMemoryDiagnostics(
