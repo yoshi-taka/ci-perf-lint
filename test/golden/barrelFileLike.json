@@ -47,7 +47,7 @@
       "line": 1,
       "column": 1
     },
-    "message": "Embedded Oxlint scan flagged src/index.js as a large barrel file. Barrel file detected, 101 modules are loaded which exceeds the threshold of 100. Consider importing directly from the specific modules instead of using `export *` or `import *`.\nLoading 101 modules may be slow for runtimes and bundlers. See: https://marvinh.dev/blog/speeding-up-javascript-ecosystem-part-7",
+    "message": "Embedded Oxlint scan flagged src/index.js as a large barrel file. Barrel file detected, 101 modules are loaded which exceeds the threshold of 100.",
     "why": "Embedded Oxlint `oxc/no-barrel-file` detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.",
     "suggestion": "Replace broad `export *` barrel usage in the flagged file with direct imports or narrower explicit re-exports, then consider adding `no-barrel-file` to keep large barrels from returning.",
     "measurementHint": "Compare lint, test, typecheck, or build wall-clock time before and after replacing the flagged barrel with direct imports or narrower re-exports.",
