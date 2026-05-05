@@ -1,6 +1,6 @@
 {
   "name": "ci-perf-lint",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Static analysis tool for CI workflow performance",
   "license": "MIT",
   "type": "module",
