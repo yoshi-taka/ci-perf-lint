@@ -253,7 +253,7 @@ export async function bundledOxlintBinPath(
   accessSync?: (p: string) => void,
   resolvePackage?: (spec: string) => string | URL | Promise<string | URL>,
 ): Promise<string | undefined> {
-  if (cachedOxlintBinPath !== undefined) { return cachedOxlintBinPath; }
+  if (cachedOxlintBinPath !== undefined && !accessSync && !resolvePackage) { return cachedOxlintBinPath; }
 
   const binaryName = process.platform === "win32" ? "oxlint.exe" : "oxlint";
   const startDir = (import.meta as { dir?: string }).dir ?? path.dirname(fileURLToPath(import.meta.url));
