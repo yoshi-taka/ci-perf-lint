@@ -6,6 +6,11 @@ Read this file first when making AI-assisted edits. Keep changes scoped to the b
 
 Use `bun` not `npm` for package management and script execution.
 
+## Workflow
+
+**NEVER push without asking.** Ask before every push, commit, tag, or publish operation.
+Changes are reviewed locally first. Only push when explicitly told to.
+
 ## Main Entry Points
 
 - CLI wrapper: `src/cli.ts`
