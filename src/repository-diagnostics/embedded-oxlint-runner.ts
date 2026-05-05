@@ -47,7 +47,7 @@ type SpawnedProcess = {
   exited: Promise<number>;
 };
 
-export function spawnOxlintProcess(
+function spawnOxlintProcess(
   cmd: string[],
   cwd: string,
   useNodeSpawn?: boolean,

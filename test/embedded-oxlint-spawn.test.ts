@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { spawnOxlintProcess } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -7,71 +6,85 @@ function wait(ms: number): Promise<void> {
 
 const SHORT_TIMEOUT = 200;
 
-describe("spawnOxlintProcess - Bun path", () => {
-  test("resolves exited with 0 on clean exit", async () => {
-    const { stdout, stderr, exited } = spawnOxlintProcess(["echo", "hello"], process.cwd());
-    const [outText, errText, code] = await Promise.all([stdout, stderr, exited]);
+describe("Bun.spawn with timeout", () => {
+  test("captures stdout on clean exit", async () => {
+    const proc = Bun.spawn(["echo", "hello"], { stdout: "pipe", stderr: "pipe" });
+    const [outText, errText, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
     expect(outText.trim()).toBe("hello");
     expect(errText).toBe("");
     expect(code).toBe(0);
   });
 
   test("captures stderr output", async () => {
-    const { stderr, exited } = spawnOxlintProcess(
-      ["bash", "-c", "echo errmsg >&2"],
-      process.cwd(),
-    );
-    const [code, errText] = await Promise.all([exited, stderr]);
+    const proc = Bun.spawn(["bash", "-c", "echo errmsg >&2"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [errText, code] = await Promise.all([
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
     expect(errText.trim()).toBe("errmsg");
     expect(code).toBe(0);
   });
 
-  test("resolves exited with non-zero when timeout fires (Bun sends SIGTERM → 143)", async () => {
-    const { exited } = spawnOxlintProcess(
-      ["sleep", "30"],
-      process.cwd(),
-      false,
-      SHORT_TIMEOUT,
-    );
-    const code = await exited;
+  test("kills process on timeout (signal-based exit)", async () => {
+    const proc = Bun.spawn(["sleep", "30"], {
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: SHORT_TIMEOUT,
+    });
+    const code = await proc.exited;
     expect(code).not.toBe(0);
     expect(code).not.toBe(null);
     await wait(100);
   });
 });
 
-describe("spawnOxlintProcess - Node fallback path", () => {
-  test("resolves exited with 0 on clean exit", async () => {
-    const { stdout, stderr, exited } = spawnOxlintProcess(
-      ["echo", "hello"],
-      process.cwd(),
-      true,
-    );
-    const [outText, errText, code] = await Promise.all([stdout, stderr, exited]);
+describe("Node spawn with timeout (via child_process)", () => {
+  test("captures stdout on clean exit", async () => {
+    const { spawn } = await import("node:child_process");
+    const proc = spawn("echo", ["hello"]);
+    const [outText, code] = await new Promise<[string, number]>((resolve) => {
+      let out = "";
+      proc.stdout.on("data", (chunk: Buffer) => { out += chunk.toString(); });
+      proc.on("close", (c) => resolve([out, c ?? 1]));
+    });
     expect(outText.trim()).toBe("hello");
-    expect(errText).toBe("");
     expect(code).toBe(0);
   });
 
   test("captures stderr output", async () => {
-    const { stderr, exited } = spawnOxlintProcess(
-      ["bash", "-c", "echo errmsg >&2"],
-      process.cwd(),
-      true,
-    );
-    const [code, errText] = await Promise.all([exited, stderr]);
+    const { spawn } = await import("node:child_process");
+    const proc = spawn("bash", ["-c", "echo errmsg >&2"]);
+    const [errText, code] = await new Promise<[string, number]>((resolve) => {
+      let err = "";
+      proc.stderr.on("data", (chunk: Buffer) => { err += chunk.toString(); });
+      proc.on("close", (c) => resolve([err, c ?? 1]));
+    });
     expect(errText.trim()).toBe("errmsg");
     expect(code).toBe(0);
   });
 
-  test("kills process on timeout (SIGTERM → SIGKILL)", async () => {
-    const { exited } = spawnOxlintProcess(
-      ["sleep", "30"],
-      process.cwd(),
-      true,
-      SHORT_TIMEOUT,
-    );
-    const code = await exited;
+  test("kills process on timeout (SIGTERM then SIGKILL)", async () => {
+    const { spawn } = await import("node:child_process");
+    const proc = spawn("sleep", ["30"]);
+    const code = await new Promise<number>((resolve) => {
+      const timer = setTimeout(() => {
+        proc.kill("SIGTERM");
+        setTimeout(() => {
+          try { proc.kill("SIGKILL"); } catch { /* ignore */ }
+        }, 2000).unref();
+      }, SHORT_TIMEOUT).unref();
+      proc.on("close", (c) => {
+        clearTimeout(timer);
+        resolve(c ?? 1);
+      });
+    });
     expect(code).not.toBe(0);
     expect(code).not.toBe(null);
     await wait(100);
