@@ -4,9 +4,6 @@ on:
   push:
     tags:
       - "v*"
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
   workflow_dispatch:
 
 concurrency:
