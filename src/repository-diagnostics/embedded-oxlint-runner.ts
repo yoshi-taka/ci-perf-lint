@@ -44,36 +44,15 @@ function spawnProcess(
   cmd: string[],
   cwd: string,
 ): {
-  stdout: AsyncIterable<string>;
+  stdout: Promise<string>;
   stderr: Promise<string>;
   exited: Promise<number>;
   kill: (signal?: number) => void;
 } {
   if (typeof Bun !== "undefined") {
     const proc = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "pipe" });
-    const decoder = new TextDecoder();
     return {
-      stdout: {
-        async *[Symbol.asyncIterator]() {
-          const reader = proc.stdout.getReader();
-          let leftover = "";
-          try {
-            for (;;) {
-              const { done, value } = await reader.read();
-              if (done) { break; }
-              const text = leftover + decoder.decode(value, { stream: true });
-              const lines = text.split("\n");
-              leftover = lines.pop() ?? "";
-              for (const line of lines) {
-                if (line) { yield line; }
-              }
-            }
-            if (leftover) { yield leftover; }
-          } finally {
-            reader.releaseLock();
-          }
-        },
-      },
+      stdout: new Response(proc.stdout).text(),
       stderr: new Response(proc.stderr).text(),
       exited: proc.exited,
       kill: (signal) => { proc.kill(signal); },
@@ -84,8 +63,10 @@ function spawnProcess(
     cwd,
     stdio: ["inherit", "pipe", "pipe"],
   });
+  const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
   let stderrSize = 0;
+  proc.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
   proc.stderr.on("data", (chunk: Buffer) => {
     if (stderrSize < MAX_STDERR_BUFFER_SIZE) {
       stderrChunks.push(chunk);
@@ -93,21 +74,9 @@ function spawnProcess(
     }
   });
   return {
-    stdout: {
-      async *[Symbol.asyncIterator]() {
-        const rl = proc.stdout.setEncoding("utf8");
-        let leftover = "";
-        for await (const chunk of rl) {
-          const text = leftover + chunk;
-          const lines = text.split("\n");
-          leftover = lines.pop() ?? "";
-          for (const line of lines) {
-            if (line) { yield line; }
-          }
-        }
-        if (leftover) { yield leftover; }
-      },
-    },
+    stdout: new Promise<string>((resolve) => {
+      proc.on("close", () => resolve(Buffer.concat(stdoutChunks).toString()));
+    }),
     stderr: new Promise<string>((resolve) => {
       proc.on("close", () => resolve(Buffer.concat(stderrChunks).toString()));
     }),
@@ -373,32 +342,32 @@ export async function runEmbeddedOxlint(
             ".",
           ];
     const { stdout, stderr, exited, kill } = spawnProcess(cmd, repoRoot);
-    const timeoutResult = Symbol("timed-out");
     const timeoutHandle = setTimeout(() => {
       kill(9);
     }, EMBEDDED_OXLINT_TIMEOUT_MS);
 
-    const raceResult = await Promise.race([
-      exited.then((code) => ({ code })),
-      new Promise<{ code: number; timedOut: typeof timeoutResult }>((resolve) => {
-        setTimeout(
-          () => resolve({ code: 1, timedOut: timeoutResult }),
-          EMBEDDED_OXLINT_TIMEOUT_MS + 2_000,
-        );
-      }),
+    const FORCE_RESOLVE_AFTER_KILL_MS = 2_000;
+    const timeoutPromise = new Promise<[string, string, number]>((resolve) => {
+      setTimeout(
+        () => resolve(["", "", -1]),
+        EMBEDDED_OXLINT_TIMEOUT_MS + FORCE_RESOLVE_AFTER_KILL_MS,
+      );
+    });
+    const result = await Promise.race([
+      Promise.all([stdout, stderr, exited]),
+      timeoutPromise,
     ]);
     clearTimeout(timeoutHandle);
 
-    if ("timedOut" in raceResult) {
+    const [stdoutText, stderrText, exitCode] = result;
+
+    if (exitCode === -1) {
       process.stderr.write(
         `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. Barrel file detection, import restriction, and snapshot diagnostics were skipped for ${repoRoot}.\n`,
       );
       return [];
     }
 
-    const exitCode = raceResult.code;
-
-    const stderrText = await stderr;
     if (stderrText.trim().length > 0) {
       context.warn(
         source,
@@ -407,16 +376,15 @@ export async function runEmbeddedOxlint(
     }
 
     const diagnostics: OxlintDiagnostic[] = [];
-    let lineCount = 0;
-    for await (const line of stdout) {
-      lineCount++;
+    for (const line of stdoutText.split("\n")) {
+      if (!line) { continue; }
       const parsed = parseOxlintLine(line);
       if (parsed) {
         diagnostics.push(parsed);
       }
     }
 
-    if (exitCode !== 0 && diagnostics.length === 0 && lineCount === 0) {
+    if (exitCode !== 0 && diagnostics.length === 0) {
       context.warn(
         source,
         `Embedded Oxlint exited with code ${exitCode} and produced no output while scanning ${repoRoot}.`,
