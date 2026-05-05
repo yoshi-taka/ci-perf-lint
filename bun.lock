@@ -27,12 +27,12 @@
     },
     "packages/ci-perf-lint": {
       "name": "ci-perf-lint",
-      "version": "0.0.1-alpha.10",
+      "version": "0.0.2",
       "bin": {
         "ci-perf-lint": "cli.mjs",
       },
       "dependencies": {
-        "@yoshi-taka/ci-perf-lint": "0.0.1-alpha.10",
+        "@yoshi-taka/ci-perf-lint": "*",
       },
     },
   },
@@ -579,7 +579,7 @@
 
     "@ungap/structured-clone": ["@ungap/structured-clone@1.3.0", "", {}, "sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g=="],
 
-    "@yoshi-taka/ci-perf-lint": ["@yoshi-taka/ci-perf-lint@0.0.1-alpha.10", "", { "dependencies": { "dockerfile-ast": "^0.7.1", "oxlint": "^1.62.0", "yaml": "^2.8.3" }, "bin": { "ci-perf-lint": "dist/cli.js" } }, "sha512-fpPJHQT1wP3yduE2zElkt5fdwb/mzaZ9JHRZqENg01fWZN61PI0wLSMAk/jcM95zl5qolW4Dnsd2OnH0dwfgRw=="],
+    "@yoshi-taka/ci-perf-lint": ["@yoshi-taka/ci-perf-lint@0.0.1", "", { "dependencies": { "dockerfile-ast": "^0.7.1", "oxlint": "^1.62.0", "yaml": "^2.8.3" }, "bin": { "ci-perf-lint": "dist/cli.js" } }, "sha512-QnLH9/lPvDxswcmTS72UOb3SLu9PQaXha4r4hCT4r8QKVg1c1OJEDKMKPzV/NVcpHH2w3HNeKSjon644gc9cEQ=="],
 
     "ajv": ["ajv@8.18.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A=="],
 
