@@ -74,6 +74,9 @@ describe("e2e: packaged CLI with oxlint", () => {
         [binPath, "--findings-only", path.join(installDir, "fixture"), "--format", "json"],
         { cwd: installDir, stdio: "pipe", encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
       );
+      if (result.status !== 0 || !result.stdout) {
+        throw new Error(`CLI exited ${result.status}: stdout=${result.stdout?.slice(0, 500)} stderr=${result.stderr?.slice(0, 500)}`);
+      }
       const output = JSON.parse(result.stdout);
       const findings = Array.isArray(output) ? output : output.findings ?? [];
       const barrelFinding = findings.find(
