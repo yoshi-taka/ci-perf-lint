@@ -1,3 +1,4 @@
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
@@ -58,6 +59,68 @@ function positionAt(content: string, index: number): { line: number; column: num
   return { line, column: index - lineStart + 1 };
 }
 
+const CDK_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx"]);
+const CDK_SKIP_DIRS = new Set([".git", "node_modules", "cdk.out"]);
+
+async function findBucketDeploymentFiles(repoRoot: string): Promise<string[]> {
+  try {
+    return await findViaRg(repoRoot);
+  } catch {
+    return findViaFs(repoRoot);
+  }
+}
+
+async function findViaRg(repoRoot: string): Promise<string[]> {
+  const args = [
+    "-l", "--hidden",
+    "--glob", "!**/.git/**",
+    "--glob", "!**/node_modules/**",
+    "--glob", "!**/cdk.out/**",
+    "--glob", "!fixtures",
+    "--glob", "*.ts", "--glob", "*.tsx", "--glob", "*.js", "--glob", "*.jsx",
+    "BucketDeployment",
+    repoRoot,
+  ];
+  if (hasBun) {
+    const proc = Bun.spawn(["rg", ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
+    if (exitCode === 0) { return stdout.trim().split("\n").filter(Boolean); }
+  } else {
+    const proc = spawn("rg", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const chunks: Buffer[] = [];
+    proc.stdout.on("data", (c: Buffer) => chunks.push(c));
+    const exitCode = await new Promise<number>((resolve) => { proc.on("close", resolve); });
+    if (exitCode === 0) { return Buffer.concat(chunks).toString().trim().split("\n").filter(Boolean); }
+  }
+  return [];
+}
+
+async function findViaFs(repoRoot: string): Promise<string[]> {
+  const results: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (!CDK_SKIP_DIRS.has(entry.name) && entry.name !== "fixtures") {
+          await walk(fullPath);
+        }
+      } else if (entry.isFile() && CDK_EXTENSIONS.has(path.extname(entry.name))) {
+        try {
+          const content = await readFile(fullPath, "utf8");
+          if (content.includes("BucketDeployment")) {
+            results.push(fullPath);
+          }
+        } catch {
+          // skip unreadable files
+        }
+      }
+    }
+  }
+  await walk(repoRoot);
+  return results;
+}
+
 export async function collectCdkBucketDeploymentMemoryDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
@@ -66,66 +129,7 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  let sourceFiles: string[];
-  try {
-    const rgArgs = [
-      "-l",
-      "--hidden",
-      "--glob",
-      "!**/.git/**",
-      "--glob",
-      "!**/node_modules/**",
-      "--glob",
-      "!**/cdk.out/**",
-      "--glob",
-      "!fixtures",
-      "--glob",
-      "*.ts",
-      "--glob",
-      "*.tsx",
-      "--glob",
-      "*.js",
-      "--glob",
-      "*.jsx",
-      "BucketDeployment",
-      repoRoot,
-    ];
-    const result = hasBun
-      ? await (async () => {
-          const proc = Bun.spawn(["rg", ...rgArgs], {
-            stdio: ["ignore", "pipe", "pipe"],
-          });
-          const [exitCode, stdout] = await Promise.all([
-            proc.exited,
-            new Response(proc.stdout).text(),
-          ]);
-          return { exitCode, stdout };
-        })()
-      : await (async () => {
-          const proc = spawn("rg", rgArgs, {
-            stdio: ["ignore", "pipe", "pipe"],
-          });
-          const chunks: string[] = [];
-          for await (const chunk of proc.stdout) {
-            chunks.push(chunk.toString());
-          }
-          const stdout = chunks.join("");
-          const exitCode = await new Promise<number>((resolve) => {
-            proc.on("close", resolve);
-          });
-          return { exitCode, stdout };
-        })();
-    if (result.exitCode === 1) {
-      return [];
-    }
-    if (result.exitCode === 0) {
-      sourceFiles = result.stdout.trim().split("\n").filter(Boolean);
-    } else {
-      sourceFiles = [];
-    }
-  } catch {
-    sourceFiles = [];
-  }
+  let sourceFiles = await findBucketDeploymentFiles(repoRoot);
   if (sourceFiles.length === 0) {
     const allFiles = await context.walkFiles(".", {
       ignoredDirectories: new Set([".git", "node_modules", "cdk.out", "fixtures"]),
