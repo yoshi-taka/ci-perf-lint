@@ -362,8 +362,9 @@ export async function runEmbeddedOxlint(
     const [stdoutText, stderrText, exitCode] = result;
 
     if (exitCode === -1) {
+      const skipped = kind === "import" ? "import restriction and extension checks" : "barrel file and snapshot checks";
       process.stderr.write(
-        `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. Barrel file detection, import restriction, and snapshot diagnostics were skipped for ${repoRoot}.\n`,
+        `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
       );
       return [];
     }
