@@ -4,18 +4,31 @@
 
 Push a `v*` tag to trigger `.github/workflows/publish.yml`:
 
+### 0. Prerequisites
+
 ```sh
-# bump version
+bun run lint && bun run audit:static && bun test --parallel
+```
+
+### 1. Bump version
+
+```sh
 npm version --no-git-tag-version 0.0.x
-npm pkg set version="0.0.x" dependencies.@yoshi-taka/ci-perf-lint="0.0.x" -w packages/ci-perf-lint
-
-# update lockfile (must match package.json for bun install --frozen-lockfile)
-bun install --minimum-release-age 0
-
-# commit and tag
+npm pkg set version="0.0.x" dependencies.@yoshi-taka/ci-perf-lint="*" -w packages/ci-perf-lint
+bun install
 git add -A && git commit -m "0.0.x"
+git push
+```
+
+### 2. Wait for CI to pass on main
+
+Check https://github.com/yoshi-taka/ci-perf-lint/actions
+
+### 3. Tag and publish
+
+```sh
 git tag v0.0.x -m "v0.0.x"
-git push && git push origin v0.0.x
+git push origin v0.0.x
 ```
 
 The workflow runs lint, audit, test, build, publishes both packages to npm, and creates a GitHub Release (for stable tags).
