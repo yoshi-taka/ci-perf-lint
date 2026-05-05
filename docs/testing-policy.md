@@ -9,7 +9,7 @@
 | **CLI surface** | `test/cli.test.ts` | Argument parsing, exit codes, flags |
 | **Golden regression** | `test/golden.test.ts` | Snapshot JSON output comparison |
 | **Cross-platform invariance** | `test/cross-platform-invariance.test.ts` | Same rule fires identically across CI types |
-| **Fuzzing** | `test/fuzz-*.test.ts` | Property-based invariant testing (fast-check) |
+| **Property-based** | `test/fuzz-*.test.ts` | Random input invariant testing (fast-check) |
 | **Pairwise / combinatorial** | `test/pairwise-cluster-*.test.ts` | All-pairs interaction coverage across rule clusters |
 | **Reporter rendering** | `test/reporters-render-report.test.ts` | Text / JSON / markdown / handoff output format |
 | **Reporter aggregation** | `test/reporters-aggregation.test.ts` | Grouped findings, deduplication |
