@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getWorkflowStepText } from "./shared/workflow-step-text.ts";
@@ -83,28 +83,29 @@ function analyzePortableToolingJob(job: WorkflowJob): {
 export const preferStandardArmRunnerForPortableToolingRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (
         !jobRunsOnStandardX64Ubuntu(job) ||
         jobRunsOnArmLikeRunner(job) ||
         jobRunsInContainer(job)
       ) {
-        return [];
+        continue;
       }
 
       const analysis = analyzePortableToolingJob(job);
       if (analysis.hasArchitectureSensitiveWork) {
-        return [];
+        continue;
       }
 
       const portableTool = analysis.portableTool;
       if (!portableTool) {
-        return [];
+        continue;
       }
 
       const armRunner = suggestedStandardArmUbuntuRunner(job);
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, portableTool.step.runNode ?? portableTool.step.node, {
           message: `Job "${job.id}" is lightweight, architecture-portable tooling on a standard x64 Ubuntu runner (detected: ${portableTool.name}).`,
           why: `${portableTool.name} is only the portability signal; the recommendation is about the runner. This job looks like lint/format tooling without visible native builds, browser tests, typechecking, or containers, so it is a reasonable candidate for the matching standard GitHub-hosted arm64 Ubuntu runner. For short portable jobs, many runs are still rounded to a whole billable minute, so switching eligible work off standard x64 can improve cost or runner efficiency, but only if installs, caches, and output stay compatible on arm64.`,
@@ -114,7 +115,8 @@ export const preferStandardArmRunnerForPortableToolingRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether this lightweight portable tooling path can run on ${armRunner}. Treat ${portableTool.name} as the compatibility signal, not as the optimization itself; verify install/cache behavior and output before changing the default runner.`,
           score: 50,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

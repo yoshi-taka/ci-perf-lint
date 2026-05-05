@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import {
   hasHistoryDependentCommand,
@@ -128,23 +128,24 @@ function jobLooksScopedBuildOrRelease(workflow: WorkflowDocument, job: WorkflowJ
 export const preferSparseCheckoutForScopedWorkflowRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobLooksScopedBuildOrRelease(workflow, job)) {
-        return [];
+        continue;
       }
 
       if (jobIsStaticallyDisabled(job)) {
-        return [];
+        continue;
       }
 
       const checkout = getCheckoutStep(job);
       if (!checkout || hasSparseCheckout(checkout)) {
-        return [];
+        continue;
       }
 
       const scopePrefixes = collectScopePrefixes(job);
       if (scopePrefixes.length === 0 || scopePrefixes.length > 3) {
-        return [];
+        continue;
       }
 
       if (
@@ -153,25 +154,25 @@ export const preferSparseCheckoutForScopedWorkflowRule = {
         hasRootQualityGate(job) ||
         jobUsesLocalAction(job)
       ) {
-        return [];
+        continue;
       }
 
       if (hasOnlyScriptLikeScope(scopePrefixes) || hasOpaqueRepoScriptExecution(job)) {
-        return [];
+        continue;
       }
 
       if (jobLooksAgenticRepositoryInspection(job)) {
-        return [];
+        continue;
       }
 
       if (!hasDeepHistory(checkout) && !hasHistoryDependentCommand(job)) {
-        return [];
+        continue;
       }
 
       const usesMultipleCheckouts = countCheckoutSteps(job) >= 2;
       const hasFullHistorySignal = hasExplicitFullHistorySignal(job, checkout);
 
-      return [
+      findings.push(
         withRepositorySparseCheckoutPrecedent(
           buildDiagnostic(workflow, meta, checkout.withNode ?? checkout.usesNode ?? checkout.node, {
             severity: usesMultipleCheckouts ? "suggestion" : undefined,
@@ -200,7 +201,8 @@ export const preferSparseCheckoutForScopedWorkflowRule = {
           workflow.relativePath,
           job.id,
         ),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

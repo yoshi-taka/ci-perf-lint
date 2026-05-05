@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -59,9 +59,10 @@ function imageUsedAfterStep(job: WorkflowJob, stepIndex: number, tags: string[])
 export const dockerBuildLoadTrueUnnecessaryRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       for (const [index, step] of job.steps.entries()) {
@@ -80,7 +81,7 @@ export const dockerBuildLoadTrueUnnecessaryRule = {
 
         const tagsHint = tags.length > 0 ? `tags: ${tags.join(", ")}` : "no tags set";
 
-        return [
+        findings.push(
           buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {
             message: `Job "${job.id}" sets load: true on docker/build-push-action (${tagsHint}) but the image is not used by any subsequent step.`,
             why: "`load: true` serializes the built image into the Docker daemon, adding overhead. If no later step runs the image via `docker run`, `docker compose`, `docker tag`, or `docker save`, the load step is unnecessary.",
@@ -91,10 +92,10 @@ export const dockerBuildLoadTrueUnnecessaryRule = {
             aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and remove \`load: true\` from the docker/build-push-action step since the loaded image is not used afterward.`,
             score: 50,
           }),
-        ];
+        );
+        break;
       }
-
-      return [];
-    });
+    }
+    return findings;
   },
 };

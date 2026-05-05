@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -50,16 +50,17 @@ function jobHasTerraformProviderCache(job: WorkflowJob): boolean {
 export const cacheTerraformProvidersRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobHasTerraformInit(job)) {
-        return [];
+        continue;
       }
 
       if (jobHasTerraformProviderCache(job)) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs terraform init without provider caching.`,
           why: "Terraform provider downloads can add 1-4 minutes per run, especially with large providers such as AWS (~150-180MB compressed). Caching eliminates repeated downloads when provider versions are stable.",
@@ -69,7 +70,8 @@ export const cacheTerraformProvidersRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Add a step before terraform init that sets TF_PLUGIN_CACHE_DIR and an actions/cache step for ~/.terraform.d/plugin-cache keyed on hashFiles('**/.terraform.lock.hcl'). Also ensure .terraform.lock.hcl has CI platform hashes by running "terraform providers lock -platform=linux_amd64 -platform=linux_arm64" and committing the result. Preserve existing terraform init and plan commands.`,
           score: 50,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

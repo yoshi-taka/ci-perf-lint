@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import {
@@ -160,29 +160,31 @@ function getHostedRunnerOs(job: WorkflowJob): RunnerOs | undefined {
 export const redundantInstallForPreinstalledCliRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+
+    for (const job of workflow.jobs) {
       const runnerOs = getHostedRunnerOs(job);
       if (!runnerOs || jobUsesContainer(job)) {
-        return [];
+        continue;
       }
 
-      return preinstalledCliRules.flatMap(({ cli, label, supportedRunnerOs }) => {
+      for (const { cli, label, supportedRunnerOs } of preinstalledCliRules) {
         if (!supportedRunnerOs.includes(runnerOs)) {
-          return [];
+          continue;
         }
 
         const installStep = getFirstInstallStep(job, cli);
         if (!installStep || stepPinsVersion(installStep, cli)) {
-          return [];
+          continue;
         }
 
         if (!jobUsesCliAfterInstall(job, cli, installStep)) {
-          return [];
+          continue;
         }
 
         const runnerLabel =
           runnerOs === "windows" ? "Windows" : runnerOs === "macos" ? "macOS" : "Ubuntu";
-        return [
+        findings.push(
           buildDiagnostic(workflow, meta, installStep.runNode ?? installStep.node, {
             message: `Job "${job.id}" installs ${label} even though GitHub-hosted ${runnerLabel} runners already include it.`,
             why: `GitHub-hosted ${runnerLabel} images already ship with ${label}, so reinstalling it can add avoidable setup time when the job does not need a pinned version.`,
@@ -192,8 +194,10 @@ export const redundantInstallForPreinstalledCliRule = {
             aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and, if it runs on GitHub-hosted ${runnerLabel} without requiring a pinned ${label} version, remove the extra install step and use the preinstalled ${cli} command instead.`,
             score: 55,
           }),
-        ];
-      });
-    });
+        );
+      }
+    }
+
+    return findings;
   },
 };

@@ -29,7 +29,13 @@ export function getStepCommandText(step: AnyStep): string {
 export function getDocumentSteps(doc: AnyDocument): AnyStep[] {
   if ("jobs" in doc) {
     const wfDoc = doc;
-    return wfDoc.jobs.flatMap((job) => job.steps);
+    const steps: AnyStep[] = [];
+    for (const job of wfDoc.jobs) {
+      for (const step of job.steps) {
+        steps.push(step);
+      }
+    }
+    return steps;
   }
   return doc.steps;
 }

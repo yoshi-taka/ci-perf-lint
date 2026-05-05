@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -78,26 +78,27 @@ function getRepresentativeTestStep(job: WorkflowJob): WorkflowStep | undefined {
 export const matrixTestJobWithoutTestShardingRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobHasMatrix(job) || job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const shardKeys = getShardLikeMatrixKeys(job);
       if (shardKeys.length === 0) {
-        return [];
+        continue;
       }
 
       const testStep = getRepresentativeTestStep(job);
       if (!testStep) {
-        return [];
+        continue;
       }
 
       if (stepConsumesShardKey(testStep, shardKeys)) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, testStep.runNode ?? testStep.node, {
           message: `Job "${job.id}" uses shard-like matrix keys (${shardKeys.join(", ")}) but the visible test command does not appear to consume them.`,
           why: "A shard-like matrix only speeds up test execution if each matrix leg actually runs a different subset of tests. Otherwise the same suite may be repeated across matrix jobs.",
@@ -108,7 +109,8 @@ export const matrixTestJobWithoutTestShardingRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}", confirm whether matrix keys ${shardKeys.join(", ")} are meant for test sharding, and if so pass them into the test runner instead of running the full suite on every matrix leg.`,
           score: 36,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import type { YAMLMap } from "yaml";
 import { getScalarValue, getStringOrArrayValue } from "../workflow.ts";
@@ -104,55 +104,61 @@ function isReportingOrUploadJob(job: WorkflowJob): boolean {
 export const missingReleaseDownstreamSuccessGuardRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs
-      .filter((job) => workflowLooksReleaseLike(workflow, job) && jobHasNeeds(job))
-      .flatMap((job) => {
-        const ifText = getJobIfText(job);
-        if (!ifText) {
-          return [];
-        }
+    const findings: Diagnostic[] = [];
 
-        if (isFailureOrCancellationOnlyPath(ifText)) {
-          return [];
-        }
+    for (const job of workflow.jobs) {
+      if (!workflowLooksReleaseLike(workflow, job) || !jobHasNeeds(job)) {
+        continue;
+      }
 
-        if (isReportingOrUploadJob(job)) {
-          return [];
-        }
+      const ifText = getJobIfText(job);
+      if (!ifText) {
+        continue;
+      }
 
-        if (hasOptionalSkipBypass(ifText)) {
-          return [];
-        }
+      if (isFailureOrCancellationOnlyPath(ifText)) {
+        continue;
+      }
 
-        const hasFailureAndCancellationGuard = hasFailureCancelledGuard(ifText);
-        if (hasNeedsSuccessGuard(ifText) && hasFailureAndCancellationGuard) {
-          return [];
-        }
+      if (isReportingOrUploadJob(job)) {
+        continue;
+      }
 
-        return [
-          withRepositoryReleaseDownstreamGuardPrecedent(
-            buildDiagnostic(workflow, meta, job.ifNode ?? job.idNode ?? job.node, {
-              severity:
-                hasFailureAndCancellationGuard || !hasStatusFunction(ifText)
-                  ? "suggestion"
-                  : undefined,
-              message: `Release-like downstream job "${job.id}" depends on upstream jobs without an explicit success guard.`,
-              why: hasFailureAndCancellationGuard
-                ? "This job already avoids running after upstream failure or cancellation, so the remaining issue is mostly release readability: which upstream jobs must succeed versus which may intentionally be skipped is not explicit in `needs.*.result` terms."
-                : "This job already overrides default dependency behavior with a status-based `if:` condition, so release intent is easier to reason about when it also explicitly gates on upstream success and avoids partial follow-up work after failure or cancellation.",
-              suggestion: hasFailureAndCancellationGuard
-                ? "If this downstream release job has optional skipped upstream paths, leave the broad failure/cancellation guard alone unless you can safely document the intended `needs.*.result` success or skipped cases."
-                : "If this downstream release job really needs a status-based `if:`, confirm which upstream jobs must succeed, preserve any intentional skip-allowing branches, and only then add explicit success checks together with `!failure() && !cancelled()`.",
-              measurementHint:
-                "Simulate an upstream failure or cancellation and confirm the downstream release job is skipped instead of partially running.",
-              aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and confirm which upstream jobs truly must succeed versus which may be intentionally skipped before tightening its release downstream guard.`,
-              score: hasFailureAndCancellationGuard ? 9 : 73,
-            }),
-            _context,
-            workflow.relativePath,
-            job.id,
-          ),
-        ];
-      });
+      if (hasOptionalSkipBypass(ifText)) {
+        continue;
+      }
+
+      const hasFailureAndCancellationGuard = hasFailureCancelledGuard(ifText);
+      if (hasNeedsSuccessGuard(ifText) && hasFailureAndCancellationGuard) {
+        continue;
+      }
+
+      findings.push(
+        withRepositoryReleaseDownstreamGuardPrecedent(
+          buildDiagnostic(workflow, meta, job.ifNode ?? job.idNode ?? job.node, {
+            severity:
+              hasFailureAndCancellationGuard || !hasStatusFunction(ifText)
+                ? "suggestion"
+                : undefined,
+            message: `Release-like downstream job "${job.id}" depends on upstream jobs without an explicit success guard.`,
+            why: hasFailureAndCancellationGuard
+              ? "This job already avoids running after upstream failure or cancellation, so the remaining issue is mostly release readability: which upstream jobs must succeed versus which may intentionally be skipped is not explicit in `needs.*.result` terms."
+              : "This job already overrides default dependency behavior with a status-based `if:` condition, so release intent is easier to reason about when it also explicitly gates on upstream success and avoids partial follow-up work after failure or cancellation.",
+            suggestion: hasFailureAndCancellationGuard
+              ? "If this downstream release job has optional skipped upstream paths, leave the broad failure/cancellation guard alone unless you can safely document the intended `needs.*.result` success or skipped cases."
+              : "If this downstream release job really needs a status-based `if:`, confirm which upstream jobs must succeed, preserve any intentional skip-allowing branches, and only then add explicit success checks together with `!failure() && !cancelled()`.",
+            measurementHint:
+              "Simulate an upstream failure or cancellation and confirm the downstream release job is skipped instead of partially running.",
+            aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and confirm which upstream jobs truly must succeed versus which may be intentionally skipped before tightening its release downstream guard.`,
+            score: hasFailureAndCancellationGuard ? 9 : 73,
+          }),
+          _context,
+          workflow.relativePath,
+          job.id,
+        ),
+      );
+    }
+
+    return findings;
   },
 };

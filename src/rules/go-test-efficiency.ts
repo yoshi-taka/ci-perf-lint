@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -96,17 +96,18 @@ function findRaceTestAfterBuild(
 export const goTestRepeatsVetAfterGoVetRule = {
   meta: redundantVetMeta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const repeated = findGoTestRepeatsVet(job);
       if (!repeated) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(
           workflow,
           redundantVetMeta,
@@ -122,25 +123,27 @@ export const goTestRepeatsVetAfterGoVetRule = {
             score: 67,
           },
         ),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };
 
 export const goBuildBeforeRaceTestRule = {
   meta: raceAfterBuildMeta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const repeated = findRaceTestAfterBuild(job);
       if (!repeated) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(
           workflow,
           raceAfterBuildMeta,
@@ -156,25 +159,27 @@ export const goBuildBeforeRaceTestRule = {
             score: 65,
           },
         ),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };
 
 export const goTestBroadPackageSerialPOneRule = {
   meta: serialBroadTestMeta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const step = job.steps.find((candidate) => stepRunsBroadSerialGoTest(candidate));
       if (!step) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, serialBroadTestMeta, step.runNode ?? step.node, {
           message: `Job "${job.id}" runs broad \`go test ./...\` with \`-p 1\`.`,
           why: "`-p 1` serializes package-level Go test execution. On broad package patterns this can leave runner CPU idle and stretch both compile and test phases.",
@@ -185,7 +190,8 @@ export const goTestBroadPackageSerialPOneRule = {
           aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and avoid \`go test -p 1 ./...\` unless all packages must be serialized. Prefer serializing only the stateful subset.`,
           score: 64,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

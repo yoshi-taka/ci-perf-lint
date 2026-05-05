@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -28,17 +28,18 @@ export const pdmWithoutUseUvRule = {
       return [];
     }
 
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobRunsPdm(job.steps)) {
-        return [];
+        continue;
       }
 
       const pdmStep = job.steps.find((step) => stepRunsPdm(`${step.name ?? ""} ${step.run ?? ""}`));
       if (!pdmStep) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, pdmStep.runNode ?? pdmStep.node, {
           message: `Job "${job.id}" runs pdm commands without "use_uv = true" configured.`,
           why: "PDM can use uv for dependency resolution and installation by setting use_uv = true in [tool.pdm] in pyproject.toml. This speeds up lock operations and package installation with no workflow changes.",
@@ -48,7 +49,8 @@ export const pdmWithoutUseUvRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and enable uv backend for PDM by running "pdm config use_uv true" or adding use_uv = true to [tool.pdm] in pyproject.toml.`,
           score: 46,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

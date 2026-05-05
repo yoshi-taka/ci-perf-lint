@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -225,17 +225,18 @@ function findRedundantBuildBeforeTest(
 export const cargoBuildBeforeTestRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const redundant = findRedundantBuildBeforeTest(job);
       if (!redundant) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, redundant.buildStep.runNode ?? redundant.buildStep.node, {
           message: `Job "${job.id}" runs \`cargo build\` shortly before \`cargo test\` with identical build conditions.`,
           why: "`cargo test` compiles the required targets automatically. A preceding `cargo build` with the same profile, target, features, and package scope is usually redundant.",
@@ -246,7 +247,8 @@ export const cargoBuildBeforeTestRule = {
           aiHandoff: `Review job "${job.id}" in ${workflow.relativePath}; remove the redundant \`cargo build\` step before \`cargo test\` if it has no separate required output.`,
           score: 62,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

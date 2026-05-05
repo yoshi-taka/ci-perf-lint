@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import {
@@ -74,24 +74,25 @@ function hasArchitectureSensitiveWork(job: WorkflowJob): boolean {
 export const preferStandardArmRunnerForApiCliRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (
         !jobRunsOnStandardX64Ubuntu(job) ||
         jobRunsOnArmLikeRunner(job) ||
         jobRunsInContainer(job)
       ) {
-        return [];
+        continue;
       }
 
       const apiTool = findApiCliTool(job);
       if (!apiTool) {
-        return [];
+        continue;
       }
 
       const severity = hasArchitectureSensitiveWork(job) ? "suggestion" : "warning";
       const armRunner = suggestedStandardArmUbuntuRunner(job);
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           severity,
           message: `Job "${job.id}" runs ${apiTool} API-bound CLI work on a standard x64 Ubuntu runner.`,
@@ -102,7 +103,8 @@ export const preferStandardArmRunnerForApiCliRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether its ${apiTool} CLI path can run on ${armRunner}. Verify all third-party actions and CLI installs support arm64 before changing the default runner.`,
           score: severity === "warning" ? 52 : 36,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

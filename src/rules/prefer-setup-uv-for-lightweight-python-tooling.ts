@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { detectInstallCommand, detectPythonTool } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -57,18 +57,19 @@ function getPythonPackageManager(job: WorkflowJob): "pip" | "pipenv" | "poetry" 
 export const preferSetupUvForLightweightPythonToolingRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobUsesPythonSetup(job) || hasSetupUvStep(job)) {
-        return [];
+        continue;
       }
 
       if (!jobLooksLikeLightweightPythonTooling(job)) {
-        return [];
+        continue;
       }
 
       const packageManager = getPythonPackageManager(job);
       if (packageManager === "uv") {
-        return [];
+        continue;
       }
 
       const packageManagerText = packageManager ? `${packageManager}-based` : "python-based";
@@ -76,10 +77,10 @@ export const preferSetupUvForLightweightPythonToolingRule = {
         job.steps.find((step) => stepLooksLightweightPythonTooling(step)) ??
         job.steps.find((step) => getSetupActionKind(step) === "python");
       if (!anchorStep) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(
           workflow,
           meta,
@@ -95,7 +96,8 @@ export const preferSetupUvForLightweightPythonToolingRule = {
             score: 51,
           },
         ),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

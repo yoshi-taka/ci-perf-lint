@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -35,9 +35,10 @@ function stepHasLayerCache(step: WorkflowStep): boolean {
 export const dockerBuildWithoutLayerCacheRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const step = job.steps.find(
@@ -47,10 +48,10 @@ export const dockerBuildWithoutLayerCacheRule = {
           !stepHasLayerCache(candidate),
       );
       if (!step) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
           message: `Job "${job.id}" uses docker/build-push-action without cache-from and cache-to configuration.`,
           why: "Without layer caching, every CI run rebuilds all Docker layers from scratch, adding minutes per build. docker/build-push-action supports cache-from and cache-to natively; the simplest setup uses the GitHub Actions cache backend.",
@@ -61,7 +62,8 @@ export const dockerBuildWithoutLayerCacheRule = {
           aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and add \`cache-from: type=gha\` and \`cache-to: type=gha,mode=max\` to the docker/build-push-action step unless \`no-cache: true\` is intentional.`,
           score: 78,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

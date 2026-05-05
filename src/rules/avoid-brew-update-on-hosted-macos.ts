@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getWorkflowStepText } from "./shared/workflow-step-text.ts";
@@ -21,17 +21,18 @@ function getBrewUpdateStep(steps: WorkflowStep[]): WorkflowStep | undefined {
 export const avoidBrewUpdateOnHostedMacosRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobRunsOnHostedMacos(job) || jobUsesContainer(job)) {
-        return [];
+        continue;
       }
 
       const updateStep = getBrewUpdateStep(job.steps);
       if (!updateStep) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, updateStep.runNode ?? updateStep.node, {
           message: `Job "${job.id}" runs brew update or brew upgrade on a GitHub-hosted macOS runner.`,
           why: "GitHub-hosted macOS runner images are refreshed regularly. Updating Homebrew during every CI run can add avoidable setup time and make the job less reproducible.",
@@ -42,7 +43,8 @@ export const avoidBrewUpdateOnHostedMacosRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}", check the selected macOS runner image's Included Software list for any toolchain being upgraded, and remove the Homebrew update or upgrade step unless this CI path intentionally validates the newest formula state or requires a newer package than the hosted macOS image provides.`,
           score: 50,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

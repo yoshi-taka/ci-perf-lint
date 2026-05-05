@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -32,9 +32,10 @@ function stepHasMultiPackageGoBuild(step: WorkflowStep): boolean {
 export const collapseMultipleGoBuildsInJobRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const goBuildSteps = job.steps.filter((step) => goBuildOccurrenceCount(step.run ?? "") > 0);
@@ -43,11 +44,11 @@ export const collapseMultipleGoBuildsInJobRule = {
         0,
       );
       if (totalOccurrences < 2 || goBuildSteps.some((step) => stepHasMultiPackageGoBuild(step))) {
-        return [];
+        continue;
       }
 
       const firstStep = goBuildSteps[0];
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, firstStep?.runNode ?? firstStep?.node, {
           message: `Job "${job.id}" runs ${totalOccurrences} separate \`go build\` commands.`,
           why: "Building multiple Go packages or binaries in one go command can reuse compiler work and module/cache state more efficiently than separate sequential go build invocations.",
@@ -58,7 +59,8 @@ export const collapseMultipleGoBuildsInJobRule = {
           aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and combine repeated \`go build\` commands when they are building related packages for the same image or release set.`,
           score: 66,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

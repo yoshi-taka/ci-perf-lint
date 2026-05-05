@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobHasMatrix } from "./shared/workflow-jobs.ts";
@@ -73,17 +73,18 @@ export const preferNextestForHeavyRustTestsRule = {
       return [];
     }
 
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow || job.steps.some((step) => stepUsesNextest(step))) {
-        return [];
+        continue;
       }
 
       const cargoTestStep = getCargoTestStep(job);
       if (!cargoTestStep || !jobLooksHeavyRustTest(job, cargoTestStep, context)) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, cargoTestStep.runNode ?? cargoTestStep.node, {
           message: `Job "${job.id}" runs a heavy-looking Rust test path with cargo test instead of cargo-nextest.`,
           why: "cargo-nextest can reduce Rust test wall-clock time on larger workspaces and multi-binary test suites by running tests with a CI-oriented execution model. It does not replace doctests, so doctest coverage may need a separate cargo test --doc step.",
@@ -94,7 +95,8 @@ export const preferNextestForHeavyRustTestsRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}", confirm whether this Rust test path is slow enough to justify nextest, trial cargo nextest run with equivalent feature/workspace flags, and keep a separate cargo test --doc step if doctests are required.`,
           score: 43,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

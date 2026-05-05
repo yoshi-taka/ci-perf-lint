@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { withRepositoryBlobNoneReleasePrecedent } from "./shared/similar-workflow-consensus.ts";
@@ -151,18 +151,19 @@ function jobLooksCommitMetadataLike(job: WorkflowJob): boolean {
 export const considerFilterBlobNoneForReleaseMetadataRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobLooksHistoryMetadataLike(workflow, job)) {
-        return [];
+        continue;
       }
 
       const checkout = getCheckoutStep(job);
       if (!checkout || hasBlobNoneFilter(checkout)) {
-        return [];
+        continue;
       }
 
       if (!hasDeepHistory(checkout) && !hasHistoryDependentCommand(job)) {
-        return [];
+        continue;
       }
 
       if (
@@ -172,7 +173,7 @@ export const considerFilterBlobNoneForReleaseMetadataRule = {
         jobLooksLikeRepoEditingAgenticDocsJob(job) ||
         jobUsesLocalAction(job)
       ) {
-        return [];
+        continue;
       }
 
       const scopePrefixes = collectScopePrefixes(job);
@@ -184,10 +185,10 @@ export const considerFilterBlobNoneForReleaseMetadataRule = {
         !hasSparseCheckout(checkout) &&
         (scopePrefixes.length === 0 || scopePrefixes.length > 3)
       ) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         withRepositoryBlobNoneReleasePrecedent(
           buildDiagnostic(workflow, meta, checkout.withNode ?? checkout.usesNode ?? checkout.node, {
             message: `Job "${job.id}" keeps enough git history for metadata work, but checkout still downloads file blobs eagerly.`,
@@ -205,7 +206,8 @@ export const considerFilterBlobNoneForReleaseMetadataRule = {
           workflow.relativePath,
           job.id,
         ),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

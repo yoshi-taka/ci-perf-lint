@@ -127,13 +127,18 @@ function buildJobFeatureSet(workflow: WorkflowDocument, job: WorkflowJob): Set<s
 }
 
 export function collectJobSummaries(workflows: WorkflowDocument[]): JobSummary[] {
-  return workflows.flatMap((workflow) =>
-    workflow.jobs.map((job) => {
-      const installFamilies = new Set<DependencyFamily>(
-        job.steps
-          .map((step) => detectInstallCommand(step))
-          .filter((family): family is DependencyFamily => family !== undefined),
-      );
+  const summaries: JobSummary[] = [];
+
+  for (const workflow of workflows) {
+    for (const job of workflow.jobs) {
+      const installFamilies = new Set<DependencyFamily>();
+
+      for (const step of job.steps) {
+        const family = detectInstallCommand(step);
+        if (family) {
+          installFamilies.add(family as DependencyFamily);
+        }
+      }
       const hasDependencyCache = [...installFamilies].some((family) =>
         job.steps.some((step) => {
           const action = getSetupActionKind(step);
@@ -150,7 +155,7 @@ export function collectJobSummaries(workflows: WorkflowDocument[]): JobSummary[]
         checkoutStep.with["fetch-tags"] !== true &&
         checkoutStep.with["fetch-tags"] !== "true";
 
-      return {
+      summaries.push({
         workflow,
         job,
         features: buildJobFeatureSet(workflow, job),
@@ -172,7 +177,9 @@ export function collectJobSummaries(workflows: WorkflowDocument[]): JobSummary[]
           !jobMayMutateRepository(workflow, job) &&
           !workflowLooksReleaseLike(workflow, job),
         usesDeepCheckout,
-      };
-    }),
-  );
+      });
+    }
+  }
+
+  return summaries;
 }

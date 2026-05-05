@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import {
   detectBuildTool,
@@ -73,22 +73,23 @@ function getNodePackageManager(job: WorkflowJob): "npm" | "yarn" | "pnpm" | "bun
 export const preferSetupBunForLightweightNodeToolingRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobUsesNodeSetup(job) || hasSetupBunStep(job) || hasSetupPnpmStep(job)) {
-        return [];
+        continue;
       }
 
       if (jobRunsNx(job)) {
-        return [];
+        continue;
       }
 
       if (!jobLooksLikeLightweightNodeTooling(job)) {
-        return [];
+        continue;
       }
 
       const packageManager = getNodePackageManager(job);
       if (packageManager === "bun" || packageManager === "pnpm") {
-        return [];
+        continue;
       }
 
       const packageManagerText = packageManager ? `${packageManager}-based` : "node-based";
@@ -96,10 +97,10 @@ export const preferSetupBunForLightweightNodeToolingRule = {
         job.steps.find((step) => stepLooksLightweightTooling(step)) ??
         job.steps.find((step) => getSetupActionKind(step) === "node");
       if (!anchorStep) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(
           workflow,
           meta,
@@ -115,7 +116,8 @@ export const preferSetupBunForLightweightNodeToolingRule = {
             score: 52,
           },
         ),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

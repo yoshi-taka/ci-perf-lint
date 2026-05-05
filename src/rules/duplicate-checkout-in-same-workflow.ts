@@ -21,23 +21,24 @@ interface CheckoutOccurrence {
 export const duplicateCheckoutInSameWorkflowRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    const checkoutOccurrences: CheckoutOccurrence[] = workflow.jobs.flatMap((job) => {
+    const checkoutOccurrences: CheckoutOccurrence[] = [];
+    for (const job of workflow.jobs) {
       if (
         job.usesReusableWorkflow ||
         jobHasMatrix(job) ||
         !hasCheckoutStep(job) ||
         !job.steps.some((step) => detectInstallCommand(step) !== undefined)
       ) {
-        return [];
+        continue;
       }
 
       const checkoutStep = getCheckoutStep(job);
       if (!checkoutStep) {
-        return [];
+        continue;
       }
 
-      return [{ jobId: job.id, step: checkoutStep }];
-    });
+      checkoutOccurrences.push({ jobId: job.id, step: checkoutStep });
+    }
 
     if (checkoutOccurrences.length < 2) {
       return [];

@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -14,18 +14,19 @@ const meta = {
 export const preferBuildxBakeForMultipleImagesRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow || jobRunsBuildxBake(job)) {
-        return [];
+        continue;
       }
 
       const buildSteps = job.steps.filter((step) => stepRunsDockerBuild(step));
       if (buildSteps.length < 2) {
-        return [];
+        continue;
       }
 
       const firstStep: WorkflowStep | undefined = buildSteps[0];
-      return [
+      findings.push(
         buildDiagnostic(
           workflow,
           meta,
@@ -41,7 +42,8 @@ export const preferBuildxBakeForMultipleImagesRule = {
             score: 71,
           },
         ),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

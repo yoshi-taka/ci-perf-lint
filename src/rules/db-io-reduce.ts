@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -109,30 +109,32 @@ function checkServiceContainers(workflow: WorkflowDocument, meta: RuleMeta, job:
     return [];
   }
 
-  return Object.entries(services).flatMap(([serviceName, config]) => {
+  const findings: Diagnostic[] = [];
+
+  for (const [serviceName, config] of Object.entries(services)) {
     if (!config || typeof config !== "object") {
-      return [];
+      continue;
     }
     const service = config as Record<string, unknown>;
 
     const image = typeof service.image === "string" ? service.image : undefined;
     if (!image) {
-      return [];
+      continue;
     }
 
     const dbType = detectDbType(image);
     if (!dbType) {
-      return [];
+      continue;
     }
 
     const options = typeof service.options === "string" ? service.options : "";
     const env = service.env as Record<string, unknown> | undefined;
     if (serviceIsOptimized(dbType, options, env)) {
-      return [];
+      continue;
     }
 
     const info = DB_INFO[dbType];
-    return [
+    findings.push(
       buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
         message: `Job "${job.id}" uses ${info.name} service container "${serviceName}" without disk I/O optimization`,
         why: `${info.name} containers in CI write to disk by default. On GitHub Actions hosted runners this causes unnecessary I/O overhead that can slow down test suites.`,
@@ -141,12 +143,16 @@ function checkServiceContainers(workflow: WorkflowDocument, meta: RuleMeta, job:
         aiHandoff: `In ${workflow.relativePath}, job "${job.id}", add disk I/O optimization to the "${serviceName}" ${info.name} service container. Either add \`options: --tmpfs ${info.dataDir}\` to the service definition, or configure ${dbType === "mysql" ? "innodb_flush_log_at_trx_commit" : "fsync=off"} via environment variables or config.`,
         score: 65,
       }),
-    ];
-  });
+    );
+  }
+
+  return findings;
 }
 
 function checkDockerRunSteps(workflow: WorkflowDocument, meta: RuleMeta, job: WorkflowJob) {
-  return job.steps.flatMap((step) => {
+  const findings: Diagnostic[] = [];
+
+  for (const step of job.steps) {
     let dbType: DbType | undefined;
     if (stepIsDockerRunWithDb(step, "mysql")) {
       dbType = "mysql";
@@ -155,16 +161,16 @@ function checkDockerRunSteps(workflow: WorkflowDocument, meta: RuleMeta, job: Wo
     }
 
     if (!dbType) {
-      return [];
+      continue;
     }
 
     const run = step.run ?? "";
     if (serviceIsOptimized(dbType, run)) {
-      return [];
+      continue;
     }
 
     const info = DB_INFO[dbType];
-    return [
+    findings.push(
       buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
         message: `Job "${job.id}" starts ${info.name} via \`docker run\` without disk I/O optimization`,
         why: `${info.name} containers in CI write to disk by default. On GitHub Actions hosted runners this causes unnecessary I/O overhead that can slow down test suites.`,
@@ -173,22 +179,26 @@ function checkDockerRunSteps(workflow: WorkflowDocument, meta: RuleMeta, job: Wo
         aiHandoff: `In ${workflow.relativePath}, job "${job.id}", the step "${step.name ?? "unnamed"}" starts ${info.name} via \`docker run\` without disk I/O optimization. Add \`--tmpfs ${info.dataDir}\` to the docker run options.`,
         score: 60,
       }),
-    ];
-  });
+    );
+  }
+
+  return findings;
 }
 
 function checkDockerComposeSteps(workflow: WorkflowDocument, meta: RuleMeta, job: WorkflowJob) {
-  return job.steps.flatMap((step) => {
+  const findings: Diagnostic[] = [];
+
+  for (const step of job.steps) {
     if (!stepIsDockerComposeWithDbHint(step)) {
-      return [];
+      continue;
     }
 
     const run = step.run ?? "";
     if (hasTmpfs(run)) {
-      return [];
+      continue;
     }
 
-    return [
+    findings.push(
       buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
         severity: "warning",
         confidence: "medium",
@@ -201,22 +211,28 @@ function checkDockerComposeSteps(workflow: WorkflowDocument, meta: RuleMeta, job
         aiHandoff: `In ${workflow.relativePath}, job "${job.id}", the step "${step.name ?? "unnamed"}" runs \`docker compose\` with MySQL/PostgreSQL hints. Check the compose file and add \`--tmpfs\` or appropriate DB config flags to database services.`,
         score: 40,
       }),
-    ];
-  });
+    );
+  }
+
+  return findings;
 }
 
 export const dbIoReduceRule = {
   meta: ruleMeta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
-      return [
+      findings.push(
         ...checkServiceContainers(workflow, ruleMeta, job),
         ...checkDockerRunSteps(workflow, ruleMeta, job),
         ...checkDockerComposeSteps(workflow, ruleMeta, job),
-      ];
-    });
+      );
+    }
+
+    return findings;
   },
 };

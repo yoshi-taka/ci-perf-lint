@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -38,15 +38,18 @@ export const noxWithoutUvBackendRule = {
       return [];
     }
 
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+
+    for (const job of workflow.jobs) {
       const noxSteps = findNoxStepsWithoutUvFlag(job.steps);
       if (noxSteps.length === 0) {
-        return [];
+        continue;
       }
 
-      return noxSteps.map((stepIndex) => {
+      for (const stepIndex of noxSteps) {
         const step = job.steps[stepIndex]!;
-        return buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
+        findings.push(
+          buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
           message: `Job "${job.id}" runs nox without the --uv flag.`,
           why: "nox can use uv for virtualenv creation and package installation by passing the --uv flag or setting nox.options.uv = True in noxfile.py. This speeds up session setup with no behavioral changes.",
           suggestion:
@@ -54,8 +57,11 @@ export const noxWithoutUvBackendRule = {
           measurementHint: "Compare nox session setup time before and after adding --uv.",
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and add --uv to the nox command or set nox.options.uv = True in noxfile.py.`,
           score: 42,
-        });
-      });
-    });
+        }),
+        );
+      }
+    }
+
+    return findings;
   },
 };

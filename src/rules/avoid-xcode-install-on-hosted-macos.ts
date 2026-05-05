@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobRunsOnHostedMacos, jobUsesContainer } from "./shared/workflow-jobs.ts";
@@ -39,20 +39,21 @@ function getRequestedXcodeVersion(step: WorkflowStep): string | undefined {
 export const avoidXcodeInstallOnHostedMacosRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobRunsOnHostedMacos(job) || jobUsesContainer(job)) {
-        return [];
+        continue;
       }
 
       const installStep = getXcodeInstallStep(job.steps);
       if (!installStep) {
-        return [];
+        continue;
       }
 
       const requestedVersion = getRequestedXcodeVersion(installStep);
       const versionPhrase = requestedVersion ? ` requested Xcode ${requestedVersion}` : " Xcode";
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, installStep.runNode ?? installStep.node, {
           message: `Job "${job.id}" installs or downloads${versionPhrase} on a GitHub-hosted macOS runner.`,
           why: "GitHub-hosted macOS runner images usually include multiple Xcode versions. Installing Xcode during CI can add very large setup time unless the requested version is not present on the selected runner image.",
@@ -63,7 +64,8 @@ export const avoidXcodeInstallOnHostedMacosRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}", check whether${versionPhrase} is already included on the selected macOS runner image, and replace the install or download with xcode-select or DEVELOPER_DIR when possible.`,
           score: 58,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

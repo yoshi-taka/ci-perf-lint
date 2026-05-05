@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -79,19 +79,20 @@ function getUntunedTestStep(job: WorkflowJob): { step: WorkflowStep; tool: TestT
 export const missingTestWorkerTuningForStandardRunnerRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobRunsOnStandardHostedRunner(job) || job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const untuned = getUntunedTestStep(job);
       if (!untuned) {
-        return [];
+        continue;
       }
 
       const examples = workerTuningExamples(untuned.tool);
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, untuned.step.runNode ?? untuned.step.node, {
           message: `Job "${job.id}" runs ${untuned.tool} on a standard GitHub-hosted runner without visible worker tuning.`,
           why: "Standard GitHub-hosted runners have known CPU limits, so explicitly tuning test worker count can make runtime and contention behavior easier to reason about than relying on defaults alone.",
@@ -101,7 +102,8 @@ export const missingTestWorkerTuningForStandardRunnerRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}", confirm the current ${untuned.tool} default parallelism on the standard hosted runner label, and only add explicit worker tuning if it improves runtime or stability for this test path.`,
           score: 31,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

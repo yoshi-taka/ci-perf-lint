@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import {
@@ -22,11 +22,13 @@ const meta = {
 export const redundantManualCacheWithSetupActionRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) =>
-      job.steps.flatMap((step) => {
+    const findings: Diagnostic[] = [];
+
+    for (const job of workflow.jobs) {
+      for (const step of job.steps) {
         const action = getSetupActionKind(step);
         if (!action) {
-          return [];
+          continue;
         }
 
         const overlappingFamilies = getDependencyFamiliesUsedBySetupAction(action).filter(
@@ -37,10 +39,10 @@ export const redundantManualCacheWithSetupActionRule = {
             ),
         );
         if (overlappingFamilies.length === 0) {
-          return [];
+          continue;
         }
 
-        return [
+        findings.push(
           withRepositorySingleCacheStrategyPrecedent(
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
               message: `${step.uses} already handles ${overlappingFamilies.join(", ")} caching in job "${job.id}", but the job also defines a matching manual cache step.`,
@@ -56,8 +58,10 @@ export const redundantManualCacheWithSetupActionRule = {
             workflow.relativePath,
             job.id,
           ),
-        ];
-      }),
-    );
+        );
+      }
+    }
+
+    return findings;
   },
 };

@@ -1,3 +1,4 @@
+import type { Diagnostic } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -64,16 +65,17 @@ export const preferTailwindV4UpgradeToolRule = {
       return [];
     }
 
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       const anchorStep = setupNode20Step(job);
       if (!anchorStep || !jobRunsTailwindRelevantWork(job)) {
-        return [];
+        continue;
       }
 
       const nodeVersion = formatNodeVersion(anchorStep.with?.["node-version"]);
       const viteNote = tailwindV4ViteNote(context.repository.frameworks.usesVite);
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, anchorStep.usesNode ?? anchorStep.node, {
           message: `Job "${job.id}" runs Node ${nodeVersion} while the repository is on Tailwind CSS ${candidate.versionSpec}; this is a good candidate for trying the official v4 upgrade tool first.`,
           why: `Tailwind's v4 guide says the upgrade tool handles most v3 to v4 migration work, including dependency updates, CSS-based config migration, and template class changes. This rule only fires when CI already shows Node 20+ and no obvious Tailwind config plugins or legacy browser targets were found.${viteNote}`,
@@ -82,7 +84,8 @@ export const preferTailwindV4UpgradeToolRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and the Tailwind CSS ${candidate.versionSpec} setup. If browser support allows modern Tailwind v4 targets, run \`npx @tailwindcss/upgrade\` on a branch, inspect dependency/config/template changes, and verify visual output in the browser. Official guide: https://tailwindcss.com/docs/upgrade-guide`,
           score: tailwindV4Score(context.repository.frameworks.usesVite),
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

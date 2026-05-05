@@ -1,5 +1,5 @@
 import type { RuleContext } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { hasDirectHeavySignals, isHeavyJob } from "./shared/workflow-jobs.ts";
@@ -32,17 +32,18 @@ function jobLooksLikeCiExecution(job: WorkflowJob): boolean {
 export const considerSlimOverAlpineForCiRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       const image = getContainerImage(job);
       if (!image || !/(?:^|[:/@-])(alpine|musl)(?:$|[:/@-])/i.test(image)) {
-        return [];
+        continue;
       }
 
       if (!jobLooksLikeCiExecution(job)) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs in Alpine or musl-based container image "${image}".`,
           why: "Alpine or musl-based containers can be the right choice, but they often add friction for wheels, native addons, and prebuilt binaries in CI. That can increase package-install complexity or cause unexpected fallbacks to source builds. If musl compatibility is not actually required on this path, a slim Debian-based image is often easier to maintain.",
@@ -54,7 +55,8 @@ export const considerSlimOverAlpineForCiRule = {
             "Review whether this CI job really needs Alpine or musl compatibility. If not, test an equivalent slim Debian-based image and only keep the switch if it reduces package-install friction, source-build fallbacks, or total runtime without changing required behavior.",
           score: 29,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

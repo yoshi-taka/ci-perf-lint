@@ -109,5 +109,11 @@ export async function collectLargeBarrelFileDiagnostics(
     }),
   );
 
-  return results.filter((result) => result.status === "fulfilled").map((result) => result.value);
+  const fulfilled: Diagnostic[] = [];
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      fulfilled.push(result.value);
+    }
+  }
+  return fulfilled;
 }

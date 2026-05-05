@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -69,17 +69,18 @@ function findMissingZstdStep(jobSteps: WorkflowStep[]): WorkflowStep | undefined
 export const preferZstdCompressionForPushedDockerImagesRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
-        return [];
+        continue;
       }
 
       const step = findMissingZstdStep(job.steps);
       if (!step) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, step.runNode ?? step.usesNode ?? step.node, {
           message: `Job "${job.id}" pushes a BuildKit-built Docker image without requesting zstd layer compression.`,
           why: "BuildKit defaults to gzip layer compression. zstd can reduce push/pull and decompression time for registries and runtimes that support OCI zstd layers, especially for images pulled often by CI or Kubernetes.",
@@ -90,7 +91,8 @@ export const preferZstdCompressionForPushedDockerImagesRule = {
           aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and add \`compression=zstd,oci-mediatypes=true\` to the Docker build output if the target registry and runtime support zstd-compressed OCI layers.`,
           score: 69,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };

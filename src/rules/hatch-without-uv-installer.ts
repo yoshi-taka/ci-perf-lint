@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -28,19 +28,20 @@ export const hatchWithoutUvInstallerRule = {
       return [];
     }
 
-    return workflow.jobs.flatMap((job) => {
+    const findings: Diagnostic[] = [];
+    for (const job of workflow.jobs) {
       if (!jobRunsHatch(job.steps)) {
-        return [];
+        continue;
       }
 
       const hatchStep = job.steps.find((step) =>
         stepRunsHatch(`${step.name ?? ""} ${step.run ?? ""}`),
       );
       if (!hatchStep) {
-        return [];
+        continue;
       }
 
-      return [
+      findings.push(
         buildDiagnostic(workflow, meta, hatchStep.runNode ?? hatchStep.node, {
           message: `Job "${job.id}" runs hatch commands without "installer = \\"uv\\"" configured.`,
           why: 'Hatch can use uv for dependency installation by setting installer = "uv" in [tool.hatch.env] in pyproject.toml or [env] in hatch.toml. This speeds up environment creation with no workflow changes.',
@@ -51,7 +52,8 @@ export const hatchWithoutUvInstallerRule = {
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and add installer = "uv" to the project's hatch config. The setting lives in [tool.hatch.env] in pyproject.toml or [env] in hatch.toml.`,
           score: 46,
         }),
-      ];
-    });
+      );
+    }
+    return findings;
   },
 };
