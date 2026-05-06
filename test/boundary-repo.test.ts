@@ -5,7 +5,7 @@ import {
   promoteStrictFallbackSuggestions,
   applyLimitedActionsPriority,
   compareFindings,
-} from "../src/repo.ts";
+} from "../src/repo-finding-utils.ts";
 import type { Diagnostic } from "../src/types.ts";
 
 function makeDiagnostic(

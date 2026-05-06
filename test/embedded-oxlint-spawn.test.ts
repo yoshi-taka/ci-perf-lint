@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
+import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxlint-path.ts";
 import { accessSync } from "node:fs";
 
 function wait(ms: number): Promise<void> {

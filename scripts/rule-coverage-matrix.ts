@@ -36,7 +36,9 @@ async function main() {
 
   for (const name of fixtureNames) {
     const fixturePath = fixtures[name as keyof typeof fixtures];
-    if (!fixturePath) {continue;}
+    if (!fixturePath) {
+      continue;
+    }
 
     const report = await memoizedAnalyzeRepository({
       cwd: fixturePath,

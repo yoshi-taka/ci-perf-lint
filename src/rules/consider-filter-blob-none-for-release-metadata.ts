@@ -148,66 +148,77 @@ function jobLooksCommitMetadataLike(job: WorkflowJob): boolean {
   });
 }
 
+function evaluateJobForBlobNone(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  context: RuleContext,
+): Diagnostic | undefined {
+  if (!jobLooksHistoryMetadataLike(workflow, job)) {
+    return undefined;
+  }
+
+  const checkout = getCheckoutStep(job);
+  if (!checkout || hasBlobNoneFilter(checkout)) {
+    return undefined;
+  }
+
+  if (!hasDeepHistory(checkout) && !hasHistoryDependentCommand(job)) {
+    return undefined;
+  }
+
+  if (
+    jobHasWideRepoAccess(job) ||
+    jobHasHeavyBuildOrInstall(job) ||
+    jobLooksLikeBlobHungryReleasePipeline(job) ||
+    jobLooksLikeRepoEditingAgenticDocsJob(job) ||
+    jobUsesLocalAction(job)
+  ) {
+    return undefined;
+  }
+
+  const scopePrefixes = collectScopePrefixes(job);
+  const hasExplicitFilteredFetchCandidate = jobHasExplicitFilteredFetchCandidate(job);
+  if (
+    !jobLooksCommitMetadataLike(job) &&
+    !jobHasStrongReleaseMetadataSignal(job) &&
+    !hasExplicitFilteredFetchCandidate &&
+    !hasSparseCheckout(checkout) &&
+    (scopePrefixes.length === 0 || scopePrefixes.length > 3)
+  ) {
+    return undefined;
+  }
+
+  return withRepositoryBlobNoneReleasePrecedent(
+    buildDiagnostic(workflow, meta, checkout.withNode ?? checkout.usesNode ?? checkout.node, {
+      message: `Job "${job.id}" keeps enough git history for metadata work, but checkout still downloads file blobs eagerly.`,
+      why: `fetch-depth controls how many commits and trees are fetched; blobs are the file contents attached to those commits. This job appears to focus on commit, tag, version, or release metadata${scopePrefixes.length > 0 ? ` while touching only ${scopePrefixes.map((prefix) => `"${prefix}"`).join(", ")}` : ""}, so \`filter: blob:none\` can keep the same history depth while avoiding most file-content transfer until a file is actually read.`,
+      suggestion: hasExplicitFilteredFetchCandidate
+        ? "If this job mostly needs commit history, tags, and release metadata rather than repository file contents, keep the same depth and test checkout with `filter: blob:none`; if the later explicit `git fetch --depth` is the main history transfer, test adding `--filter=blob:none` there too."
+        : "If this job mostly needs commit history, tags, and release metadata rather than repository file contents, keep the same depth and test checkout with `filter: blob:none`.",
+      measurementHint: hasExplicitFilteredFetchCandidate
+        ? "Compare checkout duration, explicit git fetch duration, transferred data, lazy blob fetches, and total job time before and after adding blob filtering with the same fetch depth."
+        : "Compare checkout duration, transferred data, lazy blob fetches, and total job time before and after adding `filter: blob:none` with the same fetch depth.",
+      aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether checkout can use filter: blob:none while preserving its commit, tag, release-notes, or versioning behavior.`,
+      score: hasSparseCheckout(checkout) ? 74 : 68,
+    }),
+    context,
+    workflow.relativePath,
+    job.id,
+  );
+}
+
 export const considerFilterBlobNoneForReleaseMetadataRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const findings: Diagnostic[] = [];
+
     for (const job of workflow.jobs) {
-      if (!jobLooksHistoryMetadataLike(workflow, job)) {
-        continue;
+      const finding = evaluateJobForBlobNone(workflow, job, _context);
+      if (finding) {
+        findings.push(finding);
       }
-
-      const checkout = getCheckoutStep(job);
-      if (!checkout || hasBlobNoneFilter(checkout)) {
-        continue;
-      }
-
-      if (!hasDeepHistory(checkout) && !hasHistoryDependentCommand(job)) {
-        continue;
-      }
-
-      if (
-        jobHasWideRepoAccess(job) ||
-        jobHasHeavyBuildOrInstall(job) ||
-        jobLooksLikeBlobHungryReleasePipeline(job) ||
-        jobLooksLikeRepoEditingAgenticDocsJob(job) ||
-        jobUsesLocalAction(job)
-      ) {
-        continue;
-      }
-
-      const scopePrefixes = collectScopePrefixes(job);
-      const hasExplicitFilteredFetchCandidate = jobHasExplicitFilteredFetchCandidate(job);
-      if (
-        !jobLooksCommitMetadataLike(job) &&
-        !jobHasStrongReleaseMetadataSignal(job) &&
-        !hasExplicitFilteredFetchCandidate &&
-        !hasSparseCheckout(checkout) &&
-        (scopePrefixes.length === 0 || scopePrefixes.length > 3)
-      ) {
-        continue;
-      }
-
-      findings.push(
-        withRepositoryBlobNoneReleasePrecedent(
-          buildDiagnostic(workflow, meta, checkout.withNode ?? checkout.usesNode ?? checkout.node, {
-            message: `Job "${job.id}" keeps enough git history for metadata work, but checkout still downloads file blobs eagerly.`,
-            why: `fetch-depth controls how many commits and trees are fetched; blobs are the file contents attached to those commits. This job appears to focus on commit, tag, version, or release metadata${scopePrefixes.length > 0 ? ` while touching only ${scopePrefixes.map((prefix) => `"${prefix}"`).join(", ")}` : ""}, so \`filter: blob:none\` can keep the same history depth while avoiding most file-content transfer until a file is actually read.`,
-            suggestion: hasExplicitFilteredFetchCandidate
-              ? "If this job mostly needs commit history, tags, and release metadata rather than repository file contents, keep the same depth and test checkout with `filter: blob:none`; if the later explicit `git fetch --depth` is the main history transfer, test adding `--filter=blob:none` there too."
-              : "If this job mostly needs commit history, tags, and release metadata rather than repository file contents, keep the same depth and test checkout with `filter: blob:none`.",
-            measurementHint: hasExplicitFilteredFetchCandidate
-              ? "Compare checkout duration, explicit git fetch duration, transferred data, lazy blob fetches, and total job time before and after adding blob filtering with the same fetch depth."
-              : "Compare checkout duration, transferred data, lazy blob fetches, and total job time before and after adding `filter: blob:none` with the same fetch depth.",
-            aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether checkout can use filter: blob:none while preserving its commit, tag, release-notes, or versioning behavior.`,
-            score: hasSparseCheckout(checkout) ? 74 : 68,
-          }),
-          _context,
-          workflow.relativePath,
-          job.id,
-        ),
-      );
     }
+
     return findings;
   },
 };

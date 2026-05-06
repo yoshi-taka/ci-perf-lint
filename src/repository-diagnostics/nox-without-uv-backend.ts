@@ -15,17 +15,12 @@ const noxRunPattern = /(?:^|\s)(?:(?:python|python3)\s+-m\s+)?nox(?:\s|$)/i;
 const pipInstallPattern = /\b(?:pip|uv\s+pip)\s+install\b/i;
 const uvFlagPattern = /--uv\b/i;
 
-export async function collectNoxWithoutUvBackendDiagnostics(
-  repoRoot: string,
-  repository: RepositorySignals,
-  workflows: WorkflowDocument[],
-  _warnings?: AnalysisWarning[],
-  scanContext?: RepositoryScanContext,
-): Promise<Diagnostic[]> {
-  if (!repository.python.usesNox) {
-    return [];
-  }
+interface WorkflowNoxScan {
+  anyWorkflowRunsNox: boolean;
+  anyWorkflowHasUvFlag: boolean;
+}
 
+function scanWorkflowsForNoxPatterns(workflows: WorkflowDocument[]): WorkflowNoxScan {
   let anyWorkflowRunsNox = false;
   let anyWorkflowHasUvFlag = false;
 
@@ -43,42 +38,68 @@ export async function collectNoxWithoutUvBackendDiagnostics(
     }
   }
 
+  return { anyWorkflowRunsNox, anyWorkflowHasUvFlag };
+}
+
+function parseNoxfileUvOption(text: string): { hasUvOption: boolean; location: SourceLocation } {
+  const uvOptionMatch = /uv\s*=\s*True/i.exec(text);
+  if (!uvOptionMatch) {
+    return { hasUvOption: false, location: { path: "noxfile.py", line: 1, column: 1 } };
+  }
+
+  const before = text.slice(0, Math.max(0, uvOptionMatch.index));
+  const lines = before.split("\n");
+  return {
+    hasUvOption: true,
+    location: {
+      path: "noxfile.py",
+      line: lines.length,
+      column: (lines.at(-1)?.length ?? 0) + 1,
+    },
+  };
+}
+
+async function resolveNoxfileLocation(
+  context: RepositoryScanContext,
+): Promise<{ hasUvOption: boolean; location: SourceLocation }> {
+  const noxFilePath = context.resolve("noxfile.py");
+  if (!(await context.pathExists(noxFilePath))) {
+    return { hasUvOption: false, location: { path: "noxfile.py", line: 1, column: 1 } };
+  }
+
+  const text = await context.readTextFileOrWarn(noxFilePath);
+  if (!text) {
+    return { hasUvOption: false, location: { path: "noxfile.py", line: 1, column: 1 } };
+  }
+
+  return parseNoxfileUvOption(text);
+}
+
+export async function collectNoxWithoutUvBackendDiagnostics(
+  repoRoot: string,
+  repository: RepositorySignals,
+  workflows: WorkflowDocument[],
+  _warnings?: AnalysisWarning[],
+  scanContext?: RepositoryScanContext,
+): Promise<Diagnostic[]> {
+  if (!repository.python.usesNox) {
+    return [];
+  }
+
+  const { anyWorkflowRunsNox, anyWorkflowHasUvFlag } = scanWorkflowsForNoxPatterns(workflows);
+
   if (anyWorkflowRunsNox && anyWorkflowHasUvFlag) {
     return [];
   }
 
   const context = scanContext ?? new RepositoryScanContext(repoRoot, _warnings ?? []);
-  let hasNoxfileUvOption = false;
-  let location: SourceLocation | undefined;
+  const { hasUvOption, location } = await resolveNoxfileLocation(context);
 
-  const noxFilePath = context.resolve("noxfile.py");
-  if (await context.pathExists(noxFilePath)) {
-    const text = await context.readTextFileOrWarn(noxFilePath);
-    if (text) {
-      hasNoxfileUvOption = /uv\s*=\s*True/i.test(text);
-      if (hasNoxfileUvOption && anyWorkflowRunsNox) {
-        return [];
-      }
-
-      const uvOptionMatch = /uv\s*=\s*True/i.exec(text);
-      if (uvOptionMatch) {
-        const before = text.slice(0, Math.max(0, uvOptionMatch.index));
-        const lines = before.split("\n");
-        location = {
-          path: "noxfile.py",
-          line: lines.length,
-          column: (lines.at(-1)?.length ?? 0) + 1,
-        };
-      }
-      location ??= { path: "noxfile.py", line: 1, column: 1 };
-    } else {
-      location = { path: "noxfile.py", line: 1, column: 1 };
-    }
-  } else {
-    location = { path: "noxfile.py", line: 1, column: 1 };
+  if (hasUvOption && anyWorkflowRunsNox) {
+    return [];
   }
 
-  if (hasNoxfileUvOption) {
+  if (hasUvOption) {
     return [];
   }
 

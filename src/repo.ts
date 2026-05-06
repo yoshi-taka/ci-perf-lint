@@ -22,6 +22,14 @@ import {
 import { collectRepositorySignals } from "./repository-signals.ts";
 import { evaluateRules } from "./rule-engine.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
+import { PhaseTimer } from "./repo-timer.ts";
+import {
+  promoteStrictFallbackSuggestions,
+  findingIncludedInMode,
+  findingIncludedInScope,
+  compareFindings,
+  applyLimitedActionsPriority,
+} from "./repo-finding-utils.ts";
 
 const buildkitePattern = /(?:^|\/)\.buildkite\//i;
 const buildkiteAltPattern = /(?:^|\/)buildkite\//i;
@@ -51,46 +59,6 @@ interface AnalyzeOptions {
   mode?: AuditMode;
   workflowOnly?: boolean;
   repositoryOnly?: boolean;
-}
-
-function timingsEnabled(): boolean {
-  return process.env.CI_PERF_LINT_TIMINGS === "1";
-}
-
-function embeddedOxlintPrewarmEnabled(): boolean {
-  return process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM !== "1";
-}
-
-class PhaseTimer {
-  readonly #prefix: string;
-  readonly #startedAt: number;
-  #lastAt: number;
-  readonly #entries: string[] = [];
-
-  constructor(prefix: string) {
-    this.#prefix = prefix;
-    this.#startedAt = performance.now();
-    this.#lastAt = this.#startedAt;
-  }
-
-  mark(label: string): void {
-    if (!timingsEnabled()) {
-      return;
-    }
-
-    const now = performance.now();
-    this.#entries.push(`${label}=${(now - this.#lastAt).toFixed(1)}ms`);
-    this.#lastAt = now;
-  }
-
-  flush(): void {
-    if (!timingsEnabled()) {
-      return;
-    }
-
-    const total = (performance.now() - this.#startedAt).toFixed(1);
-    process.stderr.write(`[timing] ${this.#prefix} total=${total}ms ${this.#entries.join(" ")}\n`);
-  }
 }
 
 function uniqueStrings(values: string[]): string[] {
@@ -158,125 +126,6 @@ async function parseWorkflowFile(
   return parsedWorkflow;
 }
 
-const actionsPriorityScoreBonus = 30;
-const prioritizedActionsFindingLimit = 3;
-const strictFallbackWarningRuleIds = new Set([
-  "missing-paths-filter",
-  "missing-path-ignore-for-non-code",
-]);
-
-export function isActionsFinding(finding: Diagnostic): boolean {
-  return finding.scope !== "repository";
-}
-
-export function findingIncludedInMode(finding: Diagnostic, mode: AuditMode): boolean {
-  return mode === "exploratory" || finding.severity !== "suggestion";
-}
-
-export function promoteStrictFallbackSuggestions(findings: Diagnostic[]): Diagnostic[] {
-  const hasStrictFinding = findings.some((finding) => finding.severity !== "suggestion");
-  if (hasStrictFinding) {
-    return findings;
-  }
-
-  return findings.map((finding) =>
-    finding.severity === "suggestion" && strictFallbackWarningRuleIds.has(finding.ruleId)
-      ? {
-          ...finding,
-          severity: "warning",
-        }
-      : finding,
-  );
-}
-
-function findingIncludedInScope(
-  finding: Diagnostic,
-  workflowOnly: boolean,
-  repositoryOnly: boolean,
-): boolean {
-  if (workflowOnly) {
-    return isActionsFinding(finding);
-  }
-
-  if (repositoryOnly) {
-    return !isActionsFinding(finding);
-  }
-
-  return true;
-}
-
-export function compareFindings(left: Diagnostic, right: Diagnostic): number {
-  if (right.score !== left.score) {
-    return right.score - left.score;
-  }
-
-  if (left.workflow < right.workflow) {
-    return -1;
-  }
-  if (left.workflow > right.workflow) {
-    return 1;
-  }
-
-  if (left.ruleId < right.ruleId) {
-    return -1;
-  }
-  if (left.ruleId > right.ruleId) {
-    return 1;
-  }
-
-  if (left.location.path < right.location.path) {
-    return -1;
-  }
-  if (left.location.path > right.location.path) {
-    return 1;
-  }
-
-  if (left.location.line !== right.location.line) {
-    return left.location.line - right.location.line;
-  }
-
-  if (left.location.column !== right.location.column) {
-    return left.location.column - right.location.column;
-  }
-
-  if (left.message < right.message) {
-    return -1;
-  }
-  if (left.message > right.message) {
-    return 1;
-  }
-  return 0;
-}
-
-export function applyLimitedActionsPriority(findings: Diagnostic[]): Diagnostic[] {
-  const prioritizedCandidates: { finding: Diagnostic; index: number }[] = [];
-
-  for (const [index, finding] of findings.entries()) {
-    if (!isActionsFinding(finding)) {
-      continue;
-    }
-
-    prioritizedCandidates.push({ finding, index });
-  }
-
-  prioritizedCandidates.sort((left, right) => compareFindings(left.finding, right.finding));
-
-  if (prioritizedCandidates.length > prioritizedActionsFindingLimit) {
-    prioritizedCandidates.length = prioritizedActionsFindingLimit;
-  }
-
-  const prioritizedIndexes = new Set(prioritizedCandidates.map(({ index }) => index));
-
-  return findings.map((finding, index) =>
-    prioritizedIndexes.has(index)
-      ? {
-          ...finding,
-          score: finding.score + actionsPriorityScoreBonus,
-        }
-      : finding,
-  );
-}
-
 export async function analyzeRepository(options: AnalyzeOptions): Promise<ReportData> {
   const timer = new PhaseTimer("analyzeRepository");
   const mode: AuditMode = options.mode ?? "strict";
@@ -298,7 +147,7 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     }
   }
   const shouldPrewarmEmbeddedOxlint =
-    embeddedOxlintPrewarmEnabled() &&
+    process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM !== "1" &&
     (await scanContext.pathExists(scanContext.resolve("package.json"))) &&
     !workflowOnly;
   if (shouldPrewarmEmbeddedOxlint) {
