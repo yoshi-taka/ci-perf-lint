@@ -1,0 +1,4 @@
+pre-commit:
+  commands:
+    lint:
+      run: ./node_modules/.bin/nano-staged
