@@ -1,8 +1,11 @@
 pre-commit:
   commands:
-    oxlint:
+    format:
       glob: "{src,test}/*.ts"
-      run: oxlint --type-aware --fix
+      run: bun run format
+    lint:
+      glob: "{src,test}/*.ts"
+      run: bun run lint
     audit-static:
       glob: "{src,test}/*.ts"
       run: bun run audit:static
