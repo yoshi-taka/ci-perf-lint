@@ -113,6 +113,22 @@ export function memoizedAnalyzeRepository(
   return reportPromise;
 }
 
+type FixtureReportOptions = Omit<AnalyzeRepositoryOptions, "cwd">;
+
+export function getFullRepositoryFixtureReport(
+  cwd: string,
+  options: FixtureReportOptions,
+): Promise<AnalyzeRepositoryResult> {
+  return memoizedAnalyzeRepository({ cwd, ...options });
+}
+
+export function getWorkflowFocusedFixtureReport(
+  cwd: string,
+  options: Omit<FixtureReportOptions, "workflowOnly">,
+): Promise<AnalyzeRepositoryResult> {
+  return memoizedAnalyzeRepository({ cwd, ...options, workflowOnly: true });
+}
+
 type RunCliResult = {
   exitCode: number;
   lines: string[];

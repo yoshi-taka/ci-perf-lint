@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { analyzeRepository } from "../src/repo.ts";
 import { fixtures } from "./fixtures.ts";
-import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
+import { createTempDirTracker, getWorkflowFocusedFixtureReport } from "./helpers.ts";
+import type { memoizedAnalyzeRepository } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 
@@ -15,7 +15,7 @@ function getFixtureReport(
   cwd: string,
   options: Omit<Parameters<typeof memoizedAnalyzeRepository>[0], "cwd">,
 ) {
-  return memoizedAnalyzeRepository({ cwd, ...options });
+  return getWorkflowFocusedFixtureReport(cwd, options);
 }
 
 describe("analyzeRepository workflow and execution rules: heavy jobs and release guards", () => {
@@ -43,8 +43,7 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -97,8 +96,7 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -194,8 +192,7 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",

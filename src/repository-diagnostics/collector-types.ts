@@ -6,6 +6,11 @@ import type { RepositoryScanContext } from "../repository-scan-context.ts";
 export type RepositoryDiagnosticGate =
   | "javascript-heavy"
   | "javascript-tooling"
+  | "javascript-linting"
+  | "javascript-formatting"
+  | "javascript-imports"
+  | "javascript-build-config"
+  | "javascript-package-scripts"
   | "docker-heavy"
   | "terraform-heavy"
   | "large-files"
@@ -23,6 +28,11 @@ export type RepositoryDiagnosticGate =
 export interface RepositoryDiagnosticGateState {
   hasJavaScriptHeavyWorkflow: boolean;
   hasJavaScriptTooling: boolean;
+  hasJavaScriptLinting: boolean;
+  hasJavaScriptFormatting: boolean;
+  hasJavaScriptImports: boolean;
+  hasJavaScriptBuildConfig: boolean;
+  hasJavaScriptPackageScripts: boolean;
   hasDockerHeavyWorkflow: boolean;
   hasTerraformHeavyWorkflow: boolean;
   hasLargeFiles: boolean;

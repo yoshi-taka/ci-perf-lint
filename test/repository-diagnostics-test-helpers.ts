@@ -1,5 +1,5 @@
 import { afterEach } from "bun:test";
-import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
+import { createTempDirTracker, getFullRepositoryFixtureReport } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 
@@ -11,7 +11,7 @@ export { tempDirs };
 
 export function getFixtureReport(
   cwd: string,
-  options: Omit<Parameters<typeof memoizedAnalyzeRepository>[0], "cwd">,
+  options: Parameters<typeof getFullRepositoryFixtureReport>[1],
 ) {
-  return memoizedAnalyzeRepository({ cwd, ...options });
+  return getFullRepositoryFixtureReport(cwd, options);
 }

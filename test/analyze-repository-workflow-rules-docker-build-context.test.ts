@@ -628,6 +628,4 @@ describe("analyzeRepository workflow and execution rules: docker build and docke
     expect(finding?.location.line).toBe(2);
     expect(finding?.suggestion).toContain("--no-install-recommends");
   });
-
-
 });

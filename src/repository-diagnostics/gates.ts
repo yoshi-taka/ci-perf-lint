@@ -44,6 +44,16 @@ export function collectorGateMatches(
       return gateState.hasJavaScriptHeavyWorkflow;
     case "javascript-tooling":
       return gateState.hasJavaScriptTooling;
+    case "javascript-linting":
+      return gateState.hasJavaScriptLinting;
+    case "javascript-formatting":
+      return gateState.hasJavaScriptFormatting;
+    case "javascript-imports":
+      return gateState.hasJavaScriptImports;
+    case "javascript-build-config":
+      return gateState.hasJavaScriptBuildConfig;
+    case "javascript-package-scripts":
+      return gateState.hasJavaScriptPackageScripts;
     case "docker-heavy":
       return gateState.hasDockerHeavyWorkflow;
     case "large-files":
@@ -142,6 +152,132 @@ async function repositoryHasCdkManifest(scanContext: RepositoryScanContext): Pro
   return scanContext.pathExists(scanContext.resolve("cdk.out", "manifest.json"));
 }
 
+function repositoryLikelyUsesJavaScriptTooling(context: RepositoryDiagnosticContext): boolean {
+  const { repository } = context;
+  return (
+    context.workflows.length > 0 &&
+    (context.workflows.some((workflow) => workflowLooksJavaScriptHeavy(workflow)) ||
+      repository.eslint.usesEslint ||
+      repository.eslint.usesOxlint ||
+      repository.prettier.usesPrettier ||
+      repository.prettier.usesOxfmt ||
+      repository.frameworks.usesNextjs ||
+      repository.frameworks.usesStorybook ||
+      repository.frameworks.usesVite ||
+      repository.frameworks.usesAstro ||
+      repository.frameworks.usesSvelteKit ||
+      repository.frameworks.usesSolidStart ||
+      repository.frameworks.usesTurbo ||
+      repository.frameworks.usesNx ||
+      repository.frameworks.usesLerna ||
+      repository.frameworks.usesAngularCli ||
+      repository.typescript.versionSpec !== undefined ||
+      repository.jest.versionSpec !== undefined ||
+      repository.jest.jsdomVersionSpec !== undefined ||
+      repository.tailwind.usesTailwind ||
+      repository.husky.usesHusky ||
+      repository.husky.usesLintStaged ||
+      repository.babel.usesBabel ||
+      repository.nativePackages.node.length > 0)
+  );
+}
+
+function repositoryLikelyUsesJavaScriptLinting(context: RepositoryDiagnosticContext): boolean {
+  const { eslint, husky } = context.repository;
+  return (
+    eslint.usesEslint ||
+    eslint.usesOxlint ||
+    eslint.hasConfig ||
+    eslint.pluginNames.length > 0 ||
+    husky.usesHusky ||
+    husky.usesLintStaged ||
+    context.workflows.some((workflow) => /\b(?:eslint|oxlint)\b/i.test(workflow.source ?? ""))
+  );
+}
+
+function repositoryLikelyUsesJavaScriptFormatting(context: RepositoryDiagnosticContext): boolean {
+  const { prettier, tailwind } = context.repository;
+  return (
+    prettier.usesPrettier ||
+    prettier.usesOxfmt ||
+    prettier.hasConfig ||
+    prettier.pluginNames.length > 0 ||
+    tailwind.usesTailwind ||
+    context.workflows.some((workflow) =>
+      /\b(?:prettier|oxfmt|tailwind)\b/i.test(workflow.source ?? ""),
+    )
+  );
+}
+
+function repositoryLikelyUsesJavaScriptImports(context: RepositoryDiagnosticContext): boolean {
+  const { eslint, frameworks, typescript } = context.repository;
+  return (
+    eslint.usesImportPlugin ||
+    eslint.usesImportXPlugin ||
+    eslint.usesNoBarrelFilesPlugin ||
+    eslint.usesBarrelFilesPlugin ||
+    frameworks.usesVite ||
+    frameworks.usesNextjs ||
+    frameworks.usesAstro ||
+    frameworks.usesSvelteKit ||
+    frameworks.usesSolidStart ||
+    typescript.versionSpec !== undefined
+  );
+}
+
+function repositoryLikelyUsesJavaScriptBuildConfig(context: RepositoryDiagnosticContext): boolean {
+  const { frameworks, babel, typescript, jest } = context.repository;
+  return (
+    frameworks.usesNextjs ||
+    frameworks.usesStorybook ||
+    frameworks.usesTurbo ||
+    frameworks.usesNx ||
+    frameworks.usesLerna ||
+    frameworks.usesGradle ||
+    frameworks.usesAngularCli ||
+    babel.usesBabel ||
+    typescript.versionSpec !== undefined ||
+    jest.versionSpec !== undefined ||
+    context.workflows.some((workflow) =>
+      /\b(?:webpack|rspack|babel|ts-loader|fork-ts-checker|next build|vite build|storybook)\b/i.test(
+        workflow.source ?? "",
+      ),
+    )
+  );
+}
+
+function repositoryLikelyUsesJavaScriptPackageScripts(
+  context: RepositoryDiagnosticContext,
+): boolean {
+  const { npm, nativePackages } = context.repository;
+  return (
+    npm.lifecycleHookScripts.length > 0 ||
+    npm.npmrcFiles.length > 0 ||
+    npm.npmrcRelevantSettings.length > 0 ||
+    npm.packageScriptEnvReferences.length > 0 ||
+    npm.workflowEnvReferences.length > 0 ||
+    nativePackages.node.length > 0 ||
+    context.workflows.some((workflow) => /\b(?:npm|pnpm|yarn|bun)\b/i.test(workflow.source ?? ""))
+  );
+}
+
+function repositoryLikelyUsesJavaScriptFrameworks(context: RepositoryDiagnosticContext): boolean {
+  const { frameworks, tailwind, jest } = context.repository;
+  return (
+    frameworks.usesNextjs ||
+    frameworks.usesStorybook ||
+    tailwind.usesTailwind ||
+    jest.versionSpec !== undefined
+  );
+}
+
+function repositoryLikelyUsesRust(context: RepositoryDiagnosticContext): boolean {
+  return (
+    context.repository.rust.hasCargoToml ||
+    context.workflows.some((workflow) => /\b(?:cargo|rustc|nextest)\b/i.test(workflow.source ?? ""))
+  );
+}
+
 async function repositoryHasCdkBucketDeployment(
   context: RepositoryDiagnosticContext,
 ): Promise<boolean> {
@@ -178,11 +314,17 @@ export async function collectRepositoryDiagnosticGateState(
     timedGate("large-files", () => repositoryLooksLargeFilesHeavy(context.scanContext)),
     timedGate("pytest", () => repositoryLooksPytestHeavy(context.scanContext, context.workflows)),
     timedGate("renovate", () => repositoryHasRenovateConfig(context.scanContext)),
-    timedGate("javascript-tooling", () => looksLikeJavaScriptRepository(context.scanContext)),
-    timedGate("javascript-frameworks", () =>
-      looksLikeJavaScriptFrameworksRepository(context.scanContext),
-    ),
-    timedGate("rust", () => looksLikeRustRepository(context.scanContext)),
+    repositoryLikelyUsesJavaScriptTooling(context)
+      ? Promise.resolve(true)
+      : timedGate("javascript-tooling", () => looksLikeJavaScriptRepository(context.scanContext)),
+    repositoryLikelyUsesJavaScriptFrameworks(context)
+      ? Promise.resolve(true)
+      : timedGate("javascript-frameworks", () =>
+          looksLikeJavaScriptFrameworksRepository(context.scanContext),
+        ),
+    repositoryLikelyUsesRust(context)
+      ? Promise.resolve(true)
+      : timedGate("rust", () => looksLikeRustRepository(context.scanContext)),
     timedGate("cdk-manifest", () => repositoryHasCdkManifest(context.scanContext)),
     timedGate("cdk-bucket-deployment", () => repositoryHasCdkBucketDeployment(context)),
   ]);
@@ -194,6 +336,11 @@ export async function collectRepositoryDiagnosticGateState(
     hasRenovateConfig,
     hasHusky: context.repository.husky.hookFileCount > 0,
     hasJavaScriptTooling,
+    hasJavaScriptLinting: repositoryLikelyUsesJavaScriptLinting(context),
+    hasJavaScriptFormatting: repositoryLikelyUsesJavaScriptFormatting(context),
+    hasJavaScriptImports: repositoryLikelyUsesJavaScriptImports(context),
+    hasJavaScriptBuildConfig: repositoryLikelyUsesJavaScriptBuildConfig(context),
+    hasJavaScriptPackageScripts: repositoryLikelyUsesJavaScriptPackageScripts(context),
     hasJavaScriptFrameworks,
     hasRust,
     hasCdkManifest,

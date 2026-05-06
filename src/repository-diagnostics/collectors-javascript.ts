@@ -58,7 +58,7 @@ export const javascriptDiagnosticCollectors = [
   },
   {
     id: "prefer-eslint-plugin-import-x",
-    gate: "javascript-tooling",
+    gate: "javascript-linting",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPreferEslintPluginImportXDiagnostics(repoRoot, repository, warnings, scanContext),
   },
@@ -70,7 +70,7 @@ export const javascriptDiagnosticCollectors = [
   },
   {
     id: "prefer-oxlint-over-eslint",
-    gate: "javascript-tooling",
+    gate: "javascript-linting",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPreferOxlintOverEslintDiagnostics(repoRoot, repository, warnings, scanContext),
   },
@@ -82,13 +82,13 @@ export const javascriptDiagnosticCollectors = [
   },
   {
     id: "npm-ci-over-npm-install",
-    gate: "javascript-tooling",
+    gate: "javascript-package-scripts",
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectNpmCiOverNpmInstallDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
   },
   {
     id: "prefer-node-run-over-npm-run",
-    gate: "javascript-tooling",
+    gate: "javascript-package-scripts",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPackageJsonNodeRunDiagnostics(repoRoot, repository, warnings, scanContext),
   },
@@ -130,19 +130,19 @@ export const javascriptDiagnosticCollectors = [
   },
   {
     id: "recommend-webpack-4-latest-patch",
-    gate: "javascript-tooling",
+    gate: "javascript-build-config",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectRecommendWebpack4LatestPatchDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "recommend-webpack-5-latest-patch",
-    gate: "javascript-tooling",
+    gate: "javascript-build-config",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectRecommendWebpack5LatestPatchDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-turborepo-over-npm-workspaces",
-    gate: "javascript-tooling",
+    gate: "javascript-build-config",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPreferTurborepoOverNpmWorkspacesDiagnostics(
         repoRoot,
@@ -153,19 +153,19 @@ export const javascriptDiagnosticCollectors = [
   },
   {
     id: "recommend-rspack-over-webpack",
-    gate: "javascript-tooling",
+    gate: "javascript-build-config",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectRecommendRspackOverWebpackDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "recommend-swc-over-babel",
-    gate: "javascript-tooling",
+    gate: "javascript-build-config",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectRecommendSwcOverBabelDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "ts-loader-fork-ts-checker",
-    gate: "javascript-tooling",
+    gate: "javascript-build-config",
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectTsLoaderForkTsCheckerDiagnostics(repoRoot, repository, warnings, scanContext),
   },
@@ -273,17 +273,17 @@ export const javascriptDiagnosticCollectors = [
   },
   {
     id: "vercel-json-commands",
-    gate: "javascript-tooling",
+    gate: "javascript-package-scripts",
     collect: (context) => collectVercelJsonDiagnostics(context),
   },
   {
     id: "wrangler-toml-commands",
-    gate: "javascript-tooling",
+    gate: "javascript-package-scripts",
     collect: (context) => collectWranglerTomlDiagnostics(context),
   },
   {
     id: "amplify-yml-commands",
-    gate: "javascript-tooling",
+    gate: "javascript-package-scripts",
     collect: (context) => collectAmplifyYmlDiagnostics(context),
   },
 ] satisfies readonly RepositoryDiagnosticCollector[];

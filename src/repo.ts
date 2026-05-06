@@ -15,7 +15,10 @@ import type {
   WorkflowSummary,
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
-import { collectEmbeddedOxlintImportJsonDiagnostics, collectEmbeddedOxlintDiagnosticsByCode } from "./repository-diagnostics/embedded-oxlint.ts";
+import {
+  collectEmbeddedOxlintImportJsonDiagnostics,
+  collectEmbeddedOxlintDiagnosticsByCode,
+} from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
 import { evaluateRules } from "./rule-engine.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
@@ -52,6 +55,10 @@ interface AnalyzeOptions {
 
 function timingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
+}
+
+function embeddedOxlintPrewarmEnabled(): boolean {
+  return process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM !== "1";
 }
 
 class PhaseTimer {
@@ -290,11 +297,17 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
       );
     }
   }
-  if ((await scanContext.pathExists(scanContext.resolve("package.json"))) && !workflowOnly) {
+  const shouldPrewarmEmbeddedOxlint =
+    embeddedOxlintPrewarmEnabled() &&
+    (await scanContext.pathExists(scanContext.resolve("package.json"))) &&
+    !workflowOnly;
+  if (shouldPrewarmEmbeddedOxlint) {
     void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot);
     void collectEmbeddedOxlintDiagnosticsByCode(target.repoRoot, "oxc(no-barrel-file)");
   }
-  timer.mark("embedded-oxlint-prewarm");
+  timer.mark(
+    shouldPrewarmEmbeddedOxlint ? "embedded-oxlint-prewarm" : "embedded-oxlint-prewarm-skipped",
+  );
 
   const allWorkflowFiles = await collectWorkflowFiles(target);
   timer.mark("list-workflows");
@@ -347,8 +360,11 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
       ? ([] as Diagnostic[])
       : Promise.all(
           parsedWorkflows.map((workflow) =>
-            evaluateRules(workflow, ruleContext, analysisWarnings, ruleFindingCounts).then((findings) =>
-              findings.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
+            evaluateRules(workflow, ruleContext, analysisWarnings, ruleFindingCounts).then(
+              (findings) =>
+                findings.filter((finding) =>
+                  findingIncludedInScope(finding, workflowOnly, repositoryOnly),
+                ),
             ),
           ),
         ).then((results) => results.flat()),
@@ -361,8 +377,8 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
           warnings: analysisWarnings,
           scanContext,
         }).then((diags) =>
-            diags.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
-          ),
+          diags.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
+        ),
   ]);
 
   allFindings.push(...wfFindings, ...repoDiagnostics);

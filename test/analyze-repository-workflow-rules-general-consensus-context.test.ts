@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { analyzeRepository } from "../src/repo.ts";
-import { createTempDirTracker } from "./helpers.ts";
+import { createTempDirTracker, getWorkflowFocusedFixtureReport } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 
@@ -64,8 +63,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -132,8 +130,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -192,8 +189,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -250,8 +246,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -306,8 +301,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -372,8 +366,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -427,8 +420,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -482,8 +474,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -548,8 +539,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -609,8 +599,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
