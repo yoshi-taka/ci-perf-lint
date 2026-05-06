@@ -75,7 +75,6 @@
     "fast-check": "^4.7.0",
     "knip": "^6.11.0",
     "lefthook": "^2.1.6",
-    "nano-staged": "^1.0.2",
     "oxfmt": "^0.47.0",
     "oxlint-tsgolint": "^0.22.1",
     "tinybench": "^6.0.0",
