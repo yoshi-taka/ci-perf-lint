@@ -34,9 +34,9 @@ jobs:
         with:
           bun-version: 1.3.13
 
-      - name: Debug bun
-        run: which bun && bun --version
       - name: Install dependencies
+        env:
+          SKIP_INSTALL_SIMPLE_GIT_HOOKS: true
         run: bun install --frozen-lockfile
 
       - name: Lint
