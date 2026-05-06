@@ -1,69 +1,10 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { createTempDirTracker, getWorkflowFocusedFixtureReport } from "./helpers.ts";
-
-const tempDirs = createTempDirTracker();
-
-afterEach(async () => {
-  await tempDirs.cleanup();
-});
+import { describe, expect, test } from "bun:test";
+import { fixtures } from "./fixtures.ts";
+import { getWorkflowFocusedFixtureReport } from "./helpers.ts";
 
 describe("analyzeRepository workflow and execution rules: consensus and precedent context", () => {
   test("adds similar-job consensus context to missing-dependency-cache", async () => {
-    const fixtureRoot = await tempDirs.create("apl-similar-cache-consensus-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    const cachedWorkflow = (name: string) =>
-      [
-        `name: ${name}`,
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "        with:",
-        "          node-version: 20",
-        "          cache: npm",
-        "      - run: npm ci",
-        "      - run: npm test",
-      ].join("\n");
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ci-a.yml"),
-      cachedWorkflow("ci-a"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ci-b.yml"),
-      cachedWorkflow("ci-b"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ci-c.yml"),
-      cachedWorkflow("ci-c"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ci-d.yml"),
-      [
-        "name: ci-d",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "        with:",
-        "          node-version: 20",
-        "      - run: npm ci",
-        "      - run: npm test",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.consensusCacheLike, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -81,56 +22,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds similar-job consensus context to deep-checkout-without-need", async () => {
-    const fixtureRoot = await tempDirs.create("apl-similar-deep-checkout-consensus-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    const shallowWorkflow = (name: string) =>
-      [
-        `name: ${name}`,
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n");
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "build-a.yml"),
-      shallowWorkflow("build-a"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "build-b.yml"),
-      shallowWorkflow("build-b"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "build-c.yml"),
-      shallowWorkflow("build-c"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "build-d.yml"),
-      [
-        "name: build-d",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "        with:",
-        "          fetch-depth: 0",
-        "      - uses: actions/setup-node@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.consensusDeepCheckoutLike, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -148,48 +40,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds repository precedent context to missing-dependency-cache without consensus", async () => {
-    const fixtureRoot = await tempDirs.create("apl-cache-precedent-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "cached.yml"),
-      [
-        "name: cached",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "        with:",
-        "          node-version: 20",
-        "          cache: npm",
-        "      - run: npm ci",
-        "      - run: npm test",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "uncached.yml"),
-      [
-        "name: uncached",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "        with:",
-        "          node-version: 20",
-        "      - run: npm ci",
-        "      - run: npm test",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.precedentCacheLike, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -208,45 +59,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds repository precedent context to deep-checkout-without-need without consensus", async () => {
-    const fixtureRoot = await tempDirs.create("apl-shallow-checkout-precedent-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "shallow.yml"),
-      [
-        "name: shallow",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "deep.yml"),
-      [
-        "name: deep",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "        with:",
-        "          fetch-depth: 0",
-        "      - uses: actions/setup-node@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.precedentDeepCheckoutLike, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -265,43 +78,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds repository precedent context to missing-paths-filter without consensus", async () => {
-    const fixtureRoot = await tempDirs.create("apl-paths-filter-precedent-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "scoped.yml"),
-      [
-        "name: scoped",
-        "on:",
-        "  pull_request:",
-        "    paths:",
-        "      - 'src/**'",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "unscoped.yml"),
-      [
-        "name: unscoped",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.precedentPathsFilterLike, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -319,54 +96,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds similar-workflow consensus context to missing-paths-filter", async () => {
-    const fixtureRoot = await tempDirs.create("apl-paths-filter-consensus-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    const scopedWorkflow = (name: string) =>
-      [
-        `name: ${name}`,
-        "on:",
-        "  pull_request:",
-        "    paths:",
-        "      - 'src/**'",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n");
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "build-a.yml"),
-      scopedWorkflow("build-a"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "build-b.yml"),
-      scopedWorkflow("build-b"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "build-c.yml"),
-      scopedWorkflow("build-c"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "build-d.yml"),
-      [
-        "name: build-d",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.consensusPathsFilterLike, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -384,43 +114,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds repository precedent context to outdated-setup-action-without-cache", async () => {
-    const fixtureRoot = await tempDirs.create("apl-setup-cache-precedent-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "modern.yml"),
-      [
-        "name: modern",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "        with:",
-        "          cache: npm",
-        "      - run: npm ci",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "legacy.yml"),
-      [
-        "name: legacy",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v2",
-        "      - run: npm ci",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.precedentSetupCacheLike, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -438,43 +132,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds repository precedent context to missing-path-ignore-for-non-code without consensus", async () => {
-    const fixtureRoot = await tempDirs.create("apl-non-code-ignore-precedent-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ignored.yml"),
-      [
-        "name: ignored",
-        "on:",
-        "  pull_request:",
-        "    paths-ignore:",
-        "      - '**/*.md'",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "unignored.yml"),
-      [
-        "name: unignored",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.precedentNonCodeIgnoreLike, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -492,54 +150,7 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds similar-workflow consensus context to missing-path-ignore-for-non-code", async () => {
-    const fixtureRoot = await tempDirs.create("apl-non-code-ignore-consensus-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    const ignoredWorkflow = (name: string) =>
-      [
-        `name: ${name}`,
-        "on:",
-        "  pull_request:",
-        "    paths-ignore:",
-        "      - '**/*.md'",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n");
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ignore-a.yml"),
-      ignoredWorkflow("ignore-a"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ignore-b.yml"),
-      ignoredWorkflow("ignore-b"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ignore-c.yml"),
-      ignoredWorkflow("ignore-c"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "ignore-d.yml"),
-      [
-        "name: ignore-d",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  build:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npm run build",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+    const report = await getWorkflowFocusedFixtureReport(fixtures.consensusNonCodeIgnoreLike, {
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -557,53 +168,14 @@ describe("analyzeRepository workflow and execution rules: consensus and preceden
   });
 
   test("adds repository precedent context to redundant-manual-cache-with-setup-action", async () => {
-    const fixtureRoot = await tempDirs.create("apl-single-cache-strategy-precedent-");
-    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
-
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "simple-cache.yml"),
-      [
-        "name: simple-cache",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "        with:",
-        "          cache: npm",
-        "      - run: npm ci",
-      ].join("\n"),
+    const report = await getWorkflowFocusedFixtureReport(
+      fixtures.precedentSingleCacheStrategyLike,
+      {
+        targetPath: ".",
+        topCount: 20,
+        mode: "exploratory",
+      },
     );
-    await writeFile(
-      path.join(fixtureRoot, ".github", "workflows", "overlap-cache.yml"),
-      [
-        "name: overlap-cache",
-        "on:",
-        "  pull_request:",
-        "jobs:",
-        "  test:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "        with:",
-        "          cache: npm",
-        "      - uses: actions/cache@v4",
-        "        with:",
-        "          path: ~/.npm",
-        "          key: npm-cache",
-        "      - run: npm ci",
-      ].join("\n"),
-    );
-
-    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
-      targetPath: ".",
-      topCount: 20,
-      mode: "exploratory",
-    });
 
     const finding = report.findings.find(
       (candidate) =>

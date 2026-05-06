@@ -1,0 +1,15 @@
+name: Meta checks
+on: pull_request
+jobs:
+  lint_actions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npx actionlint
+  lint_policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npx actionlint

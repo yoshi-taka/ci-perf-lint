@@ -1,15 +1,7 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { describe, expect, test } from "bun:test";
 import { analyzeRepository } from "../src/repo.ts";
 import { fixtures } from "./fixtures.ts";
-import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
-
-const tempDirs = createTempDirTracker();
-
-afterEach(async () => {
-  await tempDirs.cleanup();
-});
+import { memoizedAnalyzeRepository } from "./helpers.ts";
 
 function getFixtureReport(
   cwd: string,
@@ -36,39 +28,8 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
   });
 
   test("does not flag repeated lint or duplicate install-lint patterns for matrix jobs", async () => {
-    const fixtureRoot = await tempDirs.create("apl-matrix-lint-skip-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  lint:",
-        "    strategy:",
-        "      matrix:",
-        "        package: [app, docs]",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npx eslint .",
-        "  lint_more:",
-        "    strategy:",
-        "      matrix:",
-        "        package: [app, docs]",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npx eslint .",
-      ].join("\n"),
-    );
-
     const report = await analyzeRepository({
-      cwd: fixtureRoot,
+      cwd: fixtures.matrixLintSkipLike,
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -84,33 +45,8 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
   });
 
   test("does not flag duplicate install-lint patterns for meta-check workflows", async () => {
-    const fixtureRoot = await tempDirs.create("apl-meta-lint-skip-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: Meta checks",
-        "on: pull_request",
-        "jobs:",
-        "  lint_actions:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npx actionlint",
-        "  lint_policy:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - run: npm ci",
-        "      - run: npx actionlint",
-      ].join("\n"),
-    );
-
     const report = await analyzeRepository({
-      cwd: fixtureRoot,
+      cwd: fixtures.metaLintSkipLike,
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",
@@ -122,29 +58,8 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
   });
 
   test("flags missing cache when e18e/action-dependency-diff runs npm ci internally", async () => {
-    const fixtureRoot = await tempDirs.create("apl-action-dep-diff-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "main.yml"),
-      [
-        "name: Main",
-        "on: pull_request",
-        "jobs:",
-        "  dep-review:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - uses: actions/checkout@v4",
-        "      - uses: actions/setup-node@v4",
-        "        with:",
-        "          node-version: 20",
-        "      - uses: e18e/action-dependency-diff@v1",
-      ].join("\n"),
-    );
-
     const report = await analyzeRepository({
-      cwd: fixtureRoot,
+      cwd: fixtures.actionDependencyDiffLike,
       targetPath: ".",
       topCount: 20,
       mode: "exploratory",

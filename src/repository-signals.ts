@@ -213,7 +213,7 @@ async function hasFrameworkSignalEvidence(
   if (
     workflowsMatch(
       workflows,
-      /\b(?:next|storybook|vite|astro|svelte|turbo|nx|lerna|gradle|angular)\b/i,
+      /\b(?:next|storybook|vite|astro|svelte|turbo|nx|lerna|gradle|gradlew|angular)\b/i,
     )
   ) {
     return true;

@@ -84,6 +84,7 @@ export async function evaluateRules(
   context: RuleContext,
   warnings?: AnalysisWarning[],
   findingCounts?: Map<string, number>,
+  ruleFilter?: (rule: AnyRuleModule) => boolean,
 ): Promise<Diagnostic[]> {
   prewarmStepAnalysisCaches(workflow);
   const isBuildkite = isPipelineDocument(workflow);
@@ -105,6 +106,10 @@ export async function evaluateRules(
   const ruleResults: Diagnostic[] = [];
 
   for (const rule of applicableRules) {
+    if (ruleFilter && !ruleFilter(rule)) {
+      continue;
+    }
+
     const { maxFindings } = rule.meta;
     if (
       maxFindings !== undefined &&

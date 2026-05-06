@@ -152,33 +152,66 @@ async function repositoryHasCdkManifest(scanContext: RepositoryScanContext): Pro
   return scanContext.pathExists(scanContext.resolve("cdk.out", "manifest.json"));
 }
 
+async function repositoryHasJavaScriptBuildConfigEvidence(
+  scanContext: RepositoryScanContext,
+): Promise<boolean> {
+  const candidates = [
+    "webpack.config.js",
+    "webpack.config.ts",
+    "webpack.config.mjs",
+    "webpack.config.cjs",
+    "rspack.config.js",
+    "rspack.config.ts",
+    "rspack.config.mjs",
+    "rspack.config.cjs",
+  ] as const;
+  const matches = await Promise.all(
+    candidates.map((fileName) => scanContext.pathExists(scanContext.resolve(fileName))),
+  );
+  if (matches.some(Boolean)) {
+    return true;
+  }
+
+  const packageJsonEntry = await scanContext.loadPackageJson();
+  return /"workspaces"\s*:/.test(packageJsonEntry.text ?? "");
+}
+
+async function repositoryHasJavaScriptPackageScriptEvidence(
+  scanContext: RepositoryScanContext,
+): Promise<boolean> {
+  const candidates = ["vercel.json", "wrangler.toml", "amplify.yml", "amplify.yaml"] as const;
+  const matches = await Promise.all(
+    candidates.map((fileName) => scanContext.pathExists(scanContext.resolve(fileName))),
+  );
+  return matches.some(Boolean);
+}
+
 function repositoryLikelyUsesJavaScriptTooling(context: RepositoryDiagnosticContext): boolean {
   const { repository } = context;
   return (
-    context.workflows.length > 0 &&
-    (context.workflows.some((workflow) => workflowLooksJavaScriptHeavy(workflow)) ||
-      repository.eslint.usesEslint ||
-      repository.eslint.usesOxlint ||
-      repository.prettier.usesPrettier ||
-      repository.prettier.usesOxfmt ||
-      repository.frameworks.usesNextjs ||
-      repository.frameworks.usesStorybook ||
-      repository.frameworks.usesVite ||
-      repository.frameworks.usesAstro ||
-      repository.frameworks.usesSvelteKit ||
-      repository.frameworks.usesSolidStart ||
-      repository.frameworks.usesTurbo ||
-      repository.frameworks.usesNx ||
-      repository.frameworks.usesLerna ||
-      repository.frameworks.usesAngularCli ||
-      repository.typescript.versionSpec !== undefined ||
-      repository.jest.versionSpec !== undefined ||
-      repository.jest.jsdomVersionSpec !== undefined ||
-      repository.tailwind.usesTailwind ||
-      repository.husky.usesHusky ||
-      repository.husky.usesLintStaged ||
-      repository.babel.usesBabel ||
-      repository.nativePackages.node.length > 0)
+    context.workflows.some((workflow) => workflowLooksJavaScriptHeavy(workflow)) ||
+    repository.eslint.usesEslint ||
+    repository.eslint.usesOxlint ||
+    repository.prettier.usesPrettier ||
+    repository.prettier.usesOxfmt ||
+    repository.frameworks.usesNextjs ||
+    repository.frameworks.usesStorybook ||
+    repository.frameworks.usesVite ||
+    repository.frameworks.usesAstro ||
+    repository.frameworks.usesSvelteKit ||
+    repository.frameworks.usesSolidStart ||
+    repository.frameworks.usesTurbo ||
+    repository.frameworks.usesNx ||
+    repository.frameworks.usesLerna ||
+    repository.frameworks.usesAngularCli ||
+    repository.typescript.versionSpec !== undefined ||
+    repository.jest.versionSpec !== undefined ||
+    repository.jest.jsdomVersionSpec !== undefined ||
+    repository.tailwind.usesTailwind ||
+    repository.husky.usesHusky ||
+    repository.husky.usesLintStaged ||
+    repository.babel.usesBabel ||
+    repository.nativePackages.node.length > 0
   );
 }
 
@@ -238,6 +271,8 @@ function repositoryLikelyUsesJavaScriptBuildConfig(context: RepositoryDiagnostic
     babel.usesBabel ||
     typescript.versionSpec !== undefined ||
     jest.versionSpec !== undefined ||
+    context.repository.eslint.usesEslint ||
+    context.repository.prettier.usesPrettier ||
     context.workflows.some((workflow) =>
       /\b(?:webpack|rspack|babel|ts-loader|fork-ts-checker|next build|vite build|storybook)\b/i.test(
         workflow.source ?? "",
@@ -306,6 +341,8 @@ export async function collectRepositoryDiagnosticGateState(
     hasPytest,
     hasRenovateConfig,
     hasJavaScriptTooling,
+    hasJavaScriptBuildConfigEvidence,
+    hasJavaScriptPackageScriptEvidence,
     hasJavaScriptFrameworks,
     hasRust,
     hasCdkManifest,
@@ -317,6 +354,8 @@ export async function collectRepositoryDiagnosticGateState(
     repositoryLikelyUsesJavaScriptTooling(context)
       ? Promise.resolve(true)
       : timedGate("javascript-tooling", () => looksLikeJavaScriptRepository(context.scanContext)),
+    repositoryHasJavaScriptBuildConfigEvidence(context.scanContext),
+    repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
     repositoryLikelyUsesJavaScriptFrameworks(context)
       ? Promise.resolve(true)
       : timedGate("javascript-frameworks", () =>
@@ -339,8 +378,10 @@ export async function collectRepositoryDiagnosticGateState(
     hasJavaScriptLinting: repositoryLikelyUsesJavaScriptLinting(context),
     hasJavaScriptFormatting: repositoryLikelyUsesJavaScriptFormatting(context),
     hasJavaScriptImports: repositoryLikelyUsesJavaScriptImports(context),
-    hasJavaScriptBuildConfig: repositoryLikelyUsesJavaScriptBuildConfig(context),
-    hasJavaScriptPackageScripts: repositoryLikelyUsesJavaScriptPackageScripts(context),
+    hasJavaScriptBuildConfig:
+      repositoryLikelyUsesJavaScriptBuildConfig(context) || hasJavaScriptBuildConfigEvidence,
+    hasJavaScriptPackageScripts:
+      repositoryLikelyUsesJavaScriptPackageScripts(context) || hasJavaScriptPackageScriptEvidence,
     hasJavaScriptFrameworks,
     hasRust,
     hasCdkManifest,

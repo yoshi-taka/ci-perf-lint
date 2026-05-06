@@ -354,20 +354,27 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
 
   const allFindings: Diagnostic[] = [];
   const ruleFindingCounts = new Map<string, number>();
+  const repositoryScopeWorkflowRuleIds = new Set([
+    "prefer-oxlint-over-eslint",
+    "prefer-lefthook-for-complex-git-hooks",
+  ]);
 
   const [wfFindings, repoDiagnostics] = await Promise.all([
-    repositoryOnly
-      ? ([] as Diagnostic[])
-      : Promise.all(
-          parsedWorkflows.map((workflow) =>
-            evaluateRules(workflow, ruleContext, analysisWarnings, ruleFindingCounts).then(
-              (findings) =>
-                findings.filter((finding) =>
-                  findingIncludedInScope(finding, workflowOnly, repositoryOnly),
-                ),
-            ),
+    Promise.all(
+      parsedWorkflows.map((workflow) =>
+        evaluateRules(
+          workflow,
+          ruleContext,
+          analysisWarnings,
+          ruleFindingCounts,
+          repositoryOnly ? (rule) => repositoryScopeWorkflowRuleIds.has(rule.meta.id) : undefined,
+        ).then((findings) =>
+          findings.filter((finding) =>
+            findingIncludedInScope(finding, workflowOnly, repositoryOnly),
           ),
-        ).then((results) => results.flat()),
+        ),
+      ),
+    ).then((results) => results.flat()),
     workflowOnly
       ? ([] as Diagnostic[])
       : collectRepositoryDiagnostics({
