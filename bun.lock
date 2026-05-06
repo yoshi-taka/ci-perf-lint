@@ -7,7 +7,7 @@
       "dependencies": {
         "dockerfile-ast": "^0.7.1",
         "oxlint": "^1.62.0",
-        "yaml": "^2.8.3",
+        "yaml": "^2.8.4",
       },
       "devDependencies": {
         "@astrojs/sitemap": "^3.7.2",
