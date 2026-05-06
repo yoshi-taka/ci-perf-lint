@@ -1,4 +1,11 @@
 pre-commit:
   commands:
-    lint:
-      run: ./node_modules/.bin/nano-staged
+    oxlint:
+      glob: "{src,test}/*.ts"
+      run: oxlint --type-aware --fix
+    audit-static:
+      glob: "{src,test}/*.ts"
+      run: bun run audit:static
+    config-audit:
+      glob: "{knip.json,.fallowrc.json}"
+      run: bun run audit:static

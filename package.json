@@ -64,13 +64,6 @@
     "oxlint": "^1.62.0",
     "yaml": "^2.8.4"
   },
-  "nano-staged": {
-    "{src,test}/*.ts": [
-      "oxlint --type-aware --fix",
-      "sh -c 'bun run audit:static'"
-    ],
-    "{knip.json,.fallowrc.json}": "sh -c 'bun run audit:static'"
-  },
   "devDependencies": {
     "@astrojs/sitemap": "^3.7.2",
     "@codspeed/tinybench-plugin": "^5.4.0",
