@@ -33,7 +33,11 @@ const sampleRepoParsed = parseWorkflow(
   sampleRepoSource,
 );
 
-const bench = new Bench();
+const bench = new Bench({
+  iterations: 25,
+  time: 0,
+  warmup: false,
+});
 
 bench
   .add("evaluateRules > workflow with findings (workflow-efficiency-like)", async () => {

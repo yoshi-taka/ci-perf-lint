@@ -14,7 +14,11 @@ const reportData: ReportData = await analyzeRepository({
   workflowOnly: true,
 });
 
-const bench = new Bench();
+const bench = new Bench({
+  iterations: 25,
+  time: 0,
+  warmup: false,
+});
 
 bench
   .add("renderReport > handoff format", () => {

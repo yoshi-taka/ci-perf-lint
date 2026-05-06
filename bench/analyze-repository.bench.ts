@@ -4,7 +4,11 @@ import { analyzeRepository } from "../src/repo.ts";
 
 const fixturesDir = path.resolve(import.meta.dirname, "../test/fixtures");
 
-const bench = new Bench();
+const bench = new Bench({
+  iterations: 1,
+  time: 0,
+  warmup: false,
+});
 
 bench
   .add("analyzeRepository > sample-repo (workflow-only)", async () => {

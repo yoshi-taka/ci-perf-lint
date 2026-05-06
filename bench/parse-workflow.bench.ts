@@ -23,7 +23,11 @@ const largeWorkflowPath = path.join(
 );
 const largeWorkflowSource = readFileSync(largeWorkflowPath, "utf8");
 
-const bench = new Bench();
+const bench = new Bench({
+  iterations: 25,
+  time: 0,
+  warmup: false,
+});
 
 bench
   .add("parseWorkflow > small workflow (sample-repo ci.yml)", () => {
