@@ -117,15 +117,51 @@ describe("migrations: framework milestones and bundler migration", () => {
   );
 
   const frameworkMilestoneNegativeCases = [
-    { name: "Next.js 12 once already on 12.3", fixture: fixtures.nextjs12MinorOk, ruleId: "prefer-nextjs-12-minor-performance-milestone" },
-    { name: "Next.js 13 once already on 13.3", fixture: fixtures.nextjs13MinorOk, ruleId: "prefer-nextjs-13-minor-performance-milestone" },
-    { name: "Next.js 14 once already on 14.2", fixture: fixtures.nextjs14MinorOk, ruleId: "prefer-nextjs-14-minor-performance-milestone" },
-    { name: "Storybook 6 once already on 6.5", fixture: fixtures.storybook6MinorOk, ruleId: "prefer-storybook-6-minor-performance-milestone" },
-    { name: "Storybook 7 once already on 7.6", fixture: fixtures.storybook7MinorOk, ruleId: "prefer-storybook-7-minor-performance-milestone" },
-    { name: "unverified Storybook 9 minor milestone", fixture: fixtures.storybook9MinorLike, ruleId: "prefer-storybook-9-minor-performance-milestone" },
-    { name: "Storybook 9 once already on 9.5", fixture: fixtures.storybook9MinorOk, ruleId: "prefer-storybook-9-minor-performance-milestone" },
-    { name: "unverified Storybook 10 minor milestone", fixture: fixtures.storybook10MinorLike, ruleId: "prefer-storybook-10-minor-performance-milestone" },
-    { name: "Storybook 10 once already on 10.3", fixture: fixtures.storybook10MinorOk, ruleId: "prefer-storybook-10-minor-performance-milestone" },
+    {
+      name: "Next.js 12 once already on 12.3",
+      fixture: fixtures.nextjs12MinorOk,
+      ruleId: "prefer-nextjs-12-minor-performance-milestone",
+    },
+    {
+      name: "Next.js 13 once already on 13.3",
+      fixture: fixtures.nextjs13MinorOk,
+      ruleId: "prefer-nextjs-13-minor-performance-milestone",
+    },
+    {
+      name: "Next.js 14 once already on 14.2",
+      fixture: fixtures.nextjs14MinorOk,
+      ruleId: "prefer-nextjs-14-minor-performance-milestone",
+    },
+    {
+      name: "Storybook 6 once already on 6.5",
+      fixture: fixtures.storybook6MinorOk,
+      ruleId: "prefer-storybook-6-minor-performance-milestone",
+    },
+    {
+      name: "Storybook 7 once already on 7.6",
+      fixture: fixtures.storybook7MinorOk,
+      ruleId: "prefer-storybook-7-minor-performance-milestone",
+    },
+    {
+      name: "unverified Storybook 9 minor milestone",
+      fixture: fixtures.storybook9MinorLike,
+      ruleId: "prefer-storybook-9-minor-performance-milestone",
+    },
+    {
+      name: "Storybook 9 once already on 9.5",
+      fixture: fixtures.storybook9MinorOk,
+      ruleId: "prefer-storybook-9-minor-performance-milestone",
+    },
+    {
+      name: "unverified Storybook 10 minor milestone",
+      fixture: fixtures.storybook10MinorLike,
+      ruleId: "prefer-storybook-10-minor-performance-milestone",
+    },
+    {
+      name: "Storybook 10 once already on 10.3",
+      fixture: fixtures.storybook10MinorOk,
+      ruleId: "prefer-storybook-10-minor-performance-milestone",
+    },
   ] as const;
 
   test.each(frameworkMilestoneNegativeCases.map((testCase) => [testCase.name, testCase] as const))(
@@ -144,18 +180,32 @@ describe("migrations: framework milestones and bundler migration", () => {
     };
 
     const rspackCases: RspackCase[] = [
-      { name: "recommends rspack when webpack 5 is used with simple config", fixture: fixtures.webpack5RspackLike, expectRecommendation: true },
-      { name: "does not recommend rspack when custom plugins are present", fixture: fixtures.webpack5RspackSkipPlugins },
-      { name: "does not recommend rspack when compiler/compilation hooks are used", fixture: fixtures.webpack5RspackSkipHooks },
-      { name: "does not recommend rspack when deep devServer customization is present", fixture: fixtures.webpack5RspackSkipDevserver },
-      { name: "does not recommend rspack when already using rspack", fixture: fixtures.webpack5RspackOk },
+      {
+        name: "recommends rspack when webpack 5 is used with simple config",
+        fixture: fixtures.webpack5RspackLike,
+        expectRecommendation: true,
+      },
+      {
+        name: "does not recommend rspack when custom plugins are present",
+        fixture: fixtures.webpack5RspackSkipPlugins,
+      },
+      {
+        name: "does not recommend rspack when compiler/compilation hooks are used",
+        fixture: fixtures.webpack5RspackSkipHooks,
+      },
+      {
+        name: "does not recommend rspack when deep devServer customization is present",
+        fixture: fixtures.webpack5RspackSkipDevserver,
+      },
+      {
+        name: "does not recommend rspack when already using rspack",
+        fixture: fixtures.webpack5RspackOk,
+      },
     ];
 
     test.each(rspackCases)("$name", async ({ fixture, expectRecommendation }) => {
       const report = await getFixtureReport(fixture, { ...baseOptions, mode: "exploratory" });
-      const finding = report.findings.find(
-        (c) => c.ruleId === "recommend-rspack-over-webpack",
-      );
+      const finding = report.findings.find((c) => c.ruleId === "recommend-rspack-over-webpack");
       if (expectRecommendation) {
         expect(finding).toBeDefined();
         expect(finding!.severity).toBe("suggestion");
@@ -177,21 +227,38 @@ describe("migrations: framework milestones and bundler migration", () => {
     };
 
     const swcCases: SwcCase[] = [
-      { name: "recommends swc when babel is used with simple config", fixture: fixtures.swcBabelLike, expectRecommendation: true },
+      {
+        name: "recommends swc when babel is used with simple config",
+        fixture: fixtures.swcBabelLike,
+        expectRecommendation: true,
+      },
       { name: "does not recommend swc when no babel is present", fixture: fixtures.swcBabelOk },
-      { name: "does not recommend swc when custom plugins are present", fixture: fixtures.swcBabelSkipCustomPlugins },
-      { name: "does not recommend swc when babel-plugin-macros is used", fixture: fixtures.swcBabelSkipMacros },
-      { name: "does not recommend swc when decorators are used", fixture: fixtures.swcBabelSkipDecorators },
-      { name: "does not recommend swc when emotion plugin is used", fixture: fixtures.swcBabelSkipEmotion },
+      {
+        name: "does not recommend swc when custom plugins are present",
+        fixture: fixtures.swcBabelSkipCustomPlugins,
+      },
+      {
+        name: "does not recommend swc when babel-plugin-macros is used",
+        fixture: fixtures.swcBabelSkipMacros,
+      },
+      {
+        name: "does not recommend swc when decorators are used",
+        fixture: fixtures.swcBabelSkipDecorators,
+      },
+      {
+        name: "does not recommend swc when emotion plugin is used",
+        fixture: fixtures.swcBabelSkipEmotion,
+      },
       { name: "does not recommend swc when core-js is used", fixture: fixtures.swcBabelSkipCorejs },
-      { name: "does not recommend swc when legacy browser targets are present", fixture: fixtures.swcBabelSkipLegacyTargets },
+      {
+        name: "does not recommend swc when legacy browser targets are present",
+        fixture: fixtures.swcBabelSkipLegacyTargets,
+      },
     ];
 
     test.each(swcCases)("$name", async ({ fixture, expectRecommendation }) => {
       const report = await getFixtureReport(fixture, { ...baseOptions, mode: "exploratory" });
-      const finding = report.findings.find(
-        (c) => c.ruleId === "recommend-swc-over-babel",
-      );
+      const finding = report.findings.find((c) => c.ruleId === "recommend-swc-over-babel");
       if (expectRecommendation) {
         expect(finding).toBeDefined();
         expect(finding!.severity).toBe("suggestion");

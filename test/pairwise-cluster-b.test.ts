@@ -25,10 +25,7 @@ const paramSpecs: ParamSpec[] = Object.entries(paramsDef).map(([name, values]) =
 
 const combinations = generatePairwise(paramSpecs);
 
-const clusterBRules = new Set([
-  "deep-checkout-without-need",
-  "deep-checkout-excessive-depth",
-]);
+const clusterBRules = new Set(["deep-checkout-without-need", "deep-checkout-excessive-depth"]);
 
 function expectedClusterBRules(p: Params): Set<string> {
   const expected = new Set<string>();
@@ -39,11 +36,7 @@ function expectedClusterBRules(p: Params): Set<string> {
     expected.add("deep-checkout-without-need");
   }
 
-  if (
-    (p.fetchDepth === "1000" || p.fetchDepth === "2000") &&
-    !p.hasHistoryDepCmd &&
-    !skips
-  ) {
+  if ((p.fetchDepth === "1000" || p.fetchDepth === "2000") && !p.hasHistoryDepCmd && !skips) {
     expected.add("deep-checkout-excessive-depth");
   }
 
@@ -65,19 +58,19 @@ function makeLabel(p: Params): string {
 function genTriggerDependentCommand(p: Params): string[] {
   const steps: string[] = [];
   if (p.hasHistoryDepCmd) {
-    steps.push('      - run: npx commitlint --from HEAD~1');
+    steps.push("      - run: npx commitlint --from HEAD~1");
   }
   if (p.hasOpaqueScript) {
-    steps.push('      - run: ./scripts/deploy.sh');
+    steps.push("      - run: ./scripts/deploy.sh");
   }
   if (p.mayMutateRepo) {
-    steps.push('      - run: git push origin main');
+    steps.push("      - run: git push origin main");
   }
   if (p.hasKnownHistoryAction) {
-    steps.push('      - uses: e18e/action-dependency-diff@v1');
+    steps.push("      - uses: e18e/action-dependency-diff@v1");
   }
   if (p.usesNxSetShas) {
-    steps.push('      - uses: nrwl/nx-set-shas@v1');
+    steps.push("      - uses: nrwl/nx-set-shas@v1");
   }
   return steps;
 }

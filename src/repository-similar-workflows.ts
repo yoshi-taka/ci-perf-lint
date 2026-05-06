@@ -108,15 +108,19 @@ export function collectSimilarWorkflowSignals(
 
   for (const [summaryIndex, summary] of workflowSummaries.entries()) {
     const peers = workflowPeerIndexes[summaryIndex] ?? [];
-    if (peers.length < minimumPeerCount) { continue; }
+    if (peers.length < minimumPeerCount) {
+      continue;
+    }
 
     if (summary.eligibleForConcurrency && !summary.hasConcurrency) {
       const eligibleWithConcurrencyCount = countMatchingPeers(
-        peers, workflowSummaries,
+        peers,
+        workflowSummaries,
         (peer) => peer.eligibleForConcurrency && peer.hasConcurrency,
       );
       const eligiblePeerCount = countMatchingPeers(
-        peers, workflowSummaries,
+        peers,
+        workflowSummaries,
         (peer) => peer.eligibleForConcurrency,
       );
       if (
@@ -128,7 +132,8 @@ export function collectSimilarWorkflowSignals(
           workflowPath: summary.workflow.relativePath,
           peerCount: eligibleWithConcurrencyCount,
           peerWorkflowPaths: collectPeerLabels(
-            peers, workflowSummaries,
+            peers,
+            workflowSummaries,
             (peer) => peer.eligibleForConcurrency && peer.hasConcurrency,
             (peer) => peer.workflow.relativePath,
           ),
@@ -153,7 +158,8 @@ export function collectSimilarWorkflowSignals(
           workflowPath: summary.workflow.relativePath,
           peerCount: peersWithIgnoreCount,
           peerWorkflowPaths: collectPeerLabels(
-            peers, workflowSummaries,
+            peers,
+            workflowSummaries,
             (peer) => workflowHasNonCodeIgnore(peer.workflow),
             (peer) => peer.workflow.relativePath,
           ),
@@ -161,10 +167,7 @@ export function collectSimilarWorkflowSignals(
       }
     }
 
-    if (
-      !workflowHasTriggerPathFilter(summary.workflow) &&
-      isHeavyWorkflow(summary.workflow)
-    ) {
+    if (!workflowHasTriggerPathFilter(summary.workflow) && isHeavyWorkflow(summary.workflow)) {
       const peersWithFilterCount = countMatchingPeers(peers, workflowSummaries, (peer) =>
         workflowHasTriggerPathFilter(peer.workflow),
       );
@@ -176,7 +179,8 @@ export function collectSimilarWorkflowSignals(
           workflowPath: summary.workflow.relativePath,
           peerCount: peersWithFilterCount,
           peerWorkflowPaths: collectPeerLabels(
-            peers, workflowSummaries,
+            peers,
+            workflowSummaries,
             (peer) => workflowHasTriggerPathFilter(peer.workflow),
             (peer) => peer.workflow.relativePath,
           ),
@@ -190,11 +194,13 @@ export function collectSimilarWorkflowSignals(
 
     if (summary.isTimeoutCandidate && !summary.hasTimeout) {
       const timeoutCandidatePeerCount = countMatchingPeers(
-        peers, jobSummaries,
+        peers,
+        jobSummaries,
         (peer) => peer.isTimeoutCandidate,
       );
       const timeoutPeerCount = countMatchingPeers(
-        peers, jobSummaries,
+        peers,
+        jobSummaries,
         (peer) => peer.isTimeoutCandidate && peer.hasTimeout,
       );
       if (
@@ -206,7 +212,8 @@ export function collectSimilarWorkflowSignals(
           jobId: summary.job.id,
           peerCount: timeoutPeerCount,
           peerJobLabels: collectPeerLabels(
-            peers, jobSummaries,
+            peers,
+            jobSummaries,
             (peer) => peer.isTimeoutCandidate && peer.hasTimeout,
             (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
           ),
@@ -216,11 +223,13 @@ export function collectSimilarWorkflowSignals(
 
     if (summary.isCacheCandidate && !summary.hasDependencyCache) {
       const cacheCandidatePeerCount = countMatchingPeers(
-        peers, jobSummaries,
+        peers,
+        jobSummaries,
         (peer) => peer.isCacheCandidate,
       );
       const cachePeerCount = countMatchingPeers(
-        peers, jobSummaries,
+        peers,
+        jobSummaries,
         (peer) => peer.isCacheCandidate && peer.hasDependencyCache,
       );
       if (
@@ -232,7 +241,8 @@ export function collectSimilarWorkflowSignals(
           jobId: summary.job.id,
           peerCount: cachePeerCount,
           peerJobLabels: collectPeerLabels(
-            peers, jobSummaries,
+            peers,
+            jobSummaries,
             (peer) => peer.isCacheCandidate && peer.hasDependencyCache,
             (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
           ),
@@ -242,11 +252,13 @@ export function collectSimilarWorkflowSignals(
 
     if (summary.isDeepCheckoutCandidate && summary.usesDeepCheckout) {
       const deepCheckoutCandidatePeerCount = countMatchingPeers(
-        peers, jobSummaries,
+        peers,
+        jobSummaries,
         (peer) => peer.isDeepCheckoutCandidate,
       );
       const shallowCheckoutPeerCount = countMatchingPeers(
-        peers, jobSummaries,
+        peers,
+        jobSummaries,
         (peer) => peer.isDeepCheckoutCandidate && !peer.usesDeepCheckout,
       );
       if (
@@ -258,7 +270,8 @@ export function collectSimilarWorkflowSignals(
           jobId: summary.job.id,
           peerCount: shallowCheckoutPeerCount,
           peerJobLabels: collectPeerLabels(
-            peers, jobSummaries,
+            peers,
+            jobSummaries,
             (peer) => peer.isDeepCheckoutCandidate && !peer.usesDeepCheckout,
             (peer) => `${peer.workflow.relativePath}:${peer.job.id}`,
           ),

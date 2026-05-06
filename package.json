@@ -25,7 +25,7 @@
     "docs:dev": "bun run docs:sync && astro dev --root site",
     "docs:build": "bun run docs:sync && astro build --root site",
     "docs:preview": "astro preview --root site",
-    "test": "bun test --parallel && bun run test:fuzz:fast && bun run test:mutation:helper",
+    "test": "AGENT=1 bun test --parallel && bun run test:fuzz:fast && bun run test:mutation:helper",
     "test:changed": "bun test --changed",
     "test:isolate": "bun test --isolate",
     "test:fuzz:fast": "bun test --parallel test/fuzz-*.test.ts",
@@ -62,13 +62,16 @@
   "dependencies": {
     "dockerfile-ast": "^0.7.1",
     "oxlint": "^1.62.0",
-    "yaml": "^2.8.3"
+    "yaml": "^2.8.4"
   },
   "simple-git-hooks": {
     "pre-commit": "./node_modules/.bin/nano-staged"
   },
   "nano-staged": {
-    "*.ts": ["oxlint --type-aware --fix", "sh -c 'bun run audit:static'"],
+    "{src,test}/*.ts": [
+      "oxlint --type-aware --fix",
+      "sh -c 'bun run audit:static'"
+    ],
     "{knip.json,.fallowrc.json}": "sh -c 'bun run audit:static'"
   },
   "devDependencies": {

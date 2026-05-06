@@ -76,7 +76,11 @@ function spawnOxlintProcess(
   const killTimer = setTimeout(() => {
     proc.kill("SIGTERM");
     setTimeout(() => {
-      try { proc.kill("SIGKILL"); } catch { /* ignore */ }
+      try {
+        proc.kill("SIGKILL");
+      } catch {
+        /* ignore */
+      }
     }, 2000).unref();
   }, effectiveTimeout).unref();
 
@@ -85,7 +89,9 @@ function spawnOxlintProcess(
     let size = 0;
     proc.stdout.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size <= MAX_STDOUT_BUFFER_SIZE) { chunks.push(chunk); }
+      if (size <= MAX_STDOUT_BUFFER_SIZE) {
+        chunks.push(chunk);
+      }
     });
     proc.on("close", () => resolve(Buffer.concat(chunks).toString()));
   });
@@ -94,7 +100,9 @@ function spawnOxlintProcess(
     let size = 0;
     proc.stderr.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size <= MAX_STDERR_BUFFER_SIZE) { chunks.push(chunk); }
+      if (size <= MAX_STDERR_BUFFER_SIZE) {
+        chunks.push(chunk);
+      }
     });
     proc.on("close", () => resolve(Buffer.concat(chunks).toString()));
   });
@@ -183,7 +191,8 @@ function embeddedOxlintConfigContents(kind: EmbeddedOxlintScanKind): string {
               { name: "effect", message: "Prefer direct Effect imports for CI tooling cost." },
               {
                 name: "@angular/material",
-                message: "Prefer Angular Material secondary entry-point imports for CI tooling cost.",
+                message:
+                  "Prefer Angular Material secondary entry-point imports for CI tooling cost.",
               },
               ...fontAwesomeIconPackRoots.map((dependencyName) => ({
                 name: dependencyName,
@@ -253,10 +262,13 @@ export async function bundledOxlintBinPath(
   accessSync?: (p: string) => void,
   resolvePackage?: (spec: string) => string | URL | Promise<string | URL>,
 ): Promise<string | undefined> {
-  if (cachedOxlintBinPath !== undefined && !accessSync && !resolvePackage) { return cachedOxlintBinPath; }
+  if (cachedOxlintBinPath !== undefined && !accessSync && !resolvePackage) {
+    return cachedOxlintBinPath;
+  }
 
   const binaryName = process.platform === "win32" ? "oxlint.exe" : "oxlint";
-  const startDir = (import.meta as { dir?: string }).dir ?? path.dirname(fileURLToPath(import.meta.url));
+  const startDir =
+    (import.meta as { dir?: string }).dir ?? path.dirname(fileURLToPath(import.meta.url));
   const fsAccess = accessSync ?? require("node:fs").accessSync;
   const pkgResolve = resolvePackage ?? ((spec: string) => import.meta.resolve(spec));
 
@@ -297,7 +309,9 @@ function bundledOxlintJsPath(binPath: string): string {
 
 function parseOxlintLine(line: string): OxlintDiagnostic | undefined {
   const match = OXLINE_RE.exec(line);
-  if (!match) { return undefined; }
+  if (!match) {
+    return undefined;
+  }
   return {
     filename: match[1]!,
     line: Number(match[2]!),
@@ -387,14 +401,18 @@ export async function runEmbeddedOxlint(
       ...ignorePatternFlags,
       ".",
     ];
-    const cmd = typeof Bun !== "undefined"
-      ? ["bun", bundledOxlintJsPath(oxlintPath), ...oxlintArgs]
-      : [oxlintPath, ...oxlintArgs];
+    const cmd =
+      typeof Bun !== "undefined"
+        ? ["bun", bundledOxlintJsPath(oxlintPath), ...oxlintArgs]
+        : [oxlintPath, ...oxlintArgs];
     const { stdout, stderr, exited } = spawnOxlintProcess(cmd, repoRoot);
     const [stdoutText, stderrText, exitCode] = await Promise.all([stdout, stderr, exited]);
 
     if (exitCode === -1 || (exitCode !== 0 && exitCode > 128)) {
-      const skipped = kind === "import" ? "import restriction and extension checks" : "barrel file and snapshot checks";
+      const skipped =
+        kind === "import"
+          ? "import restriction and extension checks"
+          : "barrel file and snapshot checks";
       process.stderr.write(
         `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
       );
@@ -410,7 +428,9 @@ export async function runEmbeddedOxlint(
 
     const diagnostics: OxlintDiagnostic[] = [];
     for (const line of stdoutText.split("\n")) {
-      if (!line) { continue; }
+      if (!line) {
+        continue;
+      }
       const parsed = parseOxlintLine(line);
       if (parsed) {
         diagnostics.push(parsed);

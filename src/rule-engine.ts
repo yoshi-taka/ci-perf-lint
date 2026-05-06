@@ -44,7 +44,10 @@ interface CircleCiRuleModule {
 
 interface BothRuleModule {
   meta: RuleMeta;
-  check: (workflow: WorkflowDocument | PipelineDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
+  check: (
+    workflow: WorkflowDocument | PipelineDocument,
+    context: RuleContext,
+  ) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 export type AnyRuleModule =
@@ -103,7 +106,11 @@ export async function evaluateRules(
 
   for (const rule of applicableRules) {
     const { maxFindings } = rule.meta;
-    if (maxFindings !== undefined && findingCounts && (findingCounts.get(rule.meta.id) ?? 0) >= maxFindings) {
+    if (
+      maxFindings !== undefined &&
+      findingCounts &&
+      (findingCounts.get(rule.meta.id) ?? 0) >= maxFindings
+    ) {
       continue;
     }
 
@@ -113,7 +120,9 @@ export async function evaluateRules(
       const ruleScope = rule.meta.scope ?? "github-actions";
       if (ruleScope === "both") {
         const bothRule = rule as BothRuleModule;
-        ruleResults.push(...(await bothRule.check(workflow as WorkflowDocument | PipelineDocument, context)));
+        ruleResults.push(
+          ...(await bothRule.check(workflow as WorkflowDocument | PipelineDocument, context)),
+        );
       } else if (isBuildkite) {
         const buildkiteRule = rule as BuildkiteRuleModule;
         ruleResults.push(...(await buildkiteRule.check(workflow, context)));

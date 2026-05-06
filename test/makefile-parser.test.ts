@@ -319,7 +319,10 @@ describe("makefile-parser", () => {
       const filePath = path.join(workflowDir, "test.yml");
       await writeFile(filePath, yaml);
       const workflow = parseWorkflow(filePath, tmpDir, yaml);
-      const context: RuleContext = { repository: createSignals(), scanContext: new RepositoryScanContext(tmpDir, []) };
+      const context: RuleContext = {
+        repository: createSignals(),
+        scanContext: new RepositoryScanContext(tmpDir, []),
+      };
       const result = await evaluateRules(workflow, context);
 
       const makeFindings = result.filter((d) => d.ruleId === "missing-make-j-flag");
@@ -351,7 +354,10 @@ describe("makefile-parser", () => {
       const filePath = path.join(workflowDir, "test.yml");
       await writeFile(filePath, yaml);
       const workflow = parseWorkflow(filePath, tmpDir, yaml);
-      const context: RuleContext = { repository: createSignals(), scanContext: new RepositoryScanContext(tmpDir, []) };
+      const context: RuleContext = {
+        repository: createSignals(),
+        scanContext: new RepositoryScanContext(tmpDir, []),
+      };
       const result = await evaluateRules(workflow, context);
 
       const makeFindings = result.filter((d) => d.ruleId === "missing-make-j-flag");
@@ -378,7 +384,10 @@ describe("makefile-parser", () => {
       const filePath = path.join(workflowDir, "test.yml");
       await writeFile(filePath, yaml);
       const workflow = parseWorkflow(filePath, tmpDir, yaml);
-      const context: RuleContext = { repository: createSignals(), scanContext: new RepositoryScanContext(tmpDir, []) };
+      const context: RuleContext = {
+        repository: createSignals(),
+        scanContext: new RepositoryScanContext(tmpDir, []),
+      };
       const result = await evaluateRules(workflow, context);
 
       const makeFindings = result.filter((d) => d.ruleId === "missing-make-j-flag");

@@ -51,8 +51,7 @@ const standardIconDefs: IconEntryData[] = [
     depNames: ["lucide-angular"],
     meta: lucideAngularIconsMeta,
     exactSources: ["lucide-angular"],
-    defaultContextText:
-      "Lucide Angular icons registry import detected by embedded Oxlint scan.",
+    defaultContextText: "Lucide Angular icons registry import detected by embedded Oxlint scan.",
     flaggedDescription: "a Lucide Angular icons registry import",
     why: "The `icons` export from `lucide-angular` represents the icon registry pattern and can pull a large icon set into CI-time parsing and transforms. Static Angular icon usage should register or import only the icons the app needs.",
     suggestion:
@@ -82,8 +81,7 @@ const standardIconDefs: IconEntryData[] = [
     depNames: ["@tabler/icons-react"],
     meta: tablerIconsDirectImportMeta,
     exactSources: ["@tabler/icons-react"],
-    defaultContextText:
-      "Top-level @tabler/icons-react import detected by embedded Oxlint scan.",
+    defaultContextText: "Top-level @tabler/icons-react import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level @tabler/icons-react import",
     why: "Next.js optimizes `@tabler/icons-react` by default because icon packages expose many components from their package root. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the icon package root.",
     suggestion:
@@ -117,8 +115,7 @@ const standardIconDefs: IconEntryData[] = [
     depNames: fontAwesomeIconPackRoots,
     meta: fontAwesomeDirectImportMeta,
     exactSources: fontAwesomeIconPackRoots,
-    defaultContextText:
-      "Top-level Font Awesome icon pack import detected by embedded Oxlint scan.",
+    defaultContextText: "Top-level Font Awesome icon pack import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level Font Awesome icon pack import",
     why: "Next.js optimizes Font Awesome icon packs by default because the package root can expose a large icon catalog. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from icon pack roots.",
     suggestion:

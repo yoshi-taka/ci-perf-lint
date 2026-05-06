@@ -53,7 +53,9 @@ describe("golden regression", () => {
       }
 
       if (!existsSync(goldenPath)) {
-        process.stderr.write(`[golden] No golden file for "${name}". Run with UPDATE_GOLDEN=1 to create.\n`);
+        process.stderr.write(
+          `[golden] No golden file for "${name}". Run with UPDATE_GOLDEN=1 to create.\n`,
+        );
         expect(existsSync(goldenPath)).toBe(true);
         return;
       }

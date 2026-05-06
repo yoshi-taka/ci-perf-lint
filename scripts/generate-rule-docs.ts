@@ -9,13 +9,13 @@ const readme = readFileSync(readmePath, "utf-8");
 
 function extractRuleIdsFromDiagnosticFile(filePath: string): string[] {
   const content = readFileSync(filePath, "utf-8");
-  if (!content.includes('docsPath: "docs/rules/')) return [];
+  if (!content.includes('docsPath: "docs/rules/')) {return [];}
   const ids: string[] = [];
   const pattern = /id:\s*"([^"]+)"/g;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(content)) !== null) {
     const id = match[1];
-    if (id) ids.push(id);
+    if (id) {ids.push(id);}
   }
   return ids;
 }

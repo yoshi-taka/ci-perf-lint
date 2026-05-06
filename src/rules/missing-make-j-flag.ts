@@ -39,7 +39,9 @@ async function stepTargetIsInternalParallel(
   step: WorkflowStep,
   scanContext?: RepositoryScanContext,
 ): Promise<boolean> {
-  if (!scanContext) { return false; }
+  if (!scanContext) {
+    return false;
+  }
 
   const run = step.run?.trim();
   if (!run) {
@@ -72,7 +74,9 @@ async function stepTargetIsInternalParallel(
   for (const inc of parsed.includes) {
     const incPath = path.resolve(dir, inc.trim());
     const incContent = await scanContext.readTextFileOrWarn(incPath);
-    if (incContent === undefined) { continue; }
+    if (incContent === undefined) {
+      continue;
+    }
 
     const incParsed = parseMakefile(incContent);
     for (const [k, v] of incParsed.targets) {

@@ -576,5 +576,4 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(report.findings.some((c) => c.ruleId === "prefer-pydantic-v2")).toBe(false);
     });
   });
-
 });

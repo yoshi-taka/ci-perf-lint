@@ -28,14 +28,15 @@ const clusterCRules = new Set([
 
 function familiesMatch(action: string, family: string): boolean {
   return (
-    (action === "setup-node" && family === "npm") ||
-    (action === "setup-python" && family === "pip")
+    (action === "setup-node" && family === "npm") || (action === "setup-python" && family === "pip")
   );
 }
 
 function expectedClusterCRules(p: Params): Set<string> {
   const expected = new Set<string>();
-  if (p.setupAction === "none") { return expected; }
+  if (p.setupAction === "none") {
+    return expected;
+  }
 
   const compatible = familiesMatch(p.setupAction, p.installFamily);
 
@@ -80,7 +81,9 @@ function generateWorkflowYAML(p: Params): string {
     const version = p.setupAction === "setup-node" ? "20" : "3.12";
     out.push(`      - uses: actions/${p.setupAction}@v4`);
     out.push("        with:");
-    out.push(`          ${p.setupAction === "setup-node" ? "node-version" : "python-version"}: ${version}`);
+    out.push(
+      `          ${p.setupAction === "setup-node" ? "node-version" : "python-version"}: ${version}`,
+    );
     if (p.setupActionCaches) {
       const cf = p.setupAction === "setup-node" ? "npm" : "pip";
       out.push(`          cache: ${cf}`);
@@ -88,9 +91,9 @@ function generateWorkflowYAML(p: Params): string {
   }
 
   if (p.installFamily === "npm") {
-    out.push('      - run: npm ci');
+    out.push("      - run: npm ci");
   } else if (p.installFamily === "pip") {
-    out.push('      - run: pip install -r requirements.txt');
+    out.push("      - run: pip install -r requirements.txt");
   }
 
   if (p.hasManualCache) {
@@ -103,7 +106,7 @@ function generateWorkflowYAML(p: Params): string {
   }
 
   if (p.setupAction === "none" && p.installFamily === "none" && !p.hasManualCache) {
-    out.push('      - run: echo ok');
+    out.push("      - run: echo ok");
   }
 
   return `${out.join("\n")}\n`;

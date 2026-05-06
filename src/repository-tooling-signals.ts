@@ -3,7 +3,10 @@ export {
   collectEslintSignals,
   collectPrettierSignals,
 } from "./repository-tooling-signals-eslint.ts";
-export { collectTailwindSignals, collectTypeScriptSignals } from "./repository-tooling-signals-tailwind-ts.ts";
+export {
+  collectTailwindSignals,
+  collectTypeScriptSignals,
+} from "./repository-tooling-signals-tailwind-ts.ts";
 export {
   collectPythonSignals,
   collectHatchSignals,

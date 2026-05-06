@@ -112,6 +112,9 @@ const configs = [
   },
 ];
 
-export const collectPreferNextjs12MinorPerformanceMilestoneDiagnostics = createNextjsMilestoneCollector(configs[0]!);
-export const collectPreferNextjs13MinorPerformanceMilestoneDiagnostics = createNextjsMilestoneCollector(configs[1]!);
-export const collectPreferNextjs14MinorPerformanceMilestoneDiagnostics = createNextjsMilestoneCollector(configs[2]!);
+export const collectPreferNextjs12MinorPerformanceMilestoneDiagnostics =
+  createNextjsMilestoneCollector(configs[0]!);
+export const collectPreferNextjs13MinorPerformanceMilestoneDiagnostics =
+  createNextjsMilestoneCollector(configs[1]!);
+export const collectPreferNextjs14MinorPerformanceMilestoneDiagnostics =
+  createNextjsMilestoneCollector(configs[2]!);

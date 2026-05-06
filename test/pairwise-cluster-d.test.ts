@@ -36,7 +36,9 @@ const clusterDRules = new Set([
 
 function expectedClusterDRules(p: Params): Set<string> {
   const expected = new Set<string>();
-  if (p.usesReusableWorkflow) { return expected; }
+  if (p.usesReusableWorkflow) {
+    return expected;
+  }
 
   const isMacOS = p.runsOn === "macos-14";
   const isWindows = p.runsOn === "windows-2022";
@@ -98,22 +100,34 @@ function generateWorkflowYAML(p: Params): string {
 
   if (p.hasCDrivePath) {
     out.push("    env:");
-    out.push('      ROOT: C:\\tools');
+    out.push("      ROOT: C:\\tools");
   }
 
   out.push("    steps:");
-  if (p.hasBrewUpdate) { out.push('      - run: brew update'); }
-  if (p.hasXcodeInstall) { out.push('      - run: xcodes install 15.4'); }
-  if (p.hasCDrivePath) { out.push('      - run: echo "C:\\path"'); }
+  if (p.hasBrewUpdate) {
+    out.push("      - run: brew update");
+  }
+  if (p.hasXcodeInstall) {
+    out.push("      - run: xcodes install 15.4");
+  }
+  if (p.hasCDrivePath) {
+    out.push('      - run: echo "C:\\path"');
+  }
   if (p.hasTestTool) {
-    const run = p.hasTestTuning
-      ? "npx jest --maxWorkers=2"
-      : "npx jest --coverage";
+    const run = p.hasTestTuning ? "npx jest --maxWorkers=2" : "npx jest --coverage";
     out.push(`      - run: ${run}`);
   }
-  if (p.extraHeavyStep) { out.push('      - run: npm run build'); }
-  if (!p.hasBrewUpdate && !p.hasXcodeInstall && !p.hasCDrivePath && !p.hasTestTool && !p.extraHeavyStep) {
-    out.push('      - run: echo ok');
+  if (p.extraHeavyStep) {
+    out.push("      - run: npm run build");
+  }
+  if (
+    !p.hasBrewUpdate &&
+    !p.hasXcodeInstall &&
+    !p.hasCDrivePath &&
+    !p.hasTestTool &&
+    !p.extraHeavyStep
+  ) {
+    out.push("      - run: echo ok");
   }
 
   return `${out.join("\n")}\n`;

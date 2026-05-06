@@ -3,7 +3,13 @@ import type { PipelineDocument } from "../../buildkite-workflow.ts";
 import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "../../circleci-workflow.ts";
 import { getJobAnalysis, getWorkflowAnalysis } from "./workflow-analysis.ts";
-import { detectInstallCommand, detectLintTool, detectBuildTool, detectPythonTool, detectRedundantBootstrapTool } from "./tools.ts";
+import {
+  detectInstallCommand,
+  detectLintTool,
+  detectBuildTool,
+  detectPythonTool,
+  detectRedundantBootstrapTool,
+} from "./tools.ts";
 import { isManualCacheStep, hasDependencyCacheConfig } from "./workflow-caches.ts";
 import { getSetupActionKind } from "./workflow-setup-actions.ts";
 import { getWorkflowStepText, getLoweredWorkflowStepText } from "./workflow-step-text.ts";

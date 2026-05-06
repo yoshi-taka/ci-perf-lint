@@ -6,7 +6,10 @@ const baseOptions = { targetPath: ".", topCount: 20, mode: "strict" as const };
 
 describe("analyzeRepository workflow and execution rules: dockerfile package and cache-mount rules", () => {
   test("warns when Rust Dockerfile installs cargo tools without locked resolution and builds release without cache mounts", async () => {
-    const report = await analyzeRepository({ cwd: fixtures.dockerRustUncachedLike, ...baseOptions });
+    const report = await analyzeRepository({
+      cwd: fixtures.dockerRustUncachedLike,
+      ...baseOptions,
+    });
 
     const installFinding = report.findings.find(
       (candidate) => candidate.ruleId === "dockerfile-cargo-install-without-locked",
@@ -63,7 +66,10 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
   });
 
   test("warns when Maven Dockerfile resolves dependencies and builds without cache mounts", async () => {
-    const report = await analyzeRepository({ cwd: fixtures.dockerMavenUncachedLike, ...baseOptions });
+    const report = await analyzeRepository({
+      cwd: fixtures.dockerMavenUncachedLike,
+      ...baseOptions,
+    });
 
     const offlineFinding = report.findings.find(
       (candidate) => candidate.ruleId === "dockerfile-maven-go-offline-without-cache-mount",
@@ -88,7 +94,10 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
   });
 
   test("warns when Gradle Dockerfile resolves dependencies and builds without cache mounts", async () => {
-    const report = await analyzeRepository({ cwd: fixtures.dockerGradleUncachedLike, ...baseOptions });
+    const report = await analyzeRepository({
+      cwd: fixtures.dockerGradleUncachedLike,
+      ...baseOptions,
+    });
 
     const dependenciesFinding = report.findings.find(
       (candidate) => candidate.ruleId === "dockerfile-gradle-dependencies-without-cache-mount",
@@ -114,23 +123,61 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
 
   describe("negative cases: no warning when cache mounts are used", () => {
     const negativeCases = [
-      { name: "Rust", fixture: fixtures.dockerRustCacheOk, ruleIds: ["dockerfile-cargo-install-without-locked", "dockerfile-cargo-build-release-without-cache-mount"] as const },
-      { name: "Go", fixture: fixtures.dockerGoCacheOk, ruleIds: ["dockerfile-go-mod-download-without-cache-mount", "dockerfile-go-build-without-cache-mount"] as const },
-      { name: "Maven", fixture: fixtures.dockerMavenCacheOk, ruleIds: ["dockerfile-maven-go-offline-without-cache-mount", "dockerfile-maven-build-without-cache-mount"] as const },
-      { name: "Gradle", fixture: fixtures.dockerGradleCacheOk, ruleIds: ["dockerfile-gradle-dependencies-without-cache-mount", "dockerfile-gradle-build-without-cache-mount"] as const },
-      { name: "Ruby", fixture: fixtures.dockerRubyCacheOk, ruleIds: ["dockerfile-bundle-install-without-cache-mount"] as const },
+      {
+        name: "Rust",
+        fixture: fixtures.dockerRustCacheOk,
+        ruleIds: [
+          "dockerfile-cargo-install-without-locked",
+          "dockerfile-cargo-build-release-without-cache-mount",
+        ] as const,
+      },
+      {
+        name: "Go",
+        fixture: fixtures.dockerGoCacheOk,
+        ruleIds: [
+          "dockerfile-go-mod-download-without-cache-mount",
+          "dockerfile-go-build-without-cache-mount",
+        ] as const,
+      },
+      {
+        name: "Maven",
+        fixture: fixtures.dockerMavenCacheOk,
+        ruleIds: [
+          "dockerfile-maven-go-offline-without-cache-mount",
+          "dockerfile-maven-build-without-cache-mount",
+        ] as const,
+      },
+      {
+        name: "Gradle",
+        fixture: fixtures.dockerGradleCacheOk,
+        ruleIds: [
+          "dockerfile-gradle-dependencies-without-cache-mount",
+          "dockerfile-gradle-build-without-cache-mount",
+        ] as const,
+      },
+      {
+        name: "Ruby",
+        fixture: fixtures.dockerRubyCacheOk,
+        ruleIds: ["dockerfile-bundle-install-without-cache-mount"] as const,
+      },
     ];
 
-    test.each(negativeCases)("does not flag $name Dockerfile when cache mounts are used", async ({ fixture, ruleIds }) => {
-      const report = await analyzeRepository({ cwd: fixture, ...baseOptions });
-      for (const ruleId of ruleIds) {
-        expect(report.findings.some((c) => c.ruleId === ruleId)).toBe(false);
-      }
-    });
+    test.each(negativeCases)(
+      "does not flag $name Dockerfile when cache mounts are used",
+      async ({ fixture, ruleIds }) => {
+        const report = await analyzeRepository({ cwd: fixture, ...baseOptions });
+        for (const ruleId of ruleIds) {
+          expect(report.findings.some((c) => c.ruleId === ruleId)).toBe(false);
+        }
+      },
+    );
   });
 
   test("warns when Ruby Dockerfile runs bundle install without cache mounts", async () => {
-    const report = await analyzeRepository({ cwd: fixtures.dockerRubyUncachedLike, ...baseOptions });
+    const report = await analyzeRepository({
+      cwd: fixtures.dockerRubyUncachedLike,
+      ...baseOptions,
+    });
 
     const finding = report.findings.find(
       (candidate) => candidate.ruleId === "dockerfile-bundle-install-without-cache-mount",
@@ -147,7 +194,10 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
 
   describe("docker/build-push-action layer cache", () => {
     test("warns when docker/build-push-action is used without cache-from and cache-to", async () => {
-      const report = await analyzeRepository({ cwd: fixtures.dockerBuildWithoutLayerCacheLike, ...baseOptions });
+      const report = await analyzeRepository({
+        cwd: fixtures.dockerBuildWithoutLayerCacheLike,
+        ...baseOptions,
+      });
 
       const finding = report.findings.find(
         (candidate) => candidate.ruleId === "docker-build-without-layer-cache",
@@ -163,16 +213,25 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
     type NoWarningCase = { name: string; fixture: string };
 
     const noWarningCases: NoWarningCase[] = [
-      { name: "does not warn when cache-from and cache-to are set", fixture: fixtures.dockerBuildWithoutLayerCacheOk },
-      { name: "does not warn for depot/build-push-action with cache config", fixture: fixtures.dockerBuildWithoutLayerCacheDepotOk },
-      { name: "does not warn when no-cache: true is set", fixture: fixtures.dockerBuildWithoutLayerCacheNocacheOk },
+      {
+        name: "does not warn when cache-from and cache-to are set",
+        fixture: fixtures.dockerBuildWithoutLayerCacheOk,
+      },
+      {
+        name: "does not warn for depot/build-push-action with cache config",
+        fixture: fixtures.dockerBuildWithoutLayerCacheDepotOk,
+      },
+      {
+        name: "does not warn when no-cache: true is set",
+        fixture: fixtures.dockerBuildWithoutLayerCacheNocacheOk,
+      },
     ];
 
     test.each(noWarningCases)("$name", async ({ fixture }) => {
       const report = await analyzeRepository({ cwd: fixture, ...baseOptions });
-      expect(
-        report.findings.some((c) => c.ruleId === "docker-build-without-layer-cache"),
-      ).toBe(false);
+      expect(report.findings.some((c) => c.ruleId === "docker-build-without-layer-cache")).toBe(
+        false,
+      );
     });
   });
 });

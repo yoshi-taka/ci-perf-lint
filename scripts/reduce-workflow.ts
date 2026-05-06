@@ -1,21 +1,30 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { parseDocument, isMap, isScalar, isSeq, type Document, type Pair, type YAMLMap } from "yaml";
+import {
+  parseDocument,
+  isMap,
+  isScalar,
+  isSeq,
+  type Document,
+  type Pair,
+  type YAMLMap,
+} from "yaml";
 import { getScalarString, parseWorkflow } from "../src/workflow.ts";
 import { evaluateRules } from "../src/rule-engine.ts";
 import { collectRepositorySignals } from "../src/repository-signals.ts";
 import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 import type { AnalysisWarning } from "../src/types.ts";
 
-async function ddmin<T>(
-  items: T[],
-  test: (subset: T[]) => Promise<boolean>,
-): Promise<T[]> {
-  if (items.length <= 1) { return items; }
+async function ddmin<T>(items: T[], test: (subset: T[]) => Promise<boolean>): Promise<T[]> {
+  if (items.length <= 1) {
+    return items;
+  }
 
   async function sub(current: T[], n: number): Promise<T[]> {
-    if (current.length === 1) { return current; }
+    if (current.length === 1) {
+      return current;
+    }
 
     const size = Math.max(1, Math.floor(current.length / n));
     const subsets: T[][] = [];
@@ -55,10 +64,14 @@ function buildYamlSource(
   keepStepIndicesPerJob: Map<number, Set<number> | undefined>,
 ): string {
   const doc: Document.Parsed = parseDocument(source);
-  if (!doc.contents || !isMap(doc.contents)) { return source; }
+  if (!doc.contents || !isMap(doc.contents)) {
+    return source;
+  }
 
   const jobsPair = findMapPair(doc.contents, "jobs");
-  if (!jobsPair || !isMap(jobsPair.value)) { return source; }
+  if (!jobsPair || !isMap(jobsPair.value)) {
+    return source;
+  }
 
   const jobsMap = jobsPair.value;
   const originalPairs = [...jobsMap.items];
@@ -69,14 +82,20 @@ function buildYamlSource(
 
   for (const jobIdx of keptJobIndexes) {
     const jobPair = originalPairs[jobIdx];
-    if (!jobPair || !isMap(jobPair.value)) { continue; }
+    if (!jobPair || !isMap(jobPair.value)) {
+      continue;
+    }
 
     const stepsPair = findMapPair(jobPair.value, "steps");
-    if (!stepsPair || !isSeq(stepsPair.value)) { continue; }
+    if (!stepsPair || !isSeq(stepsPair.value)) {
+      continue;
+    }
 
     const stepSeq = stepsPair.value;
     const keepSteps = keepStepIndicesPerJob.get(jobIdx);
-    if (keepSteps === undefined) { continue; }
+    if (keepSteps === undefined) {
+      continue;
+    }
 
     const originalStepItems = [...stepSeq.items];
     stepSeq.items = originalStepItems.filter((_, i) => keepSteps.has(i));
@@ -98,8 +117,8 @@ async function main(): Promise<void> {
     process.exit(args[0] === "--help" ? 0 : 1);
   }
 
-  const yamlPath = args[0] as string;
-  const ruleId = args[1] as string;
+  const yamlPath = args[0];
+  const ruleId = args[1];
   const repoRoot = process.cwd();
   const resolvedPath = path.resolve(yamlPath);
 
@@ -121,7 +140,9 @@ async function main(): Promise<void> {
   const initialStepMap = new Map<number, Set<number> | undefined>();
   for (let i = 0; i < origJobCount; i++) {
     const job = originalDoc.jobs[i];
-    if (!job) { continue; }
+    if (!job) {
+      continue;
+    }
     const steps = job.steps;
     if (steps.length > 0) {
       initialStepMap.set(i, new Set(steps.map((_, si) => si)));
@@ -158,9 +179,13 @@ async function main(): Promise<void> {
   const stepMap = new Map(initialStepMap);
   for (const jobIdx of minimalJobs) {
     const job = originalDoc.jobs[jobIdx];
-    if (!job) { continue; }
+    if (!job) {
+      continue;
+    }
     const stepIndices = job.steps.map((_, i) => i);
-    if (stepIndices.length <= 1) { continue; }
+    if (stepIndices.length <= 1) {
+      continue;
+    }
 
     const minimalSteps = await ddmin(stepIndices, async (subset) => {
       const sMap = new Map(stepMap);
@@ -173,8 +198,9 @@ async function main(): Promise<void> {
 
   const finalSource = buildYamlSource(originalSource, new Set(minimalJobs), stepMap);
   const finalDoc = parseWorkflow(resolvedPath, repoRoot, finalSource);
-  const finalDiagnostics = (await evaluateRules(finalDoc, { repository: signals }, warnings))
-    .filter((d) => d.ruleId === ruleId);
+  const finalDiagnostics = (
+    await evaluateRules(finalDoc, { repository: signals }, warnings)
+  ).filter((d) => d.ruleId === ruleId);
 
   const finalJobCount = finalDoc.jobs.length;
   const finalStepCount = finalDoc.jobs.reduce((s, j) => s + j.steps.length, 0);
@@ -185,8 +211,12 @@ async function main(): Promise<void> {
   const stepDiff = origStepCount - finalStepCount;
   if (jobDiff > 0 || stepDiff > 0) {
     const parts: string[] = [];
-    if (jobDiff > 0) { parts.push(`-${jobDiff} jobs`); }
-    if (stepDiff > 0) { parts.push(`-${stepDiff} steps`); }
+    if (jobDiff > 0) {
+      parts.push(`-${jobDiff} jobs`);
+    }
+    if (stepDiff > 0) {
+      parts.push(`-${stepDiff} steps`);
+    }
     console.error(`Stats:    ${parts.join(", ")}`);
   } else {
     console.error("Stats:    no reduction possible");

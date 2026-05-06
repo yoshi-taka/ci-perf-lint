@@ -40,7 +40,7 @@ describe("cross-platform invariance", () => {
       }
 
       // semantic fields should be identical across platforms (aside from workflow/location/score)
-      const semanticFields: (keyof typeof findings[0])[] = [
+      const semanticFields: (keyof (typeof findings)[0])[] = [
         "ruleId",
         "severity",
         "confidence",

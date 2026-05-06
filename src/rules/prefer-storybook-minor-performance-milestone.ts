@@ -108,5 +108,9 @@ const configs: StorybookMilestoneConfig[] = [
   },
 ];
 
-export const preferStorybook6MinorPerformanceMilestoneRule = createStorybookMilestoneRule(configs[0]!);
-export const preferStorybook7MinorPerformanceMilestoneRule = createStorybookMilestoneRule(configs[1]!);
+export const preferStorybook6MinorPerformanceMilestoneRule = createStorybookMilestoneRule(
+  configs[0]!,
+);
+export const preferStorybook7MinorPerformanceMilestoneRule = createStorybookMilestoneRule(
+  configs[1]!,
+);

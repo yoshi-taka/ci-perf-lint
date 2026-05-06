@@ -17,8 +17,12 @@ describe("bundledOxlintBinPath", () => {
   });
 
   test("falls back to directory walk when resolve fails", async () => {
-    const fakeResolve = () => { throw new Error("not found"); };
-    const fakeAccess = () => { throw new Error("not found"); };
+    const fakeResolve = () => {
+      throw new Error("not found");
+    };
+    const fakeAccess = () => {
+      throw new Error("not found");
+    };
     const p = await bundledOxlintBinPath(fakeAccess, fakeResolve);
     expect(p).toBeUndefined();
   });
@@ -42,10 +46,7 @@ describe("Bun.spawn with timeout", () => {
       stdout: "pipe",
       stderr: "pipe",
     });
-    const [errText, code] = await Promise.all([
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
+    const [errText, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
     expect(errText.trim()).toBe("errmsg");
     expect(code).toBe(0);
   });
@@ -69,7 +70,9 @@ describe("Node spawn with timeout (via child_process)", () => {
     const proc = spawn("echo", ["hello"]);
     const [outText, code] = await new Promise<[string, number]>((resolve) => {
       let out = "";
-      proc.stdout.on("data", (chunk: Buffer) => { out += chunk.toString(); });
+      proc.stdout.on("data", (chunk: Buffer) => {
+        out += chunk.toString();
+      });
       proc.on("close", (c) => resolve([out, c ?? 1]));
     });
     expect(outText.trim()).toBe("hello");
@@ -81,7 +84,9 @@ describe("Node spawn with timeout (via child_process)", () => {
     const proc = spawn("bash", ["-c", "echo errmsg >&2"]);
     const [errText, code] = await new Promise<[string, number]>((resolve) => {
       let err = "";
-      proc.stderr.on("data", (chunk: Buffer) => { err += chunk.toString(); });
+      proc.stderr.on("data", (chunk: Buffer) => {
+        err += chunk.toString();
+      });
       proc.on("close", (c) => resolve([err, c ?? 1]));
     });
     expect(errText.trim()).toBe("errmsg");
@@ -95,7 +100,11 @@ describe("Node spawn with timeout (via child_process)", () => {
       const timer = setTimeout(() => {
         proc.kill("SIGTERM");
         setTimeout(() => {
-          try { proc.kill("SIGKILL"); } catch { /* ignore */ }
+          try {
+            proc.kill("SIGKILL");
+          } catch {
+            /* ignore */
+          }
         }, 2000).unref();
       }, SHORT_TIMEOUT).unref();
       proc.on("close", (c) => {

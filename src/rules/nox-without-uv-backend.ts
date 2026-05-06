@@ -50,14 +50,14 @@ export const noxWithoutUvBackendRule = {
         const step = job.steps[stepIndex]!;
         findings.push(
           buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
-          message: `Job "${job.id}" runs nox without the --uv flag.`,
-          why: "nox can use uv for virtualenv creation and package installation by passing the --uv flag or setting nox.options.uv = True in noxfile.py. This speeds up session setup with no behavioral changes.",
-          suggestion:
-            'Add "--uv" to the nox command (e.g., "nox --uv -s <session>") or add "nox.options.uv = True" to noxfile.py.',
-          measurementHint: "Compare nox session setup time before and after adding --uv.",
-          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and add --uv to the nox command or set nox.options.uv = True in noxfile.py.`,
-          score: 42,
-        }),
+            message: `Job "${job.id}" runs nox without the --uv flag.`,
+            why: "nox can use uv for virtualenv creation and package installation by passing the --uv flag or setting nox.options.uv = True in noxfile.py. This speeds up session setup with no behavioral changes.",
+            suggestion:
+              'Add "--uv" to the nox command (e.g., "nox --uv -s <session>") or add "nox.options.uv = True" to noxfile.py.',
+            measurementHint: "Compare nox session setup time before and after adding --uv.",
+            aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and add --uv to the nox command or set nox.options.uv = True in noxfile.py.`,
+            score: 42,
+          }),
         );
       }
     }

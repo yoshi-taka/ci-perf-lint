@@ -115,9 +115,7 @@ async function getGitTrackedFiles(repoRoot: string): Promise<string[] | null> {
       const exitCode = await new Promise<number>((resolve) => {
         proc.on("close", resolve);
       });
-      return exitCode !== 0 || !stdout
-        ? null
-        : stdout.split("\0").filter(Boolean);
+      return exitCode !== 0 || !stdout ? null : stdout.split("\0").filter(Boolean);
     } catch {
       return null;
     }
@@ -166,7 +164,11 @@ export async function collectLargeFileDiagnostics(
         try {
           const stats = await stat(ctx.resolve(file));
           if (stats.isFile() && stats.size > 0) {
-            return { path: file, size: stats.size, isCsvData: isCsvDataFile(file) } satisfies ScannedFile;
+            return {
+              path: file,
+              size: stats.size,
+              isCsvData: isCsvDataFile(file),
+            } satisfies ScannedFile;
           }
         } catch {
           // skip files that can't be stat'd
@@ -175,7 +177,9 @@ export async function collectLargeFileDiagnostics(
       }),
     );
     for (const r of results) {
-      if (r) { scanned.push(r); }
+      if (r) {
+        scanned.push(r);
+      }
     }
   }
 

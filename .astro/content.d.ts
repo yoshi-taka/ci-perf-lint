@@ -11,12 +11,12 @@ declare module 'astro:content' {
 	export interface RenderedContent {
 		html: string;
 		metadata?: {
-			imagePaths: Array<string>;
+			imagePaths: string[];
 			[key: string]: unknown;
 		};
 	}
 
-	type Flatten<T> = T extends { [K: string]: infer U } ? U : never;
+	type Flatten<T> = T extends Record<string, infer U> ? U : never;
 
 	export type CollectionKey = keyof DataEntryMap;
 	export type CollectionEntry<C extends CollectionKey> = Flatten<DataEntryMap[C]>;

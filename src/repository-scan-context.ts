@@ -238,7 +238,9 @@ export class RepositoryScanContext {
     if (rgFiles !== null) {
       const prefix = relativeDir === "." ? "" : `${relativeDir}/`;
       for (const relativePath of rgFiles) {
-        if (!relativePath.startsWith(prefix)) { continue; }
+        if (!relativePath.startsWith(prefix)) {
+          continue;
+        }
 
         if (prefix === "") {
           const firstSegment = relativePath.split("/")[0];
@@ -406,7 +408,9 @@ export class RepositoryScanContext {
 
       const lines: string[] = [];
       let resolveExit: (code: number) => void;
-      const exitPromise = new Promise<number>((resolve) => { resolveExit = resolve; });
+      const exitPromise = new Promise<number>((resolve) => {
+        resolveExit = resolve;
+      });
       const proc = spawn(rgPath, ["--files", "--hidden", repoRoot], {
         stdio: ["ignore", "pipe", "pipe"],
       });

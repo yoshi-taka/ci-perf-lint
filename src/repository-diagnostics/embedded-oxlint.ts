@@ -17,10 +17,10 @@ interface IndexedRestrictedImportDiagnostic extends EmbeddedOxlintDiagnostic {
   source?: string;
 }
 
-const embeddedOxlintImportScanCache = new LruMap<
-  string,
-  Promise<OxlintDiagnostic[] | undefined>
->(64, 300_000);
+const embeddedOxlintImportScanCache = new LruMap<string, Promise<OxlintDiagnostic[] | undefined>>(
+  64,
+  300_000,
+);
 const embeddedOxlintNonImportScanCache = new LruMap<
   string,
   Promise<OxlintDiagnostic[] | undefined>

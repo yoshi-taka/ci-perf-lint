@@ -164,7 +164,9 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
 
   for (const [repoKey, repoEntry] of repositoryGrouped) {
     const wfEntry = workflowByRuleDocs.get(`${repoEntry.ruleId}\n${repoEntry.docsPath}`);
-    if (!wfEntry) { continue; }
+    if (!wfEntry) {
+      continue;
+    }
 
     mergeUniqueValues(wfEntry.workflows, repoEntry.workflows);
     mergeUniqueValues(wfEntry.locations, repoEntry.locations);

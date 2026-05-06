@@ -152,7 +152,9 @@ export async function collectCdkAssetWasteFilesDiagnostics(
         chunk.map(async ({ relativePath, lower, assetRelativePath }) => {
           try {
             const stats = await stat(context.resolve(relativePath));
-            if (!stats.isFile()) { return null; }
+            if (!stats.isFile()) {
+              return null;
+            }
 
             if (isWasteByName(assetRelativePath)) {
               return { path: relativePath, size: stats.size, reason: "waste-name" as const };

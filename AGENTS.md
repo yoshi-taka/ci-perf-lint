@@ -10,6 +10,7 @@ Use `bun` not `npm` for package management and script execution.
 
 **NEVER push without asking.** Ask before every push, commit, tag, or publish operation.
 Changes are reviewed locally first. Only push when explicitly told to.
+Before every commit, ensure `oxlint --type-aware --fix` passes; `nano-staged` runs that hook.
 
 ## Main Entry Points
 

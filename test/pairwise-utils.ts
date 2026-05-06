@@ -31,7 +31,9 @@ export function generatePairwise(specs: ParamSpec[]): Record<string, unknown>[] 
       for (let b = a + 1; b <= maxIdx; b++) {
         const sa = sorted[a];
         const sb = sorted[b];
-        if (!sa || !sb) { continue; }
+        if (!sa || !sb) {
+          continue;
+        }
         const key = pairKey(sa.origIdx, sb.origIdx);
         if (!coveredPairs.has(key)) {
           coveredPairs.set(key, new Set());
@@ -41,12 +43,7 @@ export function generatePairwise(specs: ParamSpec[]): Record<string, unknown>[] 
     }
   }
 
-  function isCovered(
-    origI: number,
-    origJ: number,
-    vi: unknown,
-    vj: unknown,
-  ): boolean {
+  function isCovered(origI: number, origJ: number, vi: unknown, vj: unknown): boolean {
     const key = pairKey(origI, origJ);
     return coveredPairs.get(key)?.has(valuePairKey(vi, vj)) ?? false;
   }

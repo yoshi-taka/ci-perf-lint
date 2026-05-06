@@ -335,32 +335,69 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
     };
 
     const buildCacheCases: BuildCacheCase[] = [
-      { name: "Next.js: warns when .next/cache is not persisted", fixture: fixtures.nextCacheLike, ruleId: "missing-next-build-cache", message: ".next/cache" },
-      { name: "Next.js: does not warn when .next/cache is persisted", fixture: fixtures.nextCacheOk, ruleId: "missing-next-build-cache", expectAbsent: true as const },
-      { name: "Turbo: warns when cache is not wired", fixture: fixtures.turboCacheLike, ruleId: "missing-turbo-cache", message: "Turbo tasks" },
-      { name: "Turbo: does not warn when cache is wired", fixture: fixtures.turboCacheOk, ruleId: "missing-turbo-cache", expectAbsent: true as const },
-      { name: "Gradle: warns when build cache is not configured", fixture: fixtures.gradleCacheLike, ruleId: "missing-gradle-build-cache", message: "Gradle tasks" },
-      { name: "Gradle: does not warn when build cache is configured", fixture: fixtures.gradleCacheOk, ruleId: "missing-gradle-build-cache", expectAbsent: true as const },
-      { name: "Angular CLI: warns when cache is not wired for CI", fixture: fixtures.angularCacheLike, ruleId: "missing-angular-cli-cache", message: "Angular CLI" },
-      { name: "Angular CLI: does not warn when cache is wired", fixture: fixtures.angularCacheOk, ruleId: "missing-angular-cli-cache", expectAbsent: true },
+      {
+        name: "Next.js: warns when .next/cache is not persisted",
+        fixture: fixtures.nextCacheLike,
+        ruleId: "missing-next-build-cache",
+        message: ".next/cache",
+      },
+      {
+        name: "Next.js: does not warn when .next/cache is persisted",
+        fixture: fixtures.nextCacheOk,
+        ruleId: "missing-next-build-cache",
+        expectAbsent: true as const,
+      },
+      {
+        name: "Turbo: warns when cache is not wired",
+        fixture: fixtures.turboCacheLike,
+        ruleId: "missing-turbo-cache",
+        message: "Turbo tasks",
+      },
+      {
+        name: "Turbo: does not warn when cache is wired",
+        fixture: fixtures.turboCacheOk,
+        ruleId: "missing-turbo-cache",
+        expectAbsent: true as const,
+      },
+      {
+        name: "Gradle: warns when build cache is not configured",
+        fixture: fixtures.gradleCacheLike,
+        ruleId: "missing-gradle-build-cache",
+        message: "Gradle tasks",
+      },
+      {
+        name: "Gradle: does not warn when build cache is configured",
+        fixture: fixtures.gradleCacheOk,
+        ruleId: "missing-gradle-build-cache",
+        expectAbsent: true as const,
+      },
+      {
+        name: "Angular CLI: warns when cache is not wired for CI",
+        fixture: fixtures.angularCacheLike,
+        ruleId: "missing-angular-cli-cache",
+        message: "Angular CLI",
+      },
+      {
+        name: "Angular CLI: does not warn when cache is wired",
+        fixture: fixtures.angularCacheOk,
+        ruleId: "missing-angular-cli-cache",
+        expectAbsent: true,
+      },
     ];
 
-    test.each(buildCacheCases.map((tc) => [tc.name, tc] as const))(
-      "%s",
-      async (_name, tc) => {
-        const report = await getFixtureReport(tc.fixture, defaultOptions);
+    test.each(buildCacheCases.map((tc) => [tc.name, tc] as const))("%s", async (_name, tc) => {
+      const report = await getFixtureReport(tc.fixture, defaultOptions);
 
-        if (tc.expectAbsent) {
-          expect(report.findings.some((f) => f.ruleId === tc.ruleId)).toBe(false);
-        } else {
-          const finding = report.findings.find((f) => f.ruleId === tc.ruleId);
-          expect(finding).toBeDefined();
-          expect(finding!.severity).toBe("warning");
-          expect(finding!.message).toContain(tc.message!);
-          expect(report.workflowCount).toBe(1);
-        }
-      },
-    );
+      if (tc.expectAbsent) {
+        expect(report.findings.some((f) => f.ruleId === tc.ruleId)).toBe(false);
+      } else {
+        const finding = report.findings.find((f) => f.ruleId === tc.ruleId);
+        expect(finding).toBeDefined();
+        expect(finding!.severity).toBe("warning");
+        expect(finding!.message).toContain(tc.message!);
+        expect(report.workflowCount).toBe(1);
+      }
+    });
   });
 
   describe("terraform rules", () => {
@@ -378,58 +415,165 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
     };
 
     const terraformCases: TerraformCase[] = [
-      { name: "flags terraform init jobs missing provider caching", fixture: fixtures.terraformCacheLike, ruleId: "cache-terraform-providers", mode: "exploratory", severity: "warning", message: "terraform init", count: 1 },
-      { name: "does not flag terraform init jobs with provider caching", fixture: fixtures.terraformCacheOk, ruleId: "cache-terraform-providers", mode: "exploratory" as const, expectAbsent: true as const },
-      { name: "flags missing terraform lock file", fixture: fixtures.terraformLockfileMissing, ruleId: "terraform-lockfile-missing", mode: "strict" as const, severity: "warning" as const, message: ".terraform.lock.hcl", count: 1 },
-      { name: "does not flag missing lock file when lock file exists", fixture: fixtures.terraformLockfileOk, ruleId: "terraform-lockfile-missing", mode: "strict" as const, expectAbsent: true as const },
-      { name: "flags repo-wide when no --parallelism in any terraform workflow", fixture: fixtures.terraformParallelismMissing, ruleId: "terraform-parallelism-unconfigured", mode: "exploratory" as const, severity: "suggestion" as const, message: "--parallelism", count: 1 },
-      { name: "does not flag when --parallelism is in command text", fixture: fixtures.terraformParallelismOk, ruleId: "terraform-parallelism-unconfigured", mode: "exploratory" as const, expectAbsent: true as const },
-      { name: "does not flag when TF_CLI_ARGS env var sets parallelism", fixture: fixtures.terraformParallelismOkEnv, ruleId: "terraform-parallelism-unconfigured", mode: "exploratory" as const, expectAbsent: true as const },
-      { name: "flags provider github blocks without app_auth", fixture: fixtures.terraformGitHubAppAuthLike, ruleId: "terraform-github-app-auth", mode: "exploratory" as const, severity: "suggestion" as const, confidence: "high" as const, locationPath: "main.tf", message: "app_auth", count: 2 },
-      { name: "does not flag when app_auth is present", fixture: fixtures.terraformGitHubAppAuthOk, ruleId: "terraform-github-app-auth", mode: "exploratory" as const, expectAbsent: true as const },
-      { name: "flags GHE provider without parallel_requests", fixture: fixtures.terraformGitHubParallelRequestsLike, ruleId: "terraform-github-parallel-requests", mode: "exploratory" as const, severity: "suggestion" as const, confidence: "high" as const, locationPath: "main.tf", message: "parallel_requests", count: 2 },
-      { name: "does not flag GHE provider with parallel_requests enabled", fixture: fixtures.terraformGitHubParallelRequestsOk, ruleId: "terraform-github-parallel-requests", mode: "exploratory" as const, expectAbsent: true as const },
-      { name: "flags resources with unnecessary data.github_repository lookups", fixture: fixtures.terraformGitHubSlowResourcesLike, ruleId: "terraform-github-slow-resources", mode: "strict" as const, severity: "warning" as const, confidence: "high" as const, locationPath: "main.tf", message: "data.github_repository", count: 3 },
-      { name: "does not flag when resources use direct attributes", fixture: fixtures.terraformGitHubSlowResourcesOk, ruleId: "terraform-github-slow-resources", mode: "strict" as const, expectAbsent: true as const },
-      { name: "flags pagerduty_team_membership with provider below v3.32.2", fixture: fixtures.terraformPagerDutyTeamMembershipVersionLike, ruleId: "terraform-pagerduty-team-membership-version", mode: "strict" as const, severity: "warning" as const, confidence: "high" as const, locationPath: "main.tf", message: "PagerDuty", count: 2 },
-      { name: "does not flag pagerduty_team_membership with provider >= 3.32.2", fixture: fixtures.terraformPagerDutyTeamMembershipVersionOk, ruleId: "terraform-pagerduty-team-membership-version", mode: "strict" as const, expectAbsent: true },
+      {
+        name: "flags terraform init jobs missing provider caching",
+        fixture: fixtures.terraformCacheLike,
+        ruleId: "cache-terraform-providers",
+        mode: "exploratory",
+        severity: "warning",
+        message: "terraform init",
+        count: 1,
+      },
+      {
+        name: "does not flag terraform init jobs with provider caching",
+        fixture: fixtures.terraformCacheOk,
+        ruleId: "cache-terraform-providers",
+        mode: "exploratory" as const,
+        expectAbsent: true as const,
+      },
+      {
+        name: "flags missing terraform lock file",
+        fixture: fixtures.terraformLockfileMissing,
+        ruleId: "terraform-lockfile-missing",
+        mode: "strict" as const,
+        severity: "warning" as const,
+        message: ".terraform.lock.hcl",
+        count: 1,
+      },
+      {
+        name: "does not flag missing lock file when lock file exists",
+        fixture: fixtures.terraformLockfileOk,
+        ruleId: "terraform-lockfile-missing",
+        mode: "strict" as const,
+        expectAbsent: true as const,
+      },
+      {
+        name: "flags repo-wide when no --parallelism in any terraform workflow",
+        fixture: fixtures.terraformParallelismMissing,
+        ruleId: "terraform-parallelism-unconfigured",
+        mode: "exploratory" as const,
+        severity: "suggestion" as const,
+        message: "--parallelism",
+        count: 1,
+      },
+      {
+        name: "does not flag when --parallelism is in command text",
+        fixture: fixtures.terraformParallelismOk,
+        ruleId: "terraform-parallelism-unconfigured",
+        mode: "exploratory" as const,
+        expectAbsent: true as const,
+      },
+      {
+        name: "does not flag when TF_CLI_ARGS env var sets parallelism",
+        fixture: fixtures.terraformParallelismOkEnv,
+        ruleId: "terraform-parallelism-unconfigured",
+        mode: "exploratory" as const,
+        expectAbsent: true as const,
+      },
+      {
+        name: "flags provider github blocks without app_auth",
+        fixture: fixtures.terraformGitHubAppAuthLike,
+        ruleId: "terraform-github-app-auth",
+        mode: "exploratory" as const,
+        severity: "suggestion" as const,
+        confidence: "high" as const,
+        locationPath: "main.tf",
+        message: "app_auth",
+        count: 2,
+      },
+      {
+        name: "does not flag when app_auth is present",
+        fixture: fixtures.terraformGitHubAppAuthOk,
+        ruleId: "terraform-github-app-auth",
+        mode: "exploratory" as const,
+        expectAbsent: true as const,
+      },
+      {
+        name: "flags GHE provider without parallel_requests",
+        fixture: fixtures.terraformGitHubParallelRequestsLike,
+        ruleId: "terraform-github-parallel-requests",
+        mode: "exploratory" as const,
+        severity: "suggestion" as const,
+        confidence: "high" as const,
+        locationPath: "main.tf",
+        message: "parallel_requests",
+        count: 2,
+      },
+      {
+        name: "does not flag GHE provider with parallel_requests enabled",
+        fixture: fixtures.terraformGitHubParallelRequestsOk,
+        ruleId: "terraform-github-parallel-requests",
+        mode: "exploratory" as const,
+        expectAbsent: true as const,
+      },
+      {
+        name: "flags resources with unnecessary data.github_repository lookups",
+        fixture: fixtures.terraformGitHubSlowResourcesLike,
+        ruleId: "terraform-github-slow-resources",
+        mode: "strict" as const,
+        severity: "warning" as const,
+        confidence: "high" as const,
+        locationPath: "main.tf",
+        message: "data.github_repository",
+        count: 3,
+      },
+      {
+        name: "does not flag when resources use direct attributes",
+        fixture: fixtures.terraformGitHubSlowResourcesOk,
+        ruleId: "terraform-github-slow-resources",
+        mode: "strict" as const,
+        expectAbsent: true as const,
+      },
+      {
+        name: "flags pagerduty_team_membership with provider below v3.32.2",
+        fixture: fixtures.terraformPagerDutyTeamMembershipVersionLike,
+        ruleId: "terraform-pagerduty-team-membership-version",
+        mode: "strict" as const,
+        severity: "warning" as const,
+        confidence: "high" as const,
+        locationPath: "main.tf",
+        message: "PagerDuty",
+        count: 2,
+      },
+      {
+        name: "does not flag pagerduty_team_membership with provider >= 3.32.2",
+        fixture: fixtures.terraformPagerDutyTeamMembershipVersionOk,
+        ruleId: "terraform-pagerduty-team-membership-version",
+        mode: "strict" as const,
+        expectAbsent: true,
+      },
     ];
 
-    test.each(terraformCases.map((tc) => [tc.name, tc] as const))(
-      "%s",
-      async (_name, tc) => {
-        const report = await getFixtureReport(tc.fixture, {
-          targetPath: ".",
-          topCount: 20,
-          mode: tc.mode,
-        });
+    test.each(terraformCases.map((tc) => [tc.name, tc] as const))("%s", async (_name, tc) => {
+      const report = await getFixtureReport(tc.fixture, {
+        targetPath: ".",
+        topCount: 20,
+        mode: tc.mode,
+      });
 
-        if (tc.expectAbsent) {
-          expect(report.findings.some((f) => f.ruleId === tc.ruleId)).toBe(false);
-          return;
+      if (tc.expectAbsent) {
+        expect(report.findings.some((f) => f.ruleId === tc.ruleId)).toBe(false);
+        return;
+      }
+
+      const findings = report.findings.filter((f) => f.ruleId === tc.ruleId);
+
+      if (tc.count !== undefined) {
+        expect(findings).toHaveLength(tc.count);
+      }
+
+      for (const finding of findings) {
+        expect(finding.severity).toBe(tc.severity!);
+        if (tc.confidence) {
+          expect(finding.confidence).toBe(tc.confidence);
         }
-
-        const findings = report.findings.filter((f) => f.ruleId === tc.ruleId);
-
-        if (tc.count !== undefined) {
-          expect(findings).toHaveLength(tc.count);
+        if (tc.locationPath) {
+          expect(finding.location.path).toBe(tc.locationPath);
         }
-
-        for (const finding of findings) {
-          expect(finding.severity).toBe(tc.severity!);
-          if (tc.confidence) {
-            expect(finding.confidence).toBe(tc.confidence);
-          }
-          if (tc.locationPath) {
-            expect(finding.location.path).toBe(tc.locationPath);
-          }
-          if (tc.message) {
-            expect(finding.message).toContain(tc.message);
-          }
+        if (tc.message) {
+          expect(finding.message).toContain(tc.message);
         }
-      },
-    );
+      }
+    });
   });
-
-
 });

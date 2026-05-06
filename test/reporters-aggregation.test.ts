@@ -535,7 +535,7 @@ describe("aggregateFindings and grouped reporter output", () => {
         why: "Reason.",
         suggestion: "Use `bun x`.",
         measurementHint: "Measure it.",
-        aiHandoff: 'Handoff.',
+        aiHandoff: "Handoff.",
         score: 70,
       },
     ];

@@ -93,13 +93,7 @@ describe("resolveOptionFlag similar flags boundary", () => {
   });
 
   test("filters flags beyond similarity threshold", () => {
-    const variedFlags = [
-      "--abc",
-      "--bcd",
-      "--cde",
-      "--abdc",
-      "--aaaaaa",
-    ];
+    const variedFlags = ["--abc", "--bcd", "--cde", "--abdc", "--aaaaaa"];
     const fn = () => resolveOptionFlag("--ace", variedFlags);
     expect(fn).toThrow("The most similar options are");
     expect(fn).toThrow("--abc");

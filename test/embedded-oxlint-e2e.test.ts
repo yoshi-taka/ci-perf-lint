@@ -33,10 +33,12 @@ describe("e2e: bundled CLI with oxlint", () => {
         { cwd: repoRoot, stdio: "pipe", encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
       );
       if (!result.stdout) {
-        throw new Error(`CLI produced no output: exit=${result.status} stderr=${String(result.stderr).slice(0, 500)}`);
+        throw new Error(
+          `CLI produced no output: exit=${result.status} stderr=${String(result.stderr).slice(0, 500)}`,
+        );
       }
       const output = JSON.parse(result.stdout);
-      const findings = Array.isArray(output) ? output : output.findings ?? [];
+      const findings = Array.isArray(output) ? output : (output.findings ?? []);
       const barrelFinding = findings.find(
         (f: { ruleId: string }) => f.ruleId === "detected-large-barrel-file",
       );

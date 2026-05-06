@@ -77,15 +77,21 @@ function genTrigger(trigger: string, hasPathsFilter: boolean): string[] {
   const add = (event: string) => {
     if (hasPathsFilter) {
       lines.push(`  ${event}:`);
-      lines.push('    paths:');
+      lines.push("    paths:");
       lines.push('      - "src/**"');
     } else {
       lines.push(`  ${event}:`);
     }
   };
-  if (hasPush(trigger)) { add("push"); }
-  if (hasPR(trigger)) { add("pull_request"); }
-  if (trigger === "workflow_dispatch") { lines.push("  workflow_dispatch:"); }
+  if (hasPush(trigger)) {
+    add("push");
+  }
+  if (hasPR(trigger)) {
+    add("pull_request");
+  }
+  if (trigger === "workflow_dispatch") {
+    lines.push("  workflow_dispatch:");
+  }
   return lines;
 }
 
@@ -105,8 +111,12 @@ function generateWorkflowYAML(p: Params): string {
   out.push("jobs:");
   out.push(`  ${jobName}:`);
   out.push("    runs-on: ubuntu-latest");
-  if (p.hasTimeoutMinutes) { out.push("    timeout-minutes: 10"); }
-  if (p.jobHasIf) { out.push("    if: github.ref == 'refs/heads/main'"); }
+  if (p.hasTimeoutMinutes) {
+    out.push("    timeout-minutes: 10");
+  }
+  if (p.jobHasIf) {
+    out.push("    if: github.ref == 'refs/heads/main'");
+  }
   out.push("    steps:");
   out.push("      - uses: actions/checkout@v4");
   out.push(p.heavyJob ? "      - run: npm install && npm run build" : "      - run: echo ok");
@@ -150,7 +160,9 @@ async function runCase(p: Params): Promise<{ findings: string[]; error: string |
       topCount: 100,
       mode: "exploratory",
     });
-    const ids = [...new Set(report.findings.filter((f) => clusterRules.has(f.ruleId)).map((f) => f.ruleId))].sort();
+    const ids = [
+      ...new Set(report.findings.filter((f) => clusterRules.has(f.ruleId)).map((f) => f.ruleId)),
+    ].sort();
     return { findings: ids, error: null };
   } catch (err) {
     return { findings: [], error: err instanceof Error ? err.message : String(err) };
@@ -174,8 +186,12 @@ describe("cluster E pairwise: trigger x heavy x concurrency x paths x timeout x 
       const exp = expectedClusterERules(p);
       const got = new Set(findings);
 
-      for (const r of exp) { expect(got.has(r)).toBe(true); }
-      for (const r of findings) { expect(exp.has(r) || !clusterRules.has(r)).toBe(true); }
+      for (const r of exp) {
+        expect(got.has(r)).toBe(true);
+      }
+      for (const r of findings) {
+        expect(exp.has(r) || !clusterRules.has(r)).toBe(true);
+      }
     });
   }
 });

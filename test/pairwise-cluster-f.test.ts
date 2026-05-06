@@ -23,10 +23,7 @@ const paramSpecs: ParamSpec[] = Object.entries(paramsDef).map(([name, values]) =
 
 const combinations = generatePairwise(paramSpecs);
 
-const clusterFRules = new Set([
-  "missing-timeout-minutes",
-  "matrix-test-job-without-test-sharding",
-]);
+const clusterFRules = new Set(["missing-timeout-minutes", "matrix-test-job-without-test-sharding"]);
 
 function expectedClusterFRules(p: Params): Set<string> {
   const expected = new Set<string>();
@@ -69,24 +66,26 @@ function generateWorkflowYAML(p: Params): string {
     }
   }
 
-  if (p.hasTimeout) { out.push("    timeout-minutes: 10"); }
+  if (p.hasTimeout) {
+    out.push("    timeout-minutes: 10");
+  }
   out.push("    steps:");
   out.push("      - uses: actions/checkout@v4");
 
   if (p.hasTestTool) {
     if (p.consumesShardKey && p.hasMatrix && p.hasShardKeys) {
-      out.push('      - run: npx jest --shard=${{ matrix.shard }}/3');
+      out.push("      - run: npx jest --shard=${{ matrix.shard }}/3");
     } else {
-      out.push('      - run: npx jest');
+      out.push("      - run: npx jest");
     }
   }
 
   if (p.isHeavyJob && !p.hasTestTool) {
-    out.push('      - run: npm run build');
+    out.push("      - run: npm run build");
   }
 
   if (!p.hasTestTool && !p.isHeavyJob) {
-    out.push('      - run: echo ok');
+    out.push("      - run: echo ok");
   }
 
   return `${out.join("\n")}\n`;
