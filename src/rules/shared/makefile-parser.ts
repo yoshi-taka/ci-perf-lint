@@ -48,8 +48,8 @@ function expandExpression(expr: string, variables: Map<string, string>, maxPasse
   return result;
 }
 
-const TARGET_CHAR = /^[a-zA-Z0-9_./-]+$/;
-const TARGET_DEF = /^([a-zA-Z0-9_./-][a-zA-Z0-9_./-]*)\s*:/;
+const TARGET_CHAR = /^[-a-zA-Z0-9_./]+$/;
+const TARGET_DEF = /^([-a-zA-Z0-9_./][-a-zA-Z0-9_./]*)\s*:/;
 
 export function parseMakefile(source: string): ParsedMakefile {
   const targets = new Map<string, string>();
