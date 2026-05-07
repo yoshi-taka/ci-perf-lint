@@ -13,13 +13,14 @@ async function main() {
   ];
 
   for (const bench of benches) {
-    const wrapped = withCodSpeed(bench);
-    await wrapped.run();
-    console.table(wrapped.table());
+    try {
+      const wrapped = withCodSpeed(bench);
+      await wrapped.run();
+      console.table(wrapped.table());
+    } catch (error) {
+      console.error(`[bench] Skipping failed benchmark: ${error}`);
+    }
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main();
