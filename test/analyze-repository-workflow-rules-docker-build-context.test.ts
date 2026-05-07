@@ -628,4 +628,40 @@ describe("analyzeRepository workflow and execution rules: docker build and docke
     expect(finding?.location.line).toBe(2);
     expect(finding?.suggestion).toContain("--no-install-recommends");
   });
+
+  test("does not crash on COPY with flags but no source/destination", async () => {
+    const fixtureRoot = await tempDirs.create("apl-copy-flag-no-args-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "docker.yml"),
+      [
+        "name: docker",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: docker build .",
+      ].join("\n"),
+    );
+    await writeFile(
+      path.join(fixtureRoot, "Dockerfile"),
+      [
+        "FROM alpine",
+        "COPY --link",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(report).toBeDefined();
+  });
 });

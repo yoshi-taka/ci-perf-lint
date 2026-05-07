@@ -169,7 +169,7 @@ export function parseDockerfileCopyInstruction(
     return undefined;
   }
 
-  if (instruction.flags || instruction.argumentsContent || instruction.jsonStrings) {
+  if (instruction.argumentsContent || instruction.jsonStrings) {
     const linked = (instruction.flags ?? []).some(
       (flag) => flag.name.toLowerCase() === "link" && flag.value?.toLowerCase() !== "false",
     );
