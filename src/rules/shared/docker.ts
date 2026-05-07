@@ -27,10 +27,6 @@ export function stepDisablesDockerBuildCache(step: WorkflowStep | AnyStep): bool
   );
 }
 
-export function stepRunsLegacyDockerBuild(step: WorkflowStep | AnyStep): boolean {
-  return /\bdocker\s+build\b/i.test(getStepCommandText(step));
-}
-
 export function jobRunsBuildxBake(job: WorkflowJob): boolean {
   return getJobAnalysis(job).hasBuildxBake;
 }

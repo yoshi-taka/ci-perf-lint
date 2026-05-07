@@ -45,7 +45,7 @@ interface CircleCiRuleModule {
 interface BothRuleModule {
   meta: RuleMeta;
   check: (
-    workflow: WorkflowDocument | PipelineDocument,
+    workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
     context: RuleContext,
   ) => Diagnostic[] | Promise<Diagnostic[]>;
 }
@@ -96,9 +96,9 @@ export async function evaluateRules(
   if (isBuildkite) {
     applicableRules = [...(rulesByScope.buildkite ?? []), ...(rulesByScope.both ?? [])];
   } else if (isGitlab) {
-    applicableRules = rulesByScope["gitlab-ci"] ?? [];
+    applicableRules = [...(rulesByScope["gitlab-ci"] ?? []), ...(rulesByScope.both ?? [])];
   } else if (isCircle) {
-    applicableRules = rulesByScope.circleci ?? [];
+    applicableRules = [...(rulesByScope.circleci ?? []), ...(rulesByScope.both ?? [])];
   } else {
     applicableRules = [...(rulesByScope["github-actions"] ?? []), ...(rulesByScope.both ?? [])];
   }
@@ -126,7 +126,7 @@ export async function evaluateRules(
       if (ruleScope === "both") {
         const bothRule = rule as BothRuleModule;
         ruleResults.push(
-          ...(await bothRule.check(workflow as WorkflowDocument | PipelineDocument, context)),
+          ...(await bothRule.check(workflow, context)),
         );
       } else if (isBuildkite) {
         const buildkiteRule = rule as BuildkiteRuleModule;

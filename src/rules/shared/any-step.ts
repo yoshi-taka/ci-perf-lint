@@ -5,7 +5,6 @@ import type { CircleCiDocument } from "../../circleci-workflow.ts";
 import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 
 export type AnyStep = WorkflowStep | PipelineStep;
-export type AnyDocument = WorkflowDocument | PipelineDocument;
 
 function isWorkflowStep(step: AnyStep): step is WorkflowStep {
   return "run" in step || "uses" in step;
@@ -24,20 +23,6 @@ export function getStepCommandText(step: AnyStep): string {
     return `${step.label ?? ""} ${step.command ?? ""} ${commands}`.toLowerCase();
   }
   return "";
-}
-
-export function getDocumentSteps(doc: AnyDocument): AnyStep[] {
-  if ("jobs" in doc) {
-    const wfDoc = doc;
-    const steps: AnyStep[] = [];
-    for (const job of wfDoc.jobs) {
-      for (const step of job.steps) {
-        steps.push(step);
-      }
-    }
-    return steps;
-  }
-  return doc.steps;
 }
 
 interface CommandEntry {
