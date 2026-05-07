@@ -3,6 +3,7 @@ pre-commit:
     format:
       glob: "{src,test}/*.ts"
       run: bun run format
+      stage_fixed: true
     lint-and-audit:
       glob: "{src,test}/*.ts"
       run: bun x oxlint --type-aware --type-check --fix {staged_files} && bun run audit:static
