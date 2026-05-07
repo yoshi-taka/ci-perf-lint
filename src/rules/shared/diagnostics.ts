@@ -30,7 +30,8 @@ export function buildDiagnostic(
     location?: SourceLocation;
   },
 ): Diagnostic {
-  const { severity, confidence, location, ...rest } = details;
+  const severity = details.severity ?? meta.severity;
+  const confidence = details.confidence ?? meta.confidence;
   const isPipeline = "steps" in workflow && !("jobs" in workflow);
   const isGitlab = isGitlabCiDocument(workflow);
   const isCircle = isCircleCiDocument(workflow);
@@ -43,11 +44,17 @@ export function buildDiagnostic(
         : getLocation(workflow, node);
   return {
     ruleId: meta.id,
-    severity: severity ?? meta.severity,
-    confidence: confidence ?? meta.confidence,
+    severity,
+    confidence,
+    scope: details.scope,
     docsPath: meta.docsPath,
     workflow: workflow.relativePath,
-    location: location ?? docLocation,
-    ...rest,
+    location: details.location ?? docLocation,
+    message: details.message,
+    why: details.why,
+    suggestion: details.suggestion,
+    measurementHint: details.measurementHint,
+    aiHandoff: details.aiHandoff,
+    score: details.score,
   };
 }

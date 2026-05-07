@@ -15,14 +15,21 @@ export function buildRepositoryDiagnostic(
     confidence?: Confidence;
   },
 ): Diagnostic {
-  const { severity, confidence, ...rest } = details;
+  const severity = details.severity ?? meta.severity;
+  const confidence = details.confidence ?? meta.confidence;
   return {
     ruleId: meta.id,
-    severity: severity ?? meta.severity,
-    confidence: confidence ?? meta.confidence,
+    severity,
+    confidence,
     scope: "repository",
     docsPath: meta.docsPath,
     workflow: repository.primaryWorkflowPath ?? fallbackRepositoryWorkflowPath,
-    ...rest,
+    location: details.location,
+    message: details.message,
+    why: details.why,
+    suggestion: details.suggestion,
+    measurementHint: details.measurementHint,
+    aiHandoff: details.aiHandoff,
+    score: details.score,
   };
 }
