@@ -44,7 +44,7 @@ function getJobIfText(job: WorkflowJob): string {
 }
 
 function hasNeedsSuccessGuard(ifText: string): boolean {
-  return /needs\.[^.]+\.(?:result|conclusion)\s*==\s*['"]success['"]/.test(ifText);
+  return /needs\.[^.]+\.result\s*==\s*['"]success['"]/.test(ifText);
 }
 
 function hasFailureCancelledGuard(ifText: string): boolean {
@@ -75,7 +75,7 @@ function hasOptionalSkipBypass(ifText: string): boolean {
   return (
     /github\.event_name\s*(?:==|!=)\s*['"][^'"]+['"]/.test(ifText) ||
     /needs\.[^.]+\.outputs\.[A-Za-z0-9_-]+/.test(ifText) ||
-    /needs\.[^.]+\.(?:result|conclusion)\s*==\s*['"]skipped['"]/.test(ifText)
+    /needs\.[^.]+\.result\s*==\s*['"]skipped['"]/.test(ifText)
   );
 }
 
