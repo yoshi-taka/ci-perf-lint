@@ -92,7 +92,7 @@ interface ScannedFile {
 }
 
 function anyWorkflowHasSparseCheckout(workflows: WorkflowDocument[]): boolean {
-  return workflows.some((w) => w.source!.includes("sparse-checkout"));
+  return workflows.some((w) => w.source?.includes("sparse-checkout") ?? false);
 }
 
 const gitTrackedFilesCache = new Map<string, Promise<string[] | null>>();

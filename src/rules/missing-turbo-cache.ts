@@ -42,7 +42,7 @@ function workflowHasTurboLocalCache(workflow: WorkflowDocument): boolean {
 
 function workflowHasTurboRemoteCacheWiring(workflow: WorkflowDocument): boolean {
   return /\bTURBO_TOKEN\b|\bTURBO_TEAM\b|\bTURBO_API\b|\bTURBO_REMOTE_ONLY\b/i.test(
-    workflow.source!,
+    workflow.source ?? "",
   );
 }
 

@@ -38,7 +38,7 @@ function workflowHasParallelismInStepText(workflow: WorkflowDocument): boolean {
 }
 
 function workflowHasParallelismInEnv(workflow: WorkflowDocument): boolean {
-  return /TF_CLI_ARGS[\s\S]{0,100}parallelism/i.test(workflow.source!);
+  return /TF_CLI_ARGS[\s\S]{0,100}parallelism/i.test(workflow.source ?? "");
 }
 
 function workflowHasParallelismConfig(workflow: WorkflowDocument): boolean {
