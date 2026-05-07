@@ -198,3 +198,60 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 
 すべてのやり取り、計画、において、極端に簡潔にし、簡潔さのために文法を犠牲にすること。
 tweet size以下を目指す
+
+## Debug Checklist (When A Collector Or Rule Does Not Fire)
+
+Walk these checks in order when a finding is expected but missing.
+
+### 1. Did the gate pass?
+
+Repository diagnostics are gated. Open `src/repository-diagnostics/collector-types.ts` → `RepositoryDiagnosticGate` to see all gates.
+Find your collector's gate in `src/repository-diagnostics/index.ts`. Check `collectorGateMatches()` in `src/repository-diagnostics/gates.ts`.
+The gate state field (e.g. `hasGradle`) is set in `collectRepositoryDiagnosticGateState()`. Add a test:
+
+```ts
+const gateState = await collectRepositoryDiagnosticGateState(context);
+console.log(gateState); // which gates are true?
+```
+
+Common causes:
+- **Gate depends on `frameworks.usesXxx`**: that signal is only collected when `hasFrameworkSignalEvidence()` returns true. That function checks `workflow.source` (raw YAML) against a regex — the parsed workflows must be passed correctly.
+- **Gate depends on `workflowLooksXxxHeavy`**: checks step text against a regex. If the step uses a different tool name or format, the regex won't match.
+
+### 2. Is the collector registered?
+
+Check `src/repository-diagnostics/index.ts` → `repositoryDiagnosticCollectors[]`.
+The collector must be in this array (not just imported). `as const` means the array is static.
+
+### 3. Did `workflowOnly` suppress repository diagnostics?
+
+In `src/repo.ts`: if `workflowOnly` is true, `collectRepositoryDiagnostics()` is skipped entirely.
+`workflowOnly` is set to `true` automatically when `estimatedFileCount() > HUGE_REPO_FILE_THRESHOLD (80_000)`.
+Check with `CI_PERF_LINT_TIMINGS=1`: if no repo-scope findings appear, this is the most likely cause.
+
+### 4. Is the internal detector matching?
+
+For repository collectors that check workflows (like `ciUsesGradleLifecycle`), add a direct test:
+
+```ts
+// In the collector function, the step.run values come from workflow.jobs[].steps[].run
+// Check the raw step text before applying regex
+console.log(step.run, myRegex.test(step.run ?? ""));
+```
+
+Common regex pitfalls:
+- `\b` behaves differently than expected at path boundaries (`.` and `/` are non-word chars)
+- `.test()` on a global regex advances `lastIndex` — use a fresh regex or reset it
+
+### 5. Is the test fixture correct?
+
+- Files must be written **before** calling `analyzeRepository()`. The scan phase warms up `rg --files` synchronously.
+- `readDirectoryEntries()` returns entry **names**, not full paths. Match patterns against `entry.name`, not a path.
+- `workflow.source` is the raw YAML string set during parsing — verify `workflow.source?.includes(expectedText)`.
+
+### 6. Enable verbose timings
+
+```sh
+CI_PERF_LINT_TIMINGS=1 bun test --timeout 15000 <test-file>
+CI_PERF_LINT_TIMINGS=1 bun run dist/cli.js <target> --findings-only
+```
