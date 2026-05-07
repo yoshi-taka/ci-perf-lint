@@ -7,6 +7,7 @@ import type { CircleCiDocument } from "../circleci-workflow.ts";
 import type { GitlabCiDocument } from "../gitlab-ci-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
+import { npmRunMatcher } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "prefer-node-run-over-npm-run",
@@ -19,9 +20,6 @@ interface NpmRunScript {
   script: string;
   replacement: string;
 }
-
-const npmRunMatcher =
-  /^\s*npm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)((?:\s+--[^\s]+)*)((?:\s+--(?:\s+.*)?)?)\s*$/;
 
 function detectSimpleNpmRunFromText(text: string): NpmRunScript | undefined {
   const trimmed = text.trim();
