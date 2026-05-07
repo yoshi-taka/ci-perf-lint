@@ -28,5 +28,6 @@ tag 不要。main 以外の branch からも実行可能。
 
 ## Notes
 
+- `git push --tags` は使わないこと。過去の tag が全部押し込まれて publish workflow が暴発する。
 - `packages/ci-perf-lint/package.json` の `@yoshi-taka/ci-perf-lint` 依存は常に `"*"` にしておく。release 時に固定してはいけない (bun install --frozen-lockfile がコケる)。
 - publish → docs deploy の順。
