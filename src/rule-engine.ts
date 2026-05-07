@@ -7,6 +7,8 @@ import type { GitlabCiDocument } from "./gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "./circleci-workflow.ts";
 import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
 
+type WorkflowNodeKind = "trigger" | "concurrency";
+
 let _rulesByScope: Record<string, readonly AnyRuleModule[]> | null = null;
 
 async function getRulesByScope(): Promise<Record<string, readonly AnyRuleModule[]>> {
@@ -24,26 +26,31 @@ export interface RuleContext {
 
 interface RuleModule {
   meta: RuleMeta;
+  nodeTypes?: WorkflowNodeKind[];
   check: (workflow: WorkflowDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface BuildkiteRuleModule {
   meta: RuleMeta;
+  nodeTypes?: WorkflowNodeKind[];
   check: (pipeline: PipelineDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface GitlabCiRuleModule {
   meta: RuleMeta;
+  nodeTypes?: WorkflowNodeKind[];
   check: (doc: GitlabCiDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface CircleCiRuleModule {
   meta: RuleMeta;
+  nodeTypes?: WorkflowNodeKind[];
   check: (doc: CircleCiDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface BothRuleModule {
   meta: RuleMeta;
+  nodeTypes?: WorkflowNodeKind[];
   check: (
     workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
     context: RuleContext,
@@ -77,6 +84,21 @@ function isCircleCiDocument(doc: unknown): doc is CircleCiDocument {
     "kind" in doc &&
     (doc as Record<string, unknown>).kind === "circleci"
   );
+}
+
+function workflowContainsKind(
+  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
+  kind: WorkflowNodeKind,
+): boolean {
+  if ("on" in workflow) {
+    switch (kind) {
+      case "trigger":
+        return workflow.on !== undefined;
+      case "concurrency":
+        return workflow.concurrencyNode !== undefined;
+    }
+  }
+  return true;
 }
 
 export async function evaluateRules(
@@ -116,6 +138,10 @@ export async function evaluateRules(
       findingCounts &&
       (findingCounts.get(rule.meta.id) ?? 0) >= maxFindings
     ) {
+      continue;
+    }
+
+    if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
       continue;
     }
 

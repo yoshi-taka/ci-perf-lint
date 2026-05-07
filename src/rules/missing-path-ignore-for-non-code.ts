@@ -24,6 +24,7 @@ const meta = {
 
 export const missingPathIgnoreForNonCodeRule = {
   meta,
+  nodeTypes: ["trigger"],
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const hasPullRequest = workflowHasPullRequestTrigger(workflow);
     const hasBranchPush = workflowHasBranchPushTrigger(workflow);

@@ -29,6 +29,7 @@ const meta = {
 
 export const missingConcurrencyRule = {
   meta,
+  nodeTypes: ["trigger"],
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const hasPullRequest = workflowHasPullRequestTrigger(workflow);
     const hasPush = workflowHasPushTrigger(workflow);

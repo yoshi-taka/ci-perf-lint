@@ -72,6 +72,7 @@ function workflowLooksNightlyLike(workflow: WorkflowDocument): boolean {
 
 export const scheduledHeavyWorkflowWithoutThrottlingRule = {
   meta,
+  nodeTypes: ["trigger"],
   check(workflow: WorkflowDocument, _context: RuleContext) {
     if (
       workflowHasManualOnlyTrigger(workflow) ||
