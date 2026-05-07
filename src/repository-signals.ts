@@ -1,3 +1,4 @@
+import { hashContent } from "./hash.ts";
 import type { AnalysisWarning } from "./types.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import {
@@ -83,7 +84,7 @@ function timingsEnabled(): boolean {
 
 function workflowFingerprint(workflows: WorkflowDocument[]): string {
   return workflows
-    .map((w) => `${w.relativePath}:${w.jobs.length}:${(w.source ?? "").length}`)
+    .map((w) => `${w.relativePath}:${w.jobs.length}:${hashContent(w.source ?? "")}`)
     .join("|");
 }
 
