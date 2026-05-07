@@ -2,6 +2,7 @@ import type { AnalysisWarning, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
+import { collectDockerCacheCopyPathMismatchDiagnostics } from "./docker-cache-copy-path-mismatch.ts";
 import {
   collectDockerfileCopyLinkDiagnostics,
   collectDockerfileCopyOrderDiagnostics,
@@ -25,6 +26,13 @@ export async function collectDockerBuildDiagnostics(
     collectDockerfileCopyLinkDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
     collectDockerfileImageSizeDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
     collectNodeDockerfileInstallDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+    collectDockerCacheCopyPathMismatchDiagnostics(
+      repoRoot,
+      repository,
+      workflows,
+      warnings,
+      scanContext,
+    ),
   ]);
 
   const diagnostics: Diagnostic[][] = [];

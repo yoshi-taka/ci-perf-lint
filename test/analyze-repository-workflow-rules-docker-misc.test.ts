@@ -291,4 +291,194 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
       ),
     ).toBe(false);
   });
+
+  test("reports when Dockerfile copies build.gradle.kts but only build.gradle exists", async () => {
+    const fixtureRoot = await tempDirs.create("apl-docker-copy-gradle-mismatch-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "build.gradle"),
+      'plugins { id("java") }',
+    );
+    await writeFile(
+      path.join(fixtureRoot, "Dockerfile"),
+      [
+        "FROM gradle:jdk21",
+        "COPY build.gradle.kts .",
+        "RUN gradle build -x bootJar",
+        "COPY . .",
+        "RUN gradle build",
+      ].join("\n"),
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: docker/build-push-action@v6",
+        "        with:",
+        "          context: .",
+        "          push: false",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find(
+      (c) => c.ruleId === "docker-cache-copy-path-mismatch",
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("build.gradle.kts");
+    expect(finding?.message).toContain("build.gradle");
+    expect(finding?.location.path).toContain("Dockerfile");
+    expect(finding?.location.line).toBe(2);
+  });
+
+  test("reports when Dockerfile copies build.gradle but only build.gradle.kts exists", async () => {
+    const fixtureRoot = await tempDirs.create("apl-docker-copy-gradle-mismatch2-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "build.gradle.kts"),
+      'plugins { id("java") }',
+    );
+    await writeFile(
+      path.join(fixtureRoot, "Dockerfile"),
+      [
+        "FROM gradle:jdk21",
+        "COPY build.gradle .",
+        "RUN gradle build -x bootJar",
+      ].join("\n"),
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: docker/build-push-action@v6",
+        "        with:",
+        "          context: .",
+        "          push: false",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find(
+      (c) => c.ruleId === "docker-cache-copy-path-mismatch",
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("build.gradle");
+    expect(finding?.message).toContain("build.gradle.kts");
+  });
+
+  test("skips when copied Gradle file actually exists", async () => {
+    const fixtureRoot = await tempDirs.create("apl-docker-copy-gradle-ok-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "build.gradle.kts"),
+      'plugins { id("java") }',
+    );
+    await writeFile(
+      path.join(fixtureRoot, "Dockerfile"),
+      [
+        "FROM gradle:jdk21",
+        "COPY build.gradle.kts .",
+        "RUN gradle build -x bootJar",
+      ].join("\n"),
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: docker/build-push-action@v6",
+        "        with:",
+        "          context: .",
+        "          push: false",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some((c) => c.ruleId === "docker-cache-copy-path-mismatch"),
+    ).toBe(false);
+  });
+
+  test("skips when no alternative Gradle file exists", async () => {
+    const fixtureRoot = await tempDirs.create("apl-docker-copy-non-existent-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "Dockerfile"),
+      [
+        "FROM gradle:jdk21",
+        "COPY build.gradle.kts .",
+        "RUN gradle build -x bootJar",
+      ].join("\n"),
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: docker/build-push-action@v6",
+        "        with:",
+        "          context: .",
+        "          push: false",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some((c) => c.ruleId === "docker-cache-copy-path-mismatch"),
+    ).toBe(false);
+  });
 });

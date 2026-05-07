@@ -39,6 +39,7 @@ Current rule registry:
 - `docker-build-cache-disabled-in-ci`
 - `docker-build-load-true-unnecessary`
 - `docker-build-without-layer-cache`
+- `docker-cache-copy-path-mismatch`
 - `duplicate-checkout-in-same-workflow`
 - `duplicate-install-or-lint`
 - `elixir-otp-version-performance`
