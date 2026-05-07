@@ -23,7 +23,8 @@ export type RepositoryDiagnosticGate =
   | "rust"
   | "cdk-manifest"
   | "cdk-bucket-deployment"
-  | "elixir-heavy";
+  | "elixir-heavy"
+  | "gradle";
 
 export interface RepositoryDiagnosticGateState {
   hasJavaScriptHeavyWorkflow: boolean;
@@ -46,6 +47,7 @@ export interface RepositoryDiagnosticGateState {
   hasCdkManifest: boolean;
   hasCdkBucketDeployment: boolean;
   hasElixirHeavyWorkflow: boolean;
+  hasGradle: boolean;
 }
 
 export interface RepositoryDiagnosticContext {

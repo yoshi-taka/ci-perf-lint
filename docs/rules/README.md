@@ -46,6 +46,7 @@ Current rule registry:
 - `go-build-before-race-test`
 - `go-test-broad-package-serial-p-one`
 - `go-test-repeats-vet-after-go-vet`
+- `gradle-parallel-not-enabled`
 - `hatch-without-uv-installer`
 - `large-jest-snapshot`
 - `matrix-test-job-without-test-sharding`

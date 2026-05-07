@@ -1,3 +1,4 @@
+import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import type { Diagnostic } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { cdkDiagnosticCollectors } from "./collectors-cdk.ts";
@@ -22,6 +23,18 @@ export const repositoryDiagnosticCollectors = [
   ...pythonDiagnosticCollectors,
   ...cdkDiagnosticCollectors,
   ...elixirDiagnosticCollectors,
+  {
+    id: "gradle-parallel-not-enabled",
+    gate: "gradle",
+    collect: (context: RepositoryDiagnosticContext) =>
+      collectGradleParallelNotEnabledDiagnostics(
+        context.repoRoot,
+        context.repository,
+        context.workflows,
+        context.warnings,
+        context.scanContext,
+      ),
+  },
 ] as const;
 
 function timingsEnabled(): boolean {

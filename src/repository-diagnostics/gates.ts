@@ -80,6 +80,8 @@ export function collectorGateMatches(
       return gateState.hasCdkBucketDeployment;
     case "elixir-heavy":
       return gateState.hasElixirHeavyWorkflow;
+    case "gradle":
+      return gateState.hasGradle;
   }
 }
 
@@ -386,5 +388,6 @@ export async function collectRepositoryDiagnosticGateState(
     hasRust,
     hasCdkManifest,
     hasCdkBucketDeployment,
+    hasGradle: context.repository.frameworks.usesGradle,
   };
 }

@@ -167,4 +167,161 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     expect(finding).toBeDefined();
     expect(finding?.message).toContain("src/runs");
   });
+
+  test("reports when Gradle parallel build is not enabled for multi-project", async () => {
+    const fixtureRoot = await tempDirs.create("apl-gradle-parallel-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(path.join(fixtureRoot, "gradlew"), "");
+    await writeFile(path.join(fixtureRoot, "settings.gradle"), 'rootProject.name = "test"');
+    await writeFile(path.join(fixtureRoot, "build.gradle"), 'plugins { id("java") }');
+    await mkdir(path.join(fixtureRoot, "sub-a"), { recursive: true });
+    await writeFile(path.join(fixtureRoot, "sub-a", "build.gradle"), "");
+    await mkdir(path.join(fixtureRoot, "sub-b"), { recursive: true });
+    await writeFile(path.join(fixtureRoot, "sub-b", "build.gradle"), "");
+    await writeFile(
+      path.join(fixtureRoot, "gradle.properties"),
+      "org.gradle.jvmargs=-Xmx2g",
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: ./gradlew build",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find(
+      (c) => c.ruleId === "gradle-parallel-not-enabled",
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("parallel");
+    expect(finding?.scope).toBe("repository");
+    expect(finding?.severity).toBe("warning");
+  });
+
+  test("skips when gradle.properties has parallel enabled", async () => {
+    const fixtureRoot = await tempDirs.create("apl-gradle-parallel-enabled-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(path.join(fixtureRoot, "gradlew"), "");
+    await writeFile(path.join(fixtureRoot, "build.gradle"), 'plugins { id("java") }');
+    await mkdir(path.join(fixtureRoot, "sub"), { recursive: true });
+    await writeFile(path.join(fixtureRoot, "sub", "build.gradle"), "");
+    await writeFile(
+      path.join(fixtureRoot, "gradle.properties"),
+      "org.gradle.parallel=true",
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: ./gradlew build",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled"),
+    ).toBe(false);
+  });
+
+  test("skips when CI uses --parallel flag", async () => {
+    const fixtureRoot = await tempDirs.create("apl-gradle-parallel-flag-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(path.join(fixtureRoot, "gradlew"), "");
+    await writeFile(path.join(fixtureRoot, "build.gradle"), 'plugins { id("java") }');
+    await mkdir(path.join(fixtureRoot, "sub"), { recursive: true });
+    await writeFile(path.join(fixtureRoot, "sub", "build.gradle"), "");
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: ./gradlew build --parallel",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled"),
+    ).toBe(false);
+  });
+
+  test("skips when only single build file exists", async () => {
+    const fixtureRoot = await tempDirs.create("apl-gradle-single-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(path.join(fixtureRoot, "gradlew"), "");
+    await writeFile(path.join(fixtureRoot, "build.gradle"), 'plugins { id("java") }');
+    await writeFile(
+      path.join(fixtureRoot, "gradle.properties"),
+      "org.gradle.jvmargs=-Xmx2g",
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: ./gradlew build",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled"),
+    ).toBe(false);
+  });
 });
