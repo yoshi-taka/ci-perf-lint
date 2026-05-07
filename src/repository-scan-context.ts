@@ -104,6 +104,7 @@ export class RepositoryScanContext {
   readonly #directoryEntryLoads = new LruMap<string, Promise<Dirent[]>>(4096);
   readonly #walkFileLoads = new LruMap<string, Promise<string[]>>(64);
   #rgFileListPromise: Promise<string[] | null> | null = null;
+  #filePathSet: Set<string> | null | undefined;
   static #rgPath: string | null | undefined;
 
   constructor(repoRoot: string, warnings: AnalysisWarning[]) {
@@ -160,6 +161,13 @@ export class RepositoryScanContext {
   }
 
   async pathExists(targetPath: string): Promise<boolean> {
+    if (this.#filePathSet) {
+      const relative = path.relative(this.repoRoot, targetPath);
+      if (this.#filePathSet.has(relative) || this.#filePathSet.has(targetPath)) {
+        return true;
+      }
+    }
+
     const existingLoad = this.#pathExistsLoads.get(targetPath);
     if (existingLoad) {
       return existingLoad;
@@ -333,7 +341,14 @@ export class RepositoryScanContext {
   }
 
   async #getRgFileList(): Promise<string[] | null> {
-    this.#rgFileListPromise ??= this.#doRgFileList();
+    this.#rgFileListPromise ??= this.#doRgFileList().then((files) => {
+      if (files) {
+        this.#filePathSet = new Set(files);
+      } else {
+        this.#filePathSet = null;
+      }
+      return files;
+    });
 
     return this.#rgFileListPromise;
   }
@@ -525,5 +540,6 @@ export class RepositoryScanContext {
     this.#directoryEntryLoads.clear();
     this.#walkFileLoads.clear();
     this.#rgFileListPromise = null;
+    this.#filePathSet = undefined;
   }
 }
