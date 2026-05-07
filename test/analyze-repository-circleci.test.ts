@@ -52,6 +52,18 @@ describe("analyzeRepository CircleCI rules", () => {
     expect(ruleIds).not.toContain("circleci-checkout-uses-full-clone");
   });
 
+  test("applies scope:both rules to CircleCI", async () => {
+    const report = await getFixtureReport(fixtures.scopeBothCircleciLike, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "exploratory",
+    });
+
+    const ruleIds = report.findings.map((finding) => finding.ruleId);
+    expect(ruleIds).toContain("prefer-buildx-build-over-docker-build");
+    expect(ruleIds).toContain("wasteful-npm-global-install");
+  });
+
   test("does not flag full checkout when git history is needed", async () => {
     const report = await getFixtureReport(fixtures.circleciFullCloneOkUsesHistory, {
       targetPath: ".",

@@ -212,6 +212,8 @@ const fixtureNames = {
   sampleRepo: "sample-repo",
   scheduledHeavyLike: "scheduled-heavy-like",
   scheduledHeavyOk: "scheduled-heavy-ok",
+  scopeBothCircleciLike: "scope-both-circleci-like",
+  scopeBothGitlabLike: "scope-both-gitlab-like",
   setupNodeCacheDependencyPathOk: "setup-node-cache-dependency-path-ok",
   setupNodeCacheDependencyPathUnsetLike: "setup-node-cache-dependency-path-unset-like",
   slimCiLike: "slim-ci-like",

@@ -1,0 +1,10 @@
+stages:
+  - build
+
+build-app:
+  stage: build
+  image: node:20
+  script:
+    - docker build -t app .
+    - npm install -g npm@latest
+    - yarn install

@@ -35,6 +35,18 @@ describe("analyzeRepository GitLab CI rules", () => {
     expect(timeoutFinding?.message).toContain("timeout");
   });
 
+  test("applies scope:both rules to GitLab CI", async () => {
+    const report = await getFixtureReport(fixtures.scopeBothGitlabLike, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "exploratory",
+    });
+
+    const ruleIds = report.findings.map((finding) => finding.ruleId);
+    expect(ruleIds).toContain("prefer-buildx-build-over-docker-build");
+    expect(ruleIds).toContain("wasteful-npm-global-install");
+  });
+
   test("does not flag timeouts when all heavy jobs have timeout", async () => {
     const report = await getFixtureReport(fixtures.gitlabCiTimeoutOk, {
       targetPath: ".",
