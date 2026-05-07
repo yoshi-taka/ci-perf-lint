@@ -196,6 +196,10 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 - Targets are shallow-cloned fresh each run; benchmark measures `bun run dist/cli.js --findings-only` wall time
 - Add/remove targets in `codspeed.yml`; CI path is the CodSpeed action
 
+### Known Issues
+
+- CodSpeed benchmark fails on tag push (~16s). Exact cause unclear — possibly tinybench v6 ESM-only vs `--target node` incompatibility, or CodSpeed plugin version mismatch. Partial fix: `bench/run.ts` catches per-task errors so one failure doesn't kill the whole run. Re-evaluate at next release.
+
 ## Publishing
 
 See `docs/publishing.md`. TL;DR:
