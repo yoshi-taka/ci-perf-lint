@@ -54,7 +54,25 @@ function isPipelineDoc(doc: unknown): doc is PipelineDocument {
   return typeof doc === "object" && doc !== null && "steps" in doc && !("jobs" in doc);
 }
 
+const commandEntriesCache = new WeakMap<
+  WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
+  CommandEntry[]
+>();
+
 export function collectCommandEntries(
+  doc: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
+): CommandEntry[] {
+  const cached = commandEntriesCache.get(doc);
+  if (cached) {
+    return cached;
+  }
+
+  const entries = collectCommandEntriesImpl(doc);
+  commandEntriesCache.set(doc, entries);
+  return entries;
+}
+
+function collectCommandEntriesImpl(
   doc: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
 ): CommandEntry[] {
   if (isCircleCiDoc(doc)) {
