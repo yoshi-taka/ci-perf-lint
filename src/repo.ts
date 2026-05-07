@@ -161,14 +161,18 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   const allWorkflowFiles = await collectWorkflowFiles(target);
   timer.mark("list-workflows");
 
-  const parsedWorkflowResults: PromiseSettledResult<ParsedWorkflowDocument>[] = [];
+  const parsedWorkflowResults: PromiseSettledResult<ParsedWorkflowDocument>[] = new Array(
+    allWorkflowFiles.length,
+  );
   const CONCURRENCY = 32;
   for (let i = 0; i < allWorkflowFiles.length; i += CONCURRENCY) {
-    const chunk = allWorkflowFiles.slice(i, i + CONCURRENCY);
+    const end = Math.min(i + CONCURRENCY, allWorkflowFiles.length);
     const results = await Promise.allSettled(
-      chunk.map((workflowPath) => parseWorkflowFile(workflowPath, target.repoRoot)),
+      allWorkflowFiles.slice(i, end).map((workflowPath) => parseWorkflowFile(workflowPath, target.repoRoot)),
     );
-    parsedWorkflowResults.push(...results);
+    for (let j = 0; j < results.length; j++) {
+      parsedWorkflowResults[i + j] = results[j]!;
+    }
   }
   timer.mark("parse-workflows");
 
