@@ -152,6 +152,11 @@ describe("analyzeRepository repo-aware and tooling rules: javascript repository 
         expectFinding: true as const,
       },
       { name: "does not flag npm ci usage", fixture: fixtures.npmCiOk },
+      {
+        name: "does not flag npm install <pkg>",
+        fixture: fixtures.npmInstallWithPackageLike,
+        expectFinding: false as const,
+      },
     ];
 
     test.each(cases)("$name", async ({ fixture, expectFinding }) => {

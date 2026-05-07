@@ -143,6 +143,7 @@ const fixtureNames = {
   nextjs14MinorOk: "nextjs-14-minor-ok",
   npmCiOk: "npm-ci-ok",
   npmCiOverNpmInstallLike: "npm-ci-over-npm-install-like",
+  npmInstallWithPackageLike: "npm-install-with-package-like",
   nxCacheLike: "nx-cache-like",
   nxCacheOk: "nx-cache-ok",
   nxCopilotNoCloudLike: "nx-copilot-no-cloud-like",

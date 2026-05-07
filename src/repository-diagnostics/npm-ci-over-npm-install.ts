@@ -28,10 +28,7 @@ function isNpmInstallOnly(run: string): boolean {
       continue;
     }
     for (let j = i + 1; j < tokens.length; j++) {
-      const token = tokens[j];
-      if (token?.startsWith("-")) {
-        return false;
-      }
+      return false;
     }
   }
   return true;
