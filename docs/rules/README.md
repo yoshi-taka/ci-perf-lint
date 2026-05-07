@@ -66,7 +66,6 @@ Current rule registry:
 - `nox-without-uv-backend`
 - `npm-ci-over-npm-install`
 - `outdated-datadog-lambda-extension`
-- `outdated-husky-version`
 - `outdated-setup-action-without-cache`
 - `pdm-without-use-uv`
 - `prefer-buildx-bake-for-multiple-images`
@@ -123,9 +122,10 @@ Current rule registry:
 - `prefer-uv-pip-over-pip`
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`
-- `python-top-level-heavy-client-init`
 - `pytest-norecursedirs-override`
 - `pytest-testpaths-unconfigured`
+- `pytest-xdist-installed-but-not-used`
+- `python-top-level-heavy-client-init`
 - `recommend-rspack-over-webpack`
 - `recommend-swc-over-babel`
 - `recommend-webpack-4-latest-patch`

@@ -325,5 +325,131 @@ describe("analyzeRepository repo-aware and tooling rules: python repository diag
         ),
       ).toBe(false);
     });
+
+    test("reports when pytest-xdist is installed but not used in CI", async () => {
+      const fixtureRoot = await tempDirs.create("apl-pytest-xdist-notused-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await mkdir(path.join(fixtureRoot, "tests"), { recursive: true });
+      for (let i = 0; i < 35; i++) {
+        await writeFile(path.join(fixtureRoot, "tests", `test_${i}.py`), "");
+      }
+      await writeFile(
+        path.join(fixtureRoot, "pyproject.toml"),
+        ["[project]", 'dependencies = ["pytest", "pytest-xdist"]'].join("\n"),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install pytest pytest-xdist",
+          "      - run: pytest",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      const finding = report.findings.find(
+        (c) => c.ruleId === "pytest-xdist-installed-but-not-used",
+      );
+      expect(finding).toBeDefined();
+      expect(finding?.severity).toBe("warning");
+      expect(finding?.message).toContain("pytest-xdist is installed");
+    });
+
+    test("skips when pytest-xdist is not installed", async () => {
+      const fixtureRoot = await tempDirs.create("apl-pytest-xdist-missing-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await mkdir(path.join(fixtureRoot, "tests"), { recursive: true });
+      for (let i = 0; i < 35; i++) {
+        await writeFile(path.join(fixtureRoot, "tests", `test_${i}.py`), "");
+      }
+      await writeFile(
+        path.join(fixtureRoot, "pyproject.toml"),
+        ['dependencies = ["pytest"]'].join("\n"),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install pytest",
+          "      - run: pytest",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(
+        report.findings.some((c) => c.ruleId === "pytest-xdist-installed-but-not-used"),
+      ).toBe(false);
+    });
+
+    test("skips when pytest command uses -n auto", async () => {
+      const fixtureRoot = await tempDirs.create("apl-pytest-xdist-nflag-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await mkdir(path.join(fixtureRoot, "tests"), { recursive: true });
+      for (let i = 0; i < 35; i++) {
+        await writeFile(path.join(fixtureRoot, "tests", `test_${i}.py`), "");
+      }
+      await writeFile(
+        path.join(fixtureRoot, "pyproject.toml"),
+        ["[project]", 'dependencies = ["pytest", "pytest-xdist"]'].join("\n"),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install pytest pytest-xdist",
+          "      - run: pytest -n auto",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(
+        report.findings.some((c) => c.ruleId === "pytest-xdist-installed-but-not-used"),
+      ).toBe(false);
+    });
   });
 });

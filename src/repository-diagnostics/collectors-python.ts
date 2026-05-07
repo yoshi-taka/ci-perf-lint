@@ -1,5 +1,6 @@
 import type { RepositoryDiagnosticCollector } from "./collector-types.ts";
 import { collectPytestDiagnostics } from "./pytest.ts";
+import { collectPytestXdistInstalledButNotUsedDiagnostics } from "./pytest-xdist-installed-but-not-used.ts";
 import { collectAvoidMypyProductionBundleDiagnostics } from "./avoid-mypy-production-bundle.ts";
 import { collectMypyMilestoneDiagnostics } from "./mypy-milestone.ts";
 import { collectPreferPydanticV2Diagnostics } from "./prefer-pydantic-v2.ts";
@@ -25,6 +26,18 @@ export const pytestDiagnosticCollectors = [
     gate: "pytest",
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectPytestDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+  },
+  {
+    id: "pytest-xdist-installed-but-not-used",
+    gate: "pytest",
+    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
+      collectPytestXdistInstalledButNotUsedDiagnostics(
+        repoRoot,
+        repository,
+        workflows,
+        warnings,
+        scanContext,
+      ),
   },
 ] satisfies readonly RepositoryDiagnosticCollector[];
 
