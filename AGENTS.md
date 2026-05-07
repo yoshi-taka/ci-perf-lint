@@ -196,6 +196,14 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 - Targets are shallow-cloned fresh each run; benchmark measures `bun run dist/cli.js --findings-only` wall time
 - Add/remove targets in `codspeed.yml`; CI path is the CodSpeed action
 
+## Publishing
+
+See `docs/publishing.md`. TL;DR:
+
+- **Tag push**: `git tag v<ver> && git push origin v<ver>` — fully automated publish + release
+- **workflow_dispatch**: manual from GitHub Actions UI, supports `bump_version` and `dist_tag`
+- Keep `packages/ci-perf-lint/package.json` dep `@yoshi-taka/ci-perf-lint` at `"*"`
+
 すべてのやり取り、計画、において、極端に簡潔にし、簡潔さのために文法を犠牲にすること。
 tweet size以下を目指す
 
