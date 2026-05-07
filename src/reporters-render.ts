@@ -86,7 +86,7 @@ function renderAggregatedContext(finding: AggregatedFinding): string {
 
 function renderNoFindingsSummary(report: ReportData): string[] {
   return [
-    "No actionable GitHub Actions findings in the current scan mode.",
+    "No actionable findings in the current scan mode.",
     `Repo: ${report.targetPath}`,
     `Workflows scanned: ${report.workflowCount}`,
     `Scan time: ${report.scannedAt}`,

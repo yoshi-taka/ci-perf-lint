@@ -358,7 +358,7 @@ describe("renderReport", () => {
     const handoff = renderReport(report, "handoff");
 
     expect(report.findings).toHaveLength(0);
-    expect(handoff).toContain("No actionable GitHub Actions findings in the current scan mode.");
+    expect(handoff).toContain("No actionable findings in the current scan mode.");
     expect(handoff).toContain("rerun with --mode exploratory");
     expect(handoff).not.toContain("Before editing:");
     expect(handoff).not.toContain("Address these findings first:");
@@ -375,12 +375,12 @@ describe("renderReport", () => {
     const text = renderReport(report, "text");
     const markdown = renderReport(report, "markdown");
 
-    expect(text).toContain("No actionable GitHub Actions findings in the current scan mode.");
+    expect(text).toContain("No actionable findings in the current scan mode.");
     expect(text).toContain("rerun with --mode exploratory");
     expect(text).not.toContain("Top findings:");
 
     expect(markdown).toContain("# GitHub Actions Performance Lint");
-    expect(markdown).toContain("- No actionable GitHub Actions findings in the current scan mode.");
+    expect(markdown).toContain("- No actionable findings in the current scan mode.");
     expect(markdown).toContain(
       "- If you want advisory suggestions too, rerun with --mode exploratory.",
     );
@@ -575,7 +575,7 @@ describe("renderReport", () => {
           warning.message.includes("Failed to parse JSON while collecting repository signals"),
       ),
     ).toHaveLength(1);
-    expect(text).toContain("No actionable GitHub Actions findings in the current scan mode.");
+    expect(text).toContain("No actionable findings in the current scan mode.");
     expect(text).not.toContain("analysisWarnings");
   });
 });
