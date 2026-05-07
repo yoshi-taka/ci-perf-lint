@@ -1,5 +1,6 @@
 import type { Dirent } from "node:fs";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
+import { readTextFile } from "./read-text-file.ts";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { dependencySectionsOf } from "./repository-package-helpers.ts";
@@ -185,7 +186,7 @@ export class RepositoryScanContext {
 
     const textFileLoad = (async () => {
       try {
-        return await readFile(filePath, "utf8");
+        return await readTextFile(filePath);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         this.warn(filePath, `Failed to read file while collecting repository signals: ${detail}`);

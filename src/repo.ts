@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { readTextFile } from "./read-text-file.ts";
 import { buildAiHandoff } from "./ai-handoff.ts";
 import { parsePipeline, type PipelineDocument } from "./buildkite-workflow.ts";
 import { parseGitlabCi, type GitlabCiDocument } from "./gitlab-ci-workflow.ts";
@@ -91,7 +91,7 @@ async function parseWorkflowFile(
     return cached.parsedWorkflow;
   }
 
-  const source = await readFile(workflowPath, "utf8");
+  const source = await readTextFile(workflowPath);
 
   // eslint-disable-next-line typescript-eslint/require-await
   const parsedWorkflow = (async () => {
