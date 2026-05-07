@@ -20,6 +20,7 @@ import {
   collectEmbeddedOxlintDiagnosticsByCode,
 } from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
+import type { RepositorySignals } from "./repository-signals-types.ts";
 import { evaluateRules } from "./rule-engine.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
@@ -59,6 +60,21 @@ interface AnalyzeOptions {
   mode?: AuditMode;
   workflowOnly?: boolean;
   repositoryOnly?: boolean;
+}
+
+interface ScannedRepo {
+  readonly parsedWorkflows: readonly ParsedWorkflowDocument[];
+  readonly githubWorkflows: readonly WorkflowDocument[];
+  readonly signals: RepositorySignals;
+  readonly scanContext: RepositoryScanContext;
+  readonly repoRoot: string;
+  readonly analysisWarnings: AnalysisWarning[];
+  readonly workflowOnly: boolean;
+  readonly repositoryOnly: boolean;
+  readonly timer: PhaseTimer;
+  readonly mode: AuditMode;
+  readonly topCount: number;
+  readonly inputPath: string;
 }
 
 function uniqueStrings(values: string[]): string[] {
@@ -126,7 +142,7 @@ async function parseWorkflowFile(
   return parsedWorkflow;
 }
 
-export async function analyzeRepository(options: AnalyzeOptions): Promise<ReportData> {
+async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   const timer = new PhaseTimer("analyzeRepository");
   const mode: AuditMode = options.mode ?? "strict";
   let workflowOnly = options.workflowOnly ?? false;
@@ -152,7 +168,12 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     !workflowOnly;
   if (shouldPrewarmEmbeddedOxlint) {
     void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot, undefined, scanContext);
-    void collectEmbeddedOxlintDiagnosticsByCode(target.repoRoot, "oxc(no-barrel-file)", undefined, scanContext);
+    void collectEmbeddedOxlintDiagnosticsByCode(
+      target.repoRoot,
+      "oxc(no-barrel-file)",
+      undefined,
+      scanContext,
+    );
   }
   timer.mark(
     shouldPrewarmEmbeddedOxlint ? "embedded-oxlint-prewarm" : "embedded-oxlint-prewarm-skipped",
@@ -202,8 +223,40 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   );
   timer.mark("collect-repository-signals");
   analysisWarnings.push(...repositoryAnalysis.warnings);
+
+  return {
+    parsedWorkflows,
+    githubWorkflows,
+    signals: repositoryAnalysis.signals,
+    scanContext,
+    repoRoot: target.repoRoot,
+    analysisWarnings,
+    workflowOnly,
+    repositoryOnly,
+    timer,
+    mode,
+    topCount: options.topCount,
+    inputPath,
+  };
+}
+
+async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
+  const {
+    parsedWorkflows,
+    githubWorkflows,
+    signals,
+    scanContext,
+    repoRoot,
+    analysisWarnings,
+    workflowOnly,
+    repositoryOnly,
+    timer,
+    mode,
+    topCount,
+    inputPath,
+  } = scanned;
   const ruleContext = {
-    repository: repositoryAnalysis.signals,
+    repository: signals,
     scanContext,
   };
 
@@ -214,9 +267,11 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     "prefer-lefthook-for-complex-git-hooks",
   ]);
 
+  const wfList = [...parsedWorkflows];
+
   const [wfFindings, repoDiagnostics] = await Promise.all([
     Promise.all(
-      parsedWorkflows.map((workflow) =>
+      wfList.map((workflow) =>
         evaluateRules(
           workflow,
           ruleContext,
@@ -233,9 +288,9 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     workflowOnly
       ? ([] as Diagnostic[])
       : collectRepositoryDiagnostics({
-          repoRoot: target.repoRoot,
+          repoRoot,
           repository: ruleContext.repository,
-          workflows: githubWorkflows,
+          workflows: [...githubWorkflows],
           warnings: analysisWarnings,
           scanContext,
         }).then((diags) =>
@@ -269,19 +324,19 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     }
   }
 
-  const workflows: WorkflowSummary[] = parsedWorkflows.map((workflow) => ({
+  const workflows: WorkflowSummary[] = wfList.map((workflow) => ({
     path: workflow.relativePath,
     name: workflow.name,
     findings: findingsByWorkflow.get(workflow.relativePath) ?? [],
   }));
-  parsedWorkflows.length = 0;
+  wfList.length = 0;
 
   const aggregatedFindings = aggregateFindingsWithMembers(findings);
-  const topAggregatedFindings = aggregatedFindings.aggregatedFindings.slice(0, options.topCount);
-  const topFindings = findings.slice(0, options.topCount);
+  const topAggregatedFindings = aggregatedFindings.aggregatedFindings.slice(0, topCount);
+  const topFindings = findings.slice(0, topCount);
   const fixFirst = uniqueStrings(topAggregatedFindings.map((finding) => finding.suggestion)).slice(
     0,
-    options.topCount,
+    topCount,
   );
   const aiHandoff = buildAiHandoff(topAggregatedFindings);
   timer.mark("aggregate-report");
@@ -299,4 +354,9 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     aiHandoff,
     analysisWarnings: uniqueWarnings(analysisWarnings),
   };
+}
+
+export async function analyzeRepository(options: AnalyzeOptions): Promise<ReportData> {
+  const scanned = await scanRepo(options);
+  return lintRepo(scanned);
 }
