@@ -5,6 +5,7 @@ import type { WorkflowDocument } from "./workflow.ts";
 import type { PipelineDocument } from "./buildkite-workflow.ts";
 import type { GitlabCiDocument } from "./gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "./circleci-workflow.ts";
+import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
 
 type WorkflowNodeKind = "trigger" | "concurrency";
@@ -22,6 +23,7 @@ async function getRulesByScope(): Promise<Record<string, readonly AnyRuleModule[
 export interface RuleContext {
   repository: RepositorySignals;
   scanContext?: RepositoryScanContext;
+  workflowSemantics?: WorkflowSemantics;
 }
 
 interface RuleModule {

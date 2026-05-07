@@ -22,6 +22,8 @@ import {
 import { collectRepositorySignals } from "./repository-signals.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import { evaluateRules } from "./rule-engine.ts";
+import { buildWorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
+import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
 import {
@@ -269,12 +271,25 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
 
   const wfList = [...parsedWorkflows];
 
+  const semanticsByWorkflow = new Map<ParsedWorkflowDocument, WorkflowSemantics>();
+  for (const workflow of wfList) {
+    if ("jobs" in workflow && !("kind" in workflow)) {
+      semanticsByWorkflow.set(
+        workflow,
+        buildWorkflowSemantics(workflow),
+      );
+    }
+  }
+
   const [wfFindings, repoDiagnostics] = await Promise.all([
     Promise.all(
       wfList.map((workflow) =>
         evaluateRules(
           workflow,
-          ruleContext,
+          {
+            ...ruleContext,
+            workflowSemantics: semanticsByWorkflow.get(workflow),
+          },
           analysisWarnings,
           ruleFindingCounts,
           repositoryOnly ? (rule) => repositoryScopeWorkflowRuleIds.has(rule.meta.id) : undefined,
