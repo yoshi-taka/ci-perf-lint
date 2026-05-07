@@ -33,6 +33,7 @@ describe("readTextFile", () => {
   });
 
   test("rejects on non-existent file", async () => {
+    // eslint-disable-next-line typescript-eslint/await-thenable
     await expect(readTextFile("/tmp/non-existent-opencode-test-12345")).rejects.toThrow();
   });
 });
