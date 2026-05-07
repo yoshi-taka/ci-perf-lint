@@ -297,10 +297,7 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
     await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(fixtureRoot, "build.gradle"),
-      'plugins { id("java") }',
-    );
+    await writeFile(path.join(fixtureRoot, "build.gradle"), 'plugins { id("java") }');
     await writeFile(
       path.join(fixtureRoot, "Dockerfile"),
       [
@@ -335,9 +332,7 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
       mode: "strict",
     });
 
-    const finding = report.findings.find(
-      (c) => c.ruleId === "docker-cache-copy-path-mismatch",
-    );
+    const finding = report.findings.find((c) => c.ruleId === "docker-cache-copy-path-mismatch");
     expect(finding).toBeDefined();
     expect(finding?.message).toContain("build.gradle.kts");
     expect(finding?.message).toContain("build.gradle");
@@ -350,17 +345,10 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
     await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(fixtureRoot, "build.gradle.kts"),
-      'plugins { id("java") }',
-    );
+    await writeFile(path.join(fixtureRoot, "build.gradle.kts"), 'plugins { id("java") }');
     await writeFile(
       path.join(fixtureRoot, "Dockerfile"),
-      [
-        "FROM gradle:jdk21",
-        "COPY build.gradle .",
-        "RUN gradle build -x bootJar",
-      ].join("\n"),
+      ["FROM gradle:jdk21", "COPY build.gradle .", "RUN gradle build -x bootJar"].join("\n"),
     );
     await writeFile(
       path.join(workflowDir, "ci.yml"),
@@ -386,9 +374,7 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
       mode: "strict",
     });
 
-    const finding = report.findings.find(
-      (c) => c.ruleId === "docker-cache-copy-path-mismatch",
-    );
+    const finding = report.findings.find((c) => c.ruleId === "docker-cache-copy-path-mismatch");
     expect(finding).toBeDefined();
     expect(finding?.message).toContain("build.gradle");
     expect(finding?.message).toContain("build.gradle.kts");
@@ -399,17 +385,10 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
     await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(fixtureRoot, "build.gradle.kts"),
-      'plugins { id("java") }',
-    );
+    await writeFile(path.join(fixtureRoot, "build.gradle.kts"), 'plugins { id("java") }');
     await writeFile(
       path.join(fixtureRoot, "Dockerfile"),
-      [
-        "FROM gradle:jdk21",
-        "COPY build.gradle.kts .",
-        "RUN gradle build -x bootJar",
-      ].join("\n"),
+      ["FROM gradle:jdk21", "COPY build.gradle.kts .", "RUN gradle build -x bootJar"].join("\n"),
     );
     await writeFile(
       path.join(workflowDir, "ci.yml"),
@@ -435,9 +414,7 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
       mode: "strict",
     });
 
-    expect(
-      report.findings.some((c) => c.ruleId === "docker-cache-copy-path-mismatch"),
-    ).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "docker-cache-copy-path-mismatch")).toBe(false);
   });
 
   test("skips when no alternative Gradle file exists", async () => {
@@ -447,11 +424,7 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
     await mkdir(workflowDir, { recursive: true });
     await writeFile(
       path.join(fixtureRoot, "Dockerfile"),
-      [
-        "FROM gradle:jdk21",
-        "COPY build.gradle.kts .",
-        "RUN gradle build -x bootJar",
-      ].join("\n"),
+      ["FROM gradle:jdk21", "COPY build.gradle.kts .", "RUN gradle build -x bootJar"].join("\n"),
     );
     await writeFile(
       path.join(workflowDir, "ci.yml"),
@@ -477,8 +450,6 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
       mode: "strict",
     });
 
-    expect(
-      report.findings.some((c) => c.ruleId === "docker-cache-copy-path-mismatch"),
-    ).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "docker-cache-copy-path-mismatch")).toBe(false);
   });
 });

@@ -110,9 +110,7 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
         continue;
       }
 
-      const sourceFound = await context.pathExists(
-        path.join(contextPath, source),
-      );
+      const sourceFound = await context.pathExists(path.join(contextPath, source));
       if (sourceFound) {
         continue;
       }

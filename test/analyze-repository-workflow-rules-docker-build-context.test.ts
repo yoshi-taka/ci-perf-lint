@@ -649,10 +649,7 @@ describe("analyzeRepository workflow and execution rules: docker build and docke
     );
     await writeFile(
       path.join(fixtureRoot, "Dockerfile"),
-      [
-        "FROM alpine",
-        "COPY --link",
-      ].join("\n"),
+      ["FROM alpine", "COPY --link"].join("\n"),
     );
 
     const report = await analyzeRepository({

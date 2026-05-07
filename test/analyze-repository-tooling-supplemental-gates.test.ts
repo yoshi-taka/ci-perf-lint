@@ -180,10 +180,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     await writeFile(path.join(fixtureRoot, "sub-a", "build.gradle"), "");
     await mkdir(path.join(fixtureRoot, "sub-b"), { recursive: true });
     await writeFile(path.join(fixtureRoot, "sub-b", "build.gradle"), "");
-    await writeFile(
-      path.join(fixtureRoot, "gradle.properties"),
-      "org.gradle.jvmargs=-Xmx2g",
-    );
+    await writeFile(path.join(fixtureRoot, "gradle.properties"), "org.gradle.jvmargs=-Xmx2g");
     await writeFile(
       path.join(workflowDir, "ci.yml"),
       [
@@ -205,9 +202,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       mode: "strict",
     });
 
-    const finding = report.findings.find(
-      (c) => c.ruleId === "gradle-parallel-not-enabled",
-    );
+    const finding = report.findings.find((c) => c.ruleId === "gradle-parallel-not-enabled");
     expect(finding).toBeDefined();
     expect(finding?.message).toContain("parallel");
     expect(finding?.scope).toBe("repository");
@@ -223,10 +218,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     await writeFile(path.join(fixtureRoot, "build.gradle"), 'plugins { id("java") }');
     await mkdir(path.join(fixtureRoot, "sub"), { recursive: true });
     await writeFile(path.join(fixtureRoot, "sub", "build.gradle"), "");
-    await writeFile(
-      path.join(fixtureRoot, "gradle.properties"),
-      "org.gradle.parallel=true",
-    );
+    await writeFile(path.join(fixtureRoot, "gradle.properties"), "org.gradle.parallel=true");
     await writeFile(
       path.join(workflowDir, "ci.yml"),
       [
@@ -248,9 +240,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       mode: "strict",
     });
 
-    expect(
-      report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled"),
-    ).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled")).toBe(false);
   });
 
   test("skips when CI uses --parallel flag", async () => {
@@ -283,9 +273,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       mode: "strict",
     });
 
-    expect(
-      report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled"),
-    ).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled")).toBe(false);
   });
 
   test("skips when only single build file exists", async () => {
@@ -295,10 +283,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     await mkdir(workflowDir, { recursive: true });
     await writeFile(path.join(fixtureRoot, "gradlew"), "");
     await writeFile(path.join(fixtureRoot, "build.gradle"), 'plugins { id("java") }');
-    await writeFile(
-      path.join(fixtureRoot, "gradle.properties"),
-      "org.gradle.jvmargs=-Xmx2g",
-    );
+    await writeFile(path.join(fixtureRoot, "gradle.properties"), "org.gradle.jvmargs=-Xmx2g");
     await writeFile(
       path.join(workflowDir, "ci.yml"),
       [
@@ -320,8 +305,6 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       mode: "strict",
     });
 
-    expect(
-      report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled"),
-    ).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled")).toBe(false);
   });
 });

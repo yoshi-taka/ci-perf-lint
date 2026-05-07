@@ -111,7 +111,12 @@ export async function collectRestrictedImportRepositoryDiagnostics(
 
   for (const entry of indexedDiagnostics.diagnostics) {
     findings.push(
-      ...matchRestrictedImportFindings(entry, exactSourceDefinitions, patternDefinitions, repository),
+      ...matchRestrictedImportFindings(
+        entry,
+        exactSourceDefinitions,
+        patternDefinitions,
+        repository,
+      ),
     );
   }
 

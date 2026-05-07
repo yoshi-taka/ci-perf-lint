@@ -406,9 +406,9 @@ describe("analyzeRepository repo-aware and tooling rules: python repository diag
         mode: "strict",
       });
 
-      expect(
-        report.findings.some((c) => c.ruleId === "pytest-xdist-installed-but-not-used"),
-      ).toBe(false);
+      expect(report.findings.some((c) => c.ruleId === "pytest-xdist-installed-but-not-used")).toBe(
+        false,
+      );
     });
 
     test("skips when pytest command uses -n auto", async () => {
@@ -447,9 +447,9 @@ describe("analyzeRepository repo-aware and tooling rules: python repository diag
         mode: "strict",
       });
 
-      expect(
-        report.findings.some((c) => c.ruleId === "pytest-xdist-installed-but-not-used"),
-      ).toBe(false);
+      expect(report.findings.some((c) => c.ruleId === "pytest-xdist-installed-but-not-used")).toBe(
+        false,
+      );
     });
   });
 });

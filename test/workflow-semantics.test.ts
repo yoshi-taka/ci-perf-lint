@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { buildWorkflowSemantics } from "../src/rules/shared/workflow-semantics.ts";
 import type { WorkflowDocument } from "../src/workflow.ts";
 
-function makeWorkflow(overrides: Partial<WorkflowDocument> & { on?: unknown } = {}): WorkflowDocument {
+function makeWorkflow(
+  overrides: Partial<WorkflowDocument> & { on?: unknown } = {},
+): WorkflowDocument {
   return {
     path: ".github/workflows/test.yml",
     relativePath: ".github/workflows/test.yml",

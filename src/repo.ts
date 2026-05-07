@@ -274,10 +274,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   const semanticsByWorkflow = new Map<ParsedWorkflowDocument, WorkflowSemantics>();
   for (const workflow of wfList) {
     if ("jobs" in workflow && !("kind" in workflow)) {
-      semanticsByWorkflow.set(
-        workflow,
-        buildWorkflowSemantics(workflow),
-      );
+      semanticsByWorkflow.set(workflow, buildWorkflowSemantics(workflow));
     }
   }
 
