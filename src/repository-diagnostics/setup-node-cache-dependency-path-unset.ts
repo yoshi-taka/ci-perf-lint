@@ -114,10 +114,10 @@ export async function collectSetupNodeCacheDependencyPathUnsetDiagnostics(
           location: {
             path: workflow.relativePath,
             line: step.usesNode?.range
-              ? workflow.lineCounter!.linePos(step.usesNode.range[0]).line
+              ? (workflow.lineCounter?.linePos(step.usesNode.range[0]).line ?? 1)
               : 1,
             column: step.usesNode?.range
-              ? workflow.lineCounter!.linePos(step.usesNode.range[0]).col
+              ? (workflow.lineCounter?.linePos(step.usesNode.range[0]).col ?? 1)
               : 1,
           },
           message: `Job "${job.id}" uses actions/setup-node with cache enabled but without cache-dependency-path in ${workflow.relativePath}, even though lock files exist outside the repository root.`,
