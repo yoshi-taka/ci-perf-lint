@@ -151,8 +151,8 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
     (await scanContext.pathExists(scanContext.resolve("package.json"))) &&
     !workflowOnly;
   if (shouldPrewarmEmbeddedOxlint) {
-    void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot);
-    void collectEmbeddedOxlintDiagnosticsByCode(target.repoRoot, "oxc(no-barrel-file)");
+    void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot, undefined, scanContext);
+    void collectEmbeddedOxlintDiagnosticsByCode(target.repoRoot, "oxc(no-barrel-file)", undefined, scanContext);
   }
   timer.mark(
     shouldPrewarmEmbeddedOxlint ? "embedded-oxlint-prewarm" : "embedded-oxlint-prewarm-skipped",
@@ -168,7 +168,9 @@ export async function analyzeRepository(options: AnalyzeOptions): Promise<Report
   for (let i = 0; i < allWorkflowFiles.length; i += CONCURRENCY) {
     const end = Math.min(i + CONCURRENCY, allWorkflowFiles.length);
     const results = await Promise.allSettled(
-      allWorkflowFiles.slice(i, end).map((workflowPath) => parseWorkflowFile(workflowPath, target.repoRoot)),
+      allWorkflowFiles
+        .slice(i, end)
+        .map((workflowPath) => parseWorkflowFile(workflowPath, target.repoRoot)),
     );
     for (let j = 0; j < results.length; j++) {
       parsedWorkflowResults[i + j] = results[j]!;

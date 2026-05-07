@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { AnalysisWarning } from "../types.ts";
 import { LruMap } from "../repository-scan-context.ts";
+import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
   cleanupEmbeddedOxlintTempConfigFiles,
   type EmbeddedOxlintScanKind,
@@ -79,6 +80,7 @@ async function collectEmbeddedOxlintJsonDiagnostics(
   repoRoot: string,
   kind: EmbeddedOxlintScanKind,
   warnings?: AnalysisWarning[],
+  scanContext?: RepositoryScanContext,
 ): Promise<OxlintDiagnostic[] | undefined> {
   const scanCache = embeddedOxlintScanCacheForKind(kind);
   const cached = scanCache.get(repoRoot);
@@ -87,7 +89,7 @@ async function collectEmbeddedOxlintJsonDiagnostics(
   }
 
   const promise = (async () => {
-    return runEmbeddedOxlint(repoRoot, kind, warnings);
+    return runEmbeddedOxlint(repoRoot, kind, warnings, scanContext);
   })();
 
   scanCache.set(repoRoot, promise);
@@ -97,14 +99,16 @@ async function collectEmbeddedOxlintJsonDiagnostics(
 export async function collectEmbeddedOxlintImportJsonDiagnostics(
   repoRoot: string,
   warnings?: AnalysisWarning[],
+  scanContext?: RepositoryScanContext,
 ): Promise<OxlintDiagnostic[] | undefined> {
-  return collectEmbeddedOxlintJsonDiagnostics(repoRoot, "import", warnings);
+  return collectEmbeddedOxlintJsonDiagnostics(repoRoot, "import", warnings, scanContext);
 }
 
 export async function collectEmbeddedOxlintDiagnosticsByCode(
   repoRoot: string,
   code: string,
   warnings?: AnalysisWarning[],
+  scanContext?: RepositoryScanContext,
 ): Promise<EmbeddedOxlintDiagnostic[] | undefined> {
   const cacheKey = `${repoRoot}\n${code}`;
   const cached = embeddedOxlintDiagnosticsByCodeCache.get(cacheKey);
@@ -117,6 +121,7 @@ export async function collectEmbeddedOxlintDiagnosticsByCode(
       repoRoot,
       embeddedOxlintScanKindForCode(code),
       warnings,
+      scanContext,
     );
     if (!diagnostics) {
       return undefined;

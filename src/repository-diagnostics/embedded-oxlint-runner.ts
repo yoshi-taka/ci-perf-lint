@@ -1,6 +1,9 @@
 import type { AnalysisWarning } from "../types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
-import { type EmbeddedOxlintScanKind, writeEmbeddedOxlintConfig } from "./embedded-oxlint-config.ts";
+import {
+  type EmbeddedOxlintScanKind,
+  writeEmbeddedOxlintConfig,
+} from "./embedded-oxlint-config.ts";
 import type { OxlintDiagnostic } from "./embedded-oxlint-parser.ts";
 import { parseOxlintLine } from "./embedded-oxlint-parser.ts";
 import { bundledOxlintBinPath, bundledOxlintJsPath } from "./embedded-oxlint-path.ts";
@@ -35,11 +38,12 @@ export async function runEmbeddedOxlint(
   repoRoot: string,
   kind: EmbeddedOxlintScanKind,
   warnings?: AnalysisWarning[],
+  scanContext?: RepositoryScanContext,
 ): Promise<OxlintDiagnostic[] | undefined> {
   try {
     const startedAt = performance.now();
     const localWarnings: AnalysisWarning[] = [];
-    const context = new RepositoryScanContext(repoRoot, localWarnings);
+    const context = scanContext ?? new RepositoryScanContext(repoRoot, localWarnings);
     const source = embeddedOxlintLabel(kind);
     const oxlintPath = await bundledOxlintBinPath();
     if (!oxlintPath) {
