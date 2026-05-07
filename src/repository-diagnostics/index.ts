@@ -41,6 +41,22 @@ function timingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
 }
 
+function dumpStateEnabled(): boolean {
+  return process.env.CI_PERF_LINT_DUMP_STATE === "1";
+}
+
+function extractSignals(
+  repository: RepositoryDiagnosticContext["repository"],
+): Record<string, unknown> {
+  return {
+    usesGradle: repository.frameworks.usesGradle,
+    usesDocker: repository.looksLargeOrComplex,
+    hasHusky: repository.husky.hookFileCount > 0,
+    workflowCount: repository.workflowCount,
+    heavyWorkflowCount: repository.heavyWorkflowCount,
+  };
+}
+
 export async function collectRepositoryDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
@@ -88,6 +104,33 @@ export async function collectRepositoryDiagnostics(
       source: "collectRepositoryDiagnostics",
       message: `Collector ${collector?.id ?? "unknown"} failed: ${detail}`,
     });
+  }
+
+  if (dumpStateEnabled()) {
+    const activeGates = Object.entries(gateState)
+      .filter(([_, v]) => v)
+      .map(([k]) => k.replace(/^has/, ""));
+    const collectorResults = applicableCollectors.map((c, i) => {
+      const r = results[i];
+      return {
+        id: c.id,
+        gate: c.gate,
+        findings: r?.status === "fulfilled" ? r.value.length : -1,
+        error: r?.status === "rejected" ? String(r.reason) : undefined,
+      };
+    });
+    process.stderr.write(
+      JSON.stringify({
+        type: "repo-diagnostics-state",
+        activeGates,
+        collectorCount: applicableCollectors.length,
+        totalCollectors: repositoryDiagnosticCollectors.length,
+        collectors: collectorResults,
+        signals: extractSignals(context.repository),
+        totalFindings: diagnostics.length,
+      }),
+    );
+    process.stderr.write("\n");
   }
 
   return diagnostics;

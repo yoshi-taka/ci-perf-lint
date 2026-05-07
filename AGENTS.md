@@ -255,3 +255,12 @@ Common regex pitfalls:
 CI_PERF_LINT_TIMINGS=1 bun test --timeout 15000 <test-file>
 CI_PERF_LINT_TIMINGS=1 bun run dist/cli.js <target> --findings-only
 ```
+
+### 7. Enable full state dump
+
+```sh
+CI_PERF_LINT_DUMP_STATE=1 bun test --timeout 15000 <test-file>
+CI_PERF_LINT_DUMP_STATE=1 bun run dist/cli.js <target>
+```
+
+Outputs JSON to stderr with active gates, collector names, finding counts per collector, and key signal values (e.g. `usesGradle`). Use this when a collector silently returns empty.
