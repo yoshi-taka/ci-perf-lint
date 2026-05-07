@@ -125,9 +125,7 @@ export async function evaluateRules(
       const ruleScope = rule.meta.scope ?? "github-actions";
       if (ruleScope === "both") {
         const bothRule = rule as BothRuleModule;
-        ruleResults.push(
-          ...(await bothRule.check(workflow, context)),
-        );
+        ruleResults.push(...(await bothRule.check(workflow, context)));
       } else if (isBuildkite) {
         const buildkiteRule = rule as BuildkiteRuleModule;
         ruleResults.push(...(await buildkiteRule.check(workflow, context)));
