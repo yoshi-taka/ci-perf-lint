@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { GitlabCiDocument, GitlabCiJob } from "../gitlab-ci-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -28,7 +28,7 @@ function jobLooksHeavy(job: GitlabCiJob): boolean {
 export const missingTimeoutInMinutesGitlabCiRule = {
   meta,
   check(doc: GitlabCiDocument, _context: RuleContext) {
-    const findings = [];
+    const findings: Diagnostic[] = [];
 
     for (const job of doc.jobs) {
       if (job.timeoutNode !== undefined) {

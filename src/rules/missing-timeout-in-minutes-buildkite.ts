@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { PipelineDocument, PipelineStep } from "../buildkite-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -26,7 +26,7 @@ function stepHasTimeout(step: PipelineStep): boolean {
 export const missingTimeoutInMinutesBuildkiteRule = {
   meta,
   check(pipeline: PipelineDocument, _context: RuleContext) {
-    const findings = [];
+    const findings: Diagnostic[] = [];
 
     for (const step of pipeline.steps) {
       if (step.isWait || step.isBlock || step.isTrigger || step.isGroup) {

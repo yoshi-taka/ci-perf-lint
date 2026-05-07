@@ -1,5 +1,5 @@
 import type { Node } from "yaml";
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { CircleCiDocument, CircleCiJob } from "../circleci-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -29,7 +29,7 @@ function jobNeedsFullHistory(job: CircleCiJob): boolean {
 export const circleciCheckoutUsesFullCloneRule = {
   meta,
   check(doc: CircleCiDocument, _context: RuleContext) {
-    const findings = [];
+    const findings: Diagnostic[] = [];
 
     for (const job of doc.jobs) {
       let usesFullClone = false;

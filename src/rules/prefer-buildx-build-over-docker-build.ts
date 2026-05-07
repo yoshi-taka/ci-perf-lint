@@ -1,4 +1,4 @@
-import type { RuleMeta } from "../types.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { PipelineDocument } from "../buildkite-workflow.ts";
@@ -23,7 +23,7 @@ export const preferBuildxBuildOverDockerBuildRule = {
     workflow: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
     _context: RuleContext,
   ) {
-    const findings = [];
+    const findings: Diagnostic[] = [];
     const entries = collectCommandEntries(workflow);
 
     for (const entry of entries) {
