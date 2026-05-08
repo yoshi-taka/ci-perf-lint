@@ -21,3 +21,4 @@ Compare artifact upload duration and download size before and after enabling `ar
 
 - `archive: false` is only supported for single-file uploads. If the `path` resolves to multiple files, the action will fail.
 - When `archive: false` is used, the artifact name becomes the uploaded file name and the `name` input is ignored. Verify downstream `download-artifact` references if you rely on a custom artifact name.
+- When uploading a `.zip` file with `archive: false`, downstream `actions/download-artifact` steps may need `skip-decompress: true` to prevent double-decompression.

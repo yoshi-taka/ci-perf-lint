@@ -138,7 +138,7 @@ export const preferDirectUploadForCompressedArtifactsRule = {
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
               message: `${step.uses} uploads ${singlePath} without direct upload support.`,
               why: "actions/upload-artifact v7 added direct (unzipped) uploads for single files. Uploading an already-compressed or binary file through an older version forces an unnecessary zip wrapper, which wastes time and storage.",
-              suggestion: `Upgrade to actions/upload-artifact@v7 or later and add \`archive: false\` for single-file uploads of already-compressed or binary artifacts. Note that with \`archive: false\` the artifact name becomes the file name and the \`name\` input is ignored; verify any downstream download-artifact references.`,
+              suggestion: `Upgrade to actions/upload-artifact@v7 or later and add \`archive: false\` for single-file uploads of already-compressed or binary artifacts. Note that with \`archive: false\` the artifact name becomes the file name and the \`name\` input is ignored; add \`skip-decompress: true\` to downstream download-artifact steps when uploading .zip files to prevent double-decompression.`,
               measurementHint:
                 "Compare artifact upload duration and download size before and after the change.",
               aiHandoff: `Update the upload-artifact step in ${workflow.relativePath} to use actions/upload-artifact@v7 or later with archive: false for ${singlePath}. Preserve unrelated behavior and verify downstream artifact references.`,
@@ -150,7 +150,7 @@ export const preferDirectUploadForCompressedArtifactsRule = {
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
               message: `${step.uses} uploads ${singlePath} without skipping the zip wrapper.`,
               why: "Uploading an already-compressed or binary file with archive wrapping adds unnecessary overhead. actions/upload-artifact v7 supports `archive: false` for single files to skip this.",
-              suggestion: `Add \`archive: false\` to upload-artifact steps that upload already-compressed or binary files. Note that with \`archive: false\` the artifact name becomes the file name and the \`name\` input is ignored; verify any downstream download-artifact references.`,
+              suggestion: `Add \`archive: false\` to upload-artifact steps that upload already-compressed or binary files. Note that with \`archive: false\` the artifact name becomes the file name and the \`name\` input is ignored; add \`skip-decompress: true\` to downstream download-artifact steps when uploading .zip files to prevent double-decompression.`,
               measurementHint:
                 "Compare artifact upload duration and download size before and after the change.",
               aiHandoff: `Add archive: false to the upload-artifact step in ${workflow.relativePath} that uploads ${singlePath}. Preserve unrelated behavior and verify downstream artifact references.`,
