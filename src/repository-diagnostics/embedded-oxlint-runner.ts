@@ -8,6 +8,7 @@ import type { OxlintDiagnostic } from "./embedded-oxlint-parser.ts";
 import { parseOxlintLine } from "./embedded-oxlint-parser.ts";
 import { bundledOxlintBinPath, bundledOxlintJsPath } from "./embedded-oxlint-path.ts";
 import { EMBEDDED_OXLINT_TIMEOUT_MS, spawnOxlintProcess } from "./embedded-oxlint-spawn.ts";
+import { stderrWarn } from "../stderr-warn.ts";
 
 export type { EmbeddedOxlintScanKind } from "./embedded-oxlint-config.ts";
 export { cleanupEmbeddedOxlintTempConfigFiles } from "./embedded-oxlint-config.ts";
@@ -92,7 +93,7 @@ export async function runEmbeddedOxlint(
         kind === "import"
           ? "import restriction and extension checks"
           : "barrel file and snapshot checks";
-      process.stderr.write(
+      stderrWarn(
         `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
       );
       return [];

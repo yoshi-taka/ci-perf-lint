@@ -26,6 +26,7 @@ import { buildWorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
+import { stderrWarn } from "./stderr-warn.ts";
 import {
   promoteStrictFallbackSuggestions,
   findingIncludedInMode,
@@ -159,7 +160,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     const fileCount = await scanContext.estimatedFileCount();
     if (fileCount !== null && fileCount > HUGE_REPO_FILE_THRESHOLD) {
       workflowOnly = true;
-      process.stderr.write(
+      stderrWarn(
         `[repo] Large repository detected (~${(fileCount / 1000).toFixed(0)}k files). Falling back to workflow-only analysis. Use --repository-only to force repository-wide diagnostics.\n`,
       );
     }

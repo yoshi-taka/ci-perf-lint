@@ -100,7 +100,7 @@ describe("renderReport", () => {
 
     expect(handoff).toContain("1. missing-release-downstream-success-guard (");
     expect(handoff).toContain(
-      "https://ci-perf-lint.veritycost.com/rules/missing-release-downstream-success-guard/)",
+      "https://ci-perf-lint.veritycost.com/rules/missing-release-downstream-success-guard)",
     );
     expect(handoff).toContain(".github/workflows/release.yml:");
     expect(handoff).toContain("+2 more");
@@ -179,7 +179,7 @@ describe("renderReport", () => {
     expect(aggregated).toHaveLength(1);
     expect(aggregated[0]?.locations).toEqual(["src/App.ts:1:1", "src/main.ts:2:1"]);
     expect(handoff).toContain(
-      "prefer-explicit-import-extensions (src/App.ts:1:1 +1 more, https://ci-perf-lint.veritycost.com/rules/prefer-explicit-import-extensions/)",
+      "prefer-explicit-import-extensions (src/App.ts:1:1 +1 more, https://ci-perf-lint.veritycost.com/rules/prefer-explicit-import-extensions)",
     );
     expect(handoff).toContain(
       "Context: prefer-explicit-import-extensions appears in 2 source/tooling locations",
@@ -577,5 +577,282 @@ describe("renderReport", () => {
     ).toHaveLength(1);
     expect(text).toContain("No actionable findings in the current scan mode.");
     expect(text).not.toContain("analysisWarnings");
+  });
+
+  describe("TTY formatting (colors and hyperlinks)", () => {
+    const ttyOpts = { colors: true, hyperlinks: true, cwd: "/repo" };
+
+    test("colors rule IDs cyan in text format", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const text = renderReport(report, "text", ttyOpts);
+      expect(text).toContain("\x1b[96m");
+      expect(text).toContain("\x1b[0m");
+    });
+
+    test("colors rule IDs cyan in handoff format", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const handoff = renderReport(report, "handoff", {
+        ...ttyOpts,
+        topCount: 5,
+        mode: "exploratory",
+      });
+      expect(handoff).toContain("\x1b[96m");
+    });
+
+    test("dims source locations in text format", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const text = renderReport(report, "text", ttyOpts);
+      expect(text).toContain("\x1b[90m");
+    });
+
+    test("applies OSC8 hyperlinks to source locations", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const text = renderReport(report, "text", ttyOpts);
+      expect(text).toContain("\x1b]8;;file://");
+      expect(text).toContain("\x1b]8;;\x1b\\");
+    });
+
+    test("applies OSC8 hyperlinks to docs URLs", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const text = renderReport(report, "text", ttyOpts);
+      expect(text).toContain("\x1b]8;;https://ci-perf-lint.veritycost.com");
+    });
+
+    test("highlights inline code cyan in text format", () => {
+      const findings: Diagnostic[] = [
+        {
+          ruleId: "npm-audit-in-ci",
+          severity: "suggestion",
+          confidence: "high",
+          docsPath: "docs/rules/npm-audit-in-ci.md",
+          workflow: ".github/workflows/ci.yml",
+          location: { path: ".github/workflows/ci.yml", line: 5, column: 7 },
+          message: 'Step "test" runs `npm audit` on every push or PR.',
+          why: "Consider using `dependabot` or `renovate` instead.",
+          suggestion: "Remove `npm audit` from CI.",
+          measurementHint: "Run `npm audit` locally instead.",
+          aiHandoff: "Remove npm audit",
+          score: 30,
+        },
+      ];
+      const aggregated = aggregateFindingsWithMembers(findings).aggregatedFindings;
+      const report: ReportData = {
+        targetPath: "/repo",
+        workflowCount: 1,
+        scannedAt: "2026-04-20T00:00:00.000Z",
+        topFindings: findings,
+        topAggregatedFindings: aggregated,
+        findings,
+        workflows: [],
+        fixFirst: ["Remove npm audit"],
+        aiHandoff: [],
+        analysisWarnings: [],
+      };
+      const text = renderReport(report, "text", { ...ttyOpts, topCount: 5, mode: "strict" });
+      expect(text).toContain("`\x1b[92mnpm audit\x1b[0m`");
+    });
+
+    test("no ANSI codes when colors flag is off", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const text = renderReport(report, "text");
+      expect(text).not.toContain("\x1b[");
+    });
+
+    test("no ANSI codes in markdown output even with TTY flags", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const md = renderReport(report, "markdown", ttyOpts);
+      expect(md).not.toContain("\x1b[");
+    });
+
+    test("no ANSI codes in JSON output even with TTY flags", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const json = renderReport(report, "json", ttyOpts);
+      expect(json).not.toContain("\x1b[");
+    });
+
+    test("highlights inline code in findings-only handoff", () => {
+      const findings: Diagnostic[] = [
+        {
+          ruleId: "npm-audit-in-ci",
+          severity: "suggestion",
+          confidence: "high",
+          docsPath: "docs/rules/npm-audit-in-ci.md",
+          workflow: ".github/workflows/ci.yml",
+          location: { path: ".github/workflows/ci.yml", line: 5, column: 7 },
+          message: 'Step "test" runs `npm audit` on every push or PR.',
+          why: "Consider using `dependabot` or `renovate` instead.",
+          suggestion: "Remove `npm audit` from CI.",
+          measurementHint: "Run `npm audit` locally instead.",
+          aiHandoff: "Remove npm audit",
+          score: 30,
+        },
+      ];
+      const aggregated = aggregateFindingsWithMembers(findings).aggregatedFindings;
+      const report: ReportData = {
+        targetPath: "/repo",
+        workflowCount: 1,
+        scannedAt: "2026-04-20T00:00:00.000Z",
+        topFindings: findings,
+        topAggregatedFindings: aggregated,
+        findings,
+        workflows: [],
+        fixFirst: ["Remove npm audit"],
+        aiHandoff: [],
+        analysisWarnings: [],
+      };
+      const handoff = renderReport(report, "handoff", {
+        ...ttyOpts,
+        findingsOnly: true,
+        mode: "strict",
+      });
+      expect(handoff).toContain("`\x1b[92mnpm audit\x1b[0m`");
+    });
+
+    test("marks header bold in text format", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const text = renderReport(report, "text", ttyOpts);
+      expect(text).toContain("\x1b[1mGitHub Actions Performance Lint\x1b[0m");
+      expect(text).toContain("\x1b[1mTop findings:\x1b[0m");
+    });
+
+    test("marks section headers bold in handoff format", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const handoff = renderReport(report, "handoff", {
+        ...ttyOpts,
+        topCount: 5,
+        mode: "exploratory",
+      });
+      expect(handoff).toContain(
+        "\x1b[1mUpdate this repository using the performance findings below.\x1b[0m",
+      );
+      expect(handoff).toContain("\x1b[1mBefore editing:\x1b[0m");
+      expect(handoff).toContain("\x1b[1mAddress these findings first:\x1b[0m");
+      expect(handoff).toContain("\x1b[1mConstraints:\x1b[0m");
+    });
+
+    test("dims labels in handoff format", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const handoff = renderReport(report, "handoff", {
+        ...ttyOpts,
+        topCount: 5,
+        mode: "exploratory",
+      });
+      expect(handoff).toContain("\x1b[90mWhy it matters:\x1b[0m");
+      expect(handoff).toContain("\x1b[90mSuggested action:\x1b[0m");
+      expect(handoff).toContain("\x1b[90mVerify:\x1b[0m");
+    });
+
+    test("no ANSI codes in findings-only text when colors flag is off", async () => {
+      const report = await getFixtureReport(fixtures.sampleRepo, {
+        targetPath: ".",
+        topCount: 5,
+        mode: "exploratory",
+      });
+      const text = renderReport(report, "text", { findingsOnly: true });
+      expect(text).not.toContain("\x1b[");
+    });
+
+    test("applies dim to workflow values in affected workflows list", () => {
+      const findings: Diagnostic[] = [
+        {
+          ruleId: "missing-concurrency",
+          severity: "suggestion",
+          confidence: "high",
+          docsPath: "docs/rules/missing-concurrency.md",
+          workflow: ".github/workflows/ci.yml",
+          location: { path: ".github/workflows/ci.yml", line: 3, column: 5 },
+          message: "missing concurrency",
+          why: "stale runs waste runner time",
+          suggestion: "add concurrency",
+          measurementHint: "push multiple commits",
+          aiHandoff: "add concurrency",
+          score: 58,
+        },
+        {
+          ruleId: "missing-concurrency",
+          severity: "suggestion",
+          confidence: "high",
+          docsPath: "docs/rules/missing-concurrency.md",
+          workflow: ".github/workflows/release.yml",
+          location: { path: ".github/workflows/release.yml", line: 3, column: 5 },
+          message: "missing concurrency",
+          why: "stale runs waste runner time",
+          suggestion: "add concurrency",
+          measurementHint: "push multiple commits",
+          aiHandoff: "add concurrency",
+          score: 58,
+        },
+      ];
+      const aggregated = aggregateFindingsWithMembers(findings).aggregatedFindings;
+      const report: ReportData = {
+        targetPath: "/repo",
+        workflowCount: 2,
+        scannedAt: "2026-04-20T00:00:00.000Z",
+        topFindings: findings,
+        topAggregatedFindings: aggregated,
+        findings,
+        workflows: [],
+        fixFirst: ["add concurrency"],
+        aiHandoff: buildAiHandoff(aggregated),
+        analysisWarnings: [],
+      };
+      const handoff = renderReport(report, "handoff", { ...ttyOpts, topCount: 5, mode: "strict" });
+      expect(handoff).toContain("\x1b[90m.github/workflows/ci.yml\x1b[0m");
+      expect(handoff).toContain("\x1b[90m.github/workflows/release.yml\x1b[0m");
+    });
+
+    test("colors --mode exploratory in no-findings text", async () => {
+      const report = await getFixtureReport(fixtures.cleanNoFindings, {
+        targetPath: ".",
+        topCount: 3,
+        mode: "strict",
+      });
+      const text = renderReport(report, "text", { ...ttyOpts, topCount: 3, mode: "strict" });
+      expect(text).toContain("\x1b[92m--mode exploratory\x1b[0m");
+    });
   });
 });

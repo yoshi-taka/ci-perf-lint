@@ -8,6 +8,9 @@ export interface RenderOptions {
   topCount?: number;
   mode?: AuditMode;
   showAllLocations?: boolean;
+  hyperlinks?: boolean;
+  colors?: boolean;
+  cwd?: string;
 }
 
 export interface SourceLocation {

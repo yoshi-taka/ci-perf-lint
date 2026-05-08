@@ -250,12 +250,17 @@ export async function runCli(args: string[], cwd: string, logger: LoggerLike): P
       repositoryOnly: options.repositoryOnly,
     });
 
+    const noColor = process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "";
+    const isTty = process.stdout.isTTY && !noColor;
     logger.log(
       renderReport(report, options.format, {
         findingsOnly: options.findingsOnly,
         topCount: options.top,
         mode: options.mode,
         showAllLocations: options.showAllLocations,
+        hyperlinks: isTty,
+        colors: isTty,
+        cwd: isTty ? cwd : undefined,
       }),
     );
     emitTiming("runCli", cliStartedAt);
