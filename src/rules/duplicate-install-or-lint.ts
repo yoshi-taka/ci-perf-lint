@@ -1,7 +1,12 @@
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
-import { detectInstallCommand, detectLintTool, normalizeRunCommand } from "./shared/tools.ts";
+import {
+  detectInstallCommand,
+  detectInstallCommandFromText,
+  detectLintTool,
+  normalizeRunCommand,
+} from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobHasMatrix, workflowLooksMetaCheckLike } from "./shared/workflow-jobs.ts";
 
@@ -59,8 +64,26 @@ export const duplicateInstallOrLintRule = {
         }
       }
 
+      function signatureRun(run: string): string {
+        if (!run.includes("\n")) {
+          return run;
+        }
+        for (const line of run.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#")) {
+            continue;
+          }
+          if (detectInstallCommandFromText(trimmed)) {
+            continue;
+          }
+          return trimmed;
+        }
+        return run;
+      }
+
       for (const [tool, step] of uniqueTools) {
-        const run = normalizeRunCommand(step.run);
+        const normalized = normalizeRunCommand(step.run);
+        const run = signatureRun(normalized);
         const signature = run ? `${installManager}:${tool}::${run}` : `${installManager}:${tool}`;
         const jobs = patterns.get(signature) ?? [];
         jobs.push({ jobId: job.id, step });

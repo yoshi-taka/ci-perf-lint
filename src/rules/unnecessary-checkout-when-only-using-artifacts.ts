@@ -70,11 +70,20 @@ function jobHasHeavyBuildOrInstall(job: WorkflowJob): boolean {
 }
 
 function jobHasRepoFileOperations(job: WorkflowJob): boolean {
-  const repoFilePattern =
-    /\b(?:rm|cp|mv|cat|chmod|chown|ln|rsync|tar)\s+(?:-[a-zA-Z]+\s+)*(?:\.\/)?[a-zA-Z_][a-zA-Z0-9_@./-]*\/[a-zA-Z0-9_@./{}*?!=-]+/;
+  const patterns = [
+    // existing: commands operating on paths with directory separator
+    /\b(?:rm|cp|mv|cat|chmod|chown|ln|rsync|tar)\s+(?:-[a-zA-Z]+\s+)*(?:\.\/)?[a-zA-Z_][a-zA-Z0-9_@./-]*\/[a-zA-Z0-9_@./{}*?!=-]+/,
+    // file in current dir with extension (no /)
+    /\b(?:rm|cp|mv|cat|chmod|chown|ln|rsync|tar|install)\s+(?:-[a-zA-Z]+\s+)*(?:\.\/)?[a-zA-Z_][a-zA-Z0-9_@.-]*\.[a-zA-Z0-9]+\b/,
+    // tee writes to files
+    /\btee\s+(?:-[a-zA-Z]+\s+)*(?:\.\/)?[a-zA-Z_][a-zA-Z0-9_@./-]+/,
+    // shell redirection to a repo file
+    /(?:>>?)\s*(?:\.\/)?[a-zA-Z_][a-zA-Z0-9_@.-]*\.[a-zA-Z0-9]+\b/,
+  ];
+
   return job.steps.some((step) => {
     const run = step.run ?? "";
-    return repoFilePattern.test(run);
+    return patterns.some((pattern) => pattern.test(run));
   });
 }
 

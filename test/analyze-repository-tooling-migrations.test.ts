@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { analyzeRepository } from "../src/repo.ts";
 import { fixtures } from "./fixtures.ts";
 import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
 
@@ -399,5 +400,68 @@ describe("migrations: python and platform tooling", () => {
         (candidate) => candidate.ruleId === "prefer-turborepo-over-npm-workspaces",
       ),
     ).toBe(false);
+  });
+
+  test("does not flag helm install when version is set via job-level env", async () => {
+    const fixtureRoot = await tempDirs.create("apl-redun-cli-env-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: deploy",
+        "on: push",
+        "jobs:",
+        "  deploy:",
+        "    runs-on: ubuntu-latest",
+        "    env:",
+        '      HELM_VERSION: "3.14.0"',
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: brew install helm",
+        "      - run: helm upgrade --install myapp ./chart",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(report.findings.some((f) => f.ruleId === "redundant-install-for-preinstalled-cli")).toBe(
+      false,
+    );
+  });
+
+  test("does not flag helm install when version is set via prior step export", async () => {
+    const fixtureRoot = await tempDirs.create("apl-redun-cli-prior-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: deploy",
+        "on: push",
+        "jobs:",
+        "  deploy:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        '      - run: echo "HELM_VERSION=3.14.0" >> $GITHUB_ENV',
+        "      - run: brew install helm",
+        "      - run: helm version",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(report.findings.some((f) => f.ruleId === "redundant-install-for-preinstalled-cli")).toBe(
+      false,
+    );
   });
 });

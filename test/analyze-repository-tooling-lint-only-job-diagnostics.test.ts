@@ -217,6 +217,144 @@ describe("analyzeRepository repo-aware and tooling rules: lint-only job diagnost
     ).toBe(false);
   });
 
+  test("does not flag job with npm ci + tsc --noEmit (type-checking is a real compile step)", async () => {
+    const fixtureRoot = await tempDirs.create("apl-tsc-noemit-ok-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  typecheck:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: npm ci",
+        "      - run: tsc --noEmit",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
+      ),
+    ).toBe(false);
+  });
+
+  test("does not flag job with npm ci + tsc --noEmit + eslint (type-checking still justifies install)", async () => {
+    const fixtureRoot = await tempDirs.create("apl-tsc-noemit-eslint-ok-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  typecheck:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: npm ci",
+        "      - run: tsc --noEmit",
+        "      - run: npx eslint .",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
+      ),
+    ).toBe(false);
+  });
+
+  test("does not flag job with npm ci + bare tsc", async () => {
+    const fixtureRoot = await tempDirs.create("apl-bare-tsc-ok-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  typecheck:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: npm ci",
+        "      - run: tsc",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
+      ),
+    ).toBe(false);
+  });
+
+  test("still flags job with npm ci + tsc --version (version check is not a compile step)", async () => {
+    const fixtureRoot = await tempDirs.create("apl-tsc-version-flagged-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  check-ts-version:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: npm ci",
+        "      - run: tsc --version",
+        "      - run: npx eslint .",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const findings = report.findings.filter(
+      (candidate) => candidate.ruleId === "unnecessary-app-install-for-lint-job",
+    );
+
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+  });
+
   test("does not flag prettier job when prettier plugins are used", async () => {
     const fixtureRoot = await tempDirs.create("apl-prettier-plugin-ok-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");

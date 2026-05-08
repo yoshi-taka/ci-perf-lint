@@ -12,6 +12,7 @@ import {
   manualCacheStepMatchesDependencyFamily,
   setupActionHasBuiltInCacheForFamily,
 } from "./shared/workflow-caches.ts";
+import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
 
 const meta = {
   id: "missing-dependency-cache",
@@ -26,6 +27,10 @@ export const missingDependencyCacheRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
+      if (workflowLooksReleaseLike(workflow, job)) {
+        continue;
+      }
+
       const installFamilies = new Set<DependencyFamily>(
         job.steps
           .map((step) => detectInstallCommand(step))
@@ -103,6 +108,6 @@ export const missingDependencyCacheRule = {
       }
     }
 
-    return findings;
+    return findings.slice(0, 3);
   },
 };

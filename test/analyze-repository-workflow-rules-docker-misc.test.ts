@@ -452,4 +452,119 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
 
     expect(report.findings.some((c) => c.ruleId === "docker-cache-copy-path-mismatch")).toBe(false);
   });
+
+  test("warns for unused zip in container even when later step contains unzip (word boundary fix)", async () => {
+    const fixtureRoot = await tempDirs.create("apl-unused-zip-unzip-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: ci",
+        "on: push",
+        "jobs:",
+        "  test:",
+        "    container: ubuntu:22.04",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - name: Install zip",
+        "        run: apt-get update && apt-get install -y zip",
+        "      - name: Unzip something",
+        "        run: unzip archive.zip",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find(
+      (candidate) => candidate.ruleId === "wasteful-package-install-in-container",
+    );
+
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("zip");
+  });
+
+  test("warns for unused jq in container even when later step has .jq path (substring match fix)", async () => {
+    const fixtureRoot = await tempDirs.create("apl-unused-jq-path-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: ci",
+        "on: push",
+        "jobs:",
+        "  test:",
+        "    container: ubuntu:22.04",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - name: Install jq",
+        "        run: apt-get update && apt-get install -y jq",
+        "      - name: Process config",
+        "        run: cat config.jq",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find(
+      (candidate) => candidate.ruleId === "wasteful-package-install-in-container",
+    );
+
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("jq");
+  });
+
+  test("warns for unused git in container when later step only mentions github (substring match fix)", async () => {
+    const fixtureRoot = await tempDirs.create("apl-unused-git-github-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: ci",
+        "on: push",
+        "jobs:",
+        "  test:",
+        "    container: ubuntu:22.04",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - name: Install packages",
+        "        run: apt-get update && apt-get install -y git",
+        "      - name: Checkout from github",
+        "        uses: actions/checkout@v4",
+        "      - name: Run tests",
+        "        run: npm ci && npm test",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find(
+      (candidate) => candidate.ruleId === "wasteful-package-install-in-container",
+    );
+
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("git");
+  });
 });

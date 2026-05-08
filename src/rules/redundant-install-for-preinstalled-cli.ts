@@ -98,14 +98,52 @@ const meta = {
   docsPath: "docs/rules/redundant-install-for-preinstalled-cli.md",
 } satisfies RuleMeta;
 
+const versionEnvVarForCli: Record<PreinstalledCli, string> = {
+  aws: "AWS_CLI_VERSION",
+  az: "AZ_VERSION",
+  azcopy: "AZCOPY_VERSION",
+  gh: "GH_VERSION",
+  helm: "HELM_VERSION",
+  jq: "JQ_VERSION",
+  kubectl: "KUBECTL_VERSION",
+  yq: "YQ_VERSION",
+};
+
+const versionEnvVarPattern = new RegExp(
+  `\\b(?:${Object.values(versionEnvVarForCli).join("|")})\\b`,
+);
+
 function stepPinsVersion(step: WorkflowStep, cli: PreinstalledCli): boolean {
   const text = `${step.name ?? ""} ${step.run ?? ""}`.trim();
   return (
     new RegExp(`\\b${cli}\\b.*(?:==|=@|@\\d|version\\s+[0-9]|v[0-9]+\\.[0-9]+)`, "i").test(text) ||
-    /\b(?:AWS_CLI_VERSION|AZ_VERSION|AZCOPY_VERSION|GH_VERSION|HELM_VERSION|JQ_VERSION|KUBECTL_VERSION|YQ_VERSION)\b/.test(
-      text,
-    )
+    versionEnvVarPattern.test(text)
   );
+}
+
+function jobPinsVersion(job: WorkflowJob, installStepIndex: number, cli: PreinstalledCli): boolean {
+  // check install step itself
+  if (stepPinsVersion(job.steps[installStepIndex]!, cli)) {
+    return true;
+  }
+
+  // check prior steps for version env var assignment
+  for (let i = 0; i < installStepIndex; i++) {
+    if (stepPinsVersion(job.steps[i]!, cli)) {
+      return true;
+    }
+  }
+
+  // check job-level env block
+  const jobEnv = job.raw.env;
+  if (jobEnv && typeof jobEnv === "object") {
+    const versionVar = versionEnvVarForCli[cli];
+    if (versionVar && versionVar in jobEnv) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function getFirstInstallStep(job: WorkflowJob, cli: PreinstalledCli): WorkflowStep | undefined {
@@ -174,7 +212,7 @@ export const redundantInstallForPreinstalledCliRule = {
         }
 
         const installStep = getFirstInstallStep(job, cli);
-        if (!installStep || stepPinsVersion(installStep, cli)) {
+        if (!installStep || jobPinsVersion(job, job.steps.indexOf(installStep), cli)) {
           continue;
         }
 

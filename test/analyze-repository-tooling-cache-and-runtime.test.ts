@@ -1,7 +1,15 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { analyzeRepository } from "../src/repo.ts";
+import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
 import { fixtures } from "./fixtures.ts";
-import { memoizedAnalyzeRepository } from "./helpers.ts";
+
+const tempDirs = createTempDirTracker();
+
+afterEach(async () => {
+  await tempDirs.cleanup();
+});
 
 function getFixtureReport(
   cwd: string,
@@ -489,6 +497,45 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
           expect(finding.message).toContain(tc.message);
         }
       }
+    });
+
+    test("does not flag intentionally scoped lint jobs with multi-line run commands linting different directories", async () => {
+      const fixtureRoot = await tempDirs.create("apl-duplicate-multiline-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  lint-frontend:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - run: npm ci",
+          "      - run: |",
+          "          eslint src/",
+          "",
+          "  lint-backend:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - run: npm ci",
+          "      - run: |",
+          "          eslint api/",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((f) => f.ruleId === "duplicate-install-or-lint")).toBe(false);
     });
   });
 });

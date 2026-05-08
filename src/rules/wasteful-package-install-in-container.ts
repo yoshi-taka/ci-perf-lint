@@ -48,6 +48,10 @@ function extractPackagesFromInstall(run: string): string[] {
   return [...new Set(packages)];
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function packagesUsedLater(
   packages: string[],
   steps: WorkflowStep[],
@@ -61,8 +65,8 @@ function packagesUsedLater(
     .toLowerCase();
 
   for (const pkg of packages) {
-    const lowerPkg = pkg.toLowerCase();
-    if (laterText.includes(lowerPkg)) {
+    const pattern = new RegExp(`(?<=^|\\s)${escapeRegex(pkg)}(?=\\s|$)`);
+    if (pattern.test(laterText)) {
       used.add(pkg);
     }
   }

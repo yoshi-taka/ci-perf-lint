@@ -12,7 +12,7 @@ const meta = {
 } satisfies RuleMeta;
 
 const appConsumingPattern =
-  /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|test|dev|start|serve|preview|storybook)\b|\b(?:go|tsc)\s+(?:build|test)\b|\bcargo\s+(?:build|test)\b|\brake\s+(?:build|test)\b|\bpytest\b|\bvitest\b|\bjest\b|\bava\b|\bvite\s+build\b|\bnext\s+build\b|\bturbo\s+run\s+build\b|\bmvn\b|\bgradle\b|\bdotnet\s+build\b/i;
+  /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|test|dev|start|serve|preview|storybook)\b|\bgo\s+(?:build|test)\b|\btsc\b(?!\s+--version\b)|\bcargo\s+(?:build|test)\b|\brake\s+(?:build|test)\b|\bpytest\b|\bvitest\b|\bjest\b|\bava\b|\bvite\s+build\b|\bnext\s+build\b|\bturbo\s+run\s+build\b|\bmvn\b|\bgradle\b|\bdotnet\s+build\b/i;
 
 export const unnecessaryAppInstallForLintJobRule = {
   meta,
