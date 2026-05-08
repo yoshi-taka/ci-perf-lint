@@ -5,6 +5,7 @@ import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { getNode, getScalarString } from "../workflow.ts";
 import { jobRunsOnHostedWindows } from "./shared/workflow-jobs.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { stepDisplayName } from "./shared/any-step.ts";
 
 const meta = {
   id: "avoid-c-drive-on-windows-runner",
@@ -68,7 +69,7 @@ function* findCDrivePathsInJob(job: WorkflowJob): Generator<{ node: Node; messag
     if (step.workingDirectory && isCDrivePath(step.workingDirectory)) {
       yield {
         node: step.workingDirectoryNode ?? step.node,
-        message: `Step "${step.name ?? "(unnamed)"}" in job "${job.id}" sets working-directory to a C:\\ drive path.`,
+        message: `Step "${stepDisplayName(step)}" in job "${job.id}" sets working-directory to a C:\\ drive path.`,
       };
     }
 
@@ -78,7 +79,7 @@ function* findCDrivePathsInJob(job: WorkflowJob): Generator<{ node: Node; messag
       for (const { key, node } of findCDriveEnvEntries(stepEnvNode)) {
         yield {
           node,
-          message: `Step "${step.name ?? "(unnamed)"}" in job "${job.id}" sets env "${key}" to a C:\\ drive path.`,
+          message: `Step "${stepDisplayName(step)}" in job "${job.id}" sets env "${key}" to a C:\\ drive path.`,
         };
       }
     }
@@ -90,7 +91,7 @@ function* findCDrivePathsInJob(job: WorkflowJob): Generator<{ node: Node; messag
       if (pathNode && isCDrivePath(pathNode)) {
         yield {
           node: pathNode,
-          message: `Step "${step.name ?? "(unnamed)"}" in job "${job.id}" passes a C:\\ drive path to the "path" input.`,
+          message: `Step "${stepDisplayName(step)}" in job "${job.id}" passes a C:\\ drive path to the "path" input.`,
         };
       }
     }

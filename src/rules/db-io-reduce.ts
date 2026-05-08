@@ -2,6 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { stepDisplayName } from "./shared/any-step.ts";
 
 const ruleMeta = {
   id: "db-io-reduce",
@@ -176,7 +177,7 @@ function checkDockerRunSteps(workflow: WorkflowDocument, meta: RuleMeta, job: Wo
         why: `${info.name} containers in CI write to disk by default. On GitHub Actions hosted runners this causes unnecessary I/O overhead that can slow down test suites.`,
         suggestion: `Add --tmpfs ${info.dataDir} to the docker run options, or pass ${dbType === "mysql" ? "--innodb_flush_log_at_trx_commit=2" : "-c fsync=off"} as a ${info.name} argument.`,
         measurementHint: `Compare test duration before and after adding tmpfs or DB config to the docker run step in ${workflow.relativePath}.`,
-        aiHandoff: `In ${workflow.relativePath}, job "${job.id}", the step "${step.name ?? "unnamed"}" starts ${info.name} via \`docker run\` without disk I/O optimization. Add \`--tmpfs ${info.dataDir}\` to the docker run options.`,
+        aiHandoff: `In ${workflow.relativePath}, job "${job.id}", the step "${stepDisplayName(step)}" starts ${info.name} via \`docker run\` without disk I/O optimization. Add \`--tmpfs ${info.dataDir}\` to the docker run options.`,
         score: 60,
       }),
     );
@@ -208,7 +209,7 @@ function checkDockerComposeSteps(workflow: WorkflowDocument, meta: RuleMeta, job
           "Verify your docker compose file adds tmpfs mounts or DB config flags (innodb_flush_log_at_trx_commit for MySQL, fsync=off for PostgreSQL) to database service definitions.",
         measurementHint:
           "Review the compose file referenced in the step and compare test duration before/after adding disk I/O optimization.",
-        aiHandoff: `In ${workflow.relativePath}, job "${job.id}", the step "${step.name ?? "unnamed"}" runs \`docker compose\` with MySQL/PostgreSQL hints. Check the compose file and add \`--tmpfs\` or appropriate DB config flags to database services.`,
+        aiHandoff: `In ${workflow.relativePath}, job "${job.id}", the step "${stepDisplayName(step)}" runs \`docker compose\` with MySQL/PostgreSQL hints. Check the compose file and add \`--tmpfs\` or appropriate DB config flags to database services.`,
         score: 40,
       }),
     );

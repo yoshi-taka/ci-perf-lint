@@ -6,6 +6,30 @@ import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 
 export type AnyStep = WorkflowStep | PipelineStep;
 
+const MAX_RUN_PREVIEW = 40;
+const ansiRe = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[a-zA-Z]`, "g");
+
+function stripAnsi(text: string): string {
+  return text.replace(ansiRe, "");
+}
+
+export function stepDisplayName(step: WorkflowStep): string {
+  if (step.name) {
+    return stripAnsi(step.name);
+  }
+  if (step.run) {
+    const text = stripAnsi(step.run.replace(/\s+/g, " ").trim());
+    if (text.length <= MAX_RUN_PREVIEW) {
+      return `\`${text}\``;
+    }
+    return `\`${text.slice(0, MAX_RUN_PREVIEW - 3)}...\``;
+  }
+  if (step.uses) {
+    return stripAnsi(step.uses);
+  }
+  return "(unnamed)";
+}
+
 function isWorkflowStep(step: AnyStep): step is WorkflowStep {
   return "run" in step || "uses" in step;
 }
@@ -84,7 +108,7 @@ function collectCommandEntriesImpl(
             text: step.command,
             node: step.commandNode ?? step.node,
             jobName: job.name,
-            stepName: step.name ?? "unnamed",
+            stepName: stepDisplayName(step),
           });
         }
       }
@@ -137,7 +161,7 @@ function collectCommandEntriesImpl(
           text: step.run,
           node: step.runNode ?? step.node,
           jobName: job.id,
-          stepName: step.name ?? "unnamed",
+          stepName: stepDisplayName(step),
         });
       }
     }

@@ -589,7 +589,7 @@ describe("renderReport", () => {
         mode: "exploratory",
       });
       const text = renderReport(report, "text", ttyOpts);
-      expect(text).toContain("\x1b[96m");
+      expect(text).toContain("\x1b[36m");
       expect(text).toContain("\x1b[0m");
     });
 
@@ -604,7 +604,7 @@ describe("renderReport", () => {
         topCount: 5,
         mode: "exploratory",
       });
-      expect(handoff).toContain("\x1b[96m");
+      expect(handoff).toContain("\x1b[36m");
     });
 
     test("dims source locations in text format", async () => {
@@ -669,7 +669,7 @@ describe("renderReport", () => {
         analysisWarnings: [],
       };
       const text = renderReport(report, "text", { ...ttyOpts, topCount: 5, mode: "strict" });
-      expect(text).toContain("`\x1b[92mnpm audit\x1b[0m`");
+      expect(text).toContain("`\x1b[32mnpm audit\x1b[0m`");
     });
 
     test("no ANSI codes when colors flag is off", async () => {
@@ -737,7 +737,7 @@ describe("renderReport", () => {
         findingsOnly: true,
         mode: "strict",
       });
-      expect(handoff).toContain("`\x1b[92mnpm audit\x1b[0m`");
+      expect(handoff).toContain("`\x1b[32mnpm audit\x1b[0m`");
     });
 
     test("marks header bold in text format", async () => {
@@ -852,7 +852,7 @@ describe("renderReport", () => {
         mode: "strict",
       });
       const text = renderReport(report, "text", { ...ttyOpts, topCount: 3, mode: "strict" });
-      expect(text).toContain("\x1b[92m--mode exploratory\x1b[0m");
+      expect(text).toContain("\x1b[32m--mode exploratory\x1b[0m");
     });
   });
 });

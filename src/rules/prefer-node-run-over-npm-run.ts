@@ -229,13 +229,13 @@ async function checkBuildkite(
 
       findings.push(
         buildDiagnostic(pipeline, meta, step.commandNode ?? step.node, {
-          message: `Step "${step.label ?? "unnamed"}" runs package script "${npmRun.script}" through npm run.`,
+          message: `Step "${step.label ?? step.key ?? "(unnamed)"}" runs package script "${npmRun.script}" through npm run.`,
           why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
           suggestion:
             "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
           measurementHint:
             "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
-          aiHandoff: `Review ${pipeline.relativePath} step "${step.label ?? "unnamed"}" running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
+          aiHandoff: `Review ${pipeline.relativePath} step "${step.label ?? step.key ?? "(unnamed)"}" running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
           score: 38,
         }),
       );
@@ -263,7 +263,7 @@ async function checkCircleCi(doc: CircleCiDocument, context: RuleContext): Promi
 
       findings.push(
         buildDiagnostic(doc, meta, step.commandNode ?? step.node, {
-          message: `Job "${job.name}" step "${step.name ?? "unnamed"}" runs package script "${npmRun.script}" through npm run.`,
+          message: `Job "${job.name}" step "${step.name ?? step.command ?? "(unnamed)"}" runs package script "${npmRun.script}" through npm run.`,
           why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
           suggestion:
             "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",

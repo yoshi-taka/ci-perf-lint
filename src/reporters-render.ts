@@ -28,9 +28,9 @@ const ansi = {
   reset: "\x1b[0m",
   bold: "\x1b[1m",
   dim: "\x1b[90m",
-  highlight: "\x1b[96m",
-  code: "\x1b[92m",
-  link: "\x1b[36m",
+  highlight: "\x1b[36m",
+  code: "\x1b[32m",
+  link: "\x1b[90m\x1b[4m",
   warning: "\x1b[93m",
 };
 
@@ -270,7 +270,7 @@ function renderText(report: ReportData, options: RenderOptions = {}): string {
   const availabilityNote = renderTopAvailabilityNote(report, options);
   if (availabilityNote) {
     lines.push("");
-    lines.push(availabilityNote);
+    lines.push(maybeColor(ansi.dim, availabilityNote, options));
   }
 
   return lines.join("\n");
@@ -428,7 +428,7 @@ function renderHandoff(report: ReportData, options: RenderOptions): string {
   );
   const availabilityNote = renderTopAvailabilityNote(report, options);
   if (availabilityNote) {
-    lines.push(availabilityNote);
+    lines.push(maybeColor(ansi.dim, availabilityNote, options));
   }
   lines.push("");
   lines.push(maybeColor(ansi.bold, "Before editing:", options));
