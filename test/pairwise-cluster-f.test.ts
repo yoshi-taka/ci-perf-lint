@@ -28,7 +28,7 @@ const clusterFRules = new Set(["missing-timeout-minutes", "matrix-test-job-witho
 function expectedClusterFRules(p: Params): Set<string> {
   const expected = new Set<string>();
 
-  if (p.isHeavyJob && !p.hasTimeout && !p.hasMatrix) {
+  if (!p.hasTimeout && (p.isHeavyJob || p.hasTestTool)) {
     expected.add("missing-timeout-minutes");
   }
 

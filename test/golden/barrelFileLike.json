@@ -76,6 +76,7 @@
     "ruleId": "prefer-oxlint-over-eslint",
     "severity": "warning",
     "confidence": "medium",
+    "scope": "repository",
     "docsPath": "docs/rules/prefer-oxlint-over-eslint.md",
     "workflow": ".github/workflows/ci.yml",
     "location": {
@@ -83,7 +84,6 @@
       "line": 1,
       "column": 1
     },
-    "scope": "repository",
     "message": "Repository appears to use ESLint without visible Oxlint adoption.",
     "why": "Oxlint is often a drop-in or front-of-line speedup for JavaScript and TypeScript lint paths in CI. The official ESLint migration guide also documents incremental adoption, config migration, JS plugin fallback, and staged Oxlint-plus-ESLint rollouts. No visible unsupported ESLint plugin dependencies were detected at the repository root.",
     "suggestion": "Read OXC's 'Migrate from ESLint' guide first, then consider migrating the current ESLint entrypoint with @oxlint/migrate or running Oxlint before ESLint for a staged rollout.",

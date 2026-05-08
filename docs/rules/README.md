@@ -65,6 +65,7 @@ Current rule registry:
 - `missing-timeout-minutes`
 - `missing-turbo-cache`
 - `native-dependency-may-fall-back-to-source-build`
+- `npm-audit-in-ci`
 - `nox-without-uv-backend`
 - `npm-ci-over-npm-install`
 - `outdated-datadog-lambda-extension`
@@ -155,6 +156,7 @@ Current rule registry:
 - `ts-loader-fork-ts-checker`
 - `ungated-heavy-job`
 - `unnecessary-app-install-for-lint-job`
+- `unnecessary-npm-global-upgrade-before-npm-install`
 - `unnecessary-checkout-when-only-using-artifacts`
 - `wasteful-npm-global-install`
 - `wasteful-package-install-in-container`

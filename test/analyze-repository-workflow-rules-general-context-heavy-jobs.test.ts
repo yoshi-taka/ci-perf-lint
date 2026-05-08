@@ -284,6 +284,41 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
     expect(finding?.suggestion).toContain("optional skipped upstream paths");
   });
 
+  test("warns when a workflow upgrades npm globally before npm ci/install without yarn/pnpm/bun", async () => {
+    const report = await getFixtureReport(
+      fixtures.unnecessaryNpmGlobalUpgradeBeforeNpmInstallLike,
+      {
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      },
+    );
+
+    const finding = report.findings.find(
+      (candidate) => candidate.ruleId === "unnecessary-npm-global-upgrade-before-npm-install",
+    );
+
+    expect(report.workflowCount).toBe(1);
+    expect(finding).toBeDefined();
+    expect(finding?.severity).toBe("warning");
+    expect(finding?.message).toContain("upgrades npm globally");
+    expect(finding?.message).toContain("before a project npm install");
+  });
+
+  test("does not warn when the workflow also calls npm publish", async () => {
+    const report = await getFixtureReport(fixtures.unnecessaryNpmGlobalUpgradeBeforeNpmInstallOk, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "unnecessary-npm-global-upgrade-before-npm-install",
+      ),
+    ).toBe(false);
+  });
+
   test("warns when a job using yarn/pnpm/bun also upgrades npm globally", async () => {
     const report = await getFixtureReport(fixtures.wastefulNpmGlobalInstallLike, {
       targetPath: ".",

@@ -1,4 +1,4 @@
-export const npmRunMatcher =
+const npmRunMatcher =
   /^\s*npm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)((?:\s+--[^\s]+)*)((?:\s+--(?:\s+.*)?)?)\s*$/;
 
 export function detectSimpleNpmRunFromText(

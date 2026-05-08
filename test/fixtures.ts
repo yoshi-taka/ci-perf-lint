@@ -285,6 +285,10 @@ const fixtureNames = {
   unnecessaryCheckoutArtifactCreatePrOk: "unnecessary-checkout-artifact-create-pr-ok",
   vitest3MinorLike: "vitest-3-minor-like",
   vitest3MinorOk: "vitest-3-minor-ok",
+  unnecessaryNpmGlobalUpgradeBeforeNpmInstallLike:
+    "unnecessary-npm-global-upgrade-before-npm-install-like",
+  unnecessaryNpmGlobalUpgradeBeforeNpmInstallOk:
+    "unnecessary-npm-global-upgrade-before-npm-install-ok",
   wastefulNpmGlobalInstallLike: "wasteful-npm-global-install-like",
   wastefulNpmGlobalInstallOk: "wasteful-npm-global-install-ok",
   wastefulPackageInstallInContainerLike: "wasteful-package-install-in-container-like",
@@ -330,6 +334,8 @@ const fixtureNames = {
   amplifyYmlOk: "amplify-yml-ok",
   crossPlatformRedundantNpx: "cross-platform-redundant-npx",
   crossPlatformDockerNocache: "cross-platform-docker-nocache",
+  npmAuditInCiLike: "npm-audit-in-ci-like",
+  npmAuditInCiOk: "npm-audit-in-ci-ok",
 } as const;
 
 const cache = new Map<string, string>();

@@ -45,6 +45,7 @@ import { missingTimeoutInMinutesGitlabCiRule } from "./missing-timeout-in-minute
 import { missingTimeoutMinutesRule } from "./missing-timeout-minutes.ts";
 import { missingTurboCacheRule } from "./missing-turbo-cache.ts";
 import { matrixTestJobWithoutTestShardingRule } from "./matrix-test-job-without-test-sharding.ts";
+import { npmAuditInCiRule } from "./npm-audit-in-ci.ts";
 import { missingTestWorkerTuningForStandardRunnerRule } from "./missing-test-worker-tuning-for-standard-runner.ts";
 import { nativeDependencyMayFallBackToSourceBuildRule } from "./native-dependency-may-fall-back-to-source-build.ts";
 import { outdatedDatadogLambdaExtensionRule } from "./outdated-datadog-lambda-extension.ts";
@@ -89,6 +90,7 @@ import { repeatedLintInSameWorkflowRule } from "./repeated-lint-in-same-workflow
 import { scheduledHeavyWorkflowWithoutThrottlingRule } from "./scheduled-heavy-workflow-without-throttling.ts";
 import { ungatedHeavyJobRule } from "./ungated-heavy-job.ts";
 import { unnecessaryAppInstallForLintJobRule } from "./unnecessary-app-install-for-lint-job.ts";
+import { unnecessaryNpmGlobalUpgradeBeforeNpmInstallRule } from "./unnecessary-npm-global-upgrade-before-npm-install.ts";
 import { unnecessaryCheckoutWhenOnlyUsingArtifactsRule } from "./unnecessary-checkout-when-only-using-artifacts.ts";
 import { toxWithoutToxUvRule } from "./tox-without-tox-uv.ts";
 import { wastefulNpmGlobalInstallRule } from "./wasteful-npm-global-install.ts";
@@ -126,12 +128,14 @@ export const allRules = [
   missingTestWorkerTuningForStandardRunnerRule,
   missingTurboCacheRule,
   nativeDependencyMayFallBackToSourceBuildRule,
+  npmAuditInCiRule,
   outdatedDatadogLambdaExtensionRule,
   outdatedSetupActionWithoutCacheRule,
   noxWithoutUvBackendRule,
   pdmWithoutUseUvRule,
   ungatedHeavyJobRule,
   unnecessaryAppInstallForLintJobRule,
+  unnecessaryNpmGlobalUpgradeBeforeNpmInstallRule,
   unnecessaryCheckoutWhenOnlyUsingArtifactsRule,
   deepCheckoutExcessiveDepthRule,
   deepCheckoutWithoutNeedRule,
@@ -188,26 +192,8 @@ export const rulesByScope = {
   "github-actions": allRules.filter(
     (rule) => ((rule.meta as RuleMeta).scope ?? "github-actions") === "github-actions",
   ),
-  buildkite: [
-    ...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "buildkite"),
-    preferNodeRunOverNpmRunRule,
-    redundantNpxOrBootstrapRule,
-    dockerBuildCacheDisabledInCiRule,
-    dockerBakeFileUnusedInCiRule,
-  ],
-  "gitlab-ci": [
-    ...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "gitlab-ci"),
-    preferNodeRunOverNpmRunRule,
-    redundantNpxOrBootstrapRule,
-    dockerBuildCacheDisabledInCiRule,
-    dockerBakeFileUnusedInCiRule,
-  ],
-  circleci: [
-    ...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "circleci"),
-    preferNodeRunOverNpmRunRule,
-    redundantNpxOrBootstrapRule,
-    dockerBuildCacheDisabledInCiRule,
-    dockerBakeFileUnusedInCiRule,
-  ],
+  buildkite: [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "buildkite")],
+  "gitlab-ci": [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "gitlab-ci")],
+  circleci: [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "circleci")],
   both: allRules.filter((rule) => (rule.meta as RuleMeta).scope === "both"),
 };

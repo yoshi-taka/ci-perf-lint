@@ -59,7 +59,7 @@ function expectedClusterERules(p: Params): Set<string> {
     expected.add("missing-paths-filter");
   }
 
-  // missing-timeout-minutes: push/PR + heavy job + no timeout (not matrix/reusable)
+  // missing-timeout-minutes: push/PR + heavy job + no timeout (not reusable)
   if (hasPushOrPR && p.heavyJob && !p.hasTimeoutMinutes) {
     expected.add("missing-timeout-minutes");
   }

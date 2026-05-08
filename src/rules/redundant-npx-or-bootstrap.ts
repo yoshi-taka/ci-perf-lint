@@ -13,6 +13,7 @@ const meta = {
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/redundant-npx-or-bootstrap.md",
+  scope: "both",
 } satisfies RuleMeta;
 
 export const redundantNpxOrBootstrapRule = {

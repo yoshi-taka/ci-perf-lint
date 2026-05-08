@@ -5,7 +5,6 @@ import {
   hasDirectHeavySignals,
   isHeavyJob,
   jobIsStaticallyDisabled,
-  jobHasMatrix,
   jobHasTimeout,
   workflowLooksAgenticLike,
   workflowLooksReleaseLike,
@@ -55,7 +54,6 @@ export const missingTimeoutMinutesRule = {
         (job) =>
           !job.usesReusableWorkflow &&
           !jobIsStaticallyDisabled(job) &&
-          !jobHasMatrix(job) &&
           ((isHeavyJob(job) && hasDirectHeavySignals(job)) ||
             workflowLooksAgenticLike(workflow, job)) &&
           !jobHasTimeout(job),

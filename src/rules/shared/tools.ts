@@ -96,7 +96,7 @@ const KNOWN_INSTALLER_ACTIONS: [DependencyFamily, readonly string[]][] = [
   ["npm", ["e18e/action-dependency-diff@"]],
 ];
 
-function detectInstallCommandFromText(run: string): string | undefined {
+export function detectInstallCommandFromText(run: string): string | undefined {
   if (/\b(?:bun\s+install\s+--lockfile-only|npm\s+install\s+--package-lock-only)\b/i.test(run)) {
     return undefined;
   }

@@ -5,38 +5,18 @@ import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import type { PipelineDocument } from "../buildkite-workflow.ts";
 import type { CircleCiDocument } from "../circleci-workflow.ts";
 import type { GitlabCiDocument } from "../gitlab-ci-workflow.ts";
+import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
-import { npmRunMatcher } from "./shared/command-patterns.ts";
+import { detectSimpleNpmRunFromText } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "prefer-node-run-over-npm-run",
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
+  scope: "both",
 } satisfies RuleMeta;
-
-interface NpmRunScript {
-  script: string;
-  replacement: string;
-}
-
-function detectSimpleNpmRunFromText(text: string): NpmRunScript | undefined {
-  const trimmed = text.trim();
-  if (!trimmed || trimmed.includes("\n")) {
-    return undefined;
-  }
-  const match = trimmed.match(npmRunMatcher);
-  const script = match?.[1];
-  if (!script) {
-    return undefined;
-  }
-  const passthrough = match[3]?.trim() ?? "";
-  return {
-    script,
-    replacement: passthrough ? `node --run ${script} ${passthrough}` : `node --run ${script}`,
-  };
-}
 
 function parseVisibleNodeMajor(version: unknown): number | undefined {
   if (typeof version === "number" && Number.isInteger(version)) {
@@ -51,6 +31,72 @@ function parseVisibleNodeMajor(version: unknown): number | undefined {
   }
   const match = trimmed.match(/^(?:v)?(\d+)(?:\.|$|x)/i);
   return match?.[1] ? Number.parseInt(match[1], 10) : undefined;
+}
+
+function extractNodeMajorFromAny(text: string): number | undefined {
+  const major = parseVisibleNodeMajor(text);
+  if (major !== undefined) {
+    return major;
+  }
+  const m = text.match(/(\d+)/);
+  if (m) {
+    return Number.parseInt(m[1]!, 10);
+  }
+  return undefined;
+}
+
+function nodeVersionFromDockerImages(images: string[] | undefined): number | undefined {
+  if (!images) {
+    return undefined;
+  }
+  for (const img of images) {
+    const m = img.match(/(?:\/|^)node[:/](\d+)/i);
+    if (m) {
+      return Number.parseInt(m[1]!, 10);
+    }
+  }
+  return undefined;
+}
+
+async function getRepositoryNodeVersion(
+  scanContext: RepositoryScanContext | undefined,
+): Promise<number | undefined> {
+  if (!scanContext) {
+    return undefined;
+  }
+
+  const nvPath = scanContext.resolve(".node-version");
+  if (await scanContext.pathExists(nvPath)) {
+    const text = await scanContext.readTextFileOrWarn(nvPath);
+    if (text) {
+      const major = extractNodeMajorFromAny(text);
+      if (major !== undefined) {
+        return major;
+      }
+    }
+  }
+
+  const nvmPath = scanContext.resolve(".nvmrc");
+  if (await scanContext.pathExists(nvmPath)) {
+    const text = await scanContext.readTextFileOrWarn(nvmPath);
+    if (text) {
+      const major = extractNodeMajorFromAny(text);
+      if (major !== undefined) {
+        return major;
+      }
+    }
+  }
+
+  const pkg = await scanContext.loadPackageJson();
+  const engines = pkg.value?.engines as Record<string, unknown> | undefined;
+  if (engines?.node && typeof engines.node === "string") {
+    const major = extractNodeMajorFromAny(engines.node);
+    if (major !== undefined) {
+      return major;
+    }
+  }
+
+  return undefined;
 }
 
 function stepTargetsNodeRunCapableVersion(step: WorkflowStep): boolean {
@@ -152,8 +198,15 @@ function checkGithubActions(workflow: WorkflowDocument, context: RuleContext): D
   return findings;
 }
 
-function checkBuildkite(pipeline: PipelineDocument, context: RuleContext): Diagnostic[] {
+async function checkBuildkite(
+  pipeline: PipelineDocument,
+  context: RuleContext,
+): Promise<Diagnostic[]> {
   const findings: Diagnostic[] = [];
+  const repoNodeVersion = await getRepositoryNodeVersion(context.scanContext);
+  if (repoNodeVersion !== undefined && repoNodeVersion < 22) {
+    return findings;
+  }
 
   for (const step of pipeline.steps) {
     if (step.isWait || step.isBlock || step.isTrigger || step.isGroup) {
@@ -192,10 +245,16 @@ function checkBuildkite(pipeline: PipelineDocument, context: RuleContext): Diagn
   return findings;
 }
 
-function checkCircleCi(doc: CircleCiDocument, context: RuleContext): Diagnostic[] {
+async function checkCircleCi(doc: CircleCiDocument, context: RuleContext): Promise<Diagnostic[]> {
   const findings: Diagnostic[] = [];
+  const repoNodeVersion = await getRepositoryNodeVersion(context.scanContext);
 
   for (const job of doc.jobs) {
+    const jobNodeVersion = nodeVersionFromDockerImages(job.dockerImages) ?? repoNodeVersion;
+    if (jobNodeVersion !== undefined && jobNodeVersion < 22) {
+      continue;
+    }
+
     for (const step of job.steps) {
       const npmRun = detectSimpleNpmRunFromText(step.command ?? "");
       if (!npmRun) {
@@ -220,10 +279,17 @@ function checkCircleCi(doc: CircleCiDocument, context: RuleContext): Diagnostic[
   return findings;
 }
 
-function checkGitlabCi(doc: GitlabCiDocument, context: RuleContext): Diagnostic[] {
+async function checkGitlabCi(doc: GitlabCiDocument, context: RuleContext): Promise<Diagnostic[]> {
   const findings: Diagnostic[] = [];
+  const repoNodeVersion = await getRepositoryNodeVersion(context.scanContext);
 
   for (const job of doc.jobs) {
+    const image = job.image;
+    const jobNodeVersion = image ? nodeVersionFromDockerImages([image]) : repoNodeVersion;
+    if (jobNodeVersion !== undefined && jobNodeVersion < 22) {
+      continue;
+    }
+
     for (const cmd of job.script ?? []) {
       const npmRun = detectSimpleNpmRunFromText(cmd);
       if (!npmRun) {
@@ -250,10 +316,10 @@ function checkGitlabCi(doc: GitlabCiDocument, context: RuleContext): Diagnostic[
 
 export const preferNodeRunOverNpmRunRule = {
   meta,
-  check(
+  async check(
     workflow: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
     context: RuleContext,
-  ): Diagnostic[] {
+  ): Promise<Diagnostic[]> {
     if (isCircleCiDoc(workflow)) {
       return checkCircleCi(workflow, context);
     }

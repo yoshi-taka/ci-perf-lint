@@ -13,6 +13,7 @@ const meta = {
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/docker-build-cache-disabled-in-ci.md",
+  scope: "both",
 } satisfies RuleMeta;
 
 export const dockerBuildCacheDisabledInCiRule = {

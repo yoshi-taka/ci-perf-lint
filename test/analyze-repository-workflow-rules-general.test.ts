@@ -264,4 +264,27 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     expect(otp25Findings.length).toBeGreaterThanOrEqual(1);
     expect(elixir14Findings.length).toBeGreaterThanOrEqual(1);
   });
+
+  test("flags npm audit in a push/PR workflow", async () => {
+    const report = await getFixtureReport(fixtures.npmAuditInCiLike, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "exploratory",
+    });
+
+    const finding = report.findings.find((f) => f.ruleId === "npm-audit-in-ci");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("npm audit");
+  });
+
+  test("skips npm audit in a security-named scheduled workflow", async () => {
+    const report = await getFixtureReport(fixtures.npmAuditInCiOk, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "exploratory",
+    });
+
+    const ruleIds = report.findings.map((f) => f.ruleId);
+    expect(ruleIds).not.toContain("npm-audit-in-ci");
+  });
 });
