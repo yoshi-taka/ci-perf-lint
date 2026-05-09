@@ -6,6 +6,7 @@ import { avoidCDriveOnWindowsRunnerRule } from "./avoid-c-drive-on-windows-runne
 import { avoidDockerImageViaUsesRule } from "./avoid-docker-image-via-uses.ts";
 import { avoidEslintPluginPrettierRule } from "./avoid-eslint-plugin-prettier.ts";
 import { avoidPrettierEslintRule } from "./avoid-prettier-eslint.ts";
+import { repeatedBootstrapSetupRule } from "./repeated-bootstrap-setup.ts";
 import { avoidXcodeInstallOnHostedMacosRule } from "./avoid-xcode-install-on-hosted-macos.ts";
 import { cacheTerraformProvidersRule } from "./cache-terraform-providers.ts";
 import { cargoBuildBeforeTestRule } from "./cargo-build-before-test.ts";
@@ -174,6 +175,7 @@ export const allRules = [
   preferRuffImportSortingOverIsortRule,
   repeatedInstallInSameJobRule,
   repeatedLintInSameWorkflowRule,
+  repeatedBootstrapSetupRule,
   repeatedBuildInSameWorkflowRule,
   scheduledHeavyWorkflowWithoutThrottlingRule,
   duplicateCheckoutInSameWorkflowRule,

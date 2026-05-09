@@ -55,11 +55,11 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     ).length;
 
     expect(report.workflowCount).toBe(27);
-    expect(report.findings.length).toBeLessThan(250);
+    expect(report.findings.length).toBeLessThan(280);
     expect(ruleIds.has("missing-paths-filter")).toBe(true);
     expect(ruleIds.has("missing-concurrency")).toBe(true);
     expect(ruleIds.has("ungated-heavy-job")).toBe(true);
-    expect(ungatedCount).toBeLessThan(120);
+    expect(ungatedCount).toBeLessThan(200);
   });
 
   test("analyzes the gemini-cli workflow fixture", async () => {

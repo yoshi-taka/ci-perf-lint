@@ -177,6 +177,8 @@ const fixtureNames = {
   reactIconsGroupedImportLike: "react-icons-grouped-import-like",
   reactUseRootImportLike: "react-use-root-import-like",
   rechartsRootImportLike: "recharts-root-import-like",
+  repeatedBootstrapLike: "repeated-bootstrap-like",
+  repeatedBootstrapOk: "repeated-bootstrap-ok",
   releaseGuardFailureCancelledLike: "release-guard-failure-cancelled-like",
   releaseGuardLike: "release-guard-like",
   releaseGuardManyLike: "release-guard-many-like",
