@@ -169,6 +169,17 @@ export async function runEmbeddedOxlint(
       return undefined;
     }
 
+    if (result.timedOut && result.diagnostics.length === 0) {
+      const skipped =
+        kind === "import"
+          ? "import restriction and extension checks"
+          : "barrel file and snapshot checks";
+      stderrWarn(
+        `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
+      );
+      return undefined;
+    }
+
     if (result.exitCode !== 0 && result.diagnostics.length === 0) {
       const skipped =
         kind === "import"
