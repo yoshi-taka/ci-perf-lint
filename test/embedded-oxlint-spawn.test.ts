@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxlint-path.ts";
-import {
-  embeddedOxlintNodeFallbackCommand,
-  shouldRetryEmbeddedOxlintWithNode,
-} from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
+import { runEmbeddedOxlint } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
 import { accessSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,20 +32,24 @@ describe("bundledOxlintBinPath", () => {
   });
 });
 
-describe("embedded oxlint node fallback", () => {
-  test("retries on timeout or crash exit codes", () => {
-    expect(shouldRetryEmbeddedOxlintWithNode(undefined)).toBe(true);
-    expect(shouldRetryEmbeddedOxlintWithNode(132)).toBe(true);
-    expect(shouldRetryEmbeddedOxlintWithNode(1)).toBe(false);
-  });
+describe("embedded oxlint fixture retry", () => {
+  test("retries with fixture ignores after a silent failure", async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "apl-oxlint-fixture-retry-"));
+    try {
+      const fixtureDir = path.join(tmpDir, "test", "bundler", "transpiler", "fixtures");
+      await mkdir(fixtureDir, { recursive: true });
+      const filePath = path.join(fixtureDir, "607.js");
+      let content = "let counter = 0;\n";
+      for (let i = 1; i <= 607; i++) {
+        content +=
+          "for (let i = 0; i < 1; i++) for (let i = 0; i < 1; i++) for (let i = 0; i < 1; i++) for (let i = 0; i < 1; i++)\n";
+      }
+      await writeFile(filePath, content);
 
-  test("builds a node command from the bundled oxlint js path", async () => {
-    const binPath = await bundledOxlintBinPath();
-    expect(binPath).toBeTruthy();
-    const cmd = embeddedOxlintNodeFallbackCommand(binPath!, ["-f", "unix"]);
-    expect(cmd[0]).toBe("node");
-    expect(cmd[1]).toEndWith("/dist/cli.js");
-    expect(cmd.slice(2)).toEqual(["-f", "unix"]);
+      expect(runEmbeddedOxlint(tmpDir, "non-import")).resolves.toEqual([]);
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

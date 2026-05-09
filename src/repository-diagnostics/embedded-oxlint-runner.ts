@@ -13,16 +13,6 @@ import { stderrWarn } from "../stderr-warn.ts";
 export type { EmbeddedOxlintScanKind } from "./embedded-oxlint-config.ts";
 export { cleanupEmbeddedOxlintTempConfigFiles } from "./embedded-oxlint-config.ts";
 export type { OxlintDiagnostic } from "./embedded-oxlint-parser.ts";
-export function embeddedOxlintNodeFallbackCommand(
-  oxlintPath: string,
-  oxlintArgs: string[],
-): string[] {
-  return ["node", bundledOxlintJsPath(oxlintPath), ...oxlintArgs];
-}
-
-export function shouldRetryEmbeddedOxlintWithNode(exitCode: number | undefined): boolean {
-  return exitCode === undefined || exitCode > 128;
-}
 
 const embeddedOxlintIgnoredDirectories = new Set([
   ".git",
@@ -37,6 +27,11 @@ const embeddedOxlintIgnoredDirectories = new Set([
 const embeddedOxlintDefaultIgnorePatterns = [...embeddedOxlintIgnoredDirectories].map(
   (dir) => `**/${dir}/**`,
 );
+const embeddedOxlintFixtureIgnorePatterns = [
+  "**/fixtures/**",
+  "**/__fixtures__/**",
+  "**/*.fixture.*",
+];
 
 function timingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
@@ -52,11 +47,9 @@ export async function runEmbeddedOxlint(
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<OxlintDiagnostic[] | undefined> {
-  async function runOxlint(
-    cmd: string[],
-  ): Promise<
-    { diagnostics: OxlintDiagnostic[]; exitCode: number; stderrText: string } | undefined
-  > {
+  type OxlintRunResult = { diagnostics: OxlintDiagnostic[]; exitCode: number; stderrText: string };
+
+  async function runOxlint(cmd: string[]): Promise<OxlintRunResult | undefined> {
     const spawned = spawnOxlintProcess(cmd, repoRoot);
     const [stdoutText, stderrText, exitCode] = await Promise.all([
       spawned.stdout,
@@ -66,10 +59,6 @@ export async function runEmbeddedOxlint(
 
     if (exitCode === -1) {
       return undefined;
-    }
-
-    if (exitCode !== 0) {
-      return { diagnostics: [], exitCode, stderrText };
     }
 
     const diagnostics: OxlintDiagnostic[] = [];
@@ -86,15 +75,15 @@ export async function runEmbeddedOxlint(
     return { diagnostics, exitCode, stderrText };
   }
 
-  try {
-    const localWarnings: AnalysisWarning[] = [];
-    const context = scanContext ?? new RepositoryScanContext(repoRoot, localWarnings);
-    const source = embeddedOxlintLabel(kind);
-    const configPath = await writeEmbeddedOxlintConfig(kind);
-    const ignorePatternFlags = embeddedOxlintDefaultIgnorePatterns.flatMap((pattern) => [
-      "--ignore-pattern",
-      pattern,
-    ]);
+  async function runOxlintWithFallbacks(
+    repoContext: RepositoryScanContext,
+    configPath: string,
+    extraIgnorePatterns: string[] = [],
+  ): Promise<OxlintRunResult | undefined> {
+    const ignorePatternFlags = [
+      ...embeddedOxlintDefaultIgnorePatterns,
+      ...extraIgnorePatterns,
+    ].flatMap((pattern) => ["--ignore-pattern", pattern]);
 
     const oxlintArgs = [
       "-c",
@@ -107,16 +96,11 @@ export async function runEmbeddedOxlint(
       ".",
     ];
 
-    const startedAt = performance.now();
-    let result:
-      | { diagnostics: OxlintDiagnostic[]; exitCode: number; stderrText: string }
-      | undefined;
-    let usedFallback = false;
+    let result: OxlintRunResult | undefined;
 
-    // Try 1: bundled oxlint via node_modules (JS wrapper + native .node addon)
     const oxlintPath = await bundledOxlintBinPath();
     let bundledResolved = false;
-    if (oxlintPath && (await context.pathExists(oxlintPath))) {
+    if (oxlintPath && (await repoContext.pathExists(oxlintPath))) {
       bundledResolved = true;
       const cmd =
         typeof Bun !== "undefined"
@@ -125,19 +109,43 @@ export async function runEmbeddedOxlint(
       result = await runOxlint(cmd);
     }
 
-    // Try 2: bunx oxlint fallback — bundled path failed (timeout, crash, or
-    // Bun cache symlink issue with native binding resolution).
-    const bundledFailed = bundledResolved && result?.exitCode !== 0;
-    if (bundledFailed) {
-      if (typeof Bun !== "undefined") {
-        const bunxCmd = ["bunx", "--bun", "oxlint", ...oxlintArgs];
-        const bunxResult = await runOxlint(bunxCmd);
-        if (bunxResult?.exitCode === 0) {
-          result = bunxResult;
-          usedFallback = true;
-        }
+    const bundledFailed =
+      bundledResolved && (result?.exitCode === undefined || result.exitCode > 128);
+    if (bundledFailed && oxlintPath) {
+      const nodeCmd = ["node", bundledOxlintJsPath(oxlintPath), ...oxlintArgs];
+      const nodeResult = await runOxlint(nodeCmd);
+      if (nodeResult) {
+        result = nodeResult;
       }
     }
+
+    return result;
+  }
+
+  try {
+    const localWarnings: AnalysisWarning[] = [];
+    const context = scanContext ?? new RepositoryScanContext(repoRoot, localWarnings);
+    const source = embeddedOxlintLabel(kind);
+    const configPath = await writeEmbeddedOxlintConfig(kind);
+    const startedAt = performance.now();
+    let result = await runOxlintWithFallbacks(context, configPath);
+
+    if (
+      result?.exitCode !== undefined &&
+      result.exitCode !== 0 &&
+      result.diagnostics.length === 0
+    ) {
+      const fixtureRetryResult = await runOxlintWithFallbacks(
+        context,
+        configPath,
+        embeddedOxlintFixtureIgnorePatterns,
+      );
+      if (fixtureRetryResult) {
+        result = fixtureRetryResult;
+      }
+    }
+
+    const usedFallback = result?.exitCode === 0;
 
     const elapsedMs = performance.now() - startedAt;
 
@@ -152,7 +160,7 @@ export async function runEmbeddedOxlint(
       return undefined;
     }
 
-    if (result.exitCode !== 0) {
+    if (result.exitCode !== 0 && result.diagnostics.length === 0) {
       const skipped =
         kind === "import"
           ? "import restriction and extension checks"
@@ -179,7 +187,7 @@ export async function runEmbeddedOxlint(
 
     if (timingsEnabled()) {
       process.stderr.write(
-        `[timing] ${source} time=${elapsedMs.toFixed(1)}ms diagnostics=${result.diagnostics.length}${usedFallback ? " (via bunx)" : ""}\n`,
+        `[timing] ${source} time=${elapsedMs.toFixed(1)}ms diagnostics=${result.diagnostics.length}${usedFallback ? " (via fallback)" : ""}\n`,
       );
     }
     warnings?.push(...localWarnings);
