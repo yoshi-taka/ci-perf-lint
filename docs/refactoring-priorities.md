@@ -456,3 +456,93 @@ Set 化のデメリット:
 
 条件: この判断を再訪するのは、あと **3箇所以上の O(n*m) hotspot** が rule/repo-diagnostic に出現したとき。
 現時点では SignalIndex アーキテクチャは overengineering に倒して負債になる。
+
+## 17. Workflow信号スキャンの Token Index / Aho-Corasick 化 (保留)
+
+提案: `workflowsMatch()` の13回独立 regex スキャンを1パスの token index または Aho-Corasick に置き換える。
+
+結論: **現状不要。実測上ボトルネックになっていない。**
+
+`CI_PERF_LINT_TIMINGS=1` で計測した signal evidence 関数の実測値:
+
+```
+typescript=0.8ms
+eslint=2.0ms
+prettier=1.8ms
+frameworks=1.9ms
+```
+
+理由:
+- 12個の `has*SignalEvidence()` は `Promise.all` で並列 → wall time は最長2ms
+- `.some()` short-circuit で平均1-2ワークフローの source しか読まない
+- V8 は単純な `RegExp.test()` を超高速に処理
+
+Token index のデメリット:
+- tokenizer 設計が重要 (hyphen, @, / の境界処理)
+- 構造的パターン (`uses:\s*actions/setup-python@`) は regex の方が強い
+- 実装コストに対してリターンが極小
+
+Aho-Corasick:
+- 13パターンでは過剰。50+ patterns × 200+ documents で初めて効く
+- 現状は V8 regex で十分
+
+再訪条件: ワークフロー数 > 200 または signal evidence 収集が wall time の 5% 以上を占めるようになったとき。
+
+## 18. Version Milestones の JSON 外部化 (保留)
+
+提案: ハードコードされたバージョン閾値 (`prefer-nextjs-minor-performance-milestone.ts` 等) を `docs/version-milestones.json` に外部化し、1つの汎用 collector で処理する。
+
+結論: **現状は時期尚早。factory パターンで十分。**
+
+現在の該当ファイル (8個):
+- Next.js: rule + repo-diagnostic (2)
+- Storybook: rule + repo-diagnostic (2)
+- TypeScript: repo-diagnostic (1)
+- mypy: repo-diagnostic (1)
+- Elixir/OTP: rule + repo-diagnostic (2)
+
+Next.js は既に `createNextjsMilestoneCollector` の factory パターンで milestone 追加がデータ駆動できている。JSON 外部化のデメリット:
+- 動的ロジック (`why` や `score` の条件分岐) が JSON では表現できない
+- interface 定義 + パース + validation + fallback でコードが増える
+- 8ファイルではオーバーヘッドが勝つ
+
+再訪条件: milestone 定義が 15+ かつ 3+ frameworks になったとき。JSON 化する場合でも、動的ロジックが必要なものはコードに残す境界を明示する。
+
+## 19. low-impact-config-triggers-expensive-workflow ルール (保留)
+
+提案: `.prettierrc` 等の低インパクト設定ファイル変更が重い CI (E2E, Docker build) をトリガーするのを警告するルール。
+
+結論: **構想は viable だが現時点では優先度低い。**
+
+実装難易度: 中 (3-4時間、~340行)
+
+既存インフラ:
+- 設定ファイル検出: あり (`repository-scan-context.ts`)
+- ワークフロートリガー解析: 一部あり (`workflow-triggers.ts` → `hasPathFilter()`)
+- ワークフローの重さ判定: 一部あり (`missing-paths-filter.ts`)
+- クロスワークフロー分析: あり (repository-diagnostics パターン)
+
+欠けているもの:
+- パス glob と特定ファイルのマッチング
+- 設定ファイルのインパクト分類 (format-only, docs-only, code)
+
+簡易版 (glob なし) でも meaningful な finding にはなるが、`missing-paths-filter` / `missing-path-ignore-for-non-code` との差別化が弱い。
+差別化ポイントを明確にしてから着手するのが望ましい。
+
+## 20. repoPrecedents 転置インデックス (保留)
+
+提案: `collectRepositoryPrecedentSignals()` の O(W×F)（ワークフロー数×フィールド数）ループを転置インデックス (`Map<field, Set<workflowPath>>`) で O(1) ルックアップに置き換える。
+
+結論: **現状不要。スケールが小さすぎて inverted index のオーバーヘッドの方が重い。**
+
+現状: W ≤ 20 (通常)、F = 10 (concurrency, timeout, cache, shallowCheckout, pathsFilter, nonCodeIgnore, setupCache, releaseGuard, blobNone, sparseCheckout)。
+
+O(W×F) = 200 iterations、`.sort().slice(0,10)` も 20 log 20 × 10 fields ≈ 860 comparisons。実測上 0.1-0.5ms。
+
+転置インデックスのデメリット:
+- Map + Set の GC オブジェクト増
+- インデックス構築自体に O(W×F) かかる（節約にならない）
+- predicate は field ごとに独立しており共有不能
+- コード複雑性が増すだけ
+
+再訪条件: W > 200 または F > 50 になったとき。現在の10倍以上のスケールで初めて意味が出る。

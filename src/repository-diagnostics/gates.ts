@@ -46,10 +46,6 @@ export function collectorGateMatches(
       return gateState.hasJavaScriptTooling;
     case "javascript-linting":
       return gateState.hasJavaScriptLinting;
-    case "javascript-formatting":
-      return gateState.hasJavaScriptFormatting;
-    case "javascript-imports":
-      return gateState.hasJavaScriptImports;
     case "javascript-build-config":
       return gateState.hasJavaScriptBuildConfig;
     case "javascript-package-scripts":
@@ -76,8 +72,6 @@ export function collectorGateMatches(
       return gateState.hasRust;
     case "cdk-manifest":
       return gateState.hasCdkManifest;
-    case "cdk-bucket-deployment":
-      return gateState.hasCdkBucketDeployment;
     case "elixir-heavy":
       return gateState.hasElixirHeavyWorkflow;
     case "gradle":
@@ -230,36 +224,6 @@ function repositoryLikelyUsesJavaScriptLinting(context: RepositoryDiagnosticCont
   );
 }
 
-function repositoryLikelyUsesJavaScriptFormatting(context: RepositoryDiagnosticContext): boolean {
-  const { prettier, tailwind } = context.repository;
-  return (
-    prettier.usesPrettier ||
-    prettier.usesOxfmt ||
-    prettier.hasConfig ||
-    prettier.pluginNames.length > 0 ||
-    tailwind.usesTailwind ||
-    context.workflows.some((workflow) =>
-      /\b(?:prettier|oxfmt|tailwind)\b/i.test(workflow.source ?? ""),
-    )
-  );
-}
-
-function repositoryLikelyUsesJavaScriptImports(context: RepositoryDiagnosticContext): boolean {
-  const { eslint, frameworks, typescript } = context.repository;
-  return (
-    eslint.usesImportPlugin ||
-    eslint.usesImportXPlugin ||
-    eslint.usesNoBarrelFilesPlugin ||
-    eslint.usesBarrelFilesPlugin ||
-    frameworks.usesVite ||
-    frameworks.usesNextjs ||
-    frameworks.usesAstro ||
-    frameworks.usesSvelteKit ||
-    frameworks.usesSolidStart ||
-    typescript.versionSpec !== undefined
-  );
-}
-
 function repositoryLikelyUsesJavaScriptBuildConfig(context: RepositoryDiagnosticContext): boolean {
   const { frameworks, babel, typescript, jest } = context.repository;
   return (
@@ -315,25 +279,6 @@ function repositoryLikelyUsesRust(context: RepositoryDiagnosticContext): boolean
   );
 }
 
-async function repositoryHasCdkBucketDeployment(
-  context: RepositoryDiagnosticContext,
-): Promise<boolean> {
-  const packageJson = await context.scanContext.loadPackageJson();
-  const deps = packageJson.value;
-  if (deps) {
-    for (const section of [deps.dependencies, deps.devDependencies, deps.peerDependencies]) {
-      if (section && typeof section === "object") {
-        for (const name of Object.keys(section as Record<string, unknown>)) {
-          if (/^(?:@?aws-cdk(?:-lib)?(?:\/.+)?|aws-cdk-lib)$/.test(name)) {
-            return true;
-          }
-        }
-      }
-    }
-  }
-  return false;
-}
-
 export async function collectRepositoryDiagnosticGateState(
   context: RepositoryDiagnosticContext,
 ): Promise<RepositoryDiagnosticGateState> {
@@ -348,7 +293,6 @@ export async function collectRepositoryDiagnosticGateState(
     hasJavaScriptFrameworks,
     hasRust,
     hasCdkManifest,
-    hasCdkBucketDeployment,
   ] = await Promise.all([
     timedGate("large-files", () => repositoryLooksLargeFilesHeavy(context.scanContext)),
     timedGate("pytest", () => repositoryLooksPytestHeavy(context.scanContext, context.workflows)),
@@ -367,7 +311,6 @@ export async function collectRepositoryDiagnosticGateState(
       ? Promise.resolve(true)
       : timedGate("rust", () => looksLikeRustRepository(context.scanContext)),
     timedGate("cdk-manifest", () => repositoryHasCdkManifest(context.scanContext)),
-    timedGate("cdk-bucket-deployment", () => repositoryHasCdkBucketDeployment(context)),
   ]);
 
   return {
@@ -378,8 +321,6 @@ export async function collectRepositoryDiagnosticGateState(
     hasHusky: context.repository.husky.hookFileCount > 0,
     hasJavaScriptTooling,
     hasJavaScriptLinting: repositoryLikelyUsesJavaScriptLinting(context),
-    hasJavaScriptFormatting: repositoryLikelyUsesJavaScriptFormatting(context),
-    hasJavaScriptImports: repositoryLikelyUsesJavaScriptImports(context),
     hasJavaScriptBuildConfig:
       repositoryLikelyUsesJavaScriptBuildConfig(context) || hasJavaScriptBuildConfigEvidence,
     hasJavaScriptPackageScripts:
@@ -387,7 +328,6 @@ export async function collectRepositoryDiagnosticGateState(
     hasJavaScriptFrameworks,
     hasRust,
     hasCdkManifest,
-    hasCdkBucketDeployment,
     hasGradle: context.repository.frameworks.usesGradle,
   };
 }

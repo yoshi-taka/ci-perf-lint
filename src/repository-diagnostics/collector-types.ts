@@ -8,8 +8,6 @@ export type RepositoryDiagnosticGate =
   | "javascript-heavy"
   | "javascript-tooling"
   | "javascript-linting"
-  | "javascript-formatting"
-  | "javascript-imports"
   | "javascript-build-config"
   | "javascript-package-scripts"
   | "docker-heavy"
@@ -23,7 +21,6 @@ export type RepositoryDiagnosticGate =
   | "javascript-frameworks"
   | "rust"
   | "cdk-manifest"
-  | "cdk-bucket-deployment"
   | "elixir-heavy"
   | "gradle";
 
@@ -31,8 +28,6 @@ export interface RepositoryDiagnosticGateState {
   hasJavaScriptHeavyWorkflow: boolean;
   hasJavaScriptTooling: boolean;
   hasJavaScriptLinting: boolean;
-  hasJavaScriptFormatting: boolean;
-  hasJavaScriptImports: boolean;
   hasJavaScriptBuildConfig: boolean;
   hasJavaScriptPackageScripts: boolean;
   hasDockerHeavyWorkflow: boolean;
@@ -46,7 +41,6 @@ export interface RepositoryDiagnosticGateState {
   hasJavaScriptFrameworks: boolean;
   hasRust: boolean;
   hasCdkManifest: boolean;
-  hasCdkBucketDeployment: boolean;
   hasElixirHeavyWorkflow: boolean;
   hasGradle: boolean;
 }
