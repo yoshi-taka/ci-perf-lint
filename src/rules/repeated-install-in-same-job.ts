@@ -13,7 +13,7 @@ const meta = {
   severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/repeated-install-in-same-job.md",
-  scope: "both",
+  scope: "all",
 } satisfies RuleMeta;
 
 function parseNpmGlobalPackageNames(run: string): string[] {

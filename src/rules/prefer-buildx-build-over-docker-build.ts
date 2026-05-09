@@ -14,7 +14,7 @@ const meta = {
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-buildx-build-over-docker-build.md",
-  scope: "both",
+  scope: "all",
 } satisfies RuleMeta;
 
 export const preferBuildxBuildOverDockerBuildRule = {

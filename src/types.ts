@@ -80,6 +80,6 @@ export interface RuleMeta {
   severity: Severity;
   confidence: Confidence;
   docsPath: string;
-  scope?: "github-actions" | "buildkite" | "gitlab-ci" | "circleci" | "both";
+  scope?: "github-actions" | "buildkite" | "gitlab-ci" | "circleci" | "all";
   maxFindings?: number;
 }

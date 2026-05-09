@@ -99,7 +99,7 @@ function getRuleCheckFn(
 ) => Promise<Diagnostic[]> {
   const scope = rule.meta.scope ?? "github-actions";
 
-  if (scope === "both") {
+  if (scope === "all") {
     return (rule as BothRuleModule).check as never;
   }
   if (scope === "buildkite") {
@@ -168,7 +168,7 @@ export async function evaluateRules(
     ...(rulesByScope.buildkite ?? []),
     ...(rulesByScope["gitlab-ci"] ?? []),
     ...(rulesByScope.circleci ?? []),
-    ...(rulesByScope.both ?? []),
+    ...(rulesByScope.all ?? []),
   ];
 
   interface RuleTask {

@@ -17,7 +17,7 @@ const meta = {
   severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/wasteful-npm-global-install.md",
-  scope: "both",
+  scope: "all",
 } satisfies RuleMeta;
 
 export const wastefulNpmGlobalInstallRule = {

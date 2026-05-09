@@ -17,7 +17,7 @@ const meta = {
   severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/unnecessary-npm-global-upgrade-before-npm-install.md",
-  scope: "both",
+  scope: "all",
 } satisfies RuleMeta;
 
 export const unnecessaryNpmGlobalUpgradeBeforeNpmInstallRule = {

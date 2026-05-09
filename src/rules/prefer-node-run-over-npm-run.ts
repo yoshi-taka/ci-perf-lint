@@ -15,7 +15,7 @@ const meta = {
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
-  scope: "both",
+  scope: "all",
 } satisfies RuleMeta;
 
 function parseVisibleNodeMajor(version: unknown): number | undefined {

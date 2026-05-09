@@ -195,5 +195,5 @@ export const rulesByScope = {
   buildkite: [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "buildkite")],
   "gitlab-ci": [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "gitlab-ci")],
   circleci: [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "circleci")],
-  both: allRules.filter((rule) => (rule.meta as RuleMeta).scope === "both"),
+  all: allRules.filter((rule) => (rule.meta as RuleMeta).scope === "all"),
 };

@@ -13,7 +13,7 @@ const meta = {
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/docker-bake-file-unused-in-ci.md",
-  scope: "both",
+  scope: "all",
 } satisfies RuleMeta;
 
 const bakeInvocationPattern = /\bdocker\s+buildx\s+bake\b/i;
