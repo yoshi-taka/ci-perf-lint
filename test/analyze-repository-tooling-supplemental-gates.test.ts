@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { analyzeRepository } from "../src/repo.ts";
 import { fixtures } from "./fixtures.ts";
 import { getFixtureReport, tempDirs } from "./repository-diagnostics-test-helpers.ts";
 
@@ -41,86 +40,90 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     ).toBe(true);
   });
 
-  test("does not run JavaScript supplemental diagnostics without JavaScript-heavy workflows", async () => {
-    const fixtureRoot = await tempDirs.create("apl-js-supplemental-gate-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-    const srcDir = path.join(fixtureRoot, "src");
-    await mkdir(workflowDir, { recursive: true });
-    await mkdir(srcDir, { recursive: true });
-    await writeFile(
-      path.join(fixtureRoot, "package.json"),
-      JSON.stringify({ name: "js-supplemental-gate-fixture" }),
-    );
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  noop:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - run: echo ok",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(srcDir, "index.js"),
-      Array.from({ length: 120 }, (_, index) => `export * from "./m${index + 1}";`).join("\n"),
-    );
+  test.serial(
+    "does not run JavaScript supplemental diagnostics without JavaScript-heavy workflows",
+    async () => {
+      const fixtureRoot = await tempDirs.create("apl-js-supplemental-gate-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+      const srcDir = path.join(fixtureRoot, "src");
+      await mkdir(workflowDir, { recursive: true });
+      await mkdir(srcDir, { recursive: true });
+      await writeFile(
+        path.join(fixtureRoot, "package.json"),
+        JSON.stringify({ name: "js-supplemental-gate-fixture" }),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  noop:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - run: echo ok",
+        ].join("\n"),
+      );
+      await writeFile(
+        path.join(srcDir, "index.js"),
+        Array.from({ length: 120 }, (_, index) => `export * from "./m${index + 1}";`).join("\n"),
+      );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-      repositoryOnly: true,
-    });
+      const report = await getFixtureReport(fixtureRoot, {
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+        repositoryOnly: true,
+      });
 
-    expect(report.findings.some((finding) => finding.ruleId === "detected-large-barrel-file")).toBe(
-      false,
-    );
-  });
+      expect(
+        report.findings.some((finding) => finding.ruleId === "detected-large-barrel-file"),
+      ).toBe(false);
+    },
+  );
 
-  test("does not run Docker supplemental diagnostics without Docker-heavy workflows", async () => {
-    const fixtureRoot = await tempDirs.create("apl-docker-supplemental-gate-");
-    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
-    await mkdir(workflowDir, { recursive: true });
-    await writeFile(
-      path.join(workflowDir, "ci.yml"),
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  noop:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - run: echo ok",
-      ].join("\n"),
-    );
-    await writeFile(
-      path.join(fixtureRoot, "Dockerfile"),
-      ["FROM node:latest", "COPY . .", "RUN npm install"].join("\n"),
-    );
-    await writeFile(path.join(fixtureRoot, "package-lock.json"), "{}\n");
+  test.serial(
+    "does not run Docker supplemental diagnostics without Docker-heavy workflows",
+    async () => {
+      const fixtureRoot = await tempDirs.create("apl-docker-supplemental-gate-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  noop:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - run: echo ok",
+        ].join("\n"),
+      );
+      await writeFile(
+        path.join(fixtureRoot, "Dockerfile"),
+        ["FROM node:latest", "COPY . .", "RUN npm install"].join("\n"),
+      );
+      await writeFile(path.join(fixtureRoot, "package-lock.json"), "{}\n");
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-      repositoryOnly: true,
-    });
+      const report = await getFixtureReport(fixtureRoot, {
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+        repositoryOnly: true,
+      });
 
-    expect(
-      report.findings.some(
-        (finding) =>
-          finding.ruleId === "missing-dockerignore-for-build-context" ||
-          finding.ruleId.startsWith("dockerfile-"),
-      ),
-    ).toBe(false);
-  });
+      expect(
+        report.findings.some(
+          (finding) =>
+            finding.ruleId === "missing-dockerignore-for-build-context" ||
+            finding.ruleId.startsWith("dockerfile-"),
+        ),
+      ).toBe(false);
+    },
+  );
 
-  test("ignores experimental artifact dirs at root for large file scan", async () => {
+  test.serial("ignores experimental artifact dirs at root for large file scan", async () => {
     const fixtureRoot = await tempDirs.create("apl-large-files-ignore-artifact-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
     await mkdir(workflowDir, { recursive: true });
@@ -145,7 +148,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     expect(report.findings.some((c) => c.ruleId === "detected-large-files")).toBe(false);
   });
 
-  test("detects large files in subdir runs for large file scan", async () => {
+  test.serial("detects large files in subdir runs for large file scan", async () => {
     const fixtureRoot = await tempDirs.create("apl-large-files-subdir-runs-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
     await mkdir(workflowDir, { recursive: true });
@@ -168,7 +171,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     expect(finding?.message).toContain("src/runs");
   });
 
-  test("reports when Gradle parallel build is not enabled for multi-project", async () => {
+  test.serial("reports when Gradle parallel build is not enabled for multi-project", async () => {
     const fixtureRoot = await tempDirs.create("apl-gradle-parallel-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
@@ -195,8 +198,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -209,7 +211,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     expect(finding?.severity).toBe("warning");
   });
 
-  test("skips when gradle.properties has parallel enabled", async () => {
+  test.serial("skips when gradle.properties has parallel enabled", async () => {
     const fixtureRoot = await tempDirs.create("apl-gradle-parallel-enabled-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
@@ -233,8 +235,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -243,7 +244,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     expect(report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled")).toBe(false);
   });
 
-  test("skips when CI uses --parallel flag", async () => {
+  test.serial("skips when CI uses --parallel flag", async () => {
     const fixtureRoot = await tempDirs.create("apl-gradle-parallel-flag-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
@@ -266,8 +267,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
@@ -276,7 +276,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
     expect(report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled")).toBe(false);
   });
 
-  test("skips when only single build file exists", async () => {
+  test.serial("skips when only single build file exists", async () => {
     const fixtureRoot = await tempDirs.create("apl-gradle-single-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
@@ -298,8 +298,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       ].join("\n"),
     );
 
-    const report = await analyzeRepository({
-      cwd: fixtureRoot,
+    const report = await getFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
       mode: "strict",
