@@ -4,6 +4,7 @@ import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { WorkflowSemantics } from "../rules/shared/workflow-semantics.ts";
 import type { RepositoryFileIndex } from "../rules/shared/repository-file-index.ts";
+import type { RepositoryPredicateIndex } from "../rules/shared/repository-predicate-index.ts";
 
 export interface RepositoryDiagnosticGateState {
   hasJavaScriptHeavyWorkflow: boolean;
@@ -34,6 +35,7 @@ export interface RepositoryDiagnosticContext {
   warnings: AnalysisWarning[];
   scanContext: RepositoryScanContext;
   fileIndex: RepositoryFileIndex;
+  predicateIndex: RepositoryPredicateIndex;
 }
 
 export type GatePredicate = (state: RepositoryDiagnosticGateState) => boolean;

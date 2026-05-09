@@ -25,6 +25,7 @@ import { evaluateRules, evaluateRulesCoarseToFine } from "./rule-engine.ts";
 import { buildWorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import { buildRepositoryPrecedentIndex } from "./rules/shared/repository-precedent-index.ts";
+import { buildRepositoryPredicateIndex } from "./rules/shared/repository-predicate-index.ts";
 import { buildRepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
@@ -270,6 +271,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   const wfList = [...parsedWorkflows];
 
   const precedentIndex = buildRepositoryPrecedentIndex(githubWorkflows);
+  const predicateIndex = buildRepositoryPredicateIndex(githubWorkflows);
   const fileIndex = buildRepositoryFileIndex(scanContext);
   const ruleContext = {
     repository: signals,
@@ -343,6 +345,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           warnings: analysisWarnings,
           scanContext,
           fileIndex,
+          predicateIndex,
         }).then((diags) =>
           diags.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
         ),

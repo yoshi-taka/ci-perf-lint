@@ -1,9 +1,8 @@
 import path from "node:path";
-import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
-import type { RepositorySignals } from "../repository-signals-types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
-import { RepositoryScanContext } from "../repository-scan-context.ts";
+import type { Diagnostic, RuleMeta } from "../types.ts";
+import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 
 const meta = {
   id: "gradle-parallel-not-enabled",
@@ -19,9 +18,9 @@ const GRADLE_LIFECYCLE = /\b(?:gradle|gradlew)\b.*\b(?:build|check|test|assemble
 const PARALLEL_FLAG = /--parallel\b/;
 
 async function hasParallelInProperties(
-  context: RepositoryScanContext,
+  scanContext: RepositoryScanContext,
 ): Promise<"enabled" | "disabled" | "absent"> {
-  const text = await context.readTextFileOrWarn(context.resolve("gradle.properties"));
+  const text = await scanContext.readTextFileOrWarn(scanContext.resolve("gradle.properties"));
   if (!text) {
     return "absent";
   }
@@ -39,9 +38,9 @@ async function hasParallelInProperties(
   return "absent";
 }
 
-async function countBuildFiles(context: RepositoryScanContext): Promise<number> {
+async function countBuildFiles(scanContext: RepositoryScanContext): Promise<number> {
   try {
-    const entries = await context.readDirectoryEntries(context.repoRoot);
+    const entries = await scanContext.readDirectoryEntries(scanContext.repoRoot);
     let count = 0;
     const subdirs: string[] = [];
     for (const e of entries) {
@@ -58,8 +57,8 @@ async function countBuildFiles(context: RepositoryScanContext): Promise<number> 
       }
     }
     for (const dir of subdirs) {
-      const subEntries = await context
-        .readDirectoryEntries(path.join(context.repoRoot, dir))
+      const subEntries = await scanContext
+        .readDirectoryEntries(path.join(scanContext.repoRoot, dir))
         .catch(() => undefined);
       if (subEntries) {
         for (const e of subEntries) {
@@ -75,55 +74,32 @@ async function countBuildFiles(context: RepositoryScanContext): Promise<number> 
   }
 }
 
-function ciUsesGradleLifecycle(workflows: WorkflowDocument[]): boolean {
-  for (const workflow of workflows) {
-    for (const job of workflow.jobs) {
-      for (const step of job.steps) {
-        const run = step.run ?? "";
-        if (GRADLE_LIFECYCLE.test(run)) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
-function ciUsesParallelFlag(workflows: WorkflowDocument[]): boolean {
-  for (const workflow of workflows) {
-    for (const job of workflow.jobs) {
-      for (const step of job.steps) {
-        const run = step.run ?? "";
-        if (!GRADLE_LIFECYCLE.test(run)) {
-          continue;
-        }
-        if (PARALLEL_FLAG.test(run)) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
 export async function collectGradleParallelNotEnabledDiagnostics(
-  repoRoot: string,
-  repository: RepositorySignals,
-  workflows: WorkflowDocument[],
-  warnings?: AnalysisWarning[],
-  scanContext?: RepositoryScanContext,
+  context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
-  if (!repository.frameworks.usesGradle) {
+  if (!context.repository.frameworks.usesGradle) {
     return [];
   }
 
-  const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
+  let hasGradleLifecycle = false;
+  let hasParallelFlag = false;
+  for (const { step } of context.predicateIndex.allSteps) {
+    const run = step.run ?? "";
+    const isLifecycle = GRADLE_LIFECYCLE.test(run);
+    if (isLifecycle) {
+      hasGradleLifecycle = true;
+      if (PARALLEL_FLAG.test(run)) {
+        hasParallelFlag = true;
+        break;
+      }
+    }
+  }
 
-  if (!ciUsesGradleLifecycle(workflows)) {
+  if (!hasGradleLifecycle) {
     return [];
   }
 
-  const parallelState = await hasParallelInProperties(context);
+  const parallelState = await hasParallelInProperties(context.scanContext);
   if (parallelState === "enabled") {
     return [];
   }
@@ -131,17 +107,17 @@ export async function collectGradleParallelNotEnabledDiagnostics(
     return [];
   }
 
-  if (ciUsesParallelFlag(workflows)) {
+  if (hasParallelFlag) {
     return [];
   }
 
-  const buildFileCount = await countBuildFiles(context);
+  const buildFileCount = await countBuildFiles(context.scanContext);
   if (buildFileCount < 2) {
     return [];
   }
 
   return [
-    buildRepositoryDiagnostic(repository, meta, {
+    buildRepositoryDiagnostic(context.repository, meta, {
       location: {
         path: "gradle.properties",
         line: 1,

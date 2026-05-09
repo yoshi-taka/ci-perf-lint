@@ -84,8 +84,7 @@ export const javascriptDiagnosticCollectors = [
   {
     id: "npm-ci-over-npm-install",
     gate: gates.javascriptPackageScripts,
-    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
-      collectNpmCiOverNpmInstallDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+    collect: (context) => collectNpmCiOverNpmInstallDiagnostics(context),
   },
   {
     id: "prefer-node-run-over-npm-run",
@@ -114,14 +113,7 @@ export const javascriptDiagnosticCollectors = [
   {
     id: "setup-node-cache-dependency-path-unset",
     gate: gates.javascriptHeavy,
-    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
-      collectSetupNodeCacheDependencyPathUnsetDiagnostics(
-        repoRoot,
-        repository,
-        workflows,
-        warnings,
-        scanContext,
-      ),
+    collect: (context) => collectSetupNodeCacheDependencyPathUnsetDiagnostics(context),
   },
   {
     id: "prefer-next-typescript-performance-milestone",

@@ -41,14 +41,7 @@ export const terraformDiagnosticCollectors = [
   {
     id: "terraform-parallelism-unconfigured",
     gate: gates.terraformHeavy,
-    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
-      collectTerraformParallelismDiagnostics(
-        repoRoot,
-        repository,
-        workflows,
-        warnings,
-        scanContext,
-      ),
+    collect: (context) => collectTerraformParallelismDiagnostics(context),
   },
   {
     id: "terraform-github-slow-resources",

@@ -27,13 +27,7 @@ export const repositoryDiagnosticCollectors = [
     id: "gradle-parallel-not-enabled",
     gate: gates.gradle,
     collect: (context: RepositoryDiagnosticContext) =>
-      collectGradleParallelNotEnabledDiagnostics(
-        context.repoRoot,
-        context.repository,
-        context.workflows,
-        context.warnings,
-        context.scanContext,
-      ),
+      collectGradleParallelNotEnabledDiagnostics(context),
   },
 ] as const;
 

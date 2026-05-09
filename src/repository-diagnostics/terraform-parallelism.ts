@@ -1,8 +1,7 @@
-import type { Severity, AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
-import type { RepositorySignals } from "../repository-signals-types.ts";
+import type { Severity, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import type { WorkflowDocument } from "../workflow.ts";
+import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { getLoweredWorkflowStepText } from "../rules/shared/workflow-step-text.ts";
 
 const meta = {
@@ -15,35 +14,6 @@ const meta = {
 const TF_COMMANDS = /\bterraform\s+(?:plan|apply|destroy)\b/;
 
 const TF_FILE_EXTENSIONS = /\.tf$/;
-
-function workflowHasTerraformPlanApply(workflow: WorkflowDocument): boolean {
-  return workflow.jobs.some((job) =>
-    job.steps.some((step) => TF_COMMANDS.test(getLoweredWorkflowStepText(step))),
-  );
-}
-
-function workflowHasParallelismInStepText(workflow: WorkflowDocument): boolean {
-  return workflow.jobs.some((job) =>
-    job.steps.some((step) => {
-      const text = getLoweredWorkflowStepText(step);
-      const matchIndex = text.search(TF_COMMANDS);
-      if (matchIndex === -1) {
-        return false;
-      }
-
-      const afterCommand = text.slice(matchIndex);
-      return /--parallelism\s*=\s*\d+/.test(afterCommand);
-    }),
-  );
-}
-
-function workflowHasParallelismInEnv(workflow: WorkflowDocument): boolean {
-  return /TF_CLI_ARGS[\s\S]{0,100}parallelism/i.test(workflow.source ?? "");
-}
-
-function workflowHasParallelismConfig(workflow: WorkflowDocument): boolean {
-  return workflowHasParallelismInStepText(workflow) || workflowHasParallelismInEnv(workflow);
-}
 
 async function countTerraformFiles(scanContext: RepositoryScanContext): Promise<number> {
   let count = 0;
@@ -59,34 +29,51 @@ async function countTerraformFiles(scanContext: RepositoryScanContext): Promise<
 }
 
 export async function collectTerraformParallelismDiagnostics(
-  _repoRoot: string,
-  repository: RepositorySignals,
-  workflows: WorkflowDocument[],
-  _warnings?: AnalysisWarning[],
-  scanContext?: RepositoryScanContext,
+  context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
-  const anyTerraformWorkflow = workflows.find(workflowHasTerraformPlanApply);
-  if (!anyTerraformWorkflow) {
+  let hasTerraformWorkflow = false;
+  let exampleWorkflow: (typeof context.predicateIndex.allSteps)[number]["workflow"] | undefined;
+  let hasParallelismConfig = false;
+
+  for (const { step, workflow } of context.predicateIndex.allSteps) {
+    if (hasTerraformWorkflow && hasParallelismConfig) {
+      break;
+    }
+    const loweredText = getLoweredWorkflowStepText(step);
+    const matchIndex = loweredText.search(TF_COMMANDS);
+    if (matchIndex === -1) {
+      continue;
+    }
+    hasTerraformWorkflow = true;
+    exampleWorkflow ??= workflow;
+    const afterCommand = loweredText.slice(matchIndex);
+    if (/--parallelism\s*=\s*\d+/.test(afterCommand)) {
+      hasParallelismConfig = true;
+    }
+  }
+
+  if (!hasParallelismConfig && exampleWorkflow) {
+    hasParallelismConfig = /TF_CLI_ARGS[\s\S]{0,100}parallelism/i.test(
+      exampleWorkflow.source ?? "",
+    );
+  }
+
+  if (!hasTerraformWorkflow || !exampleWorkflow) {
     return [];
   }
 
-  const anyParallelismConfig = workflows.some(workflowHasParallelismConfig);
-  if (anyParallelismConfig) {
+  if (hasParallelismConfig) {
     return [];
   }
 
-  if (!scanContext) {
-    return [];
-  }
-
-  const tfFileCount = await countTerraformFiles(scanContext);
+  const tfFileCount = await countTerraformFiles(context.scanContext);
   const severity: Severity = tfFileCount >= 10 ? "warning" : "suggestion";
 
   return [
-    buildRepositoryDiagnostic(repository, meta, {
+    buildRepositoryDiagnostic(context.repository, meta, {
       severity,
       location: {
-        path: anyTerraformWorkflow.relativePath,
+        path: exampleWorkflow.relativePath,
         line: 1,
         column: 1,
       },
