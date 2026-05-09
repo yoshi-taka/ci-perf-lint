@@ -88,6 +88,34 @@ function isCircleCiDocument(doc: unknown): doc is CircleCiDocument {
   );
 }
 
+function getRuleCheckFn(
+  rule: AnyRuleModule,
+  isBuildkite: boolean,
+  isGitlab: boolean,
+  isCircle: boolean,
+): (
+  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
+  context: RuleContext,
+) => Promise<Diagnostic[]> {
+  const scope = rule.meta.scope ?? "github-actions";
+
+  if (scope === "both") {
+    return (rule as BothRuleModule).check as never;
+  }
+  if (scope === "buildkite") {
+    return isBuildkite ? ((rule as BuildkiteRuleModule).check as never) : () => Promise.resolve([]);
+  }
+  if (scope === "gitlab-ci") {
+    return isGitlab ? ((rule as GitlabCiRuleModule).check as never) : () => Promise.resolve([]);
+  }
+  if (scope === "circleci") {
+    return isCircle ? ((rule as CircleCiRuleModule).check as never) : () => Promise.resolve([]);
+  }
+  return !isBuildkite && !isGitlab && !isCircle
+    ? ((rule as RuleModule).check as never)
+    : () => Promise.resolve([]);
+}
+
 function workflowContainsKind(
   workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
   kind: WorkflowNodeKind,
@@ -135,16 +163,13 @@ export async function evaluateRules(
   const isCircle = isCircleCiDocument(workflow);
 
   const rulesByScope = await getRulesByScope();
-  let applicableRules: readonly AnyRuleModule[];
-  if (isBuildkite) {
-    applicableRules = [...(rulesByScope.buildkite ?? []), ...(rulesByScope.both ?? [])];
-  } else if (isGitlab) {
-    applicableRules = [...(rulesByScope["gitlab-ci"] ?? []), ...(rulesByScope.both ?? [])];
-  } else if (isCircle) {
-    applicableRules = [...(rulesByScope.circleci ?? []), ...(rulesByScope.both ?? [])];
-  } else {
-    applicableRules = [...(rulesByScope["github-actions"] ?? []), ...(rulesByScope.both ?? [])];
-  }
+  const allRules = [
+    ...(rulesByScope["github-actions"] ?? []),
+    ...(rulesByScope.buildkite ?? []),
+    ...(rulesByScope["gitlab-ci"] ?? []),
+    ...(rulesByScope.circleci ?? []),
+    ...(rulesByScope.both ?? []),
+  ];
 
   interface RuleTask {
     rule: AnyRuleModule;
@@ -153,7 +178,7 @@ export async function evaluateRules(
 
   const tasks: RuleTask[] = [];
 
-  for (const rule of applicableRules) {
+  for (const rule of allRules) {
     if (ruleFilter && !ruleFilter(rule)) {
       continue;
     }
@@ -162,26 +187,8 @@ export async function evaluateRules(
       continue;
     }
 
-    const ruleScope = rule.meta.scope ?? "github-actions";
-    let run: () => Promise<Diagnostic[]>;
-    if (ruleScope === "both") {
-      const bothRule = rule as BothRuleModule;
-      run = () => Promise.resolve(bothRule.check(workflow, context));
-    } else if (isBuildkite) {
-      const buildkiteRule = rule as BuildkiteRuleModule;
-      run = () => Promise.resolve(buildkiteRule.check(workflow, context));
-    } else if (isGitlab) {
-      const gitlabCiRule = rule as GitlabCiRuleModule;
-      run = () => Promise.resolve(gitlabCiRule.check(workflow, context));
-    } else if (isCircle) {
-      const circleCiRule = rule as CircleCiRuleModule;
-      run = () => Promise.resolve(circleCiRule.check(workflow, context));
-    } else {
-      const githubRule = rule as RuleModule;
-      run = () => Promise.resolve(githubRule.check(workflow, context));
-    }
-
-    tasks.push({ rule, run });
+    const checkFn = getRuleCheckFn(rule, isBuildkite, isGitlab, isCircle);
+    tasks.push({ rule, run: () => Promise.resolve(checkFn(workflow, context)) });
   }
 
   const settled = await runConcurrent(
