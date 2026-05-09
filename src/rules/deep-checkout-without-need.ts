@@ -19,6 +19,7 @@ const meta = {
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/deep-checkout-without-need.md",
+  requires: { isHeavy: true },
 } satisfies RuleMeta;
 
 function jobUsesNxSetShas(job: WorkflowJob): boolean {

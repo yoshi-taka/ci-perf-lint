@@ -82,4 +82,7 @@ export interface RuleMeta {
   docsPath: string;
   scope?: "github-actions" | "buildkite" | "gitlab-ci" | "circleci" | "all";
   maxFindings?: number;
+  requires?: {
+    isHeavy?: boolean;
+  };
 }
