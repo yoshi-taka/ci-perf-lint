@@ -50,7 +50,7 @@ export async function collectExplicitImportExtensionDiagnostics(
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
   if (
-    !(await looksLikeJavaScriptRepository(context)) ||
+    !(await looksLikeJavaScriptRepository(context)).value ||
     !repository.looksLargeOrComplex ||
     !repositoryUsesViteFamily(repository)
   ) {

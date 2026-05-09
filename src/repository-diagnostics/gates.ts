@@ -18,6 +18,7 @@ import {
   workflowLooksPythonHeavy,
   workflowLooksTerraformHeavy,
 } from "./imports-shared.ts";
+import { meetsMinimum } from "../rules/shared/evidence.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 
 type GateKey = keyof RepositoryDiagnosticGateState;
@@ -112,28 +113,34 @@ function collectSignalGateState(
   let hasElixirHeavyWorkflow = false;
 
   for (const workflow of workflows) {
-    if (!hasJavaScriptHeavyWorkflow && workflowLooksJavaScriptHeavy(workflow)) {
-      hasJavaScriptHeavyWorkflow = true;
+    if (!hasJavaScriptHeavyWorkflow) {
+      const jsEvidence = workflowLooksJavaScriptHeavy(workflow);
+      hasJavaScriptHeavyWorkflow = meetsMinimum(jsEvidence, "medium");
     }
 
-    if (!hasDockerHeavyWorkflow && workflowLooksDockerBuildHeavy(workflow)) {
-      hasDockerHeavyWorkflow = true;
+    if (!hasDockerHeavyWorkflow) {
+      const dockerEvidence = workflowLooksDockerBuildHeavy(workflow);
+      hasDockerHeavyWorkflow = meetsMinimum(dockerEvidence, "medium");
     }
 
-    if (!hasTerraformHeavyWorkflow && workflowLooksTerraformHeavy(workflow)) {
-      hasTerraformHeavyWorkflow = true;
+    if (!hasTerraformHeavyWorkflow) {
+      const tfEvidence = workflowLooksTerraformHeavy(workflow);
+      hasTerraformHeavyWorkflow = meetsMinimum(tfEvidence, "medium");
     }
 
-    if (!hasDatadogHeavyWorkflow && workflowLooksDatadogHeavy(workflow)) {
-      hasDatadogHeavyWorkflow = true;
+    if (!hasDatadogHeavyWorkflow) {
+      const ddEvidence = workflowLooksDatadogHeavy(workflow);
+      hasDatadogHeavyWorkflow = meetsMinimum(ddEvidence, "medium");
     }
 
-    if (!hasPythonHeavyWorkflow && workflowLooksPythonHeavy(workflow)) {
-      hasPythonHeavyWorkflow = true;
+    if (!hasPythonHeavyWorkflow) {
+      const pyEvidence = workflowLooksPythonHeavy(workflow);
+      hasPythonHeavyWorkflow = meetsMinimum(pyEvidence, "medium");
     }
 
-    if (!hasElixirHeavyWorkflow && workflowLooksElixirHeavy(workflow)) {
-      hasElixirHeavyWorkflow = true;
+    if (!hasElixirHeavyWorkflow) {
+      const elixirEvidence = workflowLooksElixirHeavy(workflow);
+      hasElixirHeavyWorkflow = meetsMinimum(elixirEvidence, "medium");
     }
 
     if (
@@ -305,14 +312,16 @@ export async function collectRepositoryDiagnosticGateState(
     state.hasRust = hasRustQuick;
   }
 
-  const [hasLargeFiles, hasPytest, hasRenovateConfig, hasCdkManifest] = await Promise.all([
-    timedGate("large-files", () => repositoryLooksLargeFilesHeavy(context.scanContext)),
-    timedGate("pytest", () => repositoryLooksPytestHeavy(context.scanContext, context.workflows)),
-    timedGate("renovate", () => repositoryHasRenovateConfig(context.scanContext)),
-    timedGate("cdk-manifest", () => repositoryHasCdkManifest(context.scanContext)),
-  ]);
-  state.hasLargeFiles = hasLargeFiles;
-  state.hasPytest = hasPytest;
+  const [largeFilesEvidence, pytestEvidence, hasRenovateConfig, hasCdkManifest] = await Promise.all(
+    [
+      timedGate("large-files", () => repositoryLooksLargeFilesHeavy(context.scanContext)),
+      timedGate("pytest", () => repositoryLooksPytestHeavy(context.scanContext, context.workflows)),
+      timedGate("renovate", () => repositoryHasRenovateConfig(context.scanContext)),
+      timedGate("cdk-manifest", () => repositoryHasCdkManifest(context.scanContext)),
+    ],
+  );
+  state.hasLargeFiles = largeFilesEvidence.value;
+  state.hasPytest = meetsMinimum(pytestEvidence, "medium");
   state.hasRenovateConfig = hasRenovateConfig;
   state.hasCdkManifest = hasCdkManifest;
 
@@ -322,7 +331,12 @@ export async function collectRepositoryDiagnosticGateState(
   const jsToolingGate = await evaluateGate(
     "hasJavaScriptTooling",
     [() => quickTestJavaScriptTooling(context)],
-    () => timedGate("javascript-tooling", () => looksLikeJavaScriptRepository(context.scanContext)),
+    async () =>
+      (
+        await timedGate("javascript-tooling", () =>
+          looksLikeJavaScriptRepository(context.scanContext),
+        )
+      ).value,
     state,
   );
   if (jsToolingGate !== undefined) {
@@ -349,10 +363,12 @@ export async function collectRepositoryDiagnosticGateState(
   const jsFrameworksGate = await evaluateGate(
     "hasJavaScriptFrameworks",
     [() => quickTestJavaScriptFrameworks(context)],
-    () =>
-      timedGate("javascript-frameworks", () =>
-        looksLikeJavaScriptFrameworksRepository(context.scanContext),
-      ),
+    async () =>
+      (
+        await timedGate("javascript-frameworks", () =>
+          looksLikeJavaScriptFrameworksRepository(context.scanContext),
+        )
+      ).value,
     state,
   );
   if (jsFrameworksGate !== undefined && state.hasJavaScriptTooling) {
@@ -364,7 +380,7 @@ export async function collectRepositoryDiagnosticGateState(
   const rustGate = await evaluateGate(
     "hasRust",
     [() => quickTestRust(context)],
-    () => timedGate("rust", () => looksLikeRustRepository(context.scanContext)),
+    async () => (await timedGate("rust", () => looksLikeRustRepository(context.scanContext))).value,
     state,
   );
   if (rustGate !== undefined) {

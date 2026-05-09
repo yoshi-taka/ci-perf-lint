@@ -3,119 +3,239 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { workflowStepTextMatches } from "../rules/shared/workflow-analysis.ts";
+import {
+  type EvidenceStrength,
+  type GradedEvidence,
+  strong,
+  medium,
+  weak,
+} from "../rules/shared/evidence.ts";
 
-export function workflowLooksJavaScriptHeavy(workflow: WorkflowDocument): boolean {
-  return (
-    workflowStepTextMatches(
-      workflow,
-      /actions\/setup-node@|oven-sh\/setup-bun@|pnpm\/action-setup@|volta-cli\/action@/,
-    ) ||
-    workflowStepTextMatches(workflow, /\b(npm|pnpm|yarn|bun)\b/) ||
-    workflowStepTextMatches(
-      workflow,
-      /\b(eslint|oxlint|tsc|tsgo|vitest|jest|next build|vite build|webpack|rollup|esbuild|turbo|nx)\b/,
-    )
-  );
+function matchAny(
+  workflow: WorkflowDocument,
+  strength: EvidenceStrength,
+  entries: [string, RegExp][],
+): GradedEvidence<boolean> {
+  const signals: string[] = [];
+  for (const [label, pattern] of entries) {
+    if (workflowStepTextMatches(workflow, pattern)) {
+      signals.push(label);
+    }
+  }
+  if (signals.length > 0) {
+    return { value: true, strength, signals };
+  }
+  return { value: false, strength: "weak", signals: [] };
 }
 
-export function workflowLooksDockerBuildHeavy(workflow: WorkflowDocument): boolean {
-  return (
-    workflowStepTextMatches(workflow, /docker\/build-push-action@/) ||
-    workflowStepTextMatches(workflow, /\bdocker\s+(?:buildx\s+build|build)\b/) ||
-    workflowStepTextMatches(workflow, /\bdocker\s+compose\b[\s\S]*\bbuild\b/)
-  );
+function matchStrong(
+  workflow: WorkflowDocument,
+  patterns: [string, RegExp][],
+): GradedEvidence<boolean> {
+  return matchAny(workflow, "strong", patterns);
 }
 
-export function workflowLooksDatadogHeavy(workflow: WorkflowDocument): boolean {
-  return workflowStepTextMatches(
-    workflow,
-    /datadog\/datadog-lambda-extension@|public\.ecr\.aws\/datadog\/lambda-extension/,
-  );
+function matchMedium(
+  workflow: WorkflowDocument,
+  patterns: [string, RegExp][],
+): GradedEvidence<boolean> {
+  return matchAny(workflow, "medium", patterns);
 }
 
-export function workflowLooksTerraformHeavy(workflow: WorkflowDocument): boolean {
-  return workflowStepTextMatches(workflow, /\bterraform\s+init\b/);
+function matchWeak(
+  workflow: WorkflowDocument,
+  patterns: [string, RegExp][],
+): GradedEvidence<boolean> {
+  return matchAny(workflow, "weak", patterns);
 }
 
-export function workflowLooksPythonHeavy(workflow: WorkflowDocument): boolean {
-  return (
-    workflowStepTextMatches(workflow, /actions\/setup-python@/) ||
-    workflowStepTextMatches(
-      workflow,
-      /\b(?:pip\s+install|python\s+-m|pytest|tox|poetry\s+install)\b/,
-    )
-  );
+export function workflowLooksJavaScriptHeavy(workflow: WorkflowDocument): GradedEvidence<boolean> {
+  const strongSignals = matchStrong(workflow, [
+    ["actions/setup-node", /actions\/setup-node@/],
+    ["oven-sh/setup-bun", /oven-sh\/setup-bun@/],
+    ["pnpm/action-setup", /pnpm\/action-setup@/],
+    ["volta-cli/action", /volta-cli\/action@/],
+  ]);
+  if (strongSignals.value) {
+    return strongSignals;
+  }
+
+  const mediumSignals = matchMedium(workflow, [
+    ["npm", /\b(npm|pnpm|yarn|bun)\b/],
+    [
+      "js-tools",
+      /\b(eslint|oxlint|tsc|vitest|jest|next build|vite build|webpack|rollup|esbuild|turbo|nx)\b/,
+    ],
+  ]);
+  if (mediumSignals.value) {
+    return mediumSignals;
+  }
+
+  return weak(false);
+}
+
+export function workflowLooksDockerBuildHeavy(workflow: WorkflowDocument): GradedEvidence<boolean> {
+  const strongSignals = matchStrong(workflow, [
+    ["docker/build-push-action", /docker\/build-push-action@/],
+  ]);
+  if (strongSignals.value) {
+    return strongSignals;
+  }
+
+  const mediumSignals = matchMedium(workflow, [
+    ["docker buildx", /\bdocker\s+(?:buildx\s+build|build)\b/],
+  ]);
+  if (mediumSignals.value) {
+    return mediumSignals;
+  }
+
+  const weakSignals = matchWeak(workflow, [
+    ["docker compose build", /\bdocker\s+compose\b[\s\S]*\bbuild\b/],
+  ]);
+  if (weakSignals.value) {
+    return weakSignals;
+  }
+
+  return weak(false);
+}
+
+export function workflowLooksDatadogHeavy(workflow: WorkflowDocument): GradedEvidence<boolean> {
+  const strongSignals = matchStrong(workflow, [
+    [
+      "datadog/datadog-lambda-extension",
+      /datadog\/datadog-lambda-extension@|public\.ecr\.aws\/datadog\/lambda-extension/,
+    ],
+  ]);
+  if (strongSignals.value) {
+    return strongSignals;
+  }
+  return weak(false);
+}
+
+export function workflowLooksTerraformHeavy(workflow: WorkflowDocument): GradedEvidence<boolean> {
+  const mediumSignals = matchMedium(workflow, [["terraform init", /\bterraform\s+init\b/]]);
+  if (mediumSignals.value) {
+    return mediumSignals;
+  }
+  return weak(false);
+}
+
+export function workflowLooksPythonHeavy(workflow: WorkflowDocument): GradedEvidence<boolean> {
+  const strongSignals = matchStrong(workflow, [["actions/setup-python", /actions\/setup-python@/]]);
+  if (strongSignals.value) {
+    return strongSignals;
+  }
+
+  const mediumSignals = matchMedium(workflow, [
+    ["pip install", /\b(?:pip\s+install|python\s+-m|pytest|tox|poetry\s+install)\b/],
+  ]);
+  if (mediumSignals.value) {
+    return mediumSignals;
+  }
+
+  return weak(false);
+}
+
+export function workflowLooksElixirHeavy(workflow: WorkflowDocument): GradedEvidence<boolean> {
+  const strongSignals = matchStrong(workflow, [["erlef/setup-beam", /erlef\/setup-beam@/]]);
+  if (strongSignals.value) {
+    return strongSignals;
+  }
+
+  const mediumSignals = matchMedium(workflow, [["elixir/mix", /\belixir\b|\bmix\b/]]);
+  if (mediumSignals.value) {
+    return mediumSignals;
+  }
+
+  const weakSignals = matchWeak(workflow, [["container: elixir", /container:\s*elixir:/]]);
+  if (weakSignals.value) {
+    return weakSignals;
+  }
+
+  return weak(false);
 }
 
 export async function looksLikeJavaScriptRepository(
-  context: RepositoryScanContext,
-): Promise<boolean> {
-  const rootEntries = await context.readDirectoryEntries(context.repoRoot);
+  scanContext: RepositoryScanContext,
+): Promise<GradedEvidence<boolean>> {
+  const rootEntries = await scanContext.readDirectoryEntries(scanContext.repoRoot);
   const rootNames = new Set(rootEntries.map((entry) => entry.name));
-  if (
-    [
-      "package.json",
-      "tsconfig.json",
-      "jsconfig.json",
-      "vercel.json",
-      "wrangler.toml",
-      "amplify.yml",
-      "amplify.yaml",
-    ].some((name) => rootNames.has(name))
-  ) {
-    return true;
+  if (rootNames.has("package.json")) {
+    return strong(true, "package.json at root");
+  }
+  if (rootNames.has("tsconfig.json")) {
+    return strong(true, "tsconfig.json at root");
+  }
+  if (rootNames.has("jsconfig.json")) {
+    return strong(true, "jsconfig.json at root");
+  }
+
+  for (const name of ["vercel.json", "wrangler.toml", "amplify.yml", "amplify.yaml"] as const) {
+    if (rootNames.has(name)) {
+      return medium(true, `${name} at root`);
+    }
   }
 
   for (const entry of rootEntries) {
     if (!entry.isDirectory()) {
       continue;
     }
-    const subEntries = await context.readDirectoryEntries(context.resolve(entry.name));
-    if (
-      subEntries.some(
-        (e) =>
-          e.name === "package.json" || e.name === "tsconfig.json" || e.name === "jsconfig.json",
-      )
-    ) {
-      return true;
+    const subEntries = await scanContext.readDirectoryEntries(scanContext.resolve(entry.name));
+    const subNames = new Set(subEntries.map((e) => e.name));
+    if (subNames.has("package.json")) {
+      return medium(true, `package.json in ${entry.name}/`);
+    }
+    if (subNames.has("tsconfig.json")) {
+      return medium(true, `tsconfig.json in ${entry.name}/`);
+    }
+    if (subNames.has("jsconfig.json")) {
+      return medium(true, `jsconfig.json in ${entry.name}/`);
     }
   }
 
-  return false;
+  return weak(false);
 }
 
 export async function looksLikeJavaScriptFrameworksRepository(
-  context: RepositoryScanContext,
-): Promise<boolean> {
-  const packageJsonEntry = await context.loadPackageJson();
+  scanContext: RepositoryScanContext,
+): Promise<GradedEvidence<boolean>> {
+  const packageJsonEntry = await scanContext.loadPackageJson();
   const packageJson = packageJsonEntry.value;
   if (!packageJson) {
-    return false;
+    return weak(false);
   }
 
-  return (
-    packageJsonHasDependency(packageJson, "next") ||
-    packageJsonHasDependency(packageJson, "@storybook/react") ||
-    packageJsonHasDependency(packageJson, "@storybook/vue") ||
-    packageJsonHasDependency(packageJson, "@storybook/angular") ||
-    packageJsonHasDependency(packageJson, "@storybook/svelte") ||
-    packageJsonHasDependency(packageJson, "@storybook/html") ||
-    packageJsonHasDependency(packageJson, "@storybook/web-components") ||
-    packageJsonHasDependency(packageJson, "tailwindcss") ||
-    packageJsonHasDependency(packageJson, "jest")
-  );
+  if (packageJsonHasDependency(packageJson, "next")) {
+    return strong(true, "next");
+  }
+  if (packageJsonHasDependency(packageJson, "tailwindcss")) {
+    return strong(true, "tailwindcss");
+  }
+  if (packageJsonHasDependency(packageJson, "jest")) {
+    return medium(true, "jest");
+  }
+
+  for (const pkg of [
+    "@storybook/react",
+    "@storybook/vue",
+    "@storybook/angular",
+    "@storybook/svelte",
+    "@storybook/html",
+    "@storybook/web-components",
+  ] as const) {
+    if (packageJsonHasDependency(packageJson, pkg)) {
+      return medium(true, pkg);
+    }
+  }
+
+  return weak(false);
 }
 
-export function workflowLooksElixirHeavy(workflow: WorkflowDocument): boolean {
-  return (
-    workflowStepTextMatches(workflow, /erlef\/setup-beam@/) ||
-    workflowStepTextMatches(workflow, /\belixir\b|\bmix\b/) ||
-    workflowStepTextMatches(workflow, /container:\s*elixir:/)
-  );
-}
-
-export async function looksLikeRustRepository(context: RepositoryScanContext): Promise<boolean> {
-  return context.pathExists(context.resolve("Cargo.toml"));
+export async function looksLikeRustRepository(
+  scanContext: RepositoryScanContext,
+): Promise<GradedEvidence<boolean>> {
+  const exists = await scanContext.pathExists(scanContext.resolve("Cargo.toml"));
+  return exists ? strong(true, "Cargo.toml") : weak(false);
 }
 
 export function isAllowedSvgComponentImporterPath(relativePath: string): boolean {
@@ -123,8 +243,8 @@ export function isAllowedSvgComponentImporterPath(relativePath: string): boolean
   return pathSegments.includes("icons") || pathSegments.includes("icon-components");
 }
 
-export async function repositoryUsesMui(context: RepositoryScanContext): Promise<boolean> {
-  const packageJsonEntry = await context.loadPackageJson();
+export async function repositoryUsesMui(scanContext: RepositoryScanContext): Promise<boolean> {
+  const packageJsonEntry = await scanContext.loadPackageJson();
   const packageJson = packageJsonEntry.value;
   if (!packageJson) {
     return false;
@@ -191,36 +311,36 @@ const largeFileIgnoredDirs: ReadonlySet<string> = new Set([
 const pytestConfigFileNames = ["pytest.ini", "pyproject.toml", "setup.cfg", "tox.ini"] as const;
 
 export async function repositoryLooksPytestHeavy(
-  context: RepositoryScanContext,
+  scanContext: RepositoryScanContext,
   workflows: WorkflowDocument[],
-): Promise<boolean> {
+): Promise<GradedEvidence<boolean>> {
   for (const fileName of pytestConfigFileNames) {
-    if (await context.pathExists(context.resolve(fileName))) {
-      return true;
+    if (await scanContext.pathExists(scanContext.resolve(fileName))) {
+      return strong(true, `${fileName} at root`);
     }
   }
 
   for (const workflow of workflows) {
     if (workflowStepTextMatches(workflow, /\bpytest\b/)) {
-      return true;
+      return medium(true, "pytest in workflow");
     }
   }
 
-  return false;
+  return weak(false);
 }
 
 export async function repositoryLooksLargeFilesHeavy(
-  context: RepositoryScanContext,
-): Promise<boolean> {
-  for await (const _relativePath of context.walkFilesIter(".", {
+  scanContext: RepositoryScanContext,
+): Promise<GradedEvidence<boolean>> {
+  for await (const _relativePath of scanContext.walkFilesIter(".", {
     ignoredDirectories: largeFileIgnoredDirs,
     include: (relativePath: string) => {
       const lower = relativePath.toLowerCase();
       return largeFileSuffixes.some((suffix) => lower.endsWith(suffix));
     },
   })) {
-    return true;
+    return strong(true, "large file suffix found");
   }
 
-  return false;
+  return weak(false);
 }

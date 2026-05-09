@@ -74,7 +74,7 @@ export async function collectRestrictedImportRepositoryDiagnostics(
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  if (!(await looksLikeJavaScriptRepository(context))) {
+  if (!(await looksLikeJavaScriptRepository(context)).value) {
     return [];
   }
 
