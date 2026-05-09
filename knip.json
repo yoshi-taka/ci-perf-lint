@@ -5,8 +5,10 @@
   "ignoreBinaries": ["hyperfine"],
   "ignoreIssues": {
     "src/rules/shared/tools.ts": ["exports"],
-    "src/rules/shared/any-step.ts": ["exports", "types"]
+    "src/rules/shared/any-step.ts": ["exports", "types"],
+    "src/repository-diagnostics/embedded-oxlint-runner.ts": ["exports", "types"]
   },
+  "ignoreExportsUsedInFile": true,
   "workspaces": {
     ".": {
       "entry": [

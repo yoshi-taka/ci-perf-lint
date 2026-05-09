@@ -13,6 +13,17 @@ import { stderrWarn } from "../stderr-warn.ts";
 export type { EmbeddedOxlintScanKind } from "./embedded-oxlint-config.ts";
 export { cleanupEmbeddedOxlintTempConfigFiles } from "./embedded-oxlint-config.ts";
 export type { OxlintDiagnostic } from "./embedded-oxlint-parser.ts";
+export function embeddedOxlintNodeFallbackCommand(
+  oxlintPath: string,
+  oxlintArgs: string[],
+): string[] {
+  return ["node", bundledOxlintJsPath(oxlintPath), ...oxlintArgs];
+}
+
+export function shouldRetryEmbeddedOxlintWithNode(exitCode: number | undefined): boolean {
+  return exitCode === undefined || exitCode > 128;
+}
+
 const embeddedOxlintIgnoredDirectories = new Set([
   ".git",
   "node_modules",

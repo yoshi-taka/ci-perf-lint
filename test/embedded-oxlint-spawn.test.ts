@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxlint-path.ts";
+import {
+  embeddedOxlintNodeFallbackCommand,
+  shouldRetryEmbeddedOxlintWithNode,
+} from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
 import { accessSync } from "node:fs";
 
 function wait(ms: number): Promise<void> {
@@ -25,6 +29,23 @@ describe("bundledOxlintBinPath", () => {
     };
     const p = await bundledOxlintBinPath(fakeAccess, fakeResolve);
     expect(p).toBeUndefined();
+  });
+});
+
+describe("embedded oxlint node fallback", () => {
+  test("retries on timeout or crash exit codes", () => {
+    expect(shouldRetryEmbeddedOxlintWithNode(undefined)).toBe(true);
+    expect(shouldRetryEmbeddedOxlintWithNode(132)).toBe(true);
+    expect(shouldRetryEmbeddedOxlintWithNode(1)).toBe(false);
+  });
+
+  test("builds a node command from the bundled oxlint js path", async () => {
+    const binPath = await bundledOxlintBinPath();
+    expect(binPath).toBeTruthy();
+    const cmd = embeddedOxlintNodeFallbackCommand(binPath!, ["-f", "unix"]);
+    expect(cmd[0]).toBe("node");
+    expect(cmd[1]).toEndWith("/dist/cli.js");
+    expect(cmd.slice(2)).toEqual(["-f", "unix"]);
   });
 });
 
