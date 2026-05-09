@@ -48,7 +48,7 @@ export async function runEmbeddedOxlint(
   scanContext?: RepositoryScanContext,
   spawnOxlint = spawnOxlintProcess,
 ): Promise<OxlintDiagnostic[] | undefined> {
-  type OxlintRunResult = { diagnostics: OxlintDiagnostic[]; exitCode: number; stderrText: string };
+  type OxlintRunResult = { diagnostics: OxlintDiagnostic[]; exitCode: number; stderrText: string; timedOut?: boolean };
 
   async function runOxlint(cmd: string[]): Promise<OxlintRunResult | undefined> {
     const spawned = spawnOxlint(cmd, repoRoot);
@@ -70,7 +70,10 @@ export async function runEmbeddedOxlint(
     }
 
     if (spawned.timedOut) {
-      return diagnostics.length > 0 ? { diagnostics, exitCode, stderrText } : undefined;
+      if (diagnostics.length > 0) {
+        return { diagnostics, exitCode, stderrText };
+      }
+      return { diagnostics, exitCode, stderrText, timedOut: true };
     }
 
     if (spawned.signaled || exitCode === -1) {
@@ -116,7 +119,7 @@ export async function runEmbeddedOxlint(
 
     const bundledFailed =
       bundledResolved && (result?.exitCode === undefined || result.exitCode > 128);
-    if (bundledFailed && oxlintPath) {
+    if (bundledFailed && oxlintPath && !result?.timedOut) {
       const nodeCmd = ["node", bundledOxlintJsPath(oxlintPath), ...oxlintArgs];
       const nodeResult = await runOxlint(nodeCmd);
       if (nodeResult) {
@@ -138,7 +141,8 @@ export async function runEmbeddedOxlint(
     if (
       result?.exitCode !== undefined &&
       result.exitCode !== 0 &&
-      result.diagnostics.length === 0
+      result.diagnostics.length === 0 &&
+      !result.timedOut
     ) {
       const fixtureRetryResult = await runOxlintWithFallbacks(
         context,
