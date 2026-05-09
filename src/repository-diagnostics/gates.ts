@@ -20,6 +20,7 @@ import {
 } from "./imports-shared.ts";
 import { meetsMinimum } from "../rules/shared/evidence.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
+import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 
 type GateKey = keyof RepositoryDiagnosticGateState;
 
@@ -96,6 +97,7 @@ export function collectorGateMatches(
 
 function collectSignalGateState(
   workflows: WorkflowDocument[],
+  featureIndex?: RepositoryFeatureIndex,
 ): Pick<
   RepositoryDiagnosticGateState,
   | "hasJavaScriptHeavyWorkflow"
@@ -105,6 +107,17 @@ function collectSignalGateState(
   | "hasPythonHeavyWorkflow"
   | "hasElixirHeavyWorkflow"
 > {
+  if (featureIndex) {
+    return {
+      hasJavaScriptHeavyWorkflow: featureIndex.ecosystems.has("javascript"),
+      hasDockerHeavyWorkflow: featureIndex.ecosystems.has("docker"),
+      hasTerraformHeavyWorkflow: featureIndex.ecosystems.has("terraform"),
+      hasDatadogHeavyWorkflow: featureIndex.ecosystems.has("datadog"),
+      hasPythonHeavyWorkflow: featureIndex.ecosystems.has("python"),
+      hasElixirHeavyWorkflow: featureIndex.ecosystems.has("elixir"),
+    };
+  }
+
   let hasJavaScriptHeavyWorkflow = false;
   let hasDockerHeavyWorkflow = false;
   let hasTerraformHeavyWorkflow = false;
@@ -295,7 +308,7 @@ export async function collectRepositoryDiagnosticGateState(
 ): Promise<RepositoryDiagnosticGateState> {
   const state: RepositoryDiagnosticGateState = { ...emptyGateState };
 
-  const signalGates = collectSignalGateState(context.workflows);
+  const signalGates = collectSignalGateState(context.workflows, context.featureIndex);
   Object.assign(state, signalGates);
 
   const hasTooling = quickTestJavaScriptTooling(context);

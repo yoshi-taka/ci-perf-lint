@@ -29,6 +29,7 @@ import { buildRepositoryPredicateIndex } from "./rules/shared/repository-predica
 import { buildRepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 import { buildPropagationClusters } from "./repository-diagnostics/repository-propagation.ts";
+import { buildRepositoryFeatureIndex } from "./repository-diagnostics/repository-feature-index.ts";
 import {
   computeImpliedChecks,
   registerAllRuleMetaForRemediation,
@@ -278,6 +279,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
 
   const precedentIndex = buildRepositoryPrecedentIndex(githubWorkflows);
   const predicateIndex = buildRepositoryPredicateIndex(githubWorkflows);
+  const featureIndex = buildRepositoryFeatureIndex(githubWorkflows);
   const fileIndex = buildRepositoryFileIndex(scanContext);
   const ruleContext = {
     repository: signals,
@@ -352,6 +354,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           scanContext,
           fileIndex,
           predicateIndex,
+          featureIndex,
         }).then((diags) =>
           diags.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
         ),
