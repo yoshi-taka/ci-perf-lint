@@ -48,7 +48,12 @@ export async function runEmbeddedOxlint(
   scanContext?: RepositoryScanContext,
   spawnOxlint = spawnOxlintProcess,
 ): Promise<OxlintDiagnostic[] | undefined> {
-  type OxlintRunResult = { diagnostics: OxlintDiagnostic[]; exitCode: number; stderrText: string; timedOut?: boolean };
+  type OxlintRunResult = {
+    diagnostics: OxlintDiagnostic[];
+    exitCode: number;
+    stderrText: string;
+    timedOut?: boolean;
+  };
 
   async function runOxlint(cmd: string[]): Promise<OxlintRunResult | undefined> {
     const spawned = spawnOxlint(cmd, repoRoot);

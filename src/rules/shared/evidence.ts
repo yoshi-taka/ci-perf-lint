@@ -33,6 +33,8 @@ export function meetsMinimum(
   evidence: GradedEvidence<boolean>,
   minimum: EvidenceStrength,
 ): boolean {
-  if (!evidence.value) return false;
+  if (!evidence.value) {
+    return false;
+  }
   return strengthPriority(evidence.strength) >= strengthPriority(minimum);
 }
