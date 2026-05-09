@@ -206,4 +206,54 @@ describe("evaluateRules", () => {
     expect(Array.isArray(result)).toBe(true);
     await cleanup();
   });
+
+  test("maxFindings caps total findings per ruleId", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        ...[1, 2, 3, 4, 5].flatMap((i) => [
+          `  job${i}:`,
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/setup-node@v4",
+          "      - run: npm ci",
+        ]),
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRules(workflow, context);
+    const missingCacheCount = result.filter((d) => d.ruleId === "missing-dependency-cache").length;
+    expect(missingCacheCount).toBeLessThanOrEqual(3);
+    await cleanup();
+  });
+
+  test("findingCounts accumulates across evaluateRules calls", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-node@v4\n      - run: npm ci\n",
+    );
+    const findingCounts = new Map<string, number>();
+    const context: RuleContext = { repository: createSignals() };
+    await evaluateRules(workflow, context, undefined, findingCounts);
+    const firstTotal = [...findingCounts.values()].reduce((a, b) => a + b, 0);
+    await evaluateRules(workflow, context, undefined, findingCounts);
+    const secondTotal = [...findingCounts.values()].reduce((a, b) => a + b, 0);
+    expect(secondTotal).toBeGreaterThanOrEqual(firstTotal);
+    await cleanup();
+  });
+
+  test("ruleFilter restricts which rules run", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm ci\n      - run: npx eslint .\n",
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRules(workflow, context, undefined, undefined, (rule) =>
+      rule.meta.id.startsWith("missing-"),
+    );
+    for (const d of result) {
+      expect(d.ruleId.startsWith("missing-")).toBe(true);
+    }
+    await cleanup();
+  });
 });

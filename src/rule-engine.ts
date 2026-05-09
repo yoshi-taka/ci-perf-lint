@@ -103,6 +103,25 @@ function workflowContainsKind(
   return true;
 }
 
+function runConcurrent<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  concurrency: number,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let index = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    for (;;) {
+      const i = index++;
+      if (i >= items.length) {
+        break;
+      }
+      results[i] = await fn(items[i]!);
+    }
+  });
+  return Promise.all(workers).then(() => results);
+}
+
 export async function evaluateRules(
   workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
   context: RuleContext,
@@ -127,19 +146,15 @@ export async function evaluateRules(
     applicableRules = [...(rulesByScope["github-actions"] ?? []), ...(rulesByScope.both ?? [])];
   }
 
-  const ruleResults: Diagnostic[] = [];
+  interface RuleTask {
+    rule: AnyRuleModule;
+    run: () => Promise<Diagnostic[]>;
+  }
+
+  const tasks: RuleTask[] = [];
 
   for (const rule of applicableRules) {
     if (ruleFilter && !ruleFilter(rule)) {
-      continue;
-    }
-
-    const { maxFindings } = rule.meta;
-    if (
-      maxFindings !== undefined &&
-      findingCounts &&
-      (findingCounts.get(rule.meta.id) ?? 0) >= maxFindings
-    ) {
       continue;
     }
 
@@ -147,42 +162,80 @@ export async function evaluateRules(
       continue;
     }
 
-    const prevLen = ruleResults.length;
-
-    try {
-      const ruleScope = rule.meta.scope ?? "github-actions";
-      if (ruleScope === "both") {
-        const bothRule = rule as BothRuleModule;
-        ruleResults.push(...(await bothRule.check(workflow, context)));
-      } else if (isBuildkite) {
-        const buildkiteRule = rule as BuildkiteRuleModule;
-        ruleResults.push(...(await buildkiteRule.check(workflow, context)));
-      } else if (isGitlab) {
-        const gitlabCiRule = rule as GitlabCiRuleModule;
-        ruleResults.push(...(await gitlabCiRule.check(workflow, context)));
-      } else if (isCircle) {
-        const circleCiRule = rule as CircleCiRuleModule;
-        ruleResults.push(...(await circleCiRule.check(workflow, context)));
-      } else {
-        const githubRule = rule as RuleModule;
-        ruleResults.push(...(await githubRule.check(workflow, context)));
-      }
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      if (warnings) {
-        warnings.push({
-          source: workflow.relativePath,
-          message: `Rule ${rule.meta.id} failed: ${detail}`,
-        });
-      }
+    const ruleScope = rule.meta.scope ?? "github-actions";
+    let run: () => Promise<Diagnostic[]>;
+    if (ruleScope === "both") {
+      const bothRule = rule as BothRuleModule;
+      run = () => Promise.resolve(bothRule.check(workflow, context));
+    } else if (isBuildkite) {
+      const buildkiteRule = rule as BuildkiteRuleModule;
+      run = () => Promise.resolve(buildkiteRule.check(workflow, context));
+    } else if (isGitlab) {
+      const gitlabCiRule = rule as GitlabCiRuleModule;
+      run = () => Promise.resolve(gitlabCiRule.check(workflow, context));
+    } else if (isCircle) {
+      const circleCiRule = rule as CircleCiRuleModule;
+      run = () => Promise.resolve(circleCiRule.check(workflow, context));
+    } else {
+      const githubRule = rule as RuleModule;
+      run = () => Promise.resolve(githubRule.check(workflow, context));
     }
+
+    tasks.push({ rule, run });
+  }
+
+  const settled = await runConcurrent(
+    tasks,
+    async (task) => {
+      try {
+        return { diagnostics: await task.run(), rule: task.rule };
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        if (warnings) {
+          warnings.push({
+            source: workflow.relativePath,
+            message: `Rule ${task.rule.meta.id} failed: ${detail}`,
+          });
+        }
+        return { diagnostics: [], rule: task.rule };
+      }
+    },
+    4,
+  );
+
+  const ruleResults: Diagnostic[] = [];
+  const idMaxFindings = new Map<string, number>();
+
+  for (const { diagnostics, rule } of settled) {
+    const { maxFindings } = rule.meta;
+    if (maxFindings !== undefined) {
+      idMaxFindings.set(rule.meta.id, maxFindings);
+    }
+    ruleResults.push(...diagnostics);
+  }
+
+  if (findingCounts || idMaxFindings.size > 0) {
+    const caps = new Map<string, number>();
+    const filtered = ruleResults.filter((d) => {
+      const max = idMaxFindings.get(d.ruleId);
+      if (max === undefined) {
+        return true;
+      }
+      const count = caps.get(d.ruleId) ?? 0;
+      if (count >= max) {
+        return false;
+      }
+      caps.set(d.ruleId, count + 1);
+      return true;
+    });
 
     if (findingCounts) {
-      const added = ruleResults.length - prevLen;
-      if (added > 0) {
-        findingCounts.set(rule.meta.id, (findingCounts.get(rule.meta.id) ?? 0) + added);
+      for (const [id, count] of caps) {
+        findingCounts.set(id, (findingCounts.get(id) ?? 0) + count);
       }
     }
+
+    return filtered;
   }
 
   return ruleResults;
