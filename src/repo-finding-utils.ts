@@ -1,11 +1,8 @@
 import type { AuditMode, Diagnostic } from "./types.ts";
+import { applySeverityPromotion } from "./severity-promotion.ts";
 
 const actionsPriorityScoreBonus = 30;
 const prioritizedActionsFindingLimit = 3;
-const strictFallbackWarningRuleIds = new Set([
-  "missing-paths-filter",
-  "missing-path-ignore-for-non-code",
-]);
 
 export function isActionsFinding(finding: Diagnostic): boolean {
   return finding.scope !== "repository";
@@ -16,19 +13,7 @@ export function findingIncludedInMode(finding: Diagnostic, mode: AuditMode): boo
 }
 
 export function promoteStrictFallbackSuggestions(findings: Diagnostic[]): Diagnostic[] {
-  const hasStrictFinding = findings.some((finding) => finding.severity !== "suggestion");
-  if (hasStrictFinding) {
-    return findings;
-  }
-
-  return findings.map((finding) =>
-    finding.severity === "suggestion" && strictFallbackWarningRuleIds.has(finding.ruleId)
-      ? {
-          ...finding,
-          severity: "warning",
-        }
-      : finding,
-  );
+  return applySeverityPromotion(findings, "strict");
 }
 
 export function findingIncludedInScope(

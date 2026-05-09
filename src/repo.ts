@@ -27,8 +27,8 @@ import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
 import { stderrWarn } from "./stderr-warn.ts";
+import { applySeverityPromotion } from "./severity-promotion.ts";
 import {
-  promoteStrictFallbackSuggestions,
   findingIncludedInMode,
   findingIncludedInScope,
   compareFindings,
@@ -320,12 +320,8 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
 
   scanContext.clearCaches();
 
-  const findings =
-    mode === "strict"
-      ? promoteStrictFallbackSuggestions(allFindings).filter((finding) =>
-          findingIncludedInMode(finding, mode),
-        )
-      : allFindings;
+  const promotedFindings = applySeverityPromotion(allFindings, mode);
+  const findings = promotedFindings.filter((finding) => findingIncludedInMode(finding, mode));
 
   findings.splice(0, findings.length, ...applyLimitedActionsPriority(findings));
   findings.sort(compareFindings);

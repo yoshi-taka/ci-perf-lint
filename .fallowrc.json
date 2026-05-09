@@ -25,6 +25,7 @@
     { "file": "src/rules/index.ts", "exports": ["allRules"] },
     { "file": "src/main.ts", "exports": ["parseArgs"] },
     { "file": "src/repository-diagnostics/embedded-oxlint-path.ts", "exports": ["bundledOxlintBinPath"] },
-    { "file": "src/repository-diagnostics/embedded-oxlint-runner.ts", "exports": ["embeddedOxlintNodeFallbackCommand", "shouldRetryEmbeddedOxlintWithNode"] }
+    { "file": "src/repository-diagnostics/embedded-oxlint-runner.ts", "exports": ["embeddedOxlintNodeFallbackCommand", "shouldRetryEmbeddedOxlintWithNode"] },
+    { "file": "src/severity-promotion.ts", "exports": ["severityPromotionRules"] }
   ]
 }
