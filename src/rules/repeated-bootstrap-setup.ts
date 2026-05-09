@@ -2,11 +2,7 @@ import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { jobHasMatrix } from "./shared/workflow-jobs.ts";
-import {
-  buildJobBootstrapProfile,
-  jobBootstrapFingerprint,
-} from "./shared/job-bootstrap-fingerprint.ts";
+import { buildWorkflowSemantics } from "./shared/workflow-semantics.ts";
 
 const meta = {
   id: "repeated-bootstrap-setup",
@@ -26,21 +22,25 @@ interface BootstrapGroup {
 
 export const repeatedBootstrapSetupRule = {
   meta,
-  check(workflow: WorkflowDocument, _context: RuleContext) {
+  check(workflow: WorkflowDocument, context: RuleContext) {
+    const semantics = context.workflowSemantics ?? buildWorkflowSemantics(workflow);
     const groups = new Map<string, BootstrapGroup>();
 
     for (const job of workflow.jobs) {
-      if (job.usesReusableWorkflow || jobHasMatrix(job)) {
+      if (job.usesReusableWorkflow || job.hasIf) {
         continue;
       }
 
-      const profile = buildJobBootstrapProfile(job);
-
-      if (!profile.hasCheckout && !profile.hasInstall) {
+      const jobMeta = semantics.jobs.find((j) => j.id === job.id);
+      if (!jobMeta || jobMeta.hasMatrix) {
         continue;
       }
 
-      const bootstrapFp = bootstrapFingerprint(profile);
+      if (!jobMeta.hasCheckout && !jobMeta.hasInstall) {
+        continue;
+      }
+
+      const bootstrapFp = `${jobMeta.hasCheckout ? "C" : "_"}${jobMeta.hasInstall ? `I${jobMeta.installManager ?? "?"}` : "_"}${jobMeta.hasCache ? "K" : "_"}`;
 
       const group = groups.get(bootstrapFp) ?? {
         bootstrapFp,
@@ -50,15 +50,13 @@ export const repeatedBootstrapSetupRule = {
         hasBuild: false,
       };
       group.jobs.push(job.id);
-
-      const fullFp = jobBootstrapFingerprint(profile);
-      if (fullFp.includes("L")) {
+      if (jobMeta.hasLint) {
         group.hasLint = true;
       }
-      if (fullFp.includes("T")) {
+      if (jobMeta.hasTest) {
         group.hasTest = true;
       }
-      if (fullFp.includes("B")) {
+      if (jobMeta.hasBuild) {
         group.hasBuild = true;
       }
       groups.set(bootstrapFp, group);
@@ -101,12 +99,3 @@ export const repeatedBootstrapSetupRule = {
     });
   },
 };
-
-function bootstrapFingerprint(profile: ReturnType<typeof buildJobBootstrapProfile>): string {
-  const parts: string[] = [
-    profile.hasCheckout ? "C" : "_",
-    profile.hasInstall ? `I${profile.installManager ?? "?"}` : "_",
-    profile.hasCache ? "K" : "_",
-  ];
-  return parts.join("");
-}

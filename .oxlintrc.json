@@ -58,13 +58,15 @@
     "typescript/no-explicit-any": "error",
     "typescript/ban-ts-comment": "error",
     "typescript/no-empty-interface": "error",
-    "eslint/no-useless-call": "error"
+    "eslint/no-useless-call": "error",
+    "typescript/await-thenable": "error"
   },
   "overrides": [
     {
       "files": ["**/*.test.*", "**/*.spec.*"],
       "rules": {
-        "import/no-cycle": "off"
+        "import/no-cycle": "off",
+        "typescript/await-thenable": "off"
       }
     },
     {

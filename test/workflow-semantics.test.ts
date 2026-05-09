@@ -48,13 +48,14 @@ describe("buildWorkflowSemantics", () => {
     const wf = makeWorkflow({
       on: { push: null },
       jobs: [
-        { id: "job1", steps: [{ name: "s1" }, { name: "s2" }] },
-        { id: "job2", steps: [{ name: "s3" }] },
+        { id: "job1", steps: [{ name: "s1" }, { name: "s2" }], raw: {} },
+        { id: "job2", steps: [{ name: "s3" }], raw: {} },
       ],
     } as unknown as Partial<WorkflowDocument>);
     const s = buildWorkflowSemantics(wf);
     expect(s.jobCount).toBe(2);
     expect(s.stepCount).toBe(3);
+    expect(s.jobs.length).toBe(2);
   });
 
   test("marks heavy workflow", () => {
@@ -63,6 +64,7 @@ describe("buildWorkflowSemantics", () => {
       jobs: Array.from({ length: 5 }, (_, i) => ({
         id: `build-${i}`,
         steps: [{ name: "s1", run: "echo hi" }],
+        raw: {},
       })),
     } as unknown as Partial<WorkflowDocument>);
     const s = buildWorkflowSemantics(wf);

@@ -49,7 +49,7 @@ describe("embedded oxlint fixture retry", () => {
         };
       };
 
-      await expect(
+      expect(
         runEmbeddedOxlint(tmpDir, "non-import", undefined, undefined, fakeSpawn),
       ).resolves.toEqual([]);
       expect(calls).toHaveLength(2);
