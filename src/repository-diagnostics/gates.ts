@@ -166,6 +166,35 @@ async function repositoryHasJavaScriptPackageScriptEvidence(
   return matches.some(Boolean);
 }
 
+function repositoryLikelyUsesJavaScriptTooling(context: RepositoryDiagnosticContext): boolean {
+  const { repository } = context;
+  return (
+    context.workflows.some((workflow) => workflowLooksJavaScriptHeavy(workflow)) ||
+    repository.eslint.usesEslint ||
+    repository.eslint.usesOxlint ||
+    repository.prettier.usesPrettier ||
+    repository.prettier.usesOxfmt ||
+    repository.frameworks.usesNextjs ||
+    repository.frameworks.usesStorybook ||
+    repository.frameworks.usesVite ||
+    repository.frameworks.usesAstro ||
+    repository.frameworks.usesSvelteKit ||
+    repository.frameworks.usesSolidStart ||
+    repository.frameworks.usesTurbo ||
+    repository.frameworks.usesNx ||
+    repository.frameworks.usesLerna ||
+    repository.frameworks.usesAngularCli ||
+    repository.typescript.versionSpec !== undefined ||
+    repository.jest.versionSpec !== undefined ||
+    repository.jest.jsdomVersionSpec !== undefined ||
+    repository.tailwind.usesTailwind ||
+    repository.husky.usesHusky ||
+    repository.husky.usesLintStaged ||
+    repository.babel.usesBabel ||
+    repository.nativePackages.node.length > 0
+  );
+}
+
 function repositoryLikelyUsesJavaScriptLinting(context: RepositoryDiagnosticContext): boolean {
   const { eslint, husky } = context.repository;
   return (
@@ -214,6 +243,23 @@ function repositoryLikelyUsesJavaScriptPackageScripts(
     npm.workflowEnvReferences.length > 0 ||
     nativePackages.node.length > 0 ||
     context.workflows.some((workflow) => /\b(?:npm|pnpm|yarn|bun)\b/i.test(workflow.source ?? ""))
+  );
+}
+
+function repositoryLikelyUsesJavaScriptFrameworks(context: RepositoryDiagnosticContext): boolean {
+  const { frameworks, tailwind, jest } = context.repository;
+  return (
+    frameworks.usesNextjs ||
+    frameworks.usesStorybook ||
+    tailwind.usesTailwind ||
+    jest.versionSpec !== undefined
+  );
+}
+
+function repositoryLikelyUsesRust(context: RepositoryDiagnosticContext): boolean {
+  return (
+    context.repository.rust.hasCargoToml ||
+    context.workflows.some((workflow) => /\b(?:cargo|rustc|nextest)\b/i.test(workflow.source ?? ""))
   );
 }
 
