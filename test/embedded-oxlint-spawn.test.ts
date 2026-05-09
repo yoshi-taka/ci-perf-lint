@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxlint-path.ts";
+import { parseOxlintLine } from "../src/repository-diagnostics/embedded-oxlint-parser.ts";
 import { spawnOxlintProcess } from "../src/repository-diagnostics/embedded-oxlint-spawn.ts";
 import { runEmbeddedOxlint } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
 import { accessSync } from "node:fs";
@@ -46,12 +47,12 @@ describe("embedded oxlint fixture retry", () => {
           stderr: Promise.resolve(""),
           exited: Promise.resolve(exitCode),
           timedOut: false,
+          signaled: false,
         };
       };
 
-      expect(
-        runEmbeddedOxlint(tmpDir, "non-import", undefined, undefined, fakeSpawn),
-      ).resolves.toEqual([]);
+      const result = await runEmbeddedOxlint(tmpDir, "non-import", undefined, undefined, fakeSpawn);
+      expect(result).toEqual([]);
       expect(calls).toHaveLength(2);
       expect(calls[1]!.join(" ")).toContain("**/fixtures/**");
     } finally {
@@ -165,5 +166,119 @@ describe("spawnOxlintProcess timeout", () => {
     expect(code).not.toBe(0);
     expect(typeof outText).toBe("string");
     expect(typeof errText).toBe("string");
+  });
+});
+
+describe("parseOxlintLine", () => {
+  test("parses [Category/Rule] format", () => {
+    const result = parseOxlintLine(
+      "src/file.ts:10:5: Use strict equality. [Warning/eslint(no-unused-vars)]",
+    );
+    expect(result).toEqual({
+      filename: "src/file.ts",
+      line: 10,
+      column: 5,
+      message: "Use strict equality.",
+      severity: "Warning",
+      code: "eslint(no-unused-vars)",
+    });
+  });
+
+  test("parses [Error] format", () => {
+    const result = parseOxlintLine("src/file.ts:1:1: Expected JSX closing tag. [Error]");
+    expect(result).toEqual({
+      filename: "src/file.ts",
+      line: 1,
+      column: 1,
+      message: "Expected JSX closing tag.",
+      severity: "Error",
+      code: "oxc(error)",
+    });
+  });
+
+  test("returns undefined for summary line", () => {
+    expect(parseOxlintLine("9 problems")).toBeUndefined();
+  });
+
+  test("returns undefined for malformed line", () => {
+    expect(parseOxlintLine("random text")).toBeUndefined();
+  });
+
+  test("returns undefined for empty line", () => {
+    expect(parseOxlintLine("")).toBeUndefined();
+  });
+});
+
+describe("runEmbeddedOxlint with mock spawn", () => {
+  test("returns undefined on timeout with no output", async () => {
+    const fakeSpawn = () => ({
+      stdout: Promise.resolve(""),
+      stderr: Promise.resolve(""),
+      exited: Promise.resolve(1),
+      timedOut: true,
+      signaled: false,
+    });
+    const result = await runEmbeddedOxlint("/tmp", "non-import", undefined, undefined, fakeSpawn);
+    expect(result).toBeUndefined();
+  });
+
+  test("returns partial diagnostics on timeout with output", async () => {
+    const fakeSpawn = () => ({
+      stdout: Promise.resolve("src/file.ts:1:1: large barrel [Warning/oxc(no-barrel-file)]\n"),
+      stderr: Promise.resolve(""),
+      exited: Promise.resolve(1),
+      timedOut: true,
+      signaled: false,
+    });
+    const result = await runEmbeddedOxlint("/tmp", "non-import", undefined, undefined, fakeSpawn);
+    expect(result).toHaveLength(1);
+    expect(result![0]!.code).toBe("oxc(no-barrel-file)");
+  });
+
+  test("falls back to node on signal", async () => {
+    let callCount = 0;
+    const fakeSpawn = () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          stdout: Promise.resolve(""),
+          stderr: Promise.resolve(""),
+          exited: Promise.resolve(1),
+          timedOut: false,
+          signaled: true,
+        };
+      }
+      return {
+        stdout: Promise.resolve("src/file.ts:1:1: msg [Warning/oxc(no-barrel-file)]\n"),
+        stderr: Promise.resolve(""),
+        exited: Promise.resolve(1),
+        timedOut: false,
+        signaled: false,
+      };
+    };
+    const result = await runEmbeddedOxlint("/tmp", "non-import", undefined, undefined, fakeSpawn);
+    expect(result).toHaveLength(1);
+    expect(callCount).toBe(2);
+  });
+
+  test("trigger fixture retry on silent failure", async () => {
+    let callCount = 0;
+    const cmds: string[][] = [];
+    const fakeSpawn = (cmd: string[]) => {
+      cmds.push(cmd);
+      callCount++;
+      const last = callCount >= 2;
+      return {
+        stdout: Promise.resolve(last ? "src/file.ts:1:1: msg [Warning/oxc(no-barrel-file)]\n" : ""),
+        stderr: Promise.resolve(""),
+        exited: Promise.resolve(last ? 1 : 1),
+        timedOut: false,
+        signaled: false,
+      };
+    };
+    const result = await runEmbeddedOxlint("/tmp", "non-import", undefined, undefined, fakeSpawn);
+    expect(result).toHaveLength(1);
+    expect(callCount).toBe(2);
+    expect(cmds[1]!.join(" ")).toContain("**/fixtures/**");
   });
 });
