@@ -62,6 +62,30 @@ export interface AnalysisWarning {
   message: string;
 }
 
+export interface DiffusionMetrics {
+  diffusionCoefficient: number;
+  weightedDiffusionMass: number;
+  propagationDepth: number;
+  workflowCentrality: number;
+}
+
+export interface SimilarityEdge {
+  source: string;
+  target: string;
+  similarity: number;
+}
+
+export interface PropagationCluster {
+  ruleId: string;
+  sourceWorkflow: string;
+  sourceConfidence: "high" | "medium" | "low";
+  sourceReason: string;
+  memberWorkflows: string[];
+  memberCount: number;
+  similarityEdges: SimilarityEdge[];
+  metrics: DiffusionMetrics;
+}
+
 export interface ReportData {
   targetPath: string;
   workflowCount: number;
@@ -73,6 +97,7 @@ export interface ReportData {
   fixFirst: string[];
   aiHandoff: string[];
   analysisWarnings: AnalysisWarning[];
+  propagationClusters: PropagationCluster[];
 }
 
 export interface RuleMeta {

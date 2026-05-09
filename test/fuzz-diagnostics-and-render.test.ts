@@ -4,7 +4,13 @@ import YAML from "yaml";
 import { buildDiagnostic } from "../src/rules/shared/diagnostics.ts";
 import { renderReport } from "../src/reporters.ts";
 import { parseWorkflow } from "../src/workflow.ts";
-import type { Confidence, OutputFormat, RuleMeta, Severity } from "../src/types.ts";
+import type {
+  Confidence,
+  OutputFormat,
+  RuleMeta,
+  Severity,
+  PropagationCluster,
+} from "../src/types.ts";
 
 // --- buildDiagnostic fuzz ---
 
@@ -159,6 +165,7 @@ const reportDataArb = fc.record({
     }),
     { maxLength: 5 },
   ),
+  propagationClusters: fc.constant([] as PropagationCluster[]),
 });
 
 describe("fuzz: renderReport", () => {

@@ -173,6 +173,7 @@ describe("renderReport", () => {
       fixFirst: ["Add explicit file extensions to relative imports."],
       aiHandoff: ["Review embedded Oxlint import/extensions findings."],
       analysisWarnings: [],
+      propagationClusters: [],
     };
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
 
@@ -224,6 +225,7 @@ describe("renderReport", () => {
       fixFirst: ["Replace broad `export *` barrel usage."],
       aiHandoff: buildAiHandoff(aggregated),
       analysisWarnings: [],
+      propagationClusters: [],
     };
 
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
@@ -280,6 +282,7 @@ describe("renderReport", () => {
       fixFirst: ["Add explicit file extensions to relative imports."],
       aiHandoff: ["Review embedded Oxlint import/extensions findings."],
       analysisWarnings: [],
+      propagationClusters: [],
     };
 
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
@@ -336,6 +339,7 @@ describe("renderReport", () => {
       fixFirst: ["Add explicit file extensions to relative imports."],
       aiHandoff: ["Review embedded Oxlint import/extensions findings."],
       analysisWarnings: [],
+      propagationClusters: [],
     };
 
     const handoff = renderReport(report, "handoff", {
@@ -475,6 +479,7 @@ describe("renderReport", () => {
       fixFirst: ["Upgrade Husky to the latest v9 release."],
       aiHandoff: buildAiHandoff(aggregated),
       analysisWarnings: [],
+      propagationClusters: [],
     };
 
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
@@ -667,6 +672,7 @@ describe("renderReport", () => {
         fixFirst: ["Remove npm audit"],
         aiHandoff: [],
         analysisWarnings: [],
+        propagationClusters: [],
       };
       const text = renderReport(report, "text", { ...ttyOpts, topCount: 5, mode: "strict" });
       expect(text).toContain("`\x1b[32mnpm audit\x1b[0m`");
@@ -731,6 +737,7 @@ describe("renderReport", () => {
         fixFirst: ["Remove npm audit"],
         aiHandoff: [],
         analysisWarnings: [],
+        propagationClusters: [],
       };
       const handoff = renderReport(report, "handoff", {
         ...ttyOpts,
@@ -839,6 +846,7 @@ describe("renderReport", () => {
         fixFirst: ["add concurrency"],
         aiHandoff: buildAiHandoff(aggregated),
         analysisWarnings: [],
+        propagationClusters: [],
       };
       const handoff = renderReport(report, "handoff", { ...ttyOpts, topCount: 5, mode: "strict" });
       expect(handoff).toContain("\x1b[90m.github/workflows/ci.yml\x1b[0m");

@@ -131,6 +131,7 @@ describe("aggregateFindings and grouped reporter output", () => {
         'Review repeated missing-timeout-minutes findings for jobs "build-layer" across workflows `.github/workflows/release-layer-java.yml`, `.github/workflows/release-layer-python.yml`. Apply one consistent fix pattern where appropriate instead of treating each workflow separately.',
       ],
       analysisWarnings: [],
+      propagationClusters: [],
     };
     report.findings = report.topFindings;
 
