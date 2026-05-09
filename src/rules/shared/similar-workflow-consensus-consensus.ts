@@ -140,3 +140,29 @@ export function withSimilarWorkflowNonCodeIgnoreConsensus(
     },
   );
 }
+
+export function detectClusterInconsistency<T>(
+  components: number[][],
+  getValue: (index: number) => T,
+  areInconsistent: (a: T, b: T) => boolean,
+): number[][] {
+  const inconsistent: number[][] = [];
+
+  for (const cluster of components) {
+    if (cluster.length < 2) {
+      continue;
+    }
+
+    const values = cluster.map((i) => getValue(i));
+    const first = values[0]!;
+    for (let i = 1; i < values.length; i++) {
+      const val = values[i];
+      if (val !== undefined && areInconsistent(first, val)) {
+        inconsistent.push(cluster);
+        break;
+      }
+    }
+  }
+
+  return inconsistent;
+}

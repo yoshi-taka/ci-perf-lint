@@ -26,6 +26,8 @@
     { "file": "src/main.ts", "exports": ["parseArgs"] },
     { "file": "src/repository-diagnostics/embedded-oxlint-path.ts", "exports": ["bundledOxlintBinPath"] },
     { "file": "src/repository-diagnostics/embedded-oxlint-runner.ts", "exports": ["embeddedOxlintNodeFallbackCommand", "shouldRetryEmbeddedOxlintWithNode"] },
-    { "file": "src/severity-promotion.ts", "exports": ["severityPromotionRules"] }
+    { "file": "src/severity-promotion.ts", "exports": ["severityPromotionRules"] },
+    { "file": "src/repository-similar-workflows-similarity.ts", "exports": ["collectConnectedComponents"] },
+    { "file": "src/rules/shared/similar-workflow-consensus-consensus.ts", "exports": ["detectClusterInconsistency"] }
   ]
 }

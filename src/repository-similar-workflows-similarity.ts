@@ -112,3 +112,40 @@ export function collectPeerIndexes<T extends FeatureComparable>(
     return peerIndexes;
   });
 }
+
+export function collectConnectedComponents(peerIndexes: number[][]): number[][] {
+  const parent = peerIndexes.map((_, i) => i);
+
+  function find(x: number): number {
+    if (parent[x] !== x) {
+      parent[x] = find(parent[x] ?? x);
+    }
+    return parent[x] ?? x;
+  }
+
+  function union(x: number, y: number): void {
+    const rootX = find(x);
+    const rootY = find(y);
+    if (rootX !== rootY) {
+      parent[rootX] = rootY;
+    }
+  }
+
+  for (const [i, peers] of peerIndexes.entries()) {
+    for (const j of peers) {
+      if (j < peerIndexes.length) {
+        union(i, j);
+      }
+    }
+  }
+
+  const components = new Map<number, number[]>();
+  for (let i = 0; i < peerIndexes.length; i++) {
+    const root = find(i);
+    const group = components.get(root) ?? [];
+    group.push(i);
+    components.set(root, group);
+  }
+
+  return [...components.values()];
+}
