@@ -342,6 +342,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           >,
           warnings: analysisWarnings,
           scanContext,
+          fileIndex,
         }).then((diags) =>
           diags.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
         ),

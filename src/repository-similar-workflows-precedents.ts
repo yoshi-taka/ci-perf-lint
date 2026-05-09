@@ -3,12 +3,15 @@ import type { YAMLMap } from "yaml";
 import { getScalarValue, getStringOrArrayValue } from "./workflow.ts";
 import { collectScopePrefixes } from "./rules/shared/workflow-path-prefixes.ts";
 import {
+  buildRepositoryPrecedentIndex,
+  type RepositoryPrecedentIndex,
+} from "./rules/shared/repository-precedent-index.ts";
+import {
   hasHistoryDependentCommand,
   isHeavyWorkflow,
   isHeavyJob,
   jobIsStaticallyDisabled,
   hasOpaqueRepoScriptExecution,
-  workflowHasConcurrency,
   workflowLooksReleaseLike,
 } from "./rules/shared/workflow-jobs.ts";
 import { getCheckoutStep } from "./rules/shared/workflow-analysis.ts";
@@ -248,10 +251,11 @@ function jobLooksCommitMetadataLike(job: WorkflowJob): boolean {
 export function collectRepositoryPrecedentSignals(
   workflows: WorkflowDocument[],
   sharedJobSummaries: JobSummary[],
+  precedentIndex?: RepositoryPrecedentIndex,
 ): RepositoryPrecedentSignals {
+  const idx = precedentIndex ?? buildRepositoryPrecedentIndex(workflows);
   return {
-    concurrency: workflows
-      .filter((workflow) => workflowHasConcurrency(workflow))
+    concurrency: [...idx.hasConcurrency]
       .map((workflow) => ({ workflowPath: workflow.relativePath }))
       .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
       .slice(0, 10),

@@ -1,6 +1,6 @@
 import type { WorkflowDocument } from "../../workflow.ts";
 import { getStepFacts } from "./step-facts.ts";
-import { getJobFacts } from "./workflow-analysis.ts";
+import { getJobFacts, getWorkflowFacts } from "./workflow-analysis.ts";
 
 export interface RepositoryPrecedentIndex {
   readonly byUsesPrefix: ReadonlyMap<string, readonly WorkflowDocument[]>;
@@ -8,6 +8,7 @@ export interface RepositoryPrecedentIndex {
   readonly byJobIdPattern: ReadonlyMap<string, readonly WorkflowDocument[]>;
   readonly usesDocker: ReadonlySet<WorkflowDocument>;
   readonly hasTimeout: ReadonlySet<WorkflowDocument>;
+  readonly hasConcurrency: ReadonlySet<WorkflowDocument>;
   readonly hasMatrix: ReadonlySet<WorkflowDocument>;
 }
 
@@ -19,9 +20,13 @@ export function buildRepositoryPrecedentIndex(
   const byJobIdPattern = new Map<string, WorkflowDocument[]>();
   const usesDocker = new Set<WorkflowDocument>();
   const hasTimeout = new Set<WorkflowDocument>();
+  const hasConcurrency = new Set<WorkflowDocument>();
   const hasMatrix = new Set<WorkflowDocument>();
 
   for (const workflow of workflows) {
+    if (getWorkflowFacts(workflow).hasConcurrency) {
+      hasConcurrency.add(workflow);
+    }
     for (const job of workflow.jobs) {
       const jobFacts = getJobFacts(job);
       if (jobFacts.hasTimeout) {
@@ -87,6 +92,7 @@ export function buildRepositoryPrecedentIndex(
     byJobIdPattern,
     usesDocker,
     hasTimeout,
+    hasConcurrency,
     hasMatrix,
   };
 }

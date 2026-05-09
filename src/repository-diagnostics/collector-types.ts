@@ -3,6 +3,7 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { WorkflowSemantics } from "../rules/shared/workflow-semantics.ts";
+import type { RepositoryFileIndex } from "../rules/shared/repository-file-index.ts";
 
 export interface RepositoryDiagnosticGateState {
   hasJavaScriptHeavyWorkflow: boolean;
@@ -32,6 +33,7 @@ export interface RepositoryDiagnosticContext {
   workflowSemantics: ReadonlyMap<WorkflowDocument, WorkflowSemantics>;
   warnings: AnalysisWarning[];
   scanContext: RepositoryScanContext;
+  fileIndex: RepositoryFileIndex;
 }
 
 export type GatePredicate = (state: RepositoryDiagnosticGateState) => boolean;
