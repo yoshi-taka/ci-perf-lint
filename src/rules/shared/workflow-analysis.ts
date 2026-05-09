@@ -48,6 +48,7 @@ export interface JobFacts {
   hasOpaqueRepoScriptExecution: boolean;
   looksMetaCheckLike: boolean;
   looksAgenticLike: boolean;
+  looksReleaseLike: boolean;
   lintTools: ReadonlySet<string>;
   pythonTools: ReadonlySet<string>;
   loweredStepTextBlob: string;
@@ -282,6 +283,7 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     hasOpaqueRepoScriptExecution,
     looksMetaCheckLike: metaCheckIdPattern.test(loweredId) || looksMetaCheckLike,
     looksAgenticLike: agenticIdPattern.test(loweredId) || looksAgenticLike,
+    looksReleaseLike: false,
     lintTools,
     pythonTools,
     loweredStepTextBlob: loweredStepTexts.join("\n"),
@@ -367,6 +369,12 @@ export function getWorkflowFacts(
   const wfNameLooksRelease = /\b(release|rollback|promote|nightly|tag|version)\b/.test(loweredName);
   const hasPushTags = triggerFacts.push.hasTags || triggerFacts.push.hasTagsIgnore;
   const looksReleaseLike = wfNameLooksRelease || hasPushTags;
+
+  for (const job of wf.jobs) {
+    const jf = getJobFacts(job);
+    const mutable = jf as { looksReleaseLike: boolean };
+    mutable.looksReleaseLike = releaseLikeJobIds.has(job.id) || looksReleaseLike;
+  }
 
   const wfNameHeavy = heavyWorkflowNamePattern.test(loweredName);
   const heavyJobNames: string[] = [];

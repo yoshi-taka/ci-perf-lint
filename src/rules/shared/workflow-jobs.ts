@@ -103,8 +103,7 @@ export function jobPublishesScorecardResults(job: WorkflowJob): boolean {
 }
 
 export function workflowLooksReleaseLike(workflow: WorkflowDocument, job: WorkflowJob): boolean {
-  const wfFacts = getWorkflowFacts(workflow);
-  return wfFacts.releaseLikeJobIds.has(job.id) || wfFacts.looksReleaseLike;
+  return getJobFacts(job).looksReleaseLike;
 }
 
 export function workflowLooksMetaCheckLike(workflow: WorkflowDocument): boolean {
