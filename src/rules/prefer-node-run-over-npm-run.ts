@@ -17,6 +17,7 @@ const meta = {
   docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
   scope: "all",
   precheck: (workflow) => (workflow.source?.includes("npm run") ? 1 : 0),
+  impliedChecks: ["npm-ci-over-npm-install"],
 } satisfies RuleMeta;
 
 function parseVisibleNodeMajor(version: unknown): number | undefined {

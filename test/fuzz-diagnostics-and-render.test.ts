@@ -6,6 +6,7 @@ import { renderReport } from "../src/reporters.ts";
 import { parseWorkflow } from "../src/workflow.ts";
 import type {
   Confidence,
+  ImpliedCheck,
   OutputFormat,
   RuleMeta,
   Severity,
@@ -166,6 +167,7 @@ const reportDataArb = fc.record({
     { maxLength: 5 },
   ),
   propagationClusters: fc.constant([] as PropagationCluster[]),
+  remediationChecks: fc.constant([] as ImpliedCheck[]),
 });
 
 describe("fuzz: renderReport", () => {

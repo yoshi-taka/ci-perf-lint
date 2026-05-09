@@ -273,6 +273,14 @@ function renderText(report: ReportData, options: RenderOptions = {}): string {
     lines.push(maybeColor(ansi.dim, availabilityNote, options));
   }
 
+  if (report.remediationChecks.length > 0) {
+    lines.push("");
+    lines.push(maybeColor(ansi.bold, "Remediation stability checks:", options));
+    for (const check of report.remediationChecks) {
+      lines.push(`   ${check.sourceRuleId} → ${check.impliedRuleId}: ${check.reason}`);
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -358,6 +366,19 @@ function renderMarkdown(report: ReportData, options: RenderOptions = {}): string
     lines.push(`- Measurement hint: ${finding.measurementHint}`);
     lines.push("");
   });
+
+  if (report.remediationChecks.length > 0) {
+    lines.push("## Remediation Stability");
+    lines.push("");
+    lines.push(
+      "Fixing some findings may surface new issues. Review the following implied checks after remediation:",
+    );
+    lines.push("");
+    for (const check of report.remediationChecks) {
+      lines.push(`- \`${check.sourceRuleId}\` → \`${check.impliedRuleId}\`: ${check.reason}`);
+    }
+    lines.push("");
+  }
 
   lines.push("## AI Handoff");
   lines.push("");

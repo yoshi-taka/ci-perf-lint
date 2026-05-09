@@ -305,19 +305,23 @@ function bfsPropagationDepth(source: string, members: string[], edges: Similarit
   return maxDepth;
 }
 
-function computeDiffusionMetrics(
-  members: string[],
-  allWorkflowPaths: string[],
-  edges: SimilarityEdge[],
-  source: string,
-  memberFindings: Map<string, Diagnostic[]>,
-): DiffusionMetrics {
+interface DiffusionMetricsParams {
+  members: string[];
+  allWorkflowPaths: string[];
+  featureSetsByPath: Map<string, Set<string>>;
+  edges: SimilarityEdge[];
+  source: string;
+  memberFindings: Map<string, Diagnostic[]>;
+}
+
+function computeDiffusionMetrics(params: DiffusionMetricsParams): DiffusionMetrics {
+  const { members, allWorkflowPaths, featureSetsByPath, edges, source, memberFindings } = params;
   const totalCount = allWorkflowPaths.length;
   const diffusionCoefficient = totalCount > 0 ? members.length / totalCount : 0;
 
   const centralityByPath = new Map<string, number>();
   for (const m of members) {
-    centralityByPath.set(m, centralityScore(m, new Map(), members));
+    centralityByPath.set(m, centralityScore(m, featureSetsByPath, members));
   }
   const maxCentrality = Math.max(...centralityByPath.values(), 1);
 
@@ -414,13 +418,14 @@ export async function buildPropagationClusters(
       list.push(f);
     }
 
-    const metrics = computeDiffusionMetrics(
-      memberPaths,
+    const metrics = computeDiffusionMetrics({
+      members: memberPaths,
       allWorkflowPaths,
+      featureSetsByPath,
       edges,
       source,
       memberFindings,
-    );
+    });
 
     clusters.push({
       ruleId,

@@ -1,6 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { parseWorkflow, type WorkflowDocument } from "../src/workflow.ts";
 import { buildPropagationClusters } from "../src/repository-diagnostics/repository-propagation.ts";
+import {
+  computeImpliedChecks,
+  registerAllRuleMetaForRemediation,
+} from "../src/rules/shared/remediation-checks.ts";
 import type { Diagnostic } from "../src/types.ts";
 
 function makeDiagnostic(ruleId: string, workflow: string, score: number): Diagnostic {
@@ -202,5 +206,93 @@ describe("buildPropagationClusters", () => {
     expect(cluster!.memberWorkflows).toEqual(
       expect.arrayContaining(["first.yml", "second.yml", "third.yml"]),
     );
+  });
+});
+
+describe("computeImpliedChecks", () => {
+  beforeEach(() => {
+    registerAllRuleMetaForRemediation([
+      {
+        meta: {
+          id: "rule-a",
+          severity: "warning",
+          confidence: "high",
+          docsPath: "docs/rules/rule-a.md",
+          impliedChecks: ["rule-b"],
+        },
+      },
+      {
+        meta: {
+          id: "rule-b",
+          severity: "suggestion",
+          confidence: "medium",
+          docsPath: "docs/rules/rule-b.md",
+          impliedChecks: ["rule-c"],
+        },
+      },
+      {
+        meta: {
+          id: "rule-c",
+          severity: "suggestion",
+          confidence: "medium",
+          docsPath: "docs/rules/rule-c.md",
+        },
+      },
+      {
+        meta: {
+          id: "rule-no-implied",
+          severity: "warning",
+          confidence: "high",
+          docsPath: "docs/rules/rule-no-implied.md",
+        },
+      },
+    ]);
+  });
+
+  test("returns implied checks from finding ruleIds", () => {
+    const findings = [makeDiagnostic("rule-a", "wf.yml", 50)];
+    const checks = computeImpliedChecks(findings);
+    expect(checks).toHaveLength(1);
+    expect(checks[0]!.sourceRuleId).toBe("rule-a");
+    expect(checks[0]!.impliedRuleId).toBe("rule-b");
+  });
+
+  test("returns empty for findings without impliedChecks", () => {
+    const findings = [makeDiagnostic("rule-no-implied", "wf.yml", 50)];
+    const checks = computeImpliedChecks(findings);
+    expect(checks).toHaveLength(0);
+  });
+
+  test("deduplicates repeated source→implied pairs", () => {
+    const findings = [
+      makeDiagnostic("rule-a", "wf1.yml", 50),
+      makeDiagnostic("rule-a", "wf2.yml", 50),
+    ];
+    const checks = computeImpliedChecks(findings);
+    const aToB = checks.filter((c) => c.sourceRuleId === "rule-a" && c.impliedRuleId === "rule-b");
+    expect(aToB).toHaveLength(1);
+  });
+
+  test("chains implied checks across rules", () => {
+    const findings = [makeDiagnostic("rule-a", "wf.yml", 50)];
+    const checks = computeImpliedChecks(findings);
+    const allImplied = new Set(checks.map((c) => c.impliedRuleId));
+    expect(allImplied.has("rule-b")).toBe(true);
+
+    const findingsB = [makeDiagnostic("rule-b", "wf.yml", 50)];
+    const checksB = computeImpliedChecks(findingsB);
+    const bToC = checksB.find((c) => c.sourceRuleId === "rule-b" && c.impliedRuleId === "rule-c");
+    expect(bToC).toBeDefined();
+  });
+
+  test("mentions already-present findings in reason", () => {
+    const findings = [
+      makeDiagnostic("rule-a", "wf.yml", 50),
+      makeDiagnostic("rule-b", "wf.yml", 50),
+    ];
+    const checks = computeImpliedChecks(findings);
+    const aToB = checks.find((c) => c.sourceRuleId === "rule-a" && c.impliedRuleId === "rule-b");
+    expect(aToB).toBeDefined();
+    expect(aToB!.reason).toContain("existing");
   });
 });

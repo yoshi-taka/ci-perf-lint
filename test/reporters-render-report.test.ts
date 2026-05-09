@@ -174,6 +174,7 @@ describe("renderReport", () => {
       aiHandoff: ["Review embedded Oxlint import/extensions findings."],
       analysisWarnings: [],
       propagationClusters: [],
+      remediationChecks: [],
     };
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
 
@@ -226,6 +227,7 @@ describe("renderReport", () => {
       aiHandoff: buildAiHandoff(aggregated),
       analysisWarnings: [],
       propagationClusters: [],
+      remediationChecks: [],
     };
 
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
@@ -283,6 +285,7 @@ describe("renderReport", () => {
       aiHandoff: ["Review embedded Oxlint import/extensions findings."],
       analysisWarnings: [],
       propagationClusters: [],
+      remediationChecks: [],
     };
 
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
@@ -340,6 +343,7 @@ describe("renderReport", () => {
       aiHandoff: ["Review embedded Oxlint import/extensions findings."],
       analysisWarnings: [],
       propagationClusters: [],
+      remediationChecks: [],
     };
 
     const handoff = renderReport(report, "handoff", {
@@ -480,6 +484,7 @@ describe("renderReport", () => {
       aiHandoff: buildAiHandoff(aggregated),
       analysisWarnings: [],
       propagationClusters: [],
+      remediationChecks: [],
     };
 
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
@@ -673,6 +678,7 @@ describe("renderReport", () => {
         aiHandoff: [],
         analysisWarnings: [],
         propagationClusters: [],
+        remediationChecks: [],
       };
       const text = renderReport(report, "text", { ...ttyOpts, topCount: 5, mode: "strict" });
       expect(text).toContain("`\x1b[32mnpm audit\x1b[0m`");
@@ -738,6 +744,7 @@ describe("renderReport", () => {
         aiHandoff: [],
         analysisWarnings: [],
         propagationClusters: [],
+        remediationChecks: [],
       };
       const handoff = renderReport(report, "handoff", {
         ...ttyOpts,
@@ -847,6 +854,7 @@ describe("renderReport", () => {
         aiHandoff: buildAiHandoff(aggregated),
         analysisWarnings: [],
         propagationClusters: [],
+        remediationChecks: [],
       };
       const handoff = renderReport(report, "handoff", { ...ttyOpts, topCount: 5, mode: "strict" });
       expect(handoff).toContain("\x1b[90m.github/workflows/ci.yml\x1b[0m");

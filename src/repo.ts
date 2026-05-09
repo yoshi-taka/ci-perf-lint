@@ -29,6 +29,11 @@ import { buildRepositoryPredicateIndex } from "./rules/shared/repository-predica
 import { buildRepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 import { buildPropagationClusters } from "./repository-diagnostics/repository-propagation.ts";
+import {
+  computeImpliedChecks,
+  registerAllRuleMetaForRemediation,
+} from "./rules/shared/remediation-checks.ts";
+import { allRules } from "./rules/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
 import { stderrWarn } from "./stderr-warn.ts";
 import { applySeverityPromotion } from "./severity-promotion.ts";
@@ -355,6 +360,10 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   allFindings.push(...wfFindings, ...repoDiagnostics);
   timer.mark("evaluate-rules-and-diagnostics");
 
+  registerAllRuleMetaForRemediation(allRules);
+  const remediationChecks = computeImpliedChecks(allFindings);
+  timer.mark("compute-remediation-checks");
+
   const propagationClusters = await buildPropagationClusters(
     allFindings,
     [...githubWorkflows],
@@ -411,6 +420,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     aiHandoff,
     analysisWarnings: uniqueWarnings(analysisWarnings),
     propagationClusters,
+    remediationChecks,
   };
 }
 

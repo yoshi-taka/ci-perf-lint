@@ -132,6 +132,7 @@ describe("aggregateFindings and grouped reporter output", () => {
       ],
       analysisWarnings: [],
       propagationClusters: [],
+      remediationChecks: [],
     };
     report.findings = report.topFindings;
 

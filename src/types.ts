@@ -98,6 +98,13 @@ export interface ReportData {
   aiHandoff: string[];
   analysisWarnings: AnalysisWarning[];
   propagationClusters: PropagationCluster[];
+  remediationChecks: ImpliedCheck[];
+}
+
+export interface ImpliedCheck {
+  sourceRuleId: string;
+  impliedRuleId: string;
+  reason: string;
 }
 
 export interface RuleMeta {
@@ -112,4 +119,5 @@ export interface RuleMeta {
   };
   precheck?: (workflow: { source?: string }) => number;
   precheckBudget?: number;
+  impliedChecks?: string[];
 }

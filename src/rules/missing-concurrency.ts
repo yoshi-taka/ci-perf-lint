@@ -27,6 +27,7 @@ const meta = {
   docsPath: "docs/rules/missing-concurrency.md",
   maxFindings: 3,
   requires: { isHeavy: true },
+  impliedChecks: ["missing-timeout-minutes"],
 } satisfies RuleMeta;
 
 export const missingConcurrencyRule = {

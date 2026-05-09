@@ -20,6 +20,7 @@ const meta = {
   severity: "suggestion",
   confidence: "medium",
   docsPath: "docs/rules/missing-dependency-cache.md",
+  impliedChecks: ["setup-node-cache-dependency-path-unset"],
 } satisfies RuleMeta;
 
 export const missingDependencyCacheRule = {

@@ -215,6 +215,7 @@ describe("metamorphic relations", () => {
       aiHandoff: ["base handoff"],
       analysisWarnings: [{ source: "base", message: "base warning" }],
       propagationClusters: [],
+      remediationChecks: [],
     };
     const mutatedReport: ReportData = {
       targetPath: "/repo-b",
@@ -234,6 +235,7 @@ describe("metamorphic relations", () => {
       aiHandoff: ["different handoff"],
       analysisWarnings: [{ source: "mutated", message: "mutated warning" }],
       propagationClusters: [],
+      remediationChecks: [],
     };
 
     expect(renderReport(baseReport, "text", { findingsOnly: true })).toBe(
@@ -270,6 +272,7 @@ describe("metamorphic relations", () => {
       aiHandoff: ["handoff"],
       analysisWarnings: [],
       propagationClusters: [],
+      remediationChecks: [],
     };
 
     const textWithNote = renderReport(report, "text", { topCount: 5 });
@@ -308,6 +311,7 @@ describe("metamorphic relations", () => {
       aiHandoff: ["handoff"],
       analysisWarnings: [{ source: "s", message: "m" }],
       propagationClusters: [],
+      remediationChecks: [],
     };
 
     const jsonA = JSON.parse(renderReport(report, "json", { topCount: 1, mode: "strict" }));
