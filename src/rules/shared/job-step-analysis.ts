@@ -1,24 +1,18 @@
-import type { WorkflowJob, WorkflowStep } from "../../workflow.ts";
+import type { WorkflowJob } from "../../workflow.ts";
 
-function stepRunsGoVet(step: WorkflowStep): boolean {
-  return /\bgo\s+vet(?:\s|$)/i.test(step.run ?? "");
+function stepRunsGoVet(run: string): boolean {
+  return /\bgo\s+vet(?:\s|$)/i.test(run);
 }
 
-function stepRunsGoTest(step: WorkflowStep): boolean {
-  return /\bgo\s+test(?:\s|$)/i.test(step.run ?? "");
+function stepRunsBroadGoBuild(run: string): boolean {
+  return /\bgo\s+build\b[\s\S]*(?:^|\s)\.\/\.\.\.(?:\s|$)/i.test(run);
 }
 
-function stepRunsGoTestWithoutVetOff(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
+function stepRunsGoTestWithoutVetOff(run: string): boolean {
   return /\bgo\s+test(?:\s|$)/i.test(run) && !/(?:^|\s)-vet=off(?:\s|$)/i.test(run);
 }
 
-function stepRunsBroadGoBuild(step: WorkflowStep): boolean {
-  return /\bgo\s+build\b[\s\S]*(?:^|\s)\.\/\.\.\.(?:\s|$)/i.test(step.run ?? "");
-}
-
-function stepRunsBroadRaceGoTest(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
+function stepRunsBroadRaceGoTest(run: string): boolean {
   return (
     /\bgo\s+test(?:\s|$)/i.test(run) &&
     /(?:^|\s)-race(?:\s|$)/i.test(run) &&
@@ -26,8 +20,7 @@ function stepRunsBroadRaceGoTest(step: WorkflowStep): boolean {
   );
 }
 
-function stepRunsBroadSerialGoTest(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
+function stepRunsBroadSerialGoTest(run: string): boolean {
   return (
     /\bgo\s+test(?:\s|$)/i.test(run) &&
     /(?:^|\s)-p(?:=|\s*)1(?:\s|$)/i.test(run) &&
@@ -85,7 +78,7 @@ function buildJobStepAnalysis(job: WorkflowJob): JobStepAnalysis {
     const step = steps[i]!;
     const run = step.run ?? "";
 
-    const vet = /\bgo\s+vet(?:\s|$)/i.test(run);
+    const vet = stepRunsGoVet(run);
     isGoVetStep[i] = vet;
     if (vet && goVetStepIndex === -1) {
       goVetStepIndex = i;
@@ -99,14 +92,14 @@ function buildJobStepAnalysis(job: WorkflowJob): JobStepAnalysis {
 
     goBuildOccurrenceTotal += goBuildOccurrenceCountInRun(run);
 
-    if (build && stepRunsBroadGoBuild(step) && broadGoBuildStepIndex === -1) {
+    if (build && stepRunsBroadGoBuild(run) && broadGoBuildStepIndex === -1) {
       broadGoBuildStepIndex = i;
     }
   }
 
   if (goVetStepIndex !== -1) {
     for (let i = goVetStepIndex + 1; i < count; i++) {
-      if (stepRunsGoTestWithoutVetOff(steps[i]!)) {
+      if (stepRunsGoTestWithoutVetOff(steps[i]!.run ?? "")) {
         firstGoTestAfterVetIndex = i;
         break;
       }
@@ -115,7 +108,7 @@ function buildJobStepAnalysis(job: WorkflowJob): JobStepAnalysis {
 
   if (broadGoBuildStepIndex !== -1) {
     for (let i = broadGoBuildStepIndex + 1; i < count; i++) {
-      if (stepRunsBroadRaceGoTest(steps[i]!)) {
+      if (stepRunsBroadRaceGoTest(steps[i]!.run ?? "")) {
         firstRaceGoTestAfterBuildIndex = i;
         break;
       }
@@ -123,7 +116,7 @@ function buildJobStepAnalysis(job: WorkflowJob): JobStepAnalysis {
   }
 
   for (let i = 0; i < count; i++) {
-    if (stepRunsBroadSerialGoTest(steps[i]!)) {
+    if (stepRunsBroadSerialGoTest(steps[i]!.run ?? "")) {
       hasBroadSerialGoTest = true;
       broadSerialGoTestStepIndex = i;
       break;
