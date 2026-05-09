@@ -104,7 +104,14 @@ export function withJobConsensus(
 export function repositoryWorkflowPrecedents(
   entries: readonly RepositoryWorkflowPrecedent[],
   workflowPath: string,
+  lookup?: ReadonlyMap<string, readonly string[]>,
 ): string[] {
+  if (lookup) {
+    const cached = lookup.get(workflowPath);
+    if (cached) {
+      return [...cached];
+    }
+  }
   return entries
     .filter((entry) => entry.workflowPath !== workflowPath)
     .map((entry) => entry.workflowPath)
@@ -115,7 +122,14 @@ export function repositoryJobPrecedents(
   entries: readonly RepositoryJobPrecedent[],
   workflowPath: string,
   jobId: string,
+  lookup?: ReadonlyMap<string, readonly string[]>,
 ): string[] {
+  if (lookup) {
+    const cached = lookup.get(`${workflowPath}:${jobId}`);
+    if (cached) {
+      return [...cached];
+    }
+  }
   return entries
     .filter((entry) => entry.workflowPath !== workflowPath || entry.jobId !== jobId)
     .map((entry) => `${entry.workflowPath}:${entry.jobId}`)

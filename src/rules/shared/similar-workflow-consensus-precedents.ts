@@ -4,20 +4,37 @@ import type { DiagnosticTransform } from "./diagnostic-transform.ts";
 import {
   appendPrecedent,
   renderPrecedentList,
-  repositoryJobPrecedents,
   repositoryWorkflowPrecedents,
+  repositoryJobPrecedents,
 } from "./similar-workflow-consensus-shared.ts";
+
+function rwp(
+  entries: { workflowPath: string }[],
+  lookup: ReadonlyMap<string, readonly string[]>,
+  workflowPath: string,
+): string[] {
+  return repositoryWorkflowPrecedents(entries, workflowPath, lookup);
+}
+
+function rjp(
+  entries: { workflowPath: string; jobId: string }[],
+  lookup: ReadonlyMap<string, readonly string[]>,
+  workflowPath: string,
+  jobId: string,
+): string[] {
+  return repositoryJobPrecedents(entries, workflowPath, jobId, lookup);
+}
 
 export function withRepositoryConcurrencyPrecedent(
   context: RuleContext,
   workflowPath: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryWorkflowPrecedents(
+    const precedents = rwp(
       context.repository.repoPrecedents.concurrency,
+      context.repository.repoPrecedents.lookups.concurrency,
       workflowPath,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -36,12 +53,12 @@ export function withRepositoryTimeoutPrecedent(
   jobId: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryJobPrecedents(
+    const precedents = rjp(
       context.repository.repoPrecedents.timeoutMinutes,
+      context.repository.repoPrecedents.lookups.timeoutMinutes,
       workflowPath,
       jobId,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -60,12 +77,12 @@ export function withRepositoryDependencyCachePrecedent(
   jobId: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryJobPrecedents(
+    const precedents = rjp(
       context.repository.repoPrecedents.dependencyCache,
+      context.repository.repoPrecedents.lookups.dependencyCache,
       workflowPath,
       jobId,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -84,12 +101,12 @@ export function withRepositoryShallowCheckoutPrecedent(
   jobId: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryJobPrecedents(
+    const precedents = rjp(
       context.repository.repoPrecedents.shallowCheckout,
+      context.repository.repoPrecedents.lookups.shallowCheckout,
       workflowPath,
       jobId,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -107,11 +124,11 @@ export function withRepositoryPathsFilterPrecedent(
   workflowPath: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryWorkflowPrecedents(
+    const precedents = rwp(
       context.repository.repoPrecedents.pathsFilter,
+      context.repository.repoPrecedents.lookups.pathsFilter,
       workflowPath,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -130,12 +147,12 @@ export function withRepositorySetupCachePrecedent(
   jobId: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryJobPrecedents(
+    const precedents = rjp(
       context.repository.repoPrecedents.setupCache,
+      context.repository.repoPrecedents.lookups.setupCache,
       workflowPath,
       jobId,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -153,11 +170,11 @@ export function withRepositoryNonCodeIgnorePrecedent(
   workflowPath: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryWorkflowPrecedents(
+    const precedents = rwp(
       context.repository.repoPrecedents.nonCodeIgnore,
+      context.repository.repoPrecedents.lookups.nonCodeIgnore,
       workflowPath,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -176,12 +193,12 @@ export function withRepositorySingleCacheStrategyPrecedent(
   jobId: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryJobPrecedents(
+    const precedents = rjp(
       context.repository.repoPrecedents.setupCache,
+      context.repository.repoPrecedents.lookups.setupCache,
       workflowPath,
       jobId,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -200,12 +217,12 @@ export function withRepositoryReleaseDownstreamGuardPrecedent(
   jobId: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryJobPrecedents(
+    const precedents = rjp(
       context.repository.repoPrecedents.releaseDownstreamSuccessGuard,
+      context.repository.repoPrecedents.lookups.releaseDownstreamSuccessGuard,
       workflowPath,
       jobId,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -224,12 +241,12 @@ export function withRepositoryBlobNoneReleasePrecedent(
   jobId: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryJobPrecedents(
+    const precedents = rjp(
       context.repository.repoPrecedents.blobNoneReleaseMetadata,
+      context.repository.repoPrecedents.lookups.blobNoneReleaseMetadata,
       workflowPath,
       jobId,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -248,12 +265,12 @@ export function withRepositorySparseCheckoutPrecedent(
   jobId: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryJobPrecedents(
+    const precedents = rjp(
       context.repository.repoPrecedents.sparseCheckoutScoped,
+      context.repository.repoPrecedents.lookups.sparseCheckoutScoped,
       workflowPath,
       jobId,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0
@@ -271,11 +288,11 @@ export function withRepositoryThrottledSchedulePrecedent(
   workflowPath: string,
 ): DiagnosticTransform {
   return (diagnostic: Diagnostic) => {
-    const precedents = repositoryWorkflowPrecedents(
+    const precedents = rwp(
       context.repository.repoPrecedents.throttledHeavySchedule,
+      context.repository.repoPrecedents.lookups.throttledHeavySchedule,
       workflowPath,
     );
-
     return appendPrecedent(
       diagnostic,
       precedents.length > 0

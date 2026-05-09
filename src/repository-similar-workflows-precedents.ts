@@ -26,6 +26,20 @@ import {
 import { estimateScheduleMinutes } from "./rules/scheduled-heavy-workflow-without-throttling.ts";
 import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts";
 
+export interface RepositoryPrecedentLookups {
+  concurrency: ReadonlyMap<string, readonly string[]>;
+  timeoutMinutes: ReadonlyMap<string, readonly string[]>;
+  dependencyCache: ReadonlyMap<string, readonly string[]>;
+  shallowCheckout: ReadonlyMap<string, readonly string[]>;
+  pathsFilter: ReadonlyMap<string, readonly string[]>;
+  nonCodeIgnore: ReadonlyMap<string, readonly string[]>;
+  setupCache: ReadonlyMap<string, readonly string[]>;
+  releaseDownstreamSuccessGuard: ReadonlyMap<string, readonly string[]>;
+  blobNoneReleaseMetadata: ReadonlyMap<string, readonly string[]>;
+  sparseCheckoutScoped: ReadonlyMap<string, readonly string[]>;
+  throttledHeavySchedule: ReadonlyMap<string, readonly string[]>;
+}
+
 export interface RepositoryPrecedentSignals {
   concurrency: {
     workflowPath: string;
@@ -67,6 +81,7 @@ export interface RepositoryPrecedentSignals {
   throttledHeavySchedule: {
     workflowPath: string;
   }[];
+  lookups: RepositoryPrecedentLookups;
 }
 
 function isYamlMap(node: unknown): node is YAMLMap<unknown, unknown> {
@@ -248,217 +263,243 @@ function jobLooksCommitMetadataLike(job: WorkflowJob): boolean {
   );
 }
 
+function buildWorkflowPrecedentLookup(
+  entries: { workflowPath: string }[],
+): ReadonlyMap<string, readonly string[]> {
+  const map = new Map<string, string[]>();
+  for (const entry of entries) {
+    const peers = entries
+      .filter((e) => e.workflowPath !== entry.workflowPath)
+      .map((e) => e.workflowPath)
+      .slice(0, 3);
+    if (peers.length > 0) {
+      map.set(entry.workflowPath, peers);
+    }
+  }
+  return map;
+}
+
+function buildJobPrecedentLookup(
+  entries: { workflowPath: string; jobId: string }[],
+): ReadonlyMap<string, readonly string[]> {
+  const map = new Map<string, string[]>();
+  for (const entry of entries) {
+    const key = `${entry.workflowPath}:${entry.jobId}`;
+    const peers = entries
+      .filter((e) => e.workflowPath !== entry.workflowPath || e.jobId !== entry.jobId)
+      .map((e) => `${e.workflowPath}:${e.jobId}`)
+      .slice(0, 3);
+    if (peers.length > 0) {
+      map.set(key, peers);
+    }
+  }
+  return map;
+}
+
 export function collectRepositoryPrecedentSignals(
   workflows: WorkflowDocument[],
   sharedJobSummaries: JobSummary[],
   precedentIndex?: RepositoryPrecedentIndex,
 ): RepositoryPrecedentSignals {
   const idx = precedentIndex ?? buildRepositoryPrecedentIndex(workflows);
+
+  const concurrency = [...idx.hasConcurrency]
+    .map((workflow) => ({ workflowPath: workflow.relativePath }))
+    .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
+    .slice(0, 10);
+  const timeoutMinutes = sharedJobSummaries
+    .filter((summary) => summary.isTimeoutCandidate && summary.hasTimeout)
+    .map((summary) => ({ workflowPath: summary.workflow.relativePath, jobId: summary.job.id }))
+    .sort(
+      (left, right) =>
+        left.workflowPath.localeCompare(right.workflowPath) ||
+        left.jobId.localeCompare(right.jobId),
+    )
+    .slice(0, 10);
+  const dependencyCache = sharedJobSummaries
+    .filter((summary) => summary.isCacheCandidate && summary.hasDependencyCache)
+    .map((summary) => ({ workflowPath: summary.workflow.relativePath, jobId: summary.job.id }))
+    .sort(
+      (left, right) =>
+        left.workflowPath.localeCompare(right.workflowPath) ||
+        left.jobId.localeCompare(right.jobId),
+    )
+    .slice(0, 10);
+  const shallowCheckout = sharedJobSummaries
+    .filter((summary) => summary.isDeepCheckoutCandidate && !summary.usesDeepCheckout)
+    .map((summary) => ({ workflowPath: summary.workflow.relativePath, jobId: summary.job.id }))
+    .sort(
+      (left, right) =>
+        left.workflowPath.localeCompare(right.workflowPath) ||
+        left.jobId.localeCompare(right.jobId),
+    )
+    .slice(0, 10);
+  const pathsFilter = workflows
+    .filter((workflow) => workflowHasTriggerPathFilter(workflow))
+    .map((workflow) => ({ workflowPath: workflow.relativePath }))
+    .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
+    .slice(0, 10);
+  const nonCodeIgnore = workflows
+    .filter((workflow) => workflowHasNonCodeIgnore(workflow))
+    .map((workflow) => ({ workflowPath: workflow.relativePath }))
+    .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
+    .slice(0, 10);
+  const setupCache = sharedJobSummaries
+    .filter((summary) => summary.isCacheCandidate && summary.hasDependencyCache)
+    .map((summary) => ({ workflowPath: summary.workflow.relativePath, jobId: summary.job.id }))
+    .sort(
+      (left, right) =>
+        left.workflowPath.localeCompare(right.workflowPath) ||
+        left.jobId.localeCompare(right.jobId),
+    )
+    .slice(0, 10);
+  const releaseDownstreamSuccessGuard = workflows
+    .flatMap((workflow) =>
+      workflow.jobs
+        .filter((job) => {
+          const ifText = getJobIfText(job);
+          return (
+            workflowLooksReleaseLike(workflow, job) &&
+            jobHasNeeds(job) &&
+            hasStatusFunction(ifText) &&
+            !hasOptionalSkipBypass(ifText) &&
+            hasNeedsSuccessGuard(ifText) &&
+            hasFailureCancelledGuard(ifText)
+          );
+        })
+        .map((job) => ({ workflowPath: workflow.relativePath, jobId: job.id })),
+    )
+    .sort(
+      (left, right) =>
+        left.workflowPath.localeCompare(right.workflowPath) ||
+        left.jobId.localeCompare(right.jobId),
+    )
+    .slice(0, 10);
+  const blobNoneReleaseMetadata = workflows
+    .flatMap((workflow) =>
+      workflow.jobs
+        .filter((job) => {
+          const checkout = getCheckoutStep(job);
+          if (
+            !jobLooksHistoryMetadataLike(workflow, job) ||
+            !checkout ||
+            !hasBlobNoneFilter(checkout)
+          ) {
+            return false;
+          }
+          if (!hasDeepHistory(checkout) && !hasHistoryDependentCommand(job)) {
+            return false;
+          }
+          if (
+            jobHasWideRepoAccess(job) ||
+            jobHasHeavyBuildOrInstall(job) ||
+            jobLooksLikeBlobHungryReleasePipeline(job) ||
+            jobLooksLikeRepoEditingAgenticDocsJob(job)
+          ) {
+            return false;
+          }
+          const scopePrefixes = collectScopePrefixes(job);
+          const hasExplicitFilteredFetch = jobHasExplicitFilteredFetchCandidate(job);
+          if (
+            !jobLooksCommitMetadataLike(job) &&
+            !jobHasStrongReleaseMetadataSignal(job) &&
+            !hasExplicitFilteredFetch &&
+            !hasSparseCheckout(checkout) &&
+            (scopePrefixes.length === 0 || scopePrefixes.length > 3)
+          ) {
+            return false;
+          }
+          return true;
+        })
+        .map((job) => ({ workflowPath: workflow.relativePath, jobId: job.id })),
+    )
+    .sort(
+      (left, right) =>
+        left.workflowPath.localeCompare(right.workflowPath) ||
+        left.jobId.localeCompare(right.jobId),
+    )
+    .slice(0, 10);
+  const sparseCheckoutScoped = workflows
+    .flatMap((workflow) =>
+      workflow.jobs
+        .filter((job) => {
+          if (!workflowLooksReleaseLike(workflow, job) && !isHeavyJob(job)) {
+            return false;
+          }
+          if (jobIsStaticallyDisabled(job)) {
+            return false;
+          }
+          const checkout = getCheckoutStep(job);
+          if (!checkout || !hasSparseCheckout(checkout)) {
+            return false;
+          }
+          const scopePrefixes = collectScopePrefixes(job);
+          if (scopePrefixes.length === 0 || scopePrefixes.length > 3) {
+            return false;
+          }
+          if (jobHasWideRepoAccess(job) || jobHasHeavyBuildOrInstall(job)) {
+            return false;
+          }
+          if (
+            scopePrefixes.every((prefix) => /^(?:script|scripts)\b/.test(prefix)) ||
+            hasOpaqueRepoScriptExecution(job) ||
+            jobLooksLikeRepoEditingAgenticDocsJob(job)
+          ) {
+            return false;
+          }
+          return hasDeepHistory(checkout) || hasHistoryDependentCommand(job);
+        })
+        .map((job) => ({ workflowPath: workflow.relativePath, jobId: job.id })),
+    )
+    .sort(
+      (left, right) =>
+        left.workflowPath.localeCompare(right.workflowPath) ||
+        left.jobId.localeCompare(right.jobId),
+    )
+    .slice(0, 10);
+  const throttledHeavySchedule = workflows
+    .filter((workflow) => {
+      if (
+        workflowHasManualOnlyTrigger(workflow) ||
+        !workflowHasScheduleTrigger(workflow) ||
+        !isHeavyWorkflow(workflow)
+      ) {
+        return false;
+      }
+      const minimumInterval = getWorkflowScheduleCrons(workflow)
+        .map((cron) => estimateScheduleMinutes(cron))
+        .filter((value): value is number => value !== undefined)
+        .sort((left, right) => left - right)[0];
+      return minimumInterval !== undefined && minimumInterval >= 180;
+    })
+    .map((workflow) => ({ workflowPath: workflow.relativePath }))
+    .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
+    .slice(0, 10);
+
   return {
-    concurrency: [...idx.hasConcurrency]
-      .map((workflow) => ({ workflowPath: workflow.relativePath }))
-      .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
-      .slice(0, 10),
-    timeoutMinutes: sharedJobSummaries
-      .filter((summary) => summary.isTimeoutCandidate && summary.hasTimeout)
-      .map((summary) => ({
-        workflowPath: summary.workflow.relativePath,
-        jobId: summary.job.id,
-      }))
-      .sort(
-        (left, right) =>
-          left.workflowPath.localeCompare(right.workflowPath) ||
-          left.jobId.localeCompare(right.jobId),
-      )
-      .slice(0, 10),
-    dependencyCache: sharedJobSummaries
-      .filter((summary) => summary.isCacheCandidate && summary.hasDependencyCache)
-      .map((summary) => ({
-        workflowPath: summary.workflow.relativePath,
-        jobId: summary.job.id,
-      }))
-      .sort(
-        (left, right) =>
-          left.workflowPath.localeCompare(right.workflowPath) ||
-          left.jobId.localeCompare(right.jobId),
-      )
-      .slice(0, 10),
-    shallowCheckout: sharedJobSummaries
-      .filter((summary) => summary.isDeepCheckoutCandidate && !summary.usesDeepCheckout)
-      .map((summary) => ({
-        workflowPath: summary.workflow.relativePath,
-        jobId: summary.job.id,
-      }))
-      .sort(
-        (left, right) =>
-          left.workflowPath.localeCompare(right.workflowPath) ||
-          left.jobId.localeCompare(right.jobId),
-      )
-      .slice(0, 10),
-    pathsFilter: workflows
-      .filter((workflow) => workflowHasTriggerPathFilter(workflow))
-      .map((workflow) => ({ workflowPath: workflow.relativePath }))
-      .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
-      .slice(0, 10),
-    nonCodeIgnore: workflows
-      .filter((workflow) => workflowHasNonCodeIgnore(workflow))
-      .map((workflow) => ({ workflowPath: workflow.relativePath }))
-      .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
-      .slice(0, 10),
-    setupCache: sharedJobSummaries
-      .filter((summary) => summary.isCacheCandidate && summary.hasDependencyCache)
-      .map((summary) => ({
-        workflowPath: summary.workflow.relativePath,
-        jobId: summary.job.id,
-      }))
-      .sort(
-        (left, right) =>
-          left.workflowPath.localeCompare(right.workflowPath) ||
-          left.jobId.localeCompare(right.jobId),
-      )
-      .slice(0, 10),
-    releaseDownstreamSuccessGuard: workflows
-      .flatMap((workflow) =>
-        workflow.jobs
-          .filter((job) => {
-            const ifText = getJobIfText(job);
-            return (
-              workflowLooksReleaseLike(workflow, job) &&
-              jobHasNeeds(job) &&
-              hasStatusFunction(ifText) &&
-              !hasOptionalSkipBypass(ifText) &&
-              hasNeedsSuccessGuard(ifText) &&
-              hasFailureCancelledGuard(ifText)
-            );
-          })
-          .map((job) => ({
-            workflowPath: workflow.relativePath,
-            jobId: job.id,
-          })),
-      )
-      .sort(
-        (left, right) =>
-          left.workflowPath.localeCompare(right.workflowPath) ||
-          left.jobId.localeCompare(right.jobId),
-      )
-      .slice(0, 10),
-    blobNoneReleaseMetadata: workflows
-      .flatMap((workflow) =>
-        workflow.jobs
-          .filter((job) => {
-            const checkout = getCheckoutStep(job);
-            if (
-              !jobLooksHistoryMetadataLike(workflow, job) ||
-              !checkout ||
-              !hasBlobNoneFilter(checkout)
-            ) {
-              return false;
-            }
-
-            if (!hasDeepHistory(checkout) && !hasHistoryDependentCommand(job)) {
-              return false;
-            }
-
-            if (
-              jobHasWideRepoAccess(job) ||
-              jobHasHeavyBuildOrInstall(job) ||
-              jobLooksLikeBlobHungryReleasePipeline(job) ||
-              jobLooksLikeRepoEditingAgenticDocsJob(job)
-            ) {
-              return false;
-            }
-
-            const scopePrefixes = collectScopePrefixes(job);
-            const hasExplicitFilteredFetch = jobHasExplicitFilteredFetchCandidate(job);
-            if (
-              !jobLooksCommitMetadataLike(job) &&
-              !jobHasStrongReleaseMetadataSignal(job) &&
-              !hasExplicitFilteredFetch &&
-              !hasSparseCheckout(checkout) &&
-              (scopePrefixes.length === 0 || scopePrefixes.length > 3)
-            ) {
-              return false;
-            }
-
-            return true;
-          })
-          .map((job) => ({
-            workflowPath: workflow.relativePath,
-            jobId: job.id,
-          })),
-      )
-      .sort(
-        (left, right) =>
-          left.workflowPath.localeCompare(right.workflowPath) ||
-          left.jobId.localeCompare(right.jobId),
-      )
-      .slice(0, 10),
-    sparseCheckoutScoped: workflows
-      .flatMap((workflow) =>
-        workflow.jobs
-          .filter((job) => {
-            if (!workflowLooksReleaseLike(workflow, job) && !isHeavyJob(job)) {
-              return false;
-            }
-
-            if (jobIsStaticallyDisabled(job)) {
-              return false;
-            }
-
-            const checkout = getCheckoutStep(job);
-            if (!checkout || !hasSparseCheckout(checkout)) {
-              return false;
-            }
-
-            const scopePrefixes = collectScopePrefixes(job);
-            if (scopePrefixes.length === 0 || scopePrefixes.length > 3) {
-              return false;
-            }
-
-            if (jobHasWideRepoAccess(job) || jobHasHeavyBuildOrInstall(job)) {
-              return false;
-            }
-
-            if (
-              scopePrefixes.every((prefix) => /^(?:script|scripts)\b/.test(prefix)) ||
-              hasOpaqueRepoScriptExecution(job) ||
-              jobLooksLikeRepoEditingAgenticDocsJob(job)
-            ) {
-              return false;
-            }
-
-            return hasDeepHistory(checkout) || hasHistoryDependentCommand(job);
-          })
-          .map((job) => ({
-            workflowPath: workflow.relativePath,
-            jobId: job.id,
-          })),
-      )
-      .sort(
-        (left, right) =>
-          left.workflowPath.localeCompare(right.workflowPath) ||
-          left.jobId.localeCompare(right.jobId),
-      )
-      .slice(0, 10),
-    throttledHeavySchedule: workflows
-      .filter((workflow) => {
-        if (
-          workflowHasManualOnlyTrigger(workflow) ||
-          !workflowHasScheduleTrigger(workflow) ||
-          !isHeavyWorkflow(workflow)
-        ) {
-          return false;
-        }
-
-        const minimumInterval = getWorkflowScheduleCrons(workflow)
-          .map((cron) => estimateScheduleMinutes(cron))
-          .filter((value): value is number => value !== undefined)
-          .sort((left, right) => left - right)[0];
-
-        return minimumInterval !== undefined && minimumInterval >= 180;
-      })
-      .map((workflow) => ({ workflowPath: workflow.relativePath }))
-      .sort((left, right) => left.workflowPath.localeCompare(right.workflowPath))
-      .slice(0, 10),
+    concurrency,
+    timeoutMinutes,
+    dependencyCache,
+    shallowCheckout,
+    pathsFilter,
+    nonCodeIgnore,
+    setupCache,
+    releaseDownstreamSuccessGuard,
+    blobNoneReleaseMetadata,
+    sparseCheckoutScoped,
+    throttledHeavySchedule,
+    lookups: {
+      concurrency: buildWorkflowPrecedentLookup(concurrency),
+      timeoutMinutes: buildJobPrecedentLookup(timeoutMinutes),
+      dependencyCache: buildJobPrecedentLookup(dependencyCache),
+      shallowCheckout: buildJobPrecedentLookup(shallowCheckout),
+      pathsFilter: buildWorkflowPrecedentLookup(pathsFilter),
+      nonCodeIgnore: buildWorkflowPrecedentLookup(nonCodeIgnore),
+      setupCache: buildJobPrecedentLookup(setupCache),
+      releaseDownstreamSuccessGuard: buildJobPrecedentLookup(releaseDownstreamSuccessGuard),
+      blobNoneReleaseMetadata: buildJobPrecedentLookup(blobNoneReleaseMetadata),
+      sparseCheckoutScoped: buildJobPrecedentLookup(sparseCheckoutScoped),
+      throttledHeavySchedule: buildWorkflowPrecedentLookup(throttledHeavySchedule),
+    },
   };
 }
