@@ -173,27 +173,8 @@ export function jobPublishesScorecardResults(job: WorkflowJob): boolean {
 }
 
 export function workflowLooksReleaseLike(workflow: WorkflowDocument, job: WorkflowJob): boolean {
-  const workflowName = workflow.name?.toLowerCase() ?? "";
-  const jobId = job.id.toLowerCase();
-
-  if (/\b(release|rollback|promote|nightly|tag|version)\b/.test(workflowName)) {
-    return true;
-  }
-
-  if (/\b(release|rollback|promote|nightly|tag|publish|version)\b/.test(jobId)) {
-    return true;
-  }
-
-  const onRecord =
-    workflow.on && typeof workflow.on === "object" && !Array.isArray(workflow.on)
-      ? (workflow.on as Record<string, unknown>)
-      : undefined;
-  const pushConfig =
-    onRecord?.push && typeof onRecord.push === "object" && !Array.isArray(onRecord.push)
-      ? (onRecord.push as Record<string, unknown>)
-      : undefined;
-
-  return Array.isArray(pushConfig?.tags) || Array.isArray(pushConfig?.["tags-ignore"]);
+  const wfFacts = getWorkflowFacts(workflow);
+  return wfFacts.releaseLikeJobIds.has(job.id) || wfFacts.looksReleaseLike;
 }
 
 export function workflowLooksMetaCheckLike(workflow: WorkflowDocument): boolean {

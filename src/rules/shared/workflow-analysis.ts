@@ -57,6 +57,8 @@ export interface WorkflowFacts {
   hasConcurrency: boolean;
   looksMetaCheckLike: boolean;
   looksAgenticLike: boolean;
+  looksReleaseLike: boolean;
+  releaseLikeJobIds: ReadonlySet<string>;
   lintTools: ReadonlySet<string>;
   pythonTools: ReadonlySet<string>;
   loweredStepTextBlob: string;
@@ -109,6 +111,8 @@ const emptyWorkflowFacts: WorkflowFacts = {
   hasConcurrency: false,
   looksMetaCheckLike: false,
   looksAgenticLike: false,
+  looksReleaseLike: false,
+  releaseLikeJobIds: new Set(),
   lintTools: new Set(),
   pythonTools: new Set(),
   loweredStepTextBlob: "",
@@ -315,11 +319,24 @@ export function getWorkflowFacts(
 
   const triggerFacts = getTriggerFacts(wf);
 
+  const releaseLikeJobIds = new Set<string>();
+  const releaseJobIdPattern = /\b(release|rollback|promote|nightly|tag|publish|version)\b/;
+  for (const job of wf.jobs) {
+    if (releaseJobIdPattern.test(job.id.toLowerCase())) {
+      releaseLikeJobIds.add(job.id);
+    }
+  }
+  const wfNameLooksRelease = /\b(release|rollback|promote|nightly|tag|version)\b/.test(loweredName);
+  const hasPushTags = triggerFacts.push.hasTags || triggerFacts.push.hasTagsIgnore;
+  const looksReleaseLike = wfNameLooksRelease || hasPushTags;
+
   const facts: WorkflowFacts = {
     isHeavyWorkflow: heavyWorkflowNamePattern.test(loweredName) || hasHeavyJob,
     hasConcurrency: Boolean(wf.concurrencyNode) || hasJobConcurrency,
     looksMetaCheckLike: metaCheckWorkflowNamePattern.test(loweredName) || hasMetaCheckJob,
     looksAgenticLike: agenticWorkflowNamePattern.test(loweredName) || hasAgenticJob,
+    looksReleaseLike,
+    releaseLikeJobIds,
     lintTools,
     pythonTools,
     loweredStepTextBlob: loweredStepTexts.join("\n"),
