@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxlint-path.ts";
+import { spawnOxlintProcess } from "../src/repository-diagnostics/embedded-oxlint-spawn.ts";
 import { runEmbeddedOxlint } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
 import { accessSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -140,5 +141,23 @@ describe("Node spawn with timeout (via child_process)", () => {
     expect(code).not.toBe(0);
     expect(code).not.toBe(null);
     await wait(100);
+  });
+});
+
+describe("spawnOxlintProcess timeout", () => {
+  test("kills the full process group", async () => {
+    const proc = spawnOxlintProcess(
+      ["bash", "-lc", "sleep 30 & wait"],
+      process.cwd(),
+      true,
+      SHORT_TIMEOUT,
+    );
+
+    const [outText, errText, code] = await Promise.all([proc.stdout, proc.stderr, proc.exited]);
+
+    expect(proc.timedOut).toBe(true);
+    expect(code).not.toBe(0);
+    expect(typeof outText).toBe("string");
+    expect(typeof errText).toBe("string");
   });
 });

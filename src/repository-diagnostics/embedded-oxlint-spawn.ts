@@ -14,51 +14,40 @@ type SpawnedProcess = {
 export function spawnOxlintProcess(
   cmd: string[],
   cwd: string,
-  useNodeSpawn?: boolean,
+  _useNodeSpawn?: boolean,
   timeoutMs?: number,
 ): SpawnedProcess {
   const effectiveTimeout = timeoutMs ?? EMBEDDED_OXLINT_TIMEOUT_MS;
   const state = { timedOut: false };
-  if (!useNodeSpawn && typeof Bun !== "undefined") {
-    const proc = Bun.spawn(cmd, {
-      cwd,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const killTimer = setTimeout(() => {
-      state.timedOut = true;
-      proc.kill("SIGTERM");
-      setTimeout(() => {
-        try {
-          proc.kill("SIGKILL");
-        } catch {
-          /* ignore */
-        }
-      }, 2000).unref();
-    }, effectiveTimeout).unref();
-    return {
-      stdout: new Response(proc.stdout).text(),
-      stderr: new Response(proc.stderr).text(),
-      exited: proc.exited.then((code) => {
-        clearTimeout(killTimer);
-        return code;
-      }),
-      get timedOut() {
-        return state.timedOut;
-      },
-    };
-  }
-
   const proc = spawn(cmd[0]!, cmd.slice(1), {
     cwd,
     stdio: ["inherit", "pipe", "pipe"],
+    detached: true,
   });
+
+  function killProcessGroup(signal: NodeJS.Signals): void {
+    const pid = proc.pid;
+    if (pid === undefined) {
+      return;
+    }
+
+    try {
+      process.kill(-pid, signal);
+    } catch {
+      try {
+        proc.kill(signal);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   const killTimer = setTimeout(() => {
     state.timedOut = true;
-    proc.kill("SIGTERM");
+    killProcessGroup("SIGTERM");
     setTimeout(() => {
       try {
-        proc.kill("SIGKILL");
+        killProcessGroup("SIGKILL");
       } catch {
         /* ignore */
       }
