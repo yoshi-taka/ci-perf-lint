@@ -1,4 +1,5 @@
 import type { RepositoryDiagnosticCollector } from "./collector-types.ts";
+import { gates } from "./gates.ts";
 import { collectTerraformGitHubAppAuthDiagnostics } from "./terraform-github-app-auth.ts";
 import { collectTerraformGitHubParallelRequestsDiagnostics } from "./terraform-github-parallel-requests.ts";
 import { collectTerraformLockfileDiagnostics } from "./terraform-lockfile.ts";
@@ -9,7 +10,7 @@ import { collectTerraformPagerDutyTeamMembershipVersionDiagnostics } from "./ter
 export const terraformDiagnosticCollectors = [
   {
     id: "terraform-github-app-auth",
-    gate: "terraform-heavy",
+    gate: gates.terraformHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectTerraformGitHubAppAuthDiagnostics(
         repoRoot,
@@ -21,7 +22,7 @@ export const terraformDiagnosticCollectors = [
   },
   {
     id: "terraform-github-parallel-requests",
-    gate: "terraform-heavy",
+    gate: gates.terraformHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectTerraformGitHubParallelRequestsDiagnostics(
         repoRoot,
@@ -33,13 +34,13 @@ export const terraformDiagnosticCollectors = [
   },
   {
     id: "terraform-lockfile-missing",
-    gate: "terraform-heavy",
+    gate: gates.terraformHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectTerraformLockfileDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
   },
   {
     id: "terraform-parallelism-unconfigured",
-    gate: "terraform-heavy",
+    gate: gates.terraformHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectTerraformParallelismDiagnostics(
         repoRoot,
@@ -51,7 +52,7 @@ export const terraformDiagnosticCollectors = [
   },
   {
     id: "terraform-github-slow-resources",
-    gate: "terraform-heavy",
+    gate: gates.terraformHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectTerraformGitHubSlowResourcesDiagnostics(
         repoRoot,
@@ -63,7 +64,7 @@ export const terraformDiagnosticCollectors = [
   },
   {
     id: "terraform-pagerduty-team-membership-version",
-    gate: "terraform-heavy",
+    gate: gates.terraformHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectTerraformPagerDutyTeamMembershipVersionDiagnostics(
         repoRoot,

@@ -4,26 +4,6 @@ import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { WorkflowSemantics } from "../rules/shared/workflow-semantics.ts";
 
-export type RepositoryDiagnosticGate =
-  | "javascript-heavy"
-  | "javascript-tooling"
-  | "javascript-linting"
-  | "javascript-build-config"
-  | "javascript-package-scripts"
-  | "docker-heavy"
-  | "terraform-heavy"
-  | "large-files"
-  | "datadog-heavy"
-  | "pytest"
-  | "python-heavy"
-  | "renovate"
-  | "husky"
-  | "javascript-frameworks"
-  | "rust"
-  | "cdk-manifest"
-  | "elixir-heavy"
-  | "gradle";
-
 export interface RepositoryDiagnosticGateState {
   hasJavaScriptHeavyWorkflow: boolean;
   hasJavaScriptTooling: boolean;
@@ -54,8 +34,10 @@ export interface RepositoryDiagnosticContext {
   scanContext: RepositoryScanContext;
 }
 
+export type GatePredicate = (state: RepositoryDiagnosticGateState) => boolean;
+
 export interface RepositoryDiagnosticCollector {
   id: string;
-  gate: RepositoryDiagnosticGate;
+  gate: GatePredicate;
   collect: (context: RepositoryDiagnosticContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }

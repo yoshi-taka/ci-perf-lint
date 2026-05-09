@@ -1,4 +1,5 @@
 import type { RepositoryDiagnosticCollector } from "./collector-types.ts";
+import { gates } from "./gates.ts";
 import { collectCdkBucketDeploymentMemoryDiagnostics } from "./cdk-bucket-deployment-memory.ts";
 import { collectCdkAssetWasteFilesDiagnostics } from "./cdk-asset-waste-files.ts";
 import { collectCdkDuplicateAssetHashDiagnostics } from "./cdk-duplicate-asset-hash.ts";
@@ -6,7 +7,7 @@ import { collectCdkDuplicateAssetHashDiagnostics } from "./cdk-duplicate-asset-h
 export const cdkDiagnosticCollectors = [
   {
     id: "cdk-bucket-deployment-memory-unconfigured",
-    gate: "javascript-tooling",
+    gate: gates.javascriptTooling,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectCdkBucketDeploymentMemoryDiagnostics(
         repoRoot,
@@ -18,13 +19,13 @@ export const cdkDiagnosticCollectors = [
   },
   {
     id: "cdk-asset-waste-files",
-    gate: "cdk-manifest",
+    gate: gates.cdkManifest,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectCdkAssetWasteFilesDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
   },
   {
     id: "cdk-duplicate-asset-hash",
-    gate: "cdk-manifest",
+    gate: gates.cdkManifest,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectCdkDuplicateAssetHashDiagnostics(
         repoRoot,

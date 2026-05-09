@@ -1,8 +1,8 @@
 import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type {
+  GatePredicate,
   RepositoryDiagnosticContext,
-  RepositoryDiagnosticGate,
   RepositoryDiagnosticGateState,
 } from "./collector-types.ts";
 import {
@@ -35,48 +35,32 @@ async function timedGate<T>(label: string, collect: () => Promise<T>): Promise<T
   return value;
 }
 
+export const gates = {
+  javascriptHeavy: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptHeavyWorkflow,
+  javascriptTooling: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptTooling,
+  javascriptLinting: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptLinting,
+  javascriptBuildConfig: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptBuildConfig,
+  javascriptPackageScripts: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptPackageScripts,
+  dockerHeavy: (s: RepositoryDiagnosticGateState) => s.hasDockerHeavyWorkflow,
+  terraformHeavy: (s: RepositoryDiagnosticGateState) => s.hasTerraformHeavyWorkflow,
+  largeFiles: (s: RepositoryDiagnosticGateState) => s.hasLargeFiles,
+  datadogHeavy: (s: RepositoryDiagnosticGateState) => s.hasDatadogHeavyWorkflow,
+  pytest: (s: RepositoryDiagnosticGateState) => s.hasPytest,
+  pythonHeavy: (s: RepositoryDiagnosticGateState) => s.hasPythonHeavyWorkflow,
+  renovate: (s: RepositoryDiagnosticGateState) => s.hasRenovateConfig,
+  husky: (s: RepositoryDiagnosticGateState) => s.hasHusky,
+  javascriptFrameworks: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptFrameworks,
+  rust: (s: RepositoryDiagnosticGateState) => s.hasRust,
+  cdkManifest: (s: RepositoryDiagnosticGateState) => s.hasCdkManifest,
+  elixirHeavy: (s: RepositoryDiagnosticGateState) => s.hasElixirHeavyWorkflow,
+  gradle: (s: RepositoryDiagnosticGateState) => s.hasGradle,
+} as const;
+
 export function collectorGateMatches(
-  gate: RepositoryDiagnosticGate,
+  gate: GatePredicate,
   gateState: RepositoryDiagnosticGateState,
 ): boolean {
-  switch (gate) {
-    case "javascript-heavy":
-      return gateState.hasJavaScriptHeavyWorkflow;
-    case "javascript-tooling":
-      return gateState.hasJavaScriptTooling;
-    case "javascript-linting":
-      return gateState.hasJavaScriptLinting;
-    case "javascript-build-config":
-      return gateState.hasJavaScriptBuildConfig;
-    case "javascript-package-scripts":
-      return gateState.hasJavaScriptPackageScripts;
-    case "docker-heavy":
-      return gateState.hasDockerHeavyWorkflow;
-    case "large-files":
-      return gateState.hasLargeFiles;
-    case "terraform-heavy":
-      return gateState.hasTerraformHeavyWorkflow;
-    case "datadog-heavy":
-      return gateState.hasDatadogHeavyWorkflow;
-    case "pytest":
-      return gateState.hasPytest;
-    case "python-heavy":
-      return gateState.hasPythonHeavyWorkflow;
-    case "renovate":
-      return gateState.hasRenovateConfig;
-    case "husky":
-      return gateState.hasHusky;
-    case "javascript-frameworks":
-      return gateState.hasJavaScriptFrameworks;
-    case "rust":
-      return gateState.hasRust;
-    case "cdk-manifest":
-      return gateState.hasCdkManifest;
-    case "elixir-heavy":
-      return gateState.hasElixirHeavyWorkflow;
-    case "gradle":
-      return gateState.hasGradle;
-  }
+  return gate(gateState);
 }
 
 function collectSignalGateState(

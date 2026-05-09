@@ -1,4 +1,5 @@
 import type { RepositoryDiagnosticCollector } from "./collector-types.ts";
+import { gates } from "./gates.ts";
 import { collectPytestDiagnostics } from "./pytest.ts";
 import { collectPytestXdistInstalledButNotUsedDiagnostics } from "./pytest-xdist-installed-but-not-used.ts";
 import { collectAvoidMypyProductionBundleDiagnostics } from "./avoid-mypy-production-bundle.ts";
@@ -17,19 +18,19 @@ import { collectAsyncTestUsesSyncTestClientDiagnostics } from "./async-test-uses
 export const pytestDiagnosticCollectors = [
   {
     id: "async-test-uses-sync-testclient",
-    gate: "pytest",
+    gate: gates.pytest,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectAsyncTestUsesSyncTestClientDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "pytest-diagnostics",
-    gate: "pytest",
+    gate: gates.pytest,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectPytestDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
   },
   {
     id: "pytest-xdist-installed-but-not-used",
-    gate: "pytest",
+    gate: gates.pytest,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectPytestXdistInstalledButNotUsedDiagnostics(
         repoRoot,
@@ -44,7 +45,7 @@ export const pytestDiagnosticCollectors = [
 export const pythonDiagnosticCollectors = [
   {
     id: "avoid-mypy-production-bundle",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectAvoidMypyProductionBundleDiagnostics(
         repoRoot,
@@ -56,25 +57,25 @@ export const pythonDiagnosticCollectors = [
   },
   {
     id: "prefer-mypy-performance-milestone",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectMypyMilestoneDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-pydantic-v2",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPreferPydanticV2Diagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-ruff-format-over-black",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPreferRuffFormatOverBlackDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-ruff-import-sorting-over-isort",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPreferRuffImportSortingOverIsortDiagnostics(
         repoRoot,
@@ -85,37 +86,37 @@ export const pythonDiagnosticCollectors = [
   },
   {
     id: "pyramid-config-scan-unrestricted",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPyramidConfigScanDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "hatch-without-uv-installer",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectHatchWithoutUvInstallerDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "nox-without-uv-backend",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectNoxWithoutUvBackendDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
   },
   {
     id: "pdm-without-use-uv",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPdmWithoutUseUvDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "python-top-level-heavy-client-init",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPythonTopLevelHeavyClientInitDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "tox-without-tox-uv",
-    gate: "python-heavy",
+    gate: gates.pythonHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectToxWithoutToxUvDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
   },

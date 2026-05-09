@@ -11,7 +11,7 @@ import {
 import { javascriptDiagnosticCollectors } from "./collectors-javascript.ts";
 import { pytestDiagnosticCollectors, pythonDiagnosticCollectors } from "./collectors-python.ts";
 import { terraformDiagnosticCollectors } from "./collectors-terraform.ts";
-import { collectorGateMatches, collectRepositoryDiagnosticGateState } from "./gates.ts";
+import { collectorGateMatches, collectRepositoryDiagnosticGateState, gates } from "./gates.ts";
 
 export const repositoryDiagnosticCollectors = [
   ...javascriptDiagnosticCollectors,
@@ -25,7 +25,7 @@ export const repositoryDiagnosticCollectors = [
   ...elixirDiagnosticCollectors,
   {
     id: "gradle-parallel-not-enabled",
-    gate: "gradle",
+    gate: gates.gradle,
     collect: (context: RepositoryDiagnosticContext) =>
       collectGradleParallelNotEnabledDiagnostics(
         context.repoRoot,
