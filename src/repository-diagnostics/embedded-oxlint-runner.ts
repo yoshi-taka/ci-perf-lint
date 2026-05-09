@@ -58,10 +58,6 @@ export async function runEmbeddedOxlint(
       spawned.exited,
     ]);
 
-    if (spawned.timedOut || spawned.signaled || exitCode === -1) {
-      return undefined;
-    }
-
     const diagnostics: OxlintDiagnostic[] = [];
     for (const line of stdoutText.split("\n")) {
       if (!line) {
@@ -71,6 +67,14 @@ export async function runEmbeddedOxlint(
       if (parsed) {
         diagnostics.push(parsed);
       }
+    }
+
+    if (spawned.timedOut) {
+      return diagnostics.length > 0 ? { diagnostics, exitCode, stderrText } : undefined;
+    }
+
+    if (spawned.signaled || exitCode === -1) {
+      return undefined;
     }
 
     return { diagnostics, exitCode, stderrText };

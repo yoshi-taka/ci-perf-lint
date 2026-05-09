@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-export const EMBEDDED_OXLINT_TIMEOUT_MS = 10_000;
+export const EMBEDDED_OXLINT_TIMEOUT_MS = 5_000;
 const MAX_STDOUT_BUFFER_SIZE = 2 * 1024 * 1024;
 const MAX_STDERR_BUFFER_SIZE = 1024 * 1024;
 
