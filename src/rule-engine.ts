@@ -238,5 +238,18 @@ export async function evaluateRules(
     return filtered;
   }
 
-  return ruleResults;
+  return deduplicateByPathLine(ruleResults);
+}
+
+function deduplicateByPathLine(diagnostics: Diagnostic[]): Diagnostic[] {
+  const seen = new Map<string, Diagnostic>();
+
+  for (const d of diagnostics) {
+    const key = `${d.location.path}:${d.location.line}`;
+    if (!seen.has(key)) {
+      seen.set(key, d);
+    }
+  }
+
+  return [...seen.values()];
 }
