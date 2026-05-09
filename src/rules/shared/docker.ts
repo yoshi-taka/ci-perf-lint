@@ -1,6 +1,6 @@
 import type { WorkflowJob, WorkflowStep } from "../../workflow.ts";
 import type { AnyStep } from "./any-step.ts";
-import { getJobAnalysis } from "./workflow-analysis.ts";
+import { getJobFacts } from "./workflow-analysis.ts";
 import { getStepCommandText } from "./any-step.ts";
 
 export function stepRunsDockerBuild(step: WorkflowStep | AnyStep): boolean {
@@ -28,7 +28,7 @@ export function stepDisablesDockerBuildCache(step: WorkflowStep | AnyStep): bool
 }
 
 export function jobRunsBuildxBake(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).hasBuildxBake;
+  return getJobFacts(job).hasBuildxBake;
 }
 
 export function textDisablesDockerBuildCache(text: string): boolean {

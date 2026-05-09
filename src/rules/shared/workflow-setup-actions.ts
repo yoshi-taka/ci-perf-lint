@@ -1,52 +1,13 @@
 import type { WorkflowStep } from "../../workflow.ts";
 import type { DependencyFamily, SetupActionKind } from "./tools.ts";
-
-const setupActionKindCache = new WeakMap<WorkflowStep, SetupActionKind | undefined>();
+import { getStepFacts } from "./step-facts.ts";
 
 export function usesSetupAction(stepUses: string | undefined, prefix: string): boolean {
   return typeof stepUses === "string" && stepUses.toLowerCase().startsWith(prefix);
 }
 
 export function getSetupActionKind(step: WorkflowStep): SetupActionKind | undefined {
-  const cached = setupActionKindCache.get(step);
-  if (cached !== undefined || setupActionKindCache.has(step)) {
-    return cached;
-  }
-
-  const uses = step.uses?.toLowerCase() ?? "";
-
-  if (uses.startsWith("actions/setup-node@")) {
-    setupActionKindCache.set(step, "node");
-    return "node";
-  }
-
-  if (uses.startsWith("actions/setup-python@")) {
-    setupActionKindCache.set(step, "python");
-    return "python";
-  }
-
-  if (uses.startsWith("actions/setup-go@")) {
-    setupActionKindCache.set(step, "go");
-    return "go";
-  }
-
-  if (uses.startsWith("actions/setup-java@")) {
-    setupActionKindCache.set(step, "java");
-    return "java";
-  }
-
-  if (uses.startsWith("ruby/setup-ruby@")) {
-    setupActionKindCache.set(step, "ruby");
-    return "ruby";
-  }
-
-  if (uses.startsWith("actions/setup-dotnet@")) {
-    setupActionKindCache.set(step, "dotnet");
-    return "dotnet";
-  }
-
-  setupActionKindCache.set(step, undefined);
-  return undefined;
+  return getStepFacts(step).setupActionKind;
 }
 
 export function getDependencyFamiliesUsedBySetupAction(

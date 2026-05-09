@@ -1,5 +1,5 @@
 import type { WorkflowDocument } from "./workflow.ts";
-import { getWorkflowAnalysis } from "./rules/shared/workflow-analysis.ts";
+import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
 import {
   isHeavyWorkflow,
   isHeavyJob,
@@ -37,7 +37,7 @@ interface WorkflowSummary {
 
 function buildWorkflowFeatureSet(workflow: WorkflowDocument): Set<string> {
   const features = new Set<string>();
-  const loweredBlob = getWorkflowAnalysis(workflow).loweredStepTextBlob;
+  const loweredBlob = getWorkflowFacts(workflow).loweredStepTextBlob;
   const jobIds = workflow.jobs.map((job) => job.id.toLowerCase()).join(" ");
   const workflowText = `${jobIds} ${loweredBlob}`;
 

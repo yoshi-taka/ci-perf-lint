@@ -2,10 +2,12 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../../workflow
 import type { PipelineDocument } from "../../buildkite-workflow.ts";
 import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "../../circleci-workflow.ts";
+import type { SetupActionKind } from "./tools.ts";
+import { getStepFacts } from "./step-facts.ts";
 import { detectLintTool, detectPythonTool } from "./tools.ts";
-import { getWorkflowStepText, getLoweredWorkflowStepText } from "./workflow-step-text.ts";
 
 const dockerBuildxBakePattern = /\bdocker\s+buildx\s+bake\b|\bdocker-buildx\s+bake\b/i;
+const dockerBuildPattern = /\bdocker\s+build\b/i;
 const heavyStepSignalPattern =
   /(npm|pnpm|yarn|bun|pip|poetry|\buv\b|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|\bclaude\b|\bcodex\b|\bgemini\b|\bbuild\b)/;
 const directHeavySignalPattern =
@@ -27,7 +29,7 @@ const metaCheckWorkflowNamePattern =
 const agenticWorkflowNamePattern =
   /\b(ai|agent|claude|codex|openai|anthropic|gemini|review bot|autofix)\b/;
 
-interface JobAnalysis {
+export interface JobFacts {
   checkoutStep?: WorkflowStep;
   hasSetupBunStep: boolean;
   hasSetupPnpmStep: boolean;
@@ -42,9 +44,13 @@ interface JobAnalysis {
   lintTools: ReadonlySet<string>;
   pythonTools: ReadonlySet<string>;
   loweredStepTextBlob: string;
+  checkoutDepth?: number;
+  hasTimeout: boolean;
+  dockerUsage: boolean;
+  setupActions: readonly SetupActionKind[];
 }
 
-interface WorkflowAnalysis {
+export interface WorkflowFacts {
   isHeavyWorkflow: boolean;
   hasConcurrency: boolean;
   looksMetaCheckLike: boolean;
@@ -52,12 +58,17 @@ interface WorkflowAnalysis {
   lintTools: ReadonlySet<string>;
   pythonTools: ReadonlySet<string>;
   loweredStepTextBlob: string;
+  checkoutDepthsByJob: ReadonlyMap<string, number | undefined>;
+  dockerUsageByJob: ReadonlyMap<string, boolean>;
+  timeoutPresenceByJob: ReadonlyMap<string, boolean>;
+  setupActionsByJob: ReadonlyMap<string, readonly SetupActionKind[]>;
+  installFamiliesByJob: ReadonlyMap<string, readonly string[]>;
 }
 
-const jobAnalysisCache = new WeakMap<WorkflowJob, JobAnalysis>();
-const workflowAnalysisCache = new WeakMap<WorkflowDocument, WorkflowAnalysis>();
+const jobFactsCache = new WeakMap<WorkflowJob, JobFacts>();
+const workflowFactsCache = new WeakMap<WorkflowDocument, WorkflowFacts>();
 
-const emptyWorkflowAnalysis: WorkflowAnalysis = {
+const emptyWorkflowFacts: WorkflowFacts = {
   isHeavyWorkflow: false,
   hasConcurrency: false,
   looksMetaCheckLike: false,
@@ -65,6 +76,11 @@ const emptyWorkflowAnalysis: WorkflowAnalysis = {
   lintTools: new Set(),
   pythonTools: new Set(),
   loweredStepTextBlob: "",
+  checkoutDepthsByJob: new Map(),
+  dockerUsageByJob: new Map(),
+  timeoutPresenceByJob: new Map(),
+  setupActionsByJob: new Map(),
+  installFamiliesByJob: new Map(),
 };
 
 function usesSetupAction(stepUses: string | undefined, prefix: string): boolean {
@@ -72,27 +88,27 @@ function usesSetupAction(stepUses: string | undefined, prefix: string): boolean 
 }
 
 export function hasCheckoutStep(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).checkoutStep !== undefined;
+  return getJobFacts(job).checkoutStep !== undefined;
 }
 
 export function getCheckoutStep(job: WorkflowJob): WorkflowStep | undefined {
-  return getJobAnalysis(job).checkoutStep;
+  return getJobFacts(job).checkoutStep;
 }
 
 export function hasSetupBunStep(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).hasSetupBunStep;
+  return getJobFacts(job).hasSetupBunStep;
 }
 
 export function hasSetupPnpmStep(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).hasSetupPnpmStep;
+  return getJobFacts(job).hasSetupPnpmStep;
 }
 
 export function hasSetupUvStep(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).hasSetupUvStep;
+  return getJobFacts(job).hasSetupUvStep;
 }
 
-export function getJobAnalysis(job: WorkflowJob): JobAnalysis {
-  const cached = jobAnalysisCache.get(job);
+export function getJobFacts(job: WorkflowJob): JobFacts {
+  const cached = jobFactsCache.get(job);
   if (cached) {
     return cached;
   }
@@ -102,28 +118,47 @@ export function getJobAnalysis(job: WorkflowJob): JobAnalysis {
   let foundSetupPnpmStep = false;
   let foundSetupUvStep = false;
   let hasBuildxBake = false;
+  let hasDockerBuild = false;
   let hasHeavyStepSignal = false;
   let hasDirectHeavySignals = false;
   let hasHistoryDependentCommand = false;
   let hasOpaqueRepoScriptExecution = false;
   let looksMetaCheckLike = false;
   let looksAgenticLike = false;
+  let checkoutFetchDepth: number | undefined;
+  let jobHasTimeout = false;
+  const setupActions: SetupActionKind[] = [];
   const lintTools = new Set<string>();
   const pythonTools = new Set<string>();
   const loweredStepTexts: string[] = [];
 
   for (const step of job.steps) {
+    const facts = getStepFacts(step);
+
     if (!checkoutStep && usesSetupAction(step.uses, "actions/checkout@")) {
       checkoutStep = step;
+      const fetchDepth = step.with?.["fetch-depth"];
+      if (fetchDepth === 0 || fetchDepth === "0") {
+        checkoutFetchDepth = 0;
+      } else if (typeof fetchDepth === "number" && fetchDepth > 1) {
+        checkoutFetchDepth = fetchDepth;
+      } else if (typeof fetchDepth === "string" && /^\d+$/.test(fetchDepth)) {
+        const n = Number(fetchDepth);
+        if (n > 1) {
+          checkoutFetchDepth = n;
+        }
+      } else if (fetchDepth !== undefined) {
+        checkoutFetchDepth = undefined;
+      }
     }
 
     foundSetupBunStep ||= usesSetupAction(step.uses, "oven-sh/setup-bun@");
     foundSetupPnpmStep ||= usesSetupAction(step.uses, "pnpm/action-setup@");
     foundSetupUvStep ||= usesSetupAction(step.uses, "astral-sh/setup-uv@");
 
-    const loweredStepText = getLoweredWorkflowStepText(step);
+    const loweredStepText = facts.loweredStepText;
     loweredStepTexts.push(loweredStepText);
-    const stepText = getWorkflowStepText(step);
+    const stepText = facts.stepText;
     const loweredRunNameText = `${step.name ?? ""} ${step.run ?? ""}`.toLowerCase();
     const run = step.run ?? "";
     const lintTool = detectLintTool(step);
@@ -137,7 +172,12 @@ export function getJobAnalysis(job: WorkflowJob): JobAnalysis {
       pythonTools.add(pythonTool);
     }
 
+    if (facts.setupActionKind) {
+      setupActions.push(facts.setupActionKind);
+    }
+
     hasBuildxBake ||= dockerBuildxBakePattern.test(run);
+    hasDockerBuild ||= dockerBuildPattern.test(run);
     hasHeavyStepSignal ||= heavyStepSignalPattern.test(loweredStepText);
     hasDirectHeavySignals ||= directHeavySignalPattern.test(loweredRunNameText);
     hasHistoryDependentCommand ||= historyDependentCommandPattern.test(stepText);
@@ -146,8 +186,13 @@ export function getJobAnalysis(job: WorkflowJob): JobAnalysis {
     looksAgenticLike ||= agenticLikePattern.test(loweredStepText);
   }
 
+  const timeoutMinutes = job.raw["timeout-minutes"];
+  jobHasTimeout =
+    typeof timeoutMinutes === "number" ||
+    (typeof timeoutMinutes === "string" && timeoutMinutes.trim().length > 0);
+
   const loweredId = job.id.toLowerCase();
-  const analysis = {
+  const facts: JobFacts = {
     checkoutStep,
     hasSetupBunStep: foundSetupBunStep,
     hasSetupPnpmStep: foundSetupPnpmStep,
@@ -162,24 +207,28 @@ export function getJobAnalysis(job: WorkflowJob): JobAnalysis {
     lintTools,
     pythonTools,
     loweredStepTextBlob: loweredStepTexts.join("\n"),
-  } satisfies JobAnalysis;
-  jobAnalysisCache.set(job, analysis);
-  return analysis;
+    checkoutDepth: checkoutFetchDepth,
+    hasTimeout: jobHasTimeout,
+    dockerUsage: hasBuildxBake || hasDockerBuild,
+    setupActions,
+  };
+  jobFactsCache.set(job, facts);
+  return facts;
 }
 
-export function getWorkflowAnalysis(
+export function getWorkflowFacts(
   workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
-): WorkflowAnalysis {
+): WorkflowFacts {
   if ("steps" in workflow && !("jobs" in workflow)) {
-    return emptyWorkflowAnalysis;
+    return emptyWorkflowFacts;
   }
 
   if ("kind" in workflow) {
-    return emptyWorkflowAnalysis;
+    return emptyWorkflowFacts;
   }
 
   const wf = workflow as WorkflowDocument;
-  const cached = workflowAnalysisCache.get(wf);
+  const cached = workflowFactsCache.get(wf);
   if (cached) {
     return cached;
   }
@@ -192,23 +241,42 @@ export function getWorkflowAnalysis(
   const lintTools = new Set<string>();
   const pythonTools = new Set<string>();
   const loweredStepTexts: string[] = [];
+  const checkoutDepthsByJob = new Map<string, number | undefined>();
+  const dockerUsageByJob = new Map<string, boolean>();
+  const timeoutPresenceByJob = new Map<string, boolean>();
+  const setupActionsByJob = new Map<string, readonly SetupActionKind[]>();
+  const installFamiliesByJob = new Map<string, readonly string[]>();
 
   for (const job of wf.jobs) {
-    const jobAnalysis = getJobAnalysis(job);
+    const jobFacts = getJobFacts(job);
     hasJobConcurrency ||= Boolean(job.concurrencyNode);
-    hasHeavyJob ||= jobAnalysis.isHeavyJob;
-    hasMetaCheckJob ||= jobAnalysis.looksMetaCheckLike;
-    hasAgenticJob ||= jobAnalysis.looksAgenticLike;
-    for (const lintTool of jobAnalysis.lintTools) {
+    hasHeavyJob ||= jobFacts.isHeavyJob;
+    hasMetaCheckJob ||= jobFacts.looksMetaCheckLike;
+    hasAgenticJob ||= jobFacts.looksAgenticLike;
+    for (const lintTool of jobFacts.lintTools) {
       lintTools.add(lintTool);
     }
-    for (const pythonTool of jobAnalysis.pythonTools) {
+    for (const pythonTool of jobFacts.pythonTools) {
       pythonTools.add(pythonTool);
     }
-    loweredStepTexts.push(jobAnalysis.loweredStepTextBlob);
+    loweredStepTexts.push(jobFacts.loweredStepTextBlob);
+
+    checkoutDepthsByJob.set(job.id, jobFacts.checkoutDepth);
+    dockerUsageByJob.set(job.id, jobFacts.dockerUsage);
+    timeoutPresenceByJob.set(job.id, jobFacts.hasTimeout);
+    setupActionsByJob.set(job.id, jobFacts.setupActions);
+
+    const installFamilies: string[] = [];
+    for (const step of job.steps) {
+      const facts = getStepFacts(step);
+      if (facts.installCommand) {
+        installFamilies.push(facts.installCommand);
+      }
+    }
+    installFamiliesByJob.set(job.id, installFamilies);
   }
 
-  const analysis = {
+  const facts: WorkflowFacts = {
     isHeavyWorkflow: heavyWorkflowNamePattern.test(loweredName) || hasHeavyJob,
     hasConcurrency: Boolean(wf.concurrencyNode) || hasJobConcurrency,
     looksMetaCheckLike: metaCheckWorkflowNamePattern.test(loweredName) || hasMetaCheckJob,
@@ -216,9 +284,14 @@ export function getWorkflowAnalysis(
     lintTools,
     pythonTools,
     loweredStepTextBlob: loweredStepTexts.join("\n"),
-  } satisfies WorkflowAnalysis;
-  workflowAnalysisCache.set(wf, analysis);
-  return analysis;
+    checkoutDepthsByJob,
+    dockerUsageByJob,
+    timeoutPresenceByJob,
+    setupActionsByJob,
+    installFamiliesByJob,
+  };
+  workflowFactsCache.set(wf, facts);
+  return facts;
 }
 
 function regexMatches(text: string, matcher: RegExp): boolean {
@@ -227,13 +300,13 @@ function regexMatches(text: string, matcher: RegExp): boolean {
 }
 
 export function workflowUsesLintTool(workflow: WorkflowDocument, tool: string): boolean {
-  return getWorkflowAnalysis(workflow).lintTools.has(tool);
+  return getWorkflowFacts(workflow).lintTools.has(tool);
 }
 
 export function workflowUsesPythonTool(workflow: WorkflowDocument, tool: string): boolean {
-  return getWorkflowAnalysis(workflow).pythonTools.has(tool);
+  return getWorkflowFacts(workflow).pythonTools.has(tool);
 }
 
 export function workflowStepTextMatches(workflow: WorkflowDocument, matcher: RegExp): boolean {
-  return regexMatches(getWorkflowAnalysis(workflow).loweredStepTextBlob, matcher);
+  return regexMatches(getWorkflowFacts(workflow).loweredStepTextBlob, matcher);
 }

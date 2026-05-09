@@ -1,22 +1,22 @@
 import type { WorkflowDocument, WorkflowJob } from "../../workflow.ts";
 import type { YAMLMap } from "yaml";
 import { getNode, getScalarValue, getMapValue, getStringOrArrayValue } from "../../workflow.ts";
-import { getJobAnalysis, getWorkflowAnalysis } from "./workflow-analysis.ts";
+import { getJobFacts, getWorkflowFacts } from "./workflow-analysis.ts";
 
 export function isHeavyWorkflow(workflow: WorkflowDocument): boolean {
-  return getWorkflowAnalysis(workflow).isHeavyWorkflow;
+  return getWorkflowFacts(workflow).isHeavyWorkflow;
 }
 
 export function isHeavyJob(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).isHeavyJob;
+  return getJobFacts(job).isHeavyJob;
 }
 
 export function hasDirectHeavySignals(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).hasDirectHeavySignals;
+  return getJobFacts(job).hasDirectHeavySignals;
 }
 
 export function workflowHasConcurrency(workflow: WorkflowDocument): boolean {
-  return getWorkflowAnalysis(workflow).hasConcurrency;
+  return getWorkflowFacts(workflow).hasConcurrency;
 }
 
 export function workflowJobCount(workflow: WorkflowDocument): number {
@@ -155,11 +155,11 @@ export function jobUsesContainer(job: WorkflowJob): boolean {
 }
 
 export function hasHistoryDependentCommand(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).hasHistoryDependentCommand;
+  return getJobFacts(job).hasHistoryDependentCommand;
 }
 
 export function hasOpaqueRepoScriptExecution(job: WorkflowJob): boolean {
-  return getJobAnalysis(job).hasOpaqueRepoScriptExecution;
+  return getJobFacts(job).hasOpaqueRepoScriptExecution;
 }
 
 export function jobPublishesScorecardResults(job: WorkflowJob): boolean {
@@ -197,11 +197,11 @@ export function workflowLooksReleaseLike(workflow: WorkflowDocument, job: Workfl
 }
 
 export function workflowLooksMetaCheckLike(workflow: WorkflowDocument): boolean {
-  return getWorkflowAnalysis(workflow).looksMetaCheckLike;
+  return getWorkflowFacts(workflow).looksMetaCheckLike;
 }
 
 export function workflowLooksAgenticLike(workflow: WorkflowDocument, job?: WorkflowJob): boolean {
   return job
-    ? getJobAnalysis(job).looksAgenticLike || getWorkflowAnalysis(workflow).looksAgenticLike
-    : getWorkflowAnalysis(workflow).looksAgenticLike;
+    ? getJobFacts(job).looksAgenticLike || getWorkflowFacts(workflow).looksAgenticLike
+    : getWorkflowFacts(workflow).looksAgenticLike;
 }

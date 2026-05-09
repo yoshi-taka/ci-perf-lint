@@ -6,6 +6,8 @@ import type { PipelineDocument } from "./buildkite-workflow.ts";
 import type { GitlabCiDocument } from "./gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "./circleci-workflow.ts";
 import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
+import type { RepositoryPrecedentIndex } from "./rules/shared/repository-precedent-index.ts";
+import type { RepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
 
 type WorkflowNodeKind = "trigger" | "concurrency";
@@ -24,6 +26,8 @@ export interface RuleContext {
   repository: RepositorySignals;
   scanContext?: RepositoryScanContext;
   workflowSemantics?: WorkflowSemantics | ReadonlyMap<WorkflowDocument, WorkflowSemantics>;
+  precedentIndex?: RepositoryPrecedentIndex;
+  fileIndex?: RepositoryFileIndex;
 }
 
 interface RuleModule {

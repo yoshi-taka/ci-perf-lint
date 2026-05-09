@@ -9,7 +9,7 @@ import {
   workflowHasBranchPushTrigger,
   workflowHasTriggerPathFilter,
 } from "./workflow-triggers.ts";
-import { getWorkflowAnalysis } from "./workflow-analysis.ts";
+import { getWorkflowFacts } from "./workflow-analysis.ts";
 import { workflowHasConcurrency, isHeavyWorkflow } from "./workflows.ts";
 import { jobHasMatrix } from "./workflow-jobs.ts";
 import { detectInstallCommand, detectLintTool } from "./tools.ts";
@@ -56,7 +56,7 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
     return cached;
   }
 
-  getWorkflowAnalysis(workflow);
+  getWorkflowFacts(workflow);
 
   let stepCount = 0;
   let hasMatrixJob = false;
@@ -160,9 +160,4 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
 
   semanticsCache.set(workflow, semantics);
   return semantics;
-}
-
-function getJobSemantics(workflow: WorkflowDocument, jobId: string): JobMetadata | undefined {
-  const semantics = buildWorkflowSemantics(workflow);
-  return semantics.jobs.find((j) => j.id === jobId);
 }

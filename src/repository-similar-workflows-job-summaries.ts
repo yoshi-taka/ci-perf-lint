@@ -20,7 +20,7 @@ import {
   workflowLooksReleaseLike,
 } from "./rules/shared/workflow-jobs.ts";
 import { getSetupActionKind } from "./rules/shared/workflow-setup-actions.ts";
-import { getCheckoutStep, getJobAnalysis } from "./rules/shared/workflow-analysis.ts";
+import { getCheckoutStep, getJobFacts } from "./rules/shared/workflow-analysis.ts";
 import { jobMayMutateRepository } from "./rules/shared/workflow-mutation.ts";
 import {
   workflowHasBranchPushTrigger,
@@ -53,7 +53,7 @@ function jobUsesNxSetShas(job: WorkflowJob): boolean {
 
 function buildJobFeatureSet(workflow: WorkflowDocument, job: WorkflowJob): Set<string> {
   const features = new Set<string>();
-  const loweredBlob = getJobAnalysis(job).loweredStepTextBlob;
+  const loweredBlob = getJobFacts(job).loweredStepTextBlob;
   const jobText = `${job.id.toLowerCase()} ${loweredBlob}`;
 
   if (workflowHasPullRequestTrigger(workflow)) {

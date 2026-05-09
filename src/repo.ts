@@ -24,6 +24,8 @@ import type { RepositorySignals } from "./repository-signals-types.ts";
 import { evaluateRules, evaluateRulesCoarseToFine } from "./rule-engine.ts";
 import { buildWorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
+import { buildRepositoryPrecedentIndex } from "./rules/shared/repository-precedent-index.ts";
+import { buildRepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
 import { stderrWarn } from "./stderr-warn.ts";
@@ -258,11 +260,6 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     topCount,
     inputPath,
   } = scanned;
-  const ruleContext = {
-    repository: signals,
-    scanContext,
-  };
-
   const allFindings: Diagnostic[] = [];
   const ruleFindingCounts = new Map<string, number>();
   const repositoryScopeWorkflowRuleIds = new Set([
@@ -271,6 +268,15 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   ]);
 
   const wfList = [...parsedWorkflows];
+
+  const precedentIndex = buildRepositoryPrecedentIndex(githubWorkflows);
+  const fileIndex = buildRepositoryFileIndex(scanContext);
+  const ruleContext = {
+    repository: signals,
+    scanContext,
+    precedentIndex,
+    fileIndex,
+  };
 
   const semanticsByWorkflow = new Map<ParsedWorkflowDocument, WorkflowSemantics>();
   for (const workflow of wfList) {
