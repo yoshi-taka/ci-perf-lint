@@ -17,9 +17,10 @@
     ".": {
       "entry": [
         "stryker/stryker.core.config.mjs",
-        "stryker/stryker.helper.config.mjs",
         "stryker/stryker.repo.config.mjs",
         "stryker/stryker.renderer.config.mjs",
+        "stryker/stryker.rule-engine.config.mjs",
+        "stryker/stryker.workflow.config.mjs",
         "site/astro.config.mjs",
         "site/src/pages/index.astro",
         "site/src/pages/rules/index.astro",

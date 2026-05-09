@@ -144,6 +144,16 @@ describe("applyLimitedActionsPriority BVA", () => {
     expect(result.find((f) => f.score === 70)?.score).toBe(70); // f4 unchanged
   });
 
+  test("exactly 3 action findings: all get bonus (boundary)", () => {
+    const f1 = actionsFinding(100);
+    const f2 = actionsFinding(90);
+    const f3 = actionsFinding(80);
+    const result = applyLimitedActionsPriority([f1, f2, f3]);
+    expect(result.find((f) => f.score === 130)?.score).toBe(130);
+    expect(result.find((f) => f.score === 120)?.score).toBe(120);
+    expect(result.find((f) => f.score === 110)?.score).toBe(110);
+  });
+
   test("mix: repo findings interspersed don't count toward limit", () => {
     const f1 = actionsFinding(100);
     const f2 = repoFinding(99);

@@ -2,13 +2,13 @@
 export default {
   testRunner: "command",
   commandRunner: {
-    command: "bun test test/finding-grouping.test.ts",
+    command: "bun test test/rule-engine.test.ts",
   },
-  mutate: ["src/finding-grouping.ts"],
+  mutate: ["src/rule-engine.ts"],
   reporters: ["clear-text", "progress"],
   coverageAnalysis: "off",
   concurrency: 1,
   checkers: [],
-  tempDirName: ".stryker-tmp/helper",
+  tempDirName: ".stryker-tmp/rule-engine",
   cleanTempDir: true,
 };

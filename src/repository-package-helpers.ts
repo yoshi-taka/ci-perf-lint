@@ -28,12 +28,7 @@ export function packageJsonDependencyVersionSpec(
   packageJson: Record<string, unknown>,
   dependencyName: string,
 ): string | undefined {
-  const dependencySections = [
-    packageJson.devDependencies,
-    ...dependencySectionsOf(packageJson).filter(
-      (section) => section !== packageJson.devDependencies,
-    ),
-  ];
+  const dependencySections = [packageJson.devDependencies, ...dependencySectionsOf(packageJson)];
 
   for (const section of dependencySections) {
     if (!section || typeof section !== "object" || Array.isArray(section)) {

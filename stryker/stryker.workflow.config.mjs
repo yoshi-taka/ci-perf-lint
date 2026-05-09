@@ -2,13 +2,13 @@
 export default {
   testRunner: "command",
   commandRunner: {
-    command: "bun test test/boundary-repo.test.ts",
+    command: "bun test test/workflow.test.ts",
   },
-  mutate: ["src/repo-finding-utils.ts"],
+  mutate: ["src/workflow.ts"],
   reporters: ["clear-text", "progress"],
   coverageAnalysis: "off",
   concurrency: 1,
   checkers: [],
-  tempDirName: ".stryker-tmp/repo",
+  tempDirName: ".stryker-tmp/workflow",
   cleanTempDir: true,
 };
