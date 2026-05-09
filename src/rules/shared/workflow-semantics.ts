@@ -1,14 +1,5 @@
 import type { WorkflowDocument } from "../../workflow.ts";
 
-import {
-  workflowHasManualOnlyTrigger,
-  workflowHasScheduleTrigger,
-  workflowHasPushTrigger,
-  workflowHasPullRequestTrigger,
-  workflowHasTagOnlyPushTrigger,
-  workflowHasBranchPushTrigger,
-  workflowHasTriggerPathFilter,
-} from "./workflow-triggers.ts";
 import { getWorkflowFacts } from "./workflow-analysis.ts";
 import { workflowHasConcurrency, isHeavyWorkflow } from "./workflows.ts";
 import { jobHasMatrix } from "./workflow-jobs.ts";
@@ -56,7 +47,8 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
     return cached;
   }
 
-  getWorkflowFacts(workflow);
+  const wfFacts = getWorkflowFacts(workflow);
+  const tf = wfFacts.triggerFacts;
 
   let stepCount = 0;
   let hasMatrixJob = false;
@@ -140,13 +132,13 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
 
   const semantics: WorkflowSemantics = {
     trigger: {
-      hasPush: workflowHasPushTrigger(workflow),
-      hasPullRequest: workflowHasPullRequestTrigger(workflow),
-      hasSchedule: workflowHasScheduleTrigger(workflow),
-      hasManualOnly: workflowHasManualOnlyTrigger(workflow),
-      hasTagOnlyPush: workflowHasTagOnlyPushTrigger(workflow),
-      hasBranchPush: workflowHasBranchPushTrigger(workflow),
-      hasPathFilter: workflowHasTriggerPathFilter(workflow),
+      hasPush: tf.hasPush,
+      hasPullRequest: tf.hasPullRequest,
+      hasSchedule: tf.hasSchedule,
+      hasManualOnly: tf.isManualOnly,
+      hasTagOnlyPush: tf.push.hasTagOnly,
+      hasBranchPush: tf.push.hasBranchPush,
+      hasPathFilter: tf.hasTriggerPathFilter,
     },
     jobCount: workflow.jobs.length,
     stepCount,

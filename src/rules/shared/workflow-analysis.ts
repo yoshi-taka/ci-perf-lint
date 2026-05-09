@@ -3,6 +3,8 @@ import type { PipelineDocument } from "../../buildkite-workflow.ts";
 import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "../../circleci-workflow.ts";
 import type { SetupActionKind } from "./tools.ts";
+import type { TriggerFacts } from "./trigger-facts.ts";
+import { getTriggerFacts } from "./trigger-facts.ts";
 import { getStepFacts } from "./step-facts.ts";
 import { detectLintTool, detectPythonTool } from "./tools.ts";
 
@@ -63,10 +65,44 @@ export interface WorkflowFacts {
   timeoutPresenceByJob: ReadonlyMap<string, boolean>;
   setupActionsByJob: ReadonlyMap<string, readonly SetupActionKind[]>;
   installFamiliesByJob: ReadonlyMap<string, readonly string[]>;
+  triggerFacts: TriggerFacts;
 }
 
 const jobFactsCache = new WeakMap<WorkflowJob, JobFacts>();
 const workflowFactsCache = new WeakMap<WorkflowDocument, WorkflowFacts>();
+
+const emptyTriggerFacts: TriggerFacts = {
+  events: new Set(),
+  hasPush: false,
+  hasPullRequest: false,
+  hasSchedule: false,
+  hasWorkflowDispatch: false,
+  hasRepositoryDispatch: false,
+  hasWorkflowCall: false,
+  hasWorkflowRun: false,
+  isManualOnly: false,
+  push: {
+    hasBranches: false,
+    hasBranchesIgnore: false,
+    hasTags: false,
+    hasTagsIgnore: false,
+    hasTagOnly: false,
+    hasBranchPush: false,
+    hasPaths: false,
+    hasPathsIgnore: false,
+  },
+  pullRequest: {
+    hasBranches: false,
+    hasBranchesIgnore: false,
+    hasPaths: false,
+    hasPathsIgnore: false,
+    hasPathFilter: false,
+    hasNonCodeIgnore: false,
+  },
+  hasTriggerPathFilter: false,
+  hasNonCodeIgnore: false,
+  scheduleCrons: [],
+};
 
 const emptyWorkflowFacts: WorkflowFacts = {
   isHeavyWorkflow: false,
@@ -81,6 +117,7 @@ const emptyWorkflowFacts: WorkflowFacts = {
   timeoutPresenceByJob: new Map(),
   setupActionsByJob: new Map(),
   installFamiliesByJob: new Map(),
+  triggerFacts: emptyTriggerFacts,
 };
 
 function usesSetupAction(stepUses: string | undefined, prefix: string): boolean {
@@ -248,23 +285,23 @@ export function getWorkflowFacts(
   const installFamiliesByJob = new Map<string, readonly string[]>();
 
   for (const job of wf.jobs) {
-    const jobFacts = getJobFacts(job);
+    const jf = getJobFacts(job);
     hasJobConcurrency ||= Boolean(job.concurrencyNode);
-    hasHeavyJob ||= jobFacts.isHeavyJob;
-    hasMetaCheckJob ||= jobFacts.looksMetaCheckLike;
-    hasAgenticJob ||= jobFacts.looksAgenticLike;
-    for (const lintTool of jobFacts.lintTools) {
+    hasHeavyJob ||= jf.isHeavyJob;
+    hasMetaCheckJob ||= jf.looksMetaCheckLike;
+    hasAgenticJob ||= jf.looksAgenticLike;
+    for (const lintTool of jf.lintTools) {
       lintTools.add(lintTool);
     }
-    for (const pythonTool of jobFacts.pythonTools) {
+    for (const pythonTool of jf.pythonTools) {
       pythonTools.add(pythonTool);
     }
-    loweredStepTexts.push(jobFacts.loweredStepTextBlob);
+    loweredStepTexts.push(jf.loweredStepTextBlob);
 
-    checkoutDepthsByJob.set(job.id, jobFacts.checkoutDepth);
-    dockerUsageByJob.set(job.id, jobFacts.dockerUsage);
-    timeoutPresenceByJob.set(job.id, jobFacts.hasTimeout);
-    setupActionsByJob.set(job.id, jobFacts.setupActions);
+    checkoutDepthsByJob.set(job.id, jf.checkoutDepth);
+    dockerUsageByJob.set(job.id, jf.dockerUsage);
+    timeoutPresenceByJob.set(job.id, jf.hasTimeout);
+    setupActionsByJob.set(job.id, jf.setupActions);
 
     const installFamilies: string[] = [];
     for (const step of job.steps) {
@@ -275,6 +312,8 @@ export function getWorkflowFacts(
     }
     installFamiliesByJob.set(job.id, installFamilies);
   }
+
+  const triggerFacts = getTriggerFacts(wf);
 
   const facts: WorkflowFacts = {
     isHeavyWorkflow: heavyWorkflowNamePattern.test(loweredName) || hasHeavyJob,
@@ -289,6 +328,7 @@ export function getWorkflowFacts(
     timeoutPresenceByJob,
     setupActionsByJob,
     installFamiliesByJob,
+    triggerFacts,
   };
   workflowFactsCache.set(wf, facts);
   return facts;
