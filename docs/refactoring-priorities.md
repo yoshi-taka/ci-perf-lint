@@ -411,7 +411,9 @@ This keeps the next work aimed at the real growth points, not the old ones.
 
 Follow-up TODO:
 
-1. Make repository-wide file walking `.gitignore`-aware, or add one shared exclusion path for obvious build output directories such as `dist`, `build`, and `target`, so generated artifacts do not create noisy findings.
+1. Add gateAnd/gateOr/gateNot combinators back when composite gate conditions are needed (e.g., `docker-heavy AND NOT nix-shell`). Currently removed to avoid knip warnings.
+
+2. Make repository-wide file walking `.gitignore`-aware, or add one shared exclusion path for obvious build output directories such as `dist`, `build`, and `target`, so generated artifacts do not create noisy findings.
 2. Keep `missing-paths-filter` and `missing-path-ignore-for-non-code` as `suggestion`, and consider a dedicated strict-mode fallback section for high-value suggestions when strict mode would otherwise return no findings.
 3. Embedded Oxlint is now best left as two scans: `import` and `non-import`. `non-import` works well with `-A all`, but `import` (`no-restricted-imports` + `import/extensions`) still stays slow because current Oxlint behavior suppresses config-driven import rules when combined with `-A all`, even when the rules are re-enabled via CLI or config. Wait for upstream behavior change before splitting further or reworking local logic around this.
 4. Dogfooding on this repo currently uses `--workflow-only` in CI to avoid fixture-heavy repository-wide findings. A broader production-scan mode remains a possible follow-up if self-audit needs to include repository diagnostics without test fixture noise.
