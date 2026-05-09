@@ -434,3 +434,25 @@ Thresholds relaxed in `.fallowrc.json`:
 - Added `scripts/` to `ignorePatterns`
 
 Goal: ratchet thresholds back down as code improves.
+
+## 16. SignalIndex — RepositorySignal の Set 化 (保留)
+
+提案: `RepositorySignals` の `string[]` フィールドを `ReadonlySet<string>` に変換し、
+lazy WeakMap キャッシュで共有インデックスを提供する。
+
+結論: **現状は不要。時期尚早。実測上の win がゼロに近い。**
+
+唯一の O(n*m) ホットスポット:
+- `prefer-oxlint-over-eslint.ts` の `pluginNames.filter(p => !unsupportedPluginNames.includes(p))`
+- 典型的要素数: pluginNames ~50-100, unsupportedPluginNames ~5-20 → 最大 2000 比較
+- 年に数回の rule 実行では問題にならない
+
+他のアクセスパターンは全て `.length > 0` か `.join()` で O(1) か O(n)。
+
+Set 化のデメリット:
+- GC object 増加 (Set × 3 + WeakMap cache)
+- hash 生成コスト
+- small array (<16要素) は V8 で超高速、Set より速い
+
+条件: この判断を再訪するのは、あと **3箇所以上の O(n*m) hotspot** が rule/repo-diagnostic に出現したとき。
+現時点では SignalIndex アーキテクチャは overengineering に倒して負債になる。

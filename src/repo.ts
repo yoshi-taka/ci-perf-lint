@@ -304,6 +304,10 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           repoRoot,
           repository: ruleContext.repository,
           workflows: [...githubWorkflows],
+          workflowSemantics: semanticsByWorkflow as ReadonlyMap<
+            WorkflowDocument,
+            WorkflowSemantics
+          >,
           warnings: analysisWarnings,
           scanContext,
         }).then((diags) =>

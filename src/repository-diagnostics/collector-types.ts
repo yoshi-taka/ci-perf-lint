@@ -2,6 +2,7 @@ import type { AnalysisWarning, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
+import type { WorkflowSemantics } from "../rules/shared/workflow-semantics.ts";
 
 export type RepositoryDiagnosticGate =
   | "javascript-heavy"
@@ -54,6 +55,7 @@ export interface RepositoryDiagnosticContext {
   repoRoot: string;
   repository: RepositorySignals;
   workflows: WorkflowDocument[];
+  workflowSemantics: ReadonlyMap<WorkflowDocument, WorkflowSemantics>;
   warnings: AnalysisWarning[];
   scanContext: RepositoryScanContext;
 }
