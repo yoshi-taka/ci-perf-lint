@@ -6,7 +6,6 @@ import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { getNode, getScalarString } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import type { ParsedMakefile } from "./shared/makefile-parser.ts";
 import {
   parseMakefile,
   extractMakeTarget,
@@ -58,15 +57,7 @@ async function stepTargetIsInternalParallel(
   const workingDir = step.workingDirectory ?? jobWd ?? undefined;
   const dir = workingDir ? path.resolve(repoRoot, workingDir) : repoRoot;
 
-  let parsed: ParsedMakefile | null = null;
-  for (const name of ["GNUmakefile", "makefile", "Makefile"]) {
-    const fp = path.resolve(dir, name);
-    const source = await scanContext.readTextFileOrWarn(fp);
-    if (source !== undefined) {
-      parsed = parseMakefile(source);
-      break;
-    }
-  }
+  const parsed = await scanContext.parseMakefileAtDir(dir);
   if (!parsed) {
     return false;
   }

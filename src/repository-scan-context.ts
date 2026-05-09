@@ -6,6 +6,7 @@ import path from "node:path";
 import { dependencySectionsOf } from "./repository-package-helpers.ts";
 import { hasBun } from "./bun.ts";
 import type { AnalysisWarning } from "./types.ts";
+import type { ParsedMakefile } from "./rules/shared/makefile-parser.ts";
 
 interface PackageJsonEntry {
   path: string;
@@ -103,6 +104,7 @@ export class RepositoryScanContext {
   readonly #textFileLinesLoads = new LruMap<string, Promise<string[] | undefined>>(256);
   readonly #directoryEntryLoads = new LruMap<string, Promise<Dirent[]>>(4096);
   readonly #walkFileLoads = new LruMap<string, Promise<string[]>>(64);
+  readonly #parsedMakefileLoads = new LruMap<string, Promise<ParsedMakefile | null>>(64);
   #rgFileListPromise: Promise<string[] | null> | null = null;
   #filePathSet: Set<string> | null | undefined;
   static #rgPath: string | null | undefined;
@@ -222,6 +224,28 @@ export class RepositoryScanContext {
     this.#textFileLinesLoads.set(filePath, linesLoad);
 
     return linesLoad;
+  }
+
+  async parseMakefileAtDir(dirPath: string): Promise<ParsedMakefile | null> {
+    const existing = this.#parsedMakefileLoads.get(dirPath);
+    if (existing) {
+      return existing;
+    }
+
+    const parseLoad = (async () => {
+      const { parseMakefile } = await import("./rules/shared/makefile-parser.ts");
+      for (const name of ["GNUmakefile", "makefile", "Makefile"]) {
+        const fp = path.resolve(dirPath, name);
+        const source = await this.readTextFileOrWarn(fp);
+        if (source !== undefined) {
+          return parseMakefile(source);
+        }
+      }
+      return null;
+    })();
+
+    this.#parsedMakefileLoads.set(dirPath, parseLoad);
+    return parseLoad;
   }
 
   async readDirectoryEntries(dirPath: string): Promise<Dirent[]> {
@@ -539,6 +563,7 @@ export class RepositoryScanContext {
     this.#textFileLinesLoads.clear();
     this.#directoryEntryLoads.clear();
     this.#walkFileLoads.clear();
+    this.#parsedMakefileLoads.clear();
     this.#rgFileListPromise = null;
     this.#filePathSet = undefined;
   }
