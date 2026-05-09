@@ -97,17 +97,12 @@ export const deepCheckoutExcessiveDepthRule = {
         findings.push(
           pipe(
             withRepositoryShallowCheckoutPrecedent(_context, workflow.relativePath, job.id),
-            withSimilarWorkflowDeepCheckoutConsensus(
-              _context,
-              workflow.relativePath,
-              job.id,
-              {
-                scoreBonus: 5,
-                why: "That makes this look more like an outlier against the repository's usual shallow-checkout practice than a justified deep-history exception.",
-                aiHandoff:
-                  "Use similar jobs in this repository as the baseline checkout shape before keeping a deep fetch-depth for this one.",
-              },
-            ),
+            withSimilarWorkflowDeepCheckoutConsensus(_context, workflow.relativePath, job.id, {
+              scoreBonus: 5,
+              why: "That makes this look more like an outlier against the repository's usual shallow-checkout practice than a justified deep-history exception.",
+              aiHandoff:
+                "Use similar jobs in this repository as the baseline checkout shape before keeping a deep fetch-depth for this one.",
+            }),
           )(
             buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {
               message,

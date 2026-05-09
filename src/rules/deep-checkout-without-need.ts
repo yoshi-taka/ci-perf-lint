@@ -93,17 +93,12 @@ export const deepCheckoutWithoutNeedRule = {
         findings.push(
           pipe(
             withRepositoryShallowCheckoutPrecedent(_context, workflow.relativePath, job.id),
-            withSimilarWorkflowDeepCheckoutConsensus(
-              _context,
-              workflow.relativePath,
-              job.id,
-              {
-                scoreBonus: 7,
-                why: "That makes this look more like an outlier against the repository's usual shallow-checkout practice than a justified history-heavy exception.",
-                aiHandoff:
-                  "Use similar jobs in this repository as the baseline checkout shape before keeping full history for this one.",
-              },
-            ),
+            withSimilarWorkflowDeepCheckoutConsensus(_context, workflow.relativePath, job.id, {
+              scoreBonus: 7,
+              why: "That makes this look more like an outlier against the repository's usual shallow-checkout practice than a justified history-heavy exception.",
+              aiHandoff:
+                "Use similar jobs in this repository as the baseline checkout shape before keeping full history for this one.",
+            }),
           )(
             buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {
               message,

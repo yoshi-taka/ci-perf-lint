@@ -46,16 +46,12 @@ export const missingPathIgnoreForNonCodeRule = {
     return [
       pipe(
         withRepositoryNonCodeIgnorePrecedent(_context, workflow.relativePath),
-        withSimilarWorkflowNonCodeIgnoreConsensus(
-          _context,
-          workflow.relativePath,
-          {
-            scoreBonus: 5,
-            why: "That makes this look more like one repository-local exception than an intentional policy to run full CI on docs-only changes.",
-            aiHandoff:
-              "Prefer the repository's existing non-code ignore conventions over inventing a new ignore list unless this workflow has clearly different scope needs.",
-          },
-        ),
+        withSimilarWorkflowNonCodeIgnoreConsensus(_context, workflow.relativePath, {
+          scoreBonus: 5,
+          why: "That makes this look more like one repository-local exception than an intentional policy to run full CI on docs-only changes.",
+          aiHandoff:
+            "Prefer the repository's existing non-code ignore conventions over inventing a new ignore list unless this workflow has clearly different scope needs.",
+        }),
       )(
         buildDiagnostic(workflow, meta, workflow.onNode ?? workflow.nameNode, {
           message:

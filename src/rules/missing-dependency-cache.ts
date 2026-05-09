@@ -81,17 +81,12 @@ export const missingDependencyCacheRule = {
         findings.push(
           pipe(
             withRepositoryDependencyCachePrecedent(_context, workflow.relativePath, job.id),
-            withSimilarWorkflowDependencyCacheConsensus(
-              _context,
-              workflow.relativePath,
-              job.id,
-              {
-                scoreBonus: 6,
-                why: "That makes the missing cache look more like one repository-local drift point than a deliberate no-cache policy.",
-                aiHandoff:
-                  "Start from the cache configuration already used by similar jobs in this repository, then verify that it improves total wall-clock time before keeping it.",
-              },
-            ),
+            withSimilarWorkflowDependencyCacheConsensus(_context, workflow.relativePath, job.id, {
+              scoreBonus: 6,
+              why: "That makes the missing cache look more like one repository-local drift point than a deliberate no-cache policy.",
+              aiHandoff:
+                "Start from the cache configuration already used by similar jobs in this repository, then verify that it improves total wall-clock time before keeping it.",
+            }),
           )(
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
               message: `${step.uses} is used without visible dependency caching in job "${job.id}".`,

@@ -16,10 +16,7 @@ export function pipe(...transforms: DiagnosticTransform[]): DiagnosticTransform 
   return compose(...transforms);
 }
 
-export function applyIf(
-  condition: boolean,
-  transform: DiagnosticTransform,
-): DiagnosticTransform {
+export function applyIf(condition: boolean, transform: DiagnosticTransform): DiagnosticTransform {
   return condition ? transform : (d) => d;
 }
 

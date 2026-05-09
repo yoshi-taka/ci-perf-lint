@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, cp, rm } from "node:fs/promises";
+import { mkdtemp, cp, rm, stat } from "node:fs/promises";
+
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -15,13 +16,21 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   }
 }
 
+async function ensureCliBuilt(): Promise<void> {
+  const srcPath = path.join(repoRoot, "src", "cli.ts");
+  const distPath = path.join(repoRoot, "dist", "cli.js");
+
+  const srcStat = await stat(srcPath).catch(() => null);
+  const distStat = await stat(distPath).catch(() => null);
+
+  if (!srcStat || !distStat || srcStat.mtimeMs > distStat.mtimeMs) {
+    spawnSync("bun", ["run", "build"], { cwd: repoRoot, stdio: "pipe" });
+  }
+}
+
 describe("e2e: bundled CLI with oxlint", () => {
   test("detects barrel files via node dist/cli.js", async () => {
-    // ensure dist is built
-    const distCliJs = path.join(repoRoot, "dist", "cli.js");
-    if (!require("node:fs").existsSync(distCliJs)) {
-      spawnSync("bun", ["run", "build"], { cwd: repoRoot, stdio: "pipe" });
-    }
+    await ensureCliBuilt();
     await withTempDir(async (tmpDir) => {
       const fixtureDir = path.join(tmpDir, "fixture");
       const fixtureRoot = path.join(repoRoot, "test", "fixtures", "barrel-file-like");

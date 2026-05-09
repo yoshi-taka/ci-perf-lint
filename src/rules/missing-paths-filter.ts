@@ -45,16 +45,12 @@ export const missingPathsFilterRule = {
     return [
       pipe(
         withRepositoryPathsFilterPrecedent(_context, workflow.relativePath),
-        withSimilarWorkflowPathsFilterConsensus(
-          _context,
-          workflow.relativePath,
-          {
-            scoreBonus: 6,
-            why: "That makes this look more like a repository-local trigger-filter gap than a case where the workflow truly needs to run on every change.",
-            aiHandoff:
-              "Prefer the repository's existing trigger-filter patterns over inventing a new filter shape unless this workflow has clearly different scope requirements.",
-          },
-        ),
+        withSimilarWorkflowPathsFilterConsensus(_context, workflow.relativePath, {
+          scoreBonus: 6,
+          why: "That makes this look more like a repository-local trigger-filter gap than a case where the workflow truly needs to run on every change.",
+          aiHandoff:
+            "Prefer the repository's existing trigger-filter patterns over inventing a new filter shape unless this workflow has clearly different scope requirements.",
+        }),
         withStackedDiffContext(_context, {
           scoreBonus: 5,
           why: "Trigger filters can keep unrelated changes in a stack from multiplying expensive workflow runs.",

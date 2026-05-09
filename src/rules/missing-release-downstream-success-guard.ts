@@ -135,7 +135,9 @@ export const missingReleaseDownstreamSuccessGuardRule = {
       }
 
       findings.push(
-        pipe(withRepositoryReleaseDownstreamGuardPrecedent(_context, workflow.relativePath, job.id))(
+        pipe(
+          withRepositoryReleaseDownstreamGuardPrecedent(_context, workflow.relativePath, job.id),
+        )(
           buildDiagnostic(workflow, meta, job.ifNode ?? job.idNode ?? job.node, {
             severity:
               hasFailureAndCancellationGuard || !hasStatusFunction(ifText)

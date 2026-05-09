@@ -84,11 +84,21 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
       const uses = step.uses?.toLowerCase() ?? "";
 
       hasCheckout ||= uses.startsWith("actions/checkout@");
-      hasCache ||= uses.startsWith("actions/cache@") || uses.startsWith("ashleytaylor/cache-action@");
+      hasCache ||=
+        uses.startsWith("actions/cache@") || uses.startsWith("ashleytaylor/cache-action@");
 
-      hasLint ||= /\b(eslint|oxlint|prettier|actionlint|shellcheck|ruff|markdownlint|biome|yamllint|stylelint)\b/.test(text);
-      hasTest ||= /\b(test|tests|spec|jest|vitest|pytest|mocha|rspec|cargo test|go test|npm test|pnpm test|bun test)\b/.test(text);
-      hasBuild ||= /\b(npm run build|pnpm build|yarn build|bun run build|vite build|next build|turbo run build|nx build|gradle build|mvn build|cargo build|go build|dotnet build|webpack|rollup|esbuild)\b/.test(text);
+      hasLint ||=
+        /\b(eslint|oxlint|prettier|actionlint|shellcheck|ruff|markdownlint|biome|yamllint|stylelint)\b/.test(
+          text,
+        );
+      hasTest ||=
+        /\b(test|tests|spec|jest|vitest|pytest|mocha|rspec|cargo test|go test|npm test|pnpm test|bun test)\b/.test(
+          text,
+        );
+      hasBuild ||=
+        /\b(npm run build|pnpm build|yarn build|bun run build|vite build|next build|turbo run build|nx build|gradle build|mvn build|cargo build|go build|dotnet build|webpack|rollup|esbuild)\b/.test(
+          text,
+        );
 
       if (!installManager) {
         const mgr = detectInstallCommand(step);
@@ -152,7 +162,10 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
   return semantics;
 }
 
-export function getJobSemantics(workflow: WorkflowDocument, jobId: string): JobMetadata | undefined {
+export function getJobSemantics(
+  workflow: WorkflowDocument,
+  jobId: string,
+): JobMetadata | undefined {
   const semantics = buildWorkflowSemantics(workflow);
   return semantics.jobs.find((j) => j.id === jobId);
 }

@@ -62,17 +62,12 @@ export const missingTimeoutMinutesRule = {
       .map((job) =>
         pipe(
           withRepositoryTimeoutPrecedent(_context, workflow.relativePath, job.id),
-          withSimilarWorkflowTimeoutConsensus(
-            _context,
-            workflow.relativePath,
-            job.id,
-            {
-              scoreBonus: 6,
-              why: "That makes this look less like a consciously unbounded job and more like one timeout policy gap in an otherwise consistent repository.",
-              aiHandoff:
-                "Use similar jobs in this repository as the starting point for the timeout value before tuning for this job's actual wall-clock behavior.",
-            },
-          ),
+          withSimilarWorkflowTimeoutConsensus(_context, workflow.relativePath, job.id, {
+            scoreBonus: 6,
+            why: "That makes this look less like a consciously unbounded job and more like one timeout policy gap in an otherwise consistent repository.",
+            aiHandoff:
+              "Use similar jobs in this repository as the starting point for the timeout value before tuning for this job's actual wall-clock behavior.",
+          }),
         )(
           buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
             severity:
