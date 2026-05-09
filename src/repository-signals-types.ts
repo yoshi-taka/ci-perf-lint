@@ -51,6 +51,68 @@ export interface RepositorySignals {
       peerCount: number;
       peerWorkflowPaths: string[];
     }[];
+    index: {
+      concurrency: ReadonlyMap<
+        string,
+        {
+          workflowPath: string;
+          peerCount: number;
+          peerWorkflowPaths: string[];
+        }
+      >;
+      timeoutMinutes: ReadonlyMap<
+        string,
+        ReadonlyMap<
+          string,
+          {
+            workflowPath: string;
+            jobId: string;
+            peerCount: number;
+            peerJobLabels: string[];
+          }
+        >
+      >;
+      dependencyCache: ReadonlyMap<
+        string,
+        ReadonlyMap<
+          string,
+          {
+            workflowPath: string;
+            jobId: string;
+            peerCount: number;
+            peerJobLabels: string[];
+          }
+        >
+      >;
+      deepCheckout: ReadonlyMap<
+        string,
+        ReadonlyMap<
+          string,
+          {
+            workflowPath: string;
+            jobId: string;
+            peerCount: number;
+            peerJobLabels: string[];
+          }
+        >
+      >;
+      pathsFilter: ReadonlyMap<
+        string,
+        {
+          workflowPath: string;
+          peerCount: number;
+          peerWorkflowPaths: string[];
+        }
+      >;
+      nonCodeIgnore: ReadonlyMap<
+        string,
+        {
+          workflowPath: string;
+          peerCount: number;
+          peerWorkflowPaths: string[];
+        }
+      >;
+    };
   };
   repoPrecedents: RepositoryPrecedentSignals;
   eslint: {

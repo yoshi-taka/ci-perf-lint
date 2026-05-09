@@ -44,6 +44,14 @@ interface SimilarWorkflowSignals {
   deepCheckout: SimilarWorkflowTimeoutEvidence[];
   pathsFilter: SimilarWorkflowConcurrencyEvidence[];
   nonCodeIgnore: SimilarWorkflowConcurrencyEvidence[];
+  index: {
+    concurrency: ReadonlyMap<string, SimilarWorkflowConcurrencyEvidence>;
+    timeoutMinutes: ReadonlyMap<string, ReadonlyMap<string, SimilarWorkflowTimeoutEvidence>>;
+    dependencyCache: ReadonlyMap<string, ReadonlyMap<string, SimilarWorkflowTimeoutEvidence>>;
+    deepCheckout: ReadonlyMap<string, ReadonlyMap<string, SimilarWorkflowTimeoutEvidence>>;
+    pathsFilter: ReadonlyMap<string, SimilarWorkflowConcurrencyEvidence>;
+    nonCodeIgnore: ReadonlyMap<string, SimilarWorkflowConcurrencyEvidence>;
+  };
 }
 
 function countMatchingPeers<T>(
@@ -280,6 +288,31 @@ export function collectSimilarWorkflowSignals(
     }
   }
 
+  function buildWorkflowIndex(
+    entries: SimilarWorkflowConcurrencyEvidence[],
+  ): Map<string, SimilarWorkflowConcurrencyEvidence> {
+    const index = new Map<string, SimilarWorkflowConcurrencyEvidence>();
+    for (const entry of entries) {
+      index.set(entry.workflowPath, entry);
+    }
+    return index;
+  }
+
+  function buildJobIndex(
+    entries: SimilarWorkflowTimeoutEvidence[],
+  ): Map<string, Map<string, SimilarWorkflowTimeoutEvidence>> {
+    const index = new Map<string, Map<string, SimilarWorkflowTimeoutEvidence>>();
+    for (const entry of entries) {
+      let byJob = index.get(entry.workflowPath);
+      if (!byJob) {
+        byJob = new Map();
+        index.set(entry.workflowPath, byJob);
+      }
+      byJob.set(entry.jobId, entry);
+    }
+    return index;
+  }
+
   return {
     concurrency,
     timeoutMinutes,
@@ -287,6 +320,14 @@ export function collectSimilarWorkflowSignals(
     deepCheckout,
     pathsFilter,
     nonCodeIgnore,
+    index: {
+      concurrency: buildWorkflowIndex(concurrency),
+      timeoutMinutes: buildJobIndex(timeoutMinutes),
+      dependencyCache: buildJobIndex(dependencyCache),
+      deepCheckout: buildJobIndex(deepCheckout),
+      pathsFilter: buildWorkflowIndex(pathsFilter),
+      nonCodeIgnore: buildWorkflowIndex(nonCodeIgnore),
+    },
   };
 }
 

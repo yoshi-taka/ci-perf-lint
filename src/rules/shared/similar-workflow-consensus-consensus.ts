@@ -15,9 +15,7 @@ export function withSimilarWorkflowConcurrencyConsensus(
   return (diagnostic: Diagnostic) =>
     withWorkflowConsensus(
       diagnostic,
-      context.repository.similarWorkflows.concurrency.find(
-        (entry) => entry.workflowPath === workflowPath,
-      ),
+      context.repository.similarWorkflows.index.concurrency.get(workflowPath),
       adjustment,
       {
         peerText: "Similar workflows already using concurrency include",
@@ -38,9 +36,7 @@ export function withSimilarWorkflowTimeoutConsensus(
   return (diagnostic: Diagnostic) =>
     withJobConsensus(
       diagnostic,
-      context.repository.similarWorkflows.timeoutMinutes.find(
-        (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
-      ),
+      context.repository.similarWorkflows.index.timeoutMinutes.get(workflowPath)?.get(jobId),
       adjustment,
       {
         peerText: "Similar jobs already using timeout-minutes include",
@@ -61,9 +57,7 @@ export function withSimilarWorkflowDependencyCacheConsensus(
   return (diagnostic: Diagnostic) =>
     withJobConsensus(
       diagnostic,
-      context.repository.similarWorkflows.dependencyCache.find(
-        (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
-      ),
+      context.repository.similarWorkflows.index.dependencyCache.get(workflowPath)?.get(jobId),
       adjustment,
       {
         peerText: "Similar jobs already using dependency cache include",
@@ -84,9 +78,7 @@ export function withSimilarWorkflowDeepCheckoutConsensus(
   return (diagnostic: Diagnostic) =>
     withJobConsensus(
       diagnostic,
-      context.repository.similarWorkflows.deepCheckout.find(
-        (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
-      ),
+      context.repository.similarWorkflows.index.deepCheckout.get(workflowPath)?.get(jobId),
       adjustment,
       {
         peerText: "Similar jobs already using shallow checkout include",
@@ -106,9 +98,7 @@ export function withSimilarWorkflowPathsFilterConsensus(
   return (diagnostic: Diagnostic) =>
     withWorkflowConsensus(
       diagnostic,
-      context.repository.similarWorkflows.pathsFilter.find(
-        (entry) => entry.workflowPath === workflowPath,
-      ),
+      context.repository.similarWorkflows.index.pathsFilter.get(workflowPath),
       adjustment,
       {
         peerText: "Similar workflows already using trigger path filters include",
@@ -128,9 +118,7 @@ export function withSimilarWorkflowNonCodeIgnoreConsensus(
   return (diagnostic: Diagnostic) =>
     withWorkflowConsensus(
       diagnostic,
-      context.repository.similarWorkflows.nonCodeIgnore.find(
-        (entry) => entry.workflowPath === workflowPath,
-      ),
+      context.repository.similarWorkflows.index.nonCodeIgnore.get(workflowPath),
       adjustment,
       {
         peerText: "Similar workflows already ignoring obvious non-code changes include",

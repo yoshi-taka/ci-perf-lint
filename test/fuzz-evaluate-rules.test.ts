@@ -29,6 +29,14 @@ function emptySignals(): RepositorySignals {
       deepCheckout: [],
       pathsFilter: [],
       nonCodeIgnore: [],
+      index: {
+        concurrency: new Map(),
+        timeoutMinutes: new Map(),
+        dependencyCache: new Map(),
+        deepCheckout: new Map(),
+        pathsFilter: new Map(),
+        nonCodeIgnore: new Map(),
+      },
     },
     repoPrecedents: {
       concurrency: [],
