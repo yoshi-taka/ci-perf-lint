@@ -6,6 +6,21 @@ export interface GradedEvidence<T> {
   readonly signals: readonly string[];
 }
 
+export interface HeavyEvidence {
+  readonly isHeavy: boolean;
+  readonly strength: EvidenceStrength;
+  readonly reasons: readonly string[];
+  readonly matchedSignals: readonly string[];
+}
+
+export interface HeavyWorkflowEvidence {
+  readonly isHeavy: boolean;
+  readonly strength: EvidenceStrength;
+  readonly reasons: readonly string[];
+  readonly heavyJobCount: number;
+  readonly matchedJobNames: readonly string[];
+}
+
 export function strong<T>(value: T, ...signals: string[]): GradedEvidence<T> {
   return { value, strength: "strong", signals };
 }
@@ -37,4 +52,14 @@ export function meetsMinimum(
     return false;
   }
   return strengthPriority(evidence.strength) >= strengthPriority(minimum);
+}
+
+export function combineStrength(strengths: readonly EvidenceStrength[]): EvidenceStrength {
+  let best: EvidenceStrength = "weak";
+  for (const s of strengths) {
+    if (strengthPriority(s) > strengthPriority(best)) {
+      best = s;
+    }
+  }
+  return best;
 }

@@ -5,6 +5,8 @@ import type { CircleCiDocument } from "../../circleci-workflow.ts";
 import type { SetupActionKind } from "./tools.ts";
 import type { TriggerFacts } from "./trigger-facts.ts";
 import type { RunsOnSpec } from "./runs-on-facts.ts";
+import type { EvidenceStrength, HeavyEvidence, HeavyWorkflowEvidence } from "./evidence.ts";
+import { combineStrength } from "./evidence.ts";
 import { getTriggerFacts } from "./trigger-facts.ts";
 import { getStepFacts } from "./step-facts.ts";
 import { getRunsOnSpec } from "./runs-on-facts.ts";
@@ -40,6 +42,7 @@ export interface JobFacts {
   hasSetupUvStep: boolean;
   hasBuildxBake: boolean;
   isHeavyJob: boolean;
+  heavyEvidence: HeavyEvidence;
   hasDirectHeavySignals: boolean;
   hasHistoryDependentCommand: boolean;
   hasOpaqueRepoScriptExecution: boolean;
@@ -57,6 +60,7 @@ export interface JobFacts {
 
 export interface WorkflowFacts {
   isHeavyWorkflow: boolean;
+  heavyWorkflowEvidence: HeavyWorkflowEvidence;
   hasConcurrency: boolean;
   looksMetaCheckLike: boolean;
   looksAgenticLike: boolean;
@@ -111,6 +115,13 @@ const emptyTriggerFacts: TriggerFacts = {
 
 const emptyWorkflowFacts: WorkflowFacts = {
   isHeavyWorkflow: false,
+  heavyWorkflowEvidence: {
+    isHeavy: false,
+    strength: "weak",
+    reasons: [],
+    heavyJobCount: 0,
+    matchedJobNames: [],
+  },
   hasConcurrency: false,
   looksMetaCheckLike: false,
   looksAgenticLike: false,
@@ -236,13 +247,35 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     (typeof timeoutMinutes === "string" && timeoutMinutes.trim().length > 0);
 
   const loweredId = job.id.toLowerCase();
+  const jobNameMatch = heavyJobIdPattern.test(loweredId);
+  const isHeavy = jobNameMatch || hasHeavyStepSignal;
+  const heavyReasons: string[] = [];
+  const heavySignals: string[] = [];
+  const strengths: string[] = [];
+  if (hasHeavyStepSignal) {
+    heavyReasons.push("step signals detected");
+    heavySignals.push("install/build/test/lint commands");
+    strengths.push("medium");
+  }
+  if (jobNameMatch) {
+    heavyReasons.push(`job name matches heavy pattern`);
+    heavySignals.push(`jobId:${job.id}`);
+    strengths.push("weak");
+  }
+  const heavyEvidence: HeavyEvidence = {
+    isHeavy,
+    strength: combineStrength(strengths as EvidenceStrength[]),
+    reasons: heavyReasons,
+    matchedSignals: heavySignals,
+  };
   const facts: JobFacts = {
     checkoutStep,
     hasSetupBunStep: foundSetupBunStep,
     hasSetupPnpmStep: foundSetupPnpmStep,
     hasSetupUvStep: foundSetupUvStep,
     hasBuildxBake,
-    isHeavyJob: heavyJobIdPattern.test(loweredId) || hasHeavyStepSignal,
+    isHeavyJob: isHeavy,
+    heavyEvidence,
     hasDirectHeavySignals,
     hasHistoryDependentCommand,
     hasOpaqueRepoScriptExecution,
@@ -334,8 +367,39 @@ export function getWorkflowFacts(
   const hasPushTags = triggerFacts.push.hasTags || triggerFacts.push.hasTagsIgnore;
   const looksReleaseLike = wfNameLooksRelease || hasPushTags;
 
+  const wfNameHeavy = heavyWorkflowNamePattern.test(loweredName);
+  const heavyJobNames: string[] = [];
+  let heavyJobCount = 0;
+  for (const job of wf.jobs) {
+    const jf = getJobFacts(job);
+    if (jf.isHeavyJob) {
+      heavyJobCount++;
+      heavyJobNames.push(job.id);
+    }
+  }
+  const wfHeavyReasons: string[] = [];
+  const wfHeavySignals: string[] = [];
+  const wfHeavyStrengths: string[] = [];
+  if (heavyJobCount > 0) {
+    wfHeavyReasons.push(`${heavyJobCount} heavy job(s)`);
+    wfHeavySignals.push(...heavyJobNames);
+    wfHeavyStrengths.push("medium");
+  }
+  if (wfNameHeavy) {
+    wfHeavyReasons.push("workflow name matches heavy pattern");
+    wfHeavySignals.push(`name:${wf.name}`);
+    wfHeavyStrengths.push("weak");
+  }
+
   const facts: WorkflowFacts = {
-    isHeavyWorkflow: heavyWorkflowNamePattern.test(loweredName) || hasHeavyJob,
+    isHeavyWorkflow: wfNameHeavy || hasHeavyJob,
+    heavyWorkflowEvidence: {
+      isHeavy: wfNameHeavy || hasHeavyJob,
+      strength: combineStrength(wfHeavyStrengths as EvidenceStrength[]),
+      reasons: wfHeavyReasons,
+      heavyJobCount,
+      matchedJobNames: heavyJobNames,
+    },
     hasConcurrency: Boolean(wf.concurrencyNode) || hasJobConcurrency,
     looksMetaCheckLike: metaCheckWorkflowNamePattern.test(loweredName) || hasMetaCheckJob,
     looksAgenticLike: agenticWorkflowNamePattern.test(loweredName) || hasAgenticJob,
