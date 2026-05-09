@@ -1,10 +1,8 @@
 import path from "node:path";
 import type { AnalysisWarning, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
-  collectDockerBuildTargets,
   collectDockerfileData,
   type DockerBuildTarget,
   normalizeRelativePath,
@@ -75,12 +73,11 @@ async function looksLikeRelevantBuildContext(
 export async function collectDockerignoreDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
-  workflows: WorkflowDocument[],
+  targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const targets = await collectDockerBuildTargets(repoRoot, workflows, warnings, scanContext);
   const diagnostics: Diagnostic[] = [];
 
   for (const target of targets) {
@@ -184,12 +181,11 @@ export async function collectDockerignoreDiagnostics(
 export async function collectDockerfileCopyOrderDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
-  workflows: WorkflowDocument[],
+  targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const targets = await collectDockerBuildTargets(repoRoot, workflows, warnings, scanContext);
   const diagnostics: Diagnostic[] = [];
   const seenDockerfiles = new Set<string>();
 
@@ -259,12 +255,11 @@ export async function collectDockerfileCopyOrderDiagnostics(
 export async function collectDockerfileCopyLinkDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
-  workflows: WorkflowDocument[],
+  targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const targets = await collectDockerBuildTargets(repoRoot, workflows, warnings, scanContext);
   const diagnostics: Diagnostic[] = [];
   const seenDockerfiles = new Set<string>();
 

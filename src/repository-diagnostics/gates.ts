@@ -1,4 +1,3 @@
-import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type {
   GatePredicate,
@@ -11,12 +10,6 @@ import {
   looksLikeRustRepository,
   repositoryLooksLargeFilesHeavy,
   repositoryLooksPytestHeavy,
-  workflowLooksDatadogHeavy,
-  workflowLooksDockerBuildHeavy,
-  workflowLooksElixirHeavy,
-  workflowLooksJavaScriptHeavy,
-  workflowLooksPythonHeavy,
-  workflowLooksTerraformHeavy,
 } from "./imports-shared.ts";
 import { meetsMinimum } from "../rules/shared/evidence.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
@@ -96,8 +89,7 @@ export function collectorGateMatches(
 }
 
 function collectSignalGateState(
-  workflows: WorkflowDocument[],
-  featureIndex?: RepositoryFeatureIndex,
+  featureIndex: RepositoryFeatureIndex,
 ): Pick<
   RepositoryDiagnosticGateState,
   | "hasJavaScriptHeavyWorkflow"
@@ -107,74 +99,13 @@ function collectSignalGateState(
   | "hasPythonHeavyWorkflow"
   | "hasElixirHeavyWorkflow"
 > {
-  if (featureIndex) {
-    return {
-      hasJavaScriptHeavyWorkflow: featureIndex.ecosystems.has("javascript"),
-      hasDockerHeavyWorkflow: featureIndex.ecosystems.has("docker"),
-      hasTerraformHeavyWorkflow: featureIndex.ecosystems.has("terraform"),
-      hasDatadogHeavyWorkflow: featureIndex.ecosystems.has("datadog"),
-      hasPythonHeavyWorkflow: featureIndex.ecosystems.has("python"),
-      hasElixirHeavyWorkflow: featureIndex.ecosystems.has("elixir"),
-    };
-  }
-
-  let hasJavaScriptHeavyWorkflow = false;
-  let hasDockerHeavyWorkflow = false;
-  let hasTerraformHeavyWorkflow = false;
-  let hasDatadogHeavyWorkflow = false;
-  let hasPythonHeavyWorkflow = false;
-  let hasElixirHeavyWorkflow = false;
-
-  for (const workflow of workflows) {
-    if (!hasJavaScriptHeavyWorkflow) {
-      const jsEvidence = workflowLooksJavaScriptHeavy(workflow);
-      hasJavaScriptHeavyWorkflow = meetsMinimum(jsEvidence, "medium");
-    }
-
-    if (!hasDockerHeavyWorkflow) {
-      const dockerEvidence = workflowLooksDockerBuildHeavy(workflow);
-      hasDockerHeavyWorkflow = meetsMinimum(dockerEvidence, "medium");
-    }
-
-    if (!hasTerraformHeavyWorkflow) {
-      const tfEvidence = workflowLooksTerraformHeavy(workflow);
-      hasTerraformHeavyWorkflow = meetsMinimum(tfEvidence, "medium");
-    }
-
-    if (!hasDatadogHeavyWorkflow) {
-      const ddEvidence = workflowLooksDatadogHeavy(workflow);
-      hasDatadogHeavyWorkflow = meetsMinimum(ddEvidence, "medium");
-    }
-
-    if (!hasPythonHeavyWorkflow) {
-      const pyEvidence = workflowLooksPythonHeavy(workflow);
-      hasPythonHeavyWorkflow = meetsMinimum(pyEvidence, "medium");
-    }
-
-    if (!hasElixirHeavyWorkflow) {
-      const elixirEvidence = workflowLooksElixirHeavy(workflow);
-      hasElixirHeavyWorkflow = meetsMinimum(elixirEvidence, "medium");
-    }
-
-    if (
-      hasJavaScriptHeavyWorkflow &&
-      hasDockerHeavyWorkflow &&
-      hasTerraformHeavyWorkflow &&
-      hasDatadogHeavyWorkflow &&
-      hasPythonHeavyWorkflow &&
-      hasElixirHeavyWorkflow
-    ) {
-      break;
-    }
-  }
-
   return {
-    hasJavaScriptHeavyWorkflow,
-    hasDockerHeavyWorkflow,
-    hasTerraformHeavyWorkflow,
-    hasDatadogHeavyWorkflow,
-    hasPythonHeavyWorkflow,
-    hasElixirHeavyWorkflow,
+    hasJavaScriptHeavyWorkflow: featureIndex.ecosystems.has("javascript"),
+    hasDockerHeavyWorkflow: featureIndex.ecosystems.has("docker"),
+    hasTerraformHeavyWorkflow: featureIndex.ecosystems.has("terraform"),
+    hasDatadogHeavyWorkflow: featureIndex.ecosystems.has("datadog"),
+    hasPythonHeavyWorkflow: featureIndex.ecosystems.has("python"),
+    hasElixirHeavyWorkflow: featureIndex.ecosystems.has("elixir"),
   };
 }
 
@@ -308,7 +239,7 @@ export async function collectRepositoryDiagnosticGateState(
 ): Promise<RepositoryDiagnosticGateState> {
   const state: RepositoryDiagnosticGateState = { ...emptyGateState };
 
-  const signalGates = collectSignalGateState(context.workflows, context.featureIndex);
+  const signalGates = collectSignalGateState(context.featureIndex);
   Object.assign(state, signalGates);
 
   const hasTooling = quickTestJavaScriptTooling(context);

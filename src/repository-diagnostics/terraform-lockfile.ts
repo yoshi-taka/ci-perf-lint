@@ -2,7 +2,7 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import type { WorkflowDocument } from "../workflow.ts";
+import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 
 const meta = {
   id: "terraform-lockfile-missing",
@@ -14,16 +14,11 @@ const meta = {
 export async function collectTerraformLockfileDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
-  workflows: WorkflowDocument[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
+  featureIndex?: RepositoryFeatureIndex,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const primaryWorkflow = workflows.find((w) => w.relativePath === repository.primaryWorkflowPath);
-  const targetWorkflow = primaryWorkflow ?? workflows[0];
-  if (!targetWorkflow) {
-    return [];
-  }
 
   const lockFiles: string[] = [];
   for await (const relativePath of context.walkFilesIter(".", {
@@ -37,25 +32,19 @@ export async function collectTerraformLockfileDiagnostics(
     return [];
   }
 
-  const terraformWorkflow = workflows.find((w) =>
-    w.jobs.some((job) =>
-      job.steps.some((step) => {
-        const run = step.run ?? "";
-        const name = step.name ?? "";
-        const text = `${name} ${run}`.toLowerCase();
-        return /\bterraform\s+init\b/.test(text);
-      }),
-    ),
-  );
+  const terraformWorkflows = featureIndex?.workflowsWithEcosystem("terraform") ?? [];
+  const primaryWorkflow =
+    terraformWorkflows.find((w) => w.relativePath === repository.primaryWorkflowPath) ??
+    terraformWorkflows[0];
 
-  if (!terraformWorkflow) {
+  if (!primaryWorkflow) {
     return [];
   }
 
   return [
     buildRepositoryDiagnostic(repository, meta, {
       location: {
-        path: terraformWorkflow.relativePath,
+        path: primaryWorkflow.relativePath,
         line: 1,
         column: 1,
       },
@@ -66,7 +55,7 @@ export async function collectTerraformLockfileDiagnostics(
         "Run 'terraform init' locally or via CI to generate .terraform.lock.hcl, commit it, then add CI platform hashes: 'terraform providers lock -platform=linux_amd64 -platform=linux_arm64'. Commit the updated lock file.",
       measurementHint:
         "After committing the lock file, verify that provider versions are consistent between local and CI runs.",
-      aiHandoff: `Commit .terraform.lock.hcl and ensure it includes CI platform hashes (linux_amd64, linux_arm64) via 'terraform providers lock'. Then update ${terraformWorkflow.relativePath} to use provider caching keyed on hashFiles('**/.terraform.lock.hcl').`,
+      aiHandoff: `Commit .terraform.lock.hcl and ensure it includes CI platform hashes (linux_amd64, linux_arm64) via 'terraform providers lock'. Then update ${primaryWorkflow.relativePath} to use provider caching keyed on hashFiles('**/.terraform.lock.hcl').`,
       score: 70,
     }),
   ];

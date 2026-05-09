@@ -18,8 +18,8 @@ export const largeFileDiagnosticCollectors = [
   {
     id: "detected-large-files",
     gate: gates.largeFiles,
-    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
-      collectLargeFileDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+    collect: ({ repoRoot, repository, warnings, scanContext, featureIndex }) =>
+      collectLargeFileDiagnostics(repoRoot, repository, warnings, scanContext, featureIndex),
   },
 ] satisfies readonly RepositoryDiagnosticCollector[];
 

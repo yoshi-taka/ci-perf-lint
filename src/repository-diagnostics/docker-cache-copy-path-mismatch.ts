@@ -1,10 +1,9 @@
 import path from "node:path";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import { collectDockerBuildTargets, collectDockerfileData } from "./docker-build-targets.ts";
+import { collectDockerfileData, type DockerBuildTarget } from "./docker-build-targets.ts";
 
 const meta = {
   id: "docker-cache-copy-path-mismatch",
@@ -42,55 +41,24 @@ function lookupCandidates(source: string): string[] | undefined {
   return GRADLE_MAVEN_FILES.get(basename);
 }
 
-async function findDockerfiles(
+export async function collectDockerCacheCopyPathMismatchDiagnostics(
   repoRoot: string,
-  workflows: WorkflowDocument[],
+  repository: RepositorySignals,
+  targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
-): Promise<
-  {
-    dockerfilePath: string;
-    contextPath: string;
-    workflowPath: string;
-  }[]
-> {
-  const targets = await collectDockerBuildTargets(repoRoot, workflows, warnings, scanContext);
+): Promise<Diagnostic[]> {
+  const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
+  const diagnostics: Diagnostic[] = [];
   const seen = new Set<string>();
-  const result: {
-    dockerfilePath: string;
-    contextPath: string;
-    workflowPath: string;
-  }[] = [];
 
   for (const target of targets) {
     if (seen.has(target.dockerfilePath)) {
       continue;
     }
     seen.add(target.dockerfilePath);
-    result.push({
-      dockerfilePath: target.dockerfilePath,
-      contextPath: target.contextPath,
-      workflowPath: target.workflow,
-    });
-  }
 
-  return result;
-}
-
-export async function collectDockerCacheCopyPathMismatchDiagnostics(
-  repoRoot: string,
-  repository: RepositorySignals,
-  workflows: WorkflowDocument[],
-  warnings?: AnalysisWarning[],
-  scanContext?: RepositoryScanContext,
-): Promise<Diagnostic[]> {
-  const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const diagnostics: Diagnostic[] = [];
-
-  const dockerfiles = await findDockerfiles(repoRoot, workflows, warnings, scanContext);
-
-  for (const { dockerfilePath, contextPath } of dockerfiles) {
-    const data = await collectDockerfileData(context, dockerfilePath);
+    const data = await collectDockerfileData(context, target.dockerfilePath);
     if (!data) {
       continue;
     }
@@ -110,7 +78,7 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
         continue;
       }
 
-      const sourceFound = await context.pathExists(path.join(contextPath, source));
+      const sourceFound = await context.pathExists(path.join(target.contextPath, source));
       if (sourceFound) {
         continue;
       }
@@ -119,7 +87,7 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
       const matches: string[] = [];
       for (const alt of candidates) {
         const altPath = dir === "." ? alt : path.join(dir, alt);
-        if (await context.pathExists(path.join(contextPath, altPath))) {
+        if (await context.pathExists(path.join(target.contextPath, altPath))) {
           matches.push(altPath);
         }
       }
@@ -130,7 +98,7 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
       diagnostics.push(
         buildRepositoryDiagnostic(repository, meta, {
           location: {
-            path: dockerfilePath,
+            path: target.dockerfilePath,
             line: instruction.startLine,
             column: 1,
           },
@@ -139,7 +107,7 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
           suggestion: `Update the COPY path to match the actual file: ${matches.join(" or ")}.`,
           measurementHint:
             "Verify the Docker build cache layer is being reused by rebuilding after a clean cache and checking buildkit cache hits.",
-          aiHandoff: `Review the COPY instruction at ${dockerfilePath}:${instruction.startLine}. The file ${source} does not exist in the repository${
+          aiHandoff: `Review the COPY instruction at ${target.dockerfilePath}:${instruction.startLine}. The file ${source} does not exist in the repository${
             matches.length > 0 ? `; found ${matches.join(" or ")} instead` : ""
           }. Update the COPY path to match the actual filename, or adjust the repository layout if the file is expected to be generated earlier in the build.`,
           score: 65,

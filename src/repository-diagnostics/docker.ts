@@ -1,7 +1,8 @@
 import type { AnalysisWarning, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
+import type { WorkflowDocument } from "../workflow.ts";
+import { collectDockerBuildTargets } from "./docker-build-targets.ts";
 import { collectDockerCacheCopyPathMismatchDiagnostics } from "./docker-cache-copy-path-mismatch.ts";
 import {
   collectDockerfileCopyLinkDiagnostics,
@@ -20,16 +21,17 @@ export async function collectDockerBuildDiagnostics(
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
+  const targets = await collectDockerBuildTargets(repoRoot, workflows, warnings, scanContext);
   const results = await Promise.allSettled([
-    collectDockerignoreDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
-    collectDockerfileCopyOrderDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
-    collectDockerfileCopyLinkDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
-    collectDockerfileImageSizeDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
-    collectNodeDockerfileInstallDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+    collectDockerignoreDiagnostics(repoRoot, repository, targets, warnings, scanContext),
+    collectDockerfileCopyOrderDiagnostics(repoRoot, repository, targets, warnings, scanContext),
+    collectDockerfileCopyLinkDiagnostics(repoRoot, repository, targets, warnings, scanContext),
+    collectDockerfileImageSizeDiagnostics(repoRoot, repository, targets, warnings, scanContext),
+    collectNodeDockerfileInstallDiagnostics(repoRoot, repository, targets, warnings, scanContext),
     collectDockerCacheCopyPathMismatchDiagnostics(
       repoRoot,
       repository,
-      workflows,
+      targets,
       warnings,
       scanContext,
     ),

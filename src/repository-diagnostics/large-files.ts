@@ -3,9 +3,9 @@ import { spawn } from "node:child_process";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
-import type { WorkflowDocument } from "../workflow.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import { rootOnlyArtifactDirs, subdirArtifactDirs } from "./waste-patterns.ts";
+import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 
 const meta = {
   id: "detected-large-files",
@@ -91,10 +91,6 @@ interface ScannedFile {
   isCsvData: boolean;
 }
 
-function anyWorkflowHasSparseCheckout(workflows: WorkflowDocument[]): boolean {
-  return workflows.some((w) => w.source?.includes("sparse-checkout") ?? false);
-}
-
 const gitTrackedFilesCache = new Map<string, Promise<string[] | null>>();
 
 async function getGitTrackedFiles(repoRoot: string): Promise<string[] | null> {
@@ -127,9 +123,9 @@ async function getGitTrackedFiles(repoRoot: string): Promise<string[] | null> {
 export async function collectLargeFileDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
-  workflows: WorkflowDocument[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
+  featureIndex?: RepositoryFeatureIndex,
 ): Promise<Diagnostic[]> {
   const ctx = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
 
@@ -197,7 +193,8 @@ export async function collectLargeFileDiagnostics(
   const top5 = sorted.slice(0, 5);
   const top5List = top5.map((f) => `${f.path} (${formatSize(f.size)})`).join(", ");
 
-  const hasSparseCheckout = anyWorkflowHasSparseCheckout(workflows);
+  const hasSparseCheckout =
+    (featureIndex?.workflowsMatchingSource(/sparse-checkout/i) ?? []).length > 0;
   const parts: string[] = [];
 
   if (csvDataTotal > 0) {

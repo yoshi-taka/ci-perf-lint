@@ -1,10 +1,9 @@
 import type { AnalysisWarning, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
-  collectDockerBuildTargets,
   collectDockerfileData,
+  type DockerBuildTarget,
   normalizeRelativePath,
 } from "./docker-build-targets.ts";
 import { collectDockerfileStageAliases } from "./dockerfile-instructions.ts";
@@ -25,12 +24,11 @@ import { collectDockerInstallCacheMountDiagnostics } from "./docker-install-cach
 export async function collectDockerfileImageSizeDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
-  workflows: WorkflowDocument[],
+  targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const targets = await collectDockerBuildTargets(repoRoot, workflows, warnings, scanContext);
   const diagnostics: Diagnostic[] = [];
   const seenDockerfiles = new Set<string>();
 
@@ -77,12 +75,11 @@ export async function collectDockerfileImageSizeDiagnostics(
 export async function collectNodeDockerfileInstallDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
-  workflows: WorkflowDocument[],
+  targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const targets = await collectDockerBuildTargets(repoRoot, workflows, warnings, scanContext);
   const diagnostics: Diagnostic[] = [];
   const seenDockerfiles = new Set<string>();
 
