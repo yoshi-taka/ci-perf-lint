@@ -20,6 +20,36 @@ import {
 } from "./imports-shared.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 
+type GateKey = keyof RepositoryDiagnosticGateState;
+
+const gatePrerequisites: Partial<Record<GateKey, GateKey[]>> = {
+  hasJavaScriptLinting: ["hasJavaScriptTooling"],
+  hasJavaScriptBuildConfig: ["hasJavaScriptTooling"],
+  hasJavaScriptPackageScripts: ["hasJavaScriptTooling"],
+  hasJavaScriptFrameworks: ["hasJavaScriptTooling"],
+};
+
+const emptyGateState: RepositoryDiagnosticGateState = {
+  hasJavaScriptHeavyWorkflow: false,
+  hasJavaScriptTooling: false,
+  hasJavaScriptLinting: false,
+  hasJavaScriptBuildConfig: false,
+  hasJavaScriptPackageScripts: false,
+  hasDockerHeavyWorkflow: false,
+  hasTerraformHeavyWorkflow: false,
+  hasLargeFiles: false,
+  hasDatadogHeavyWorkflow: false,
+  hasPytest: false,
+  hasPythonHeavyWorkflow: false,
+  hasRenovateConfig: false,
+  hasHusky: false,
+  hasJavaScriptFrameworks: false,
+  hasRust: false,
+  hasCdkManifest: false,
+  hasElixirHeavyWorkflow: false,
+  hasGradle: false,
+};
+
 function timingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
 }
@@ -256,52 +286,115 @@ function quickTestRust(context: RepositoryDiagnosticContext): boolean | undefine
 export async function collectRepositoryDiagnosticGateState(
   context: RepositoryDiagnosticContext,
 ): Promise<RepositoryDiagnosticGateState> {
+  const state: RepositoryDiagnosticGateState = { ...emptyGateState };
+
   const signalGates = collectSignalGateState(context.workflows);
-  const [
-    hasLargeFiles,
-    hasPytest,
-    hasRenovateConfig,
-    hasJavaScriptTooling,
-    hasJavaScriptBuildConfigEvidence,
-    hasJavaScriptPackageScriptEvidence,
-    hasJavaScriptFrameworks,
-    hasRust,
-    hasCdkManifest,
-  ] = await Promise.all([
+  Object.assign(state, signalGates);
+
+  const hasTooling = quickTestJavaScriptTooling(context);
+  const hasFrameworks = quickTestJavaScriptFrameworks(context);
+  const hasRustQuick = quickTestRust(context);
+
+  if (hasTooling !== undefined) {
+    state.hasJavaScriptTooling = hasTooling;
+  }
+  if (hasFrameworks !== undefined) {
+    state.hasJavaScriptFrameworks = hasFrameworks;
+  }
+  if (hasRustQuick !== undefined) {
+    state.hasRust = hasRustQuick;
+  }
+
+  const [hasLargeFiles, hasPytest, hasRenovateConfig, hasCdkManifest] = await Promise.all([
     timedGate("large-files", () => repositoryLooksLargeFilesHeavy(context.scanContext)),
     timedGate("pytest", () => repositoryLooksPytestHeavy(context.scanContext, context.workflows)),
     timedGate("renovate", () => repositoryHasRenovateConfig(context.scanContext)),
-    quickTestJavaScriptTooling(context) !== undefined
-      ? Promise.resolve(quickTestJavaScriptTooling(context)!)
-      : timedGate("javascript-tooling", () => looksLikeJavaScriptRepository(context.scanContext)),
-    repositoryHasJavaScriptBuildConfigEvidence(context.scanContext),
-    repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
-    quickTestJavaScriptFrameworks(context) !== undefined
-      ? Promise.resolve(quickTestJavaScriptFrameworks(context)!)
-      : timedGate("javascript-frameworks", () =>
-          looksLikeJavaScriptFrameworksRepository(context.scanContext),
-        ),
-    quickTestRust(context) !== undefined
-      ? Promise.resolve(quickTestRust(context)!)
-      : timedGate("rust", () => looksLikeRustRepository(context.scanContext)),
     timedGate("cdk-manifest", () => repositoryHasCdkManifest(context.scanContext)),
   ]);
+  state.hasLargeFiles = hasLargeFiles;
+  state.hasPytest = hasPytest;
+  state.hasRenovateConfig = hasRenovateConfig;
+  state.hasCdkManifest = hasCdkManifest;
 
-  return {
-    ...signalGates,
-    hasLargeFiles,
-    hasPytest,
-    hasRenovateConfig,
-    hasHusky: context.repository.husky.hookFileCount > 0,
-    hasJavaScriptTooling,
-    hasJavaScriptLinting: repositoryLikelyUsesJavaScriptLinting(context),
-    hasJavaScriptBuildConfig:
-      repositoryLikelyUsesJavaScriptBuildConfig(context) || hasJavaScriptBuildConfigEvidence,
-    hasJavaScriptPackageScripts:
-      repositoryLikelyUsesJavaScriptPackageScripts(context) || hasJavaScriptPackageScriptEvidence,
-    hasJavaScriptFrameworks,
-    hasRust,
-    hasCdkManifest,
-    hasGradle: context.repository.frameworks.usesGradle,
-  };
+  state.hasHusky = context.repository.husky.hookFileCount > 0;
+  state.hasGradle = context.repository.frameworks.usesGradle;
+
+  const jsToolingGate = await evaluateGate(
+    "hasJavaScriptTooling",
+    [() => quickTestJavaScriptTooling(context)],
+    () => timedGate("javascript-tooling", () => looksLikeJavaScriptRepository(context.scanContext)),
+    state,
+  );
+  if (jsToolingGate !== undefined) {
+    state.hasJavaScriptTooling = jsToolingGate;
+  }
+
+  const jsBuildConfigEvidence = state.hasJavaScriptTooling
+    ? await repositoryHasJavaScriptBuildConfigEvidence(context.scanContext)
+    : false;
+  const jsPackageScriptEvidence = state.hasJavaScriptTooling
+    ? await repositoryHasJavaScriptPackageScriptEvidence(context.scanContext)
+    : false;
+
+  state.hasJavaScriptLinting = state.hasJavaScriptTooling
+    ? repositoryLikelyUsesJavaScriptLinting(context)
+    : false;
+  state.hasJavaScriptBuildConfig = state.hasJavaScriptTooling
+    ? repositoryLikelyUsesJavaScriptBuildConfig(context) || jsBuildConfigEvidence
+    : false;
+  state.hasJavaScriptPackageScripts = state.hasJavaScriptTooling
+    ? repositoryLikelyUsesJavaScriptPackageScripts(context) || jsPackageScriptEvidence
+    : false;
+
+  const jsFrameworksGate = await evaluateGate(
+    "hasJavaScriptFrameworks",
+    [() => quickTestJavaScriptFrameworks(context)],
+    () =>
+      timedGate("javascript-frameworks", () =>
+        looksLikeJavaScriptFrameworksRepository(context.scanContext),
+      ),
+    state,
+  );
+  if (jsFrameworksGate !== undefined && state.hasJavaScriptTooling) {
+    state.hasJavaScriptFrameworks = jsFrameworksGate;
+  } else if (!state.hasJavaScriptTooling) {
+    state.hasJavaScriptFrameworks = false;
+  }
+
+  const rustGate = await evaluateGate(
+    "hasRust",
+    [() => quickTestRust(context)],
+    () => timedGate("rust", () => looksLikeRustRepository(context.scanContext)),
+    state,
+  );
+  if (rustGate !== undefined) {
+    state.hasRust = rustGate;
+  }
+
+  return state;
+}
+
+async function evaluateGate(
+  key: GateKey,
+  quickTests: (() => boolean | undefined)[],
+  expensiveEval: () => Promise<boolean>,
+  state: RepositoryDiagnosticGateState,
+): Promise<boolean | undefined> {
+  const prereqs = gatePrerequisites[key];
+  if (prereqs) {
+    for (const prereq of prereqs) {
+      if (!state[prereq]) {
+        return false;
+      }
+    }
+  }
+
+  for (const test of quickTests) {
+    const result = test();
+    if (result !== undefined) {
+      return result;
+    }
+  }
+
+  return expensiveEval();
 }
