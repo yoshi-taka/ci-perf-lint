@@ -35,7 +35,7 @@
     "test:slow:mutation:core": "stryker run stryker/stryker.core.config.mjs",
     "test:slow:mutation:repo": "stryker run stryker/stryker.repo.config.mjs",
     "test:slow:mutation:renderer": "stryker run stryker/stryker.renderer.config.mjs",
-    "lint": "oxlint --type-aware --type-check src test",
+    "lint": "oxfmt --write src test/*.ts scripts/*.ts && oxlint --type-aware --type-check --fix src test",
     "format": "oxfmt --write src test/*.ts scripts/*.ts",
     "format:check": "oxfmt --check src test/*.ts scripts/*.ts",
     "build": "bun build ./src/cli.ts --outdir ./dist --target node --external yaml --external dockerfile-ast --external oxlint",
