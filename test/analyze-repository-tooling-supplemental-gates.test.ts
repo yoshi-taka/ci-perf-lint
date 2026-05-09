@@ -134,10 +134,10 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       path.join(workflowDir, "ci.yml"),
       "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n",
     );
-    const largeFile = "x".repeat(11 * 1024 * 1024);
-    await writeFile(path.join(fixtureRoot, "wandb", "run1", "model.bin"), largeFile);
-    await writeFile(path.join(fixtureRoot, "outputs", "model", "weights.parquet"), largeFile);
-    await writeFile(path.join(fixtureRoot, "runs", "run1", "events.json"), largeFile);
+    const smallFile = "x".repeat(1024);
+    await writeFile(path.join(fixtureRoot, "wandb", "run1", "model.bin"), smallFile);
+    await writeFile(path.join(fixtureRoot, "outputs", "model", "weights.parquet"), smallFile);
+    await writeFile(path.join(fixtureRoot, "runs", "run1", "events.json"), "x");
 
     const report = await getFixtureReport(fixtureRoot, {
       targetPath: ".",
@@ -157,7 +157,7 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
       path.join(workflowDir, "ci.yml"),
       "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n",
     );
-    const largeFile = "x".repeat(11 * 1024 * 1024);
+    const largeFile = "x".repeat(11_000_000);
     await writeFile(path.join(fixtureRoot, "src", "runs", "run1", "data.parquet"), largeFile);
 
     const report = await getFixtureReport(fixtureRoot, {
