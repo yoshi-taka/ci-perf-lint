@@ -4,11 +4,7 @@ import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import type { YAMLMap } from "yaml";
 import { getScalarValue } from "../workflow.ts";
 import { isHeavyJob } from "./shared/workflow-jobs.ts";
-import {
-  workflowHasBranchPushTrigger,
-  workflowHasPullRequestTrigger,
-  workflowHasTagOnlyPushTrigger,
-} from "./shared/workflow-triggers.ts";
+import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 
 function isYamlMap(node: unknown): node is YAMLMap<unknown, unknown> {
@@ -42,10 +38,9 @@ function looksComponentScoped(job: WorkflowJob): boolean {
 export const preferDornyPathsFilterForScopedJobsRule = {
   meta,
   check(workflow: WorkflowDocument, context: RuleContext) {
-    const hasPullRequest = workflowHasPullRequestTrigger(workflow);
-    const hasBranchPush = workflowHasBranchPushTrigger(workflow);
+    const ts = getTriggerSemantics(workflow);
 
-    if ((!hasPullRequest && !hasBranchPush) || workflowHasTagOnlyPushTrigger(workflow)) {
+    if ((!ts.hasPullRequest && !ts.hasBranchPush) || ts.hasTagOnlyPush) {
       return [];
     }
 

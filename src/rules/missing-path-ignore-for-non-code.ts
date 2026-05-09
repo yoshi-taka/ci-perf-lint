@@ -2,13 +2,7 @@ import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { isHeavyWorkflow, workflowLooksMetaCheckLike } from "./shared/workflow-jobs.ts";
-import {
-  workflowHasBranchPushTrigger,
-  workflowHasNonCodeIgnore,
-  workflowHasPullRequestTrigger,
-  workflowHasTagOnlyPushTrigger,
-  workflowHasTriggerPathFilter,
-} from "./shared/workflow-triggers.ts";
+import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import {
@@ -27,17 +21,16 @@ export const missingPathIgnoreForNonCodeRule = {
   meta,
   nodeTypes: ["trigger"],
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    const hasPullRequest = workflowHasPullRequestTrigger(workflow);
-    const hasBranchPush = workflowHasBranchPushTrigger(workflow);
+    const ts = getTriggerSemantics(workflow);
 
-    if ((!hasPullRequest && !hasBranchPush) || workflowHasTagOnlyPushTrigger(workflow)) {
+    if ((!ts.hasPullRequest && !ts.hasBranchPush) || ts.hasTagOnlyPush) {
       return [];
     }
 
     if (
       !isHeavyWorkflow(workflow) ||
-      workflowHasNonCodeIgnore(workflow) ||
-      workflowHasTriggerPathFilter(workflow) ||
+      ts.hasNonCodeIgnore ||
+      ts.hasTriggerPathFilter ||
       workflowLooksMetaCheckLike(workflow)
     ) {
       return [];

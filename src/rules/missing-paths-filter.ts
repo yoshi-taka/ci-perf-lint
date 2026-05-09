@@ -6,12 +6,7 @@ import {
   withRepositoryPathsFilterPrecedent,
   withSimilarWorkflowPathsFilterConsensus,
 } from "./shared/similar-workflow-consensus.ts";
-import {
-  workflowHasBranchPushTrigger,
-  workflowHasPullRequestTrigger,
-  workflowHasTagOnlyPushTrigger,
-  workflowHasTriggerPathFilter,
-} from "./shared/workflow-triggers.ts";
+import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
@@ -27,16 +22,15 @@ export const missingPathsFilterRule = {
   meta,
   nodeTypes: ["trigger"],
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    const hasPullRequest = workflowHasPullRequestTrigger(workflow);
-    const hasBranchPush = workflowHasBranchPushTrigger(workflow);
+    const ts = getTriggerSemantics(workflow);
 
-    if ((!hasPullRequest && !hasBranchPush) || workflowHasTagOnlyPushTrigger(workflow)) {
+    if ((!ts.hasPullRequest && !ts.hasBranchPush) || ts.hasTagOnlyPush) {
       return [];
     }
 
     if (
       !isHeavyWorkflow(workflow) ||
-      workflowHasTriggerPathFilter(workflow) ||
+      ts.hasTriggerPathFilter ||
       workflowLooksMetaCheckLike(workflow)
     ) {
       return [];

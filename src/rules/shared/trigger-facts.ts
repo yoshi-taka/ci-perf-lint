@@ -1,5 +1,17 @@
 import type { WorkflowDocument } from "../../workflow.ts";
 
+export type ActivationSurface =
+  | "push"
+  | "pr"
+  | "push_and_pr"
+  | "manual"
+  | "schedule"
+  | "tag_push"
+  | "workflow_call"
+  | "workflow_run"
+  | "composite"
+  | "unknown";
+
 export interface TriggerFacts {
   readonly events: ReadonlySet<string>;
   readonly hasPush: boolean;
@@ -15,6 +27,7 @@ export interface TriggerFacts {
   readonly hasTriggerPathFilter: boolean;
   readonly hasNonCodeIgnore: boolean;
   readonly scheduleCrons: readonly string[];
+  readonly activationSurface: ActivationSurface;
 }
 
 export interface PushTriggerFacts {
@@ -85,6 +98,58 @@ export function getTriggerFacts(workflow: WorkflowDocument): TriggerFacts {
   const facts = computeTriggerFacts(workflow);
   triggerFactsCache.set(workflow, facts);
   return facts;
+}
+
+function classifyActivationSurface(params: {
+  hasPush: boolean;
+  hasPullRequest: boolean;
+  hasSchedule: boolean;
+  isManualOnly: boolean;
+  tagOnlyPush: boolean;
+  hasWorkflowCall: boolean;
+  hasWorkflowRun: boolean;
+  activeTriggerCount: number;
+}): ActivationSurface {
+  const {
+    hasPush,
+    hasPullRequest,
+    hasSchedule,
+    isManualOnly,
+    tagOnlyPush,
+    hasWorkflowCall,
+    hasWorkflowRun,
+    activeTriggerCount,
+  } = params;
+  if (isManualOnly) {
+    return "manual";
+  }
+  if (activeTriggerCount === 1) {
+    if (hasSchedule) {
+      return "schedule";
+    }
+    if (hasPush && tagOnlyPush) {
+      return "tag_push";
+    }
+    if (hasPush) {
+      return "push";
+    }
+    if (hasPullRequest) {
+      return "pr";
+    }
+    if (hasWorkflowCall) {
+      return "workflow_call";
+    }
+    if (hasWorkflowRun) {
+      return "workflow_run";
+    }
+  }
+  if (hasPush && hasPullRequest && activeTriggerCount === 2) {
+    return "push_and_pr";
+  }
+  if (activeTriggerCount > 1) {
+    return "composite";
+  }
+  return "unknown";
 }
 
 function computeTriggerFacts(workflow: WorkflowDocument): TriggerFacts {
@@ -159,6 +224,27 @@ function computeTriggerFacts(workflow: WorkflowDocument): TriggerFacts {
   const pushNonCodeIgnore = getNonCodeIgnore(push);
   const hasNonCodeIgnore = pushNonCodeIgnore || prFacts.hasNonCodeIgnore;
 
+  const tagOnlyPush = pushFacts.hasTagOnly;
+  const activeTriggers = [
+    hasPush,
+    hasPullRequest,
+    hasSchedule,
+    hasWorkflowDispatch,
+    hasRepositoryDispatch,
+    hasWorkflowCall,
+    hasWorkflowRun,
+  ].filter(Boolean).length;
+  const activationSurface = classifyActivationSurface({
+    hasPush,
+    hasPullRequest,
+    hasSchedule,
+    isManualOnly,
+    tagOnlyPush,
+    hasWorkflowCall,
+    hasWorkflowRun,
+    activeTriggerCount: activeTriggers,
+  });
+
   return {
     events,
     hasPush,
@@ -174,5 +260,6 @@ function computeTriggerFacts(workflow: WorkflowDocument): TriggerFacts {
     hasTriggerPathFilter,
     hasNonCodeIgnore,
     scheduleCrons,
+    activationSurface,
   };
 }

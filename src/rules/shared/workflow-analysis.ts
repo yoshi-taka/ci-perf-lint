@@ -111,6 +111,7 @@ const emptyTriggerFacts: TriggerFacts = {
   hasTriggerPathFilter: false,
   hasNonCodeIgnore: false,
   scheduleCrons: [],
+  activationSurface: "unknown",
 };
 
 const emptyWorkflowFacts: WorkflowFacts = {

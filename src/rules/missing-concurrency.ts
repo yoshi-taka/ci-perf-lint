@@ -6,12 +6,7 @@ import {
   workflowLooksAgenticLike,
   workflowHasConcurrency,
 } from "./shared/workflow-jobs.ts";
-import {
-  workflowHasPullRequestTrigger,
-  workflowHasPushTrigger,
-  workflowHasTagOnlyPushTrigger,
-  workflowHasTriggerPathFilter,
-} from "./shared/workflow-triggers.ts";
+import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import {
@@ -34,19 +29,17 @@ export const missingConcurrencyRule = {
   meta,
   nodeTypes: ["trigger"],
   check(workflow: WorkflowDocument, context: RuleContext) {
-    const hasPullRequest = workflowHasPullRequestTrigger(workflow);
-    const hasPush = workflowHasPushTrigger(workflow);
-    const hasNarrowTrigger = workflowHasTriggerPathFilter(workflow);
+    const ts = getTriggerSemantics(workflow);
 
-    if (!hasPullRequest && !hasPush) {
+    if (!ts.hasPullRequest && !ts.hasPush) {
       return [];
     }
 
-    if (!hasPullRequest && workflowHasTagOnlyPushTrigger(workflow)) {
+    if (!ts.hasPullRequest && ts.hasTagOnlyPush) {
       return [];
     }
 
-    if (!hasPullRequest && hasPush && hasNarrowTrigger) {
+    if (!ts.hasPullRequest && ts.hasPush && ts.hasTriggerPathFilter) {
       return [];
     }
 
