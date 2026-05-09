@@ -8,6 +8,7 @@ type SpawnedProcess = {
   stdout: Promise<string>;
   stderr: Promise<string>;
   exited: Promise<number>;
+  timedOut: boolean;
 };
 
 export function spawnOxlintProcess(
@@ -17,17 +18,34 @@ export function spawnOxlintProcess(
   timeoutMs?: number,
 ): SpawnedProcess {
   const effectiveTimeout = timeoutMs ?? EMBEDDED_OXLINT_TIMEOUT_MS;
+  const state = { timedOut: false };
   if (!useNodeSpawn && typeof Bun !== "undefined") {
     const proc = Bun.spawn(cmd, {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
-      timeout: effectiveTimeout,
     });
+    const killTimer = setTimeout(() => {
+      state.timedOut = true;
+      proc.kill("SIGTERM");
+      setTimeout(() => {
+        try {
+          proc.kill("SIGKILL");
+        } catch {
+          /* ignore */
+        }
+      }, 2000).unref();
+    }, effectiveTimeout).unref();
     return {
       stdout: new Response(proc.stdout).text(),
       stderr: new Response(proc.stderr).text(),
-      exited: proc.exited,
+      exited: proc.exited.then((code) => {
+        clearTimeout(killTimer);
+        return code;
+      }),
+      get timedOut() {
+        return state.timedOut;
+      },
     };
   }
 
@@ -36,6 +54,7 @@ export function spawnOxlintProcess(
     stdio: ["inherit", "pipe", "pipe"],
   });
   const killTimer = setTimeout(() => {
+    state.timedOut = true;
     proc.kill("SIGTERM");
     setTimeout(() => {
       try {
@@ -79,5 +98,8 @@ export function spawnOxlintProcess(
     stdout: stdoutPromise,
     stderr: stderrPromise,
     exited: exitedPromise,
+    get timedOut() {
+      return state.timedOut;
+    },
   } satisfies SpawnedProcess;
 }

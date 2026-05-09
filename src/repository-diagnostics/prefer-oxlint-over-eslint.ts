@@ -3,6 +3,7 @@ import type { AnalysisWarning, Diagnostic, RuleMeta, SourceLocation } from "../t
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { getSignalSets, setDifference } from "../repository-signals-utils.ts";
 
 const meta = {
   id: "prefer-oxlint-over-eslint",
@@ -61,15 +62,16 @@ export async function collectPreferOxlintOverEslintDiagnostics(
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
-  const { usesEslint, usesOxlint, unsupportedPluginNames, usesCustomExtensions, pluginNames } =
+  const { usesEslint, usesOxlint, unsupportedPluginNames, usesCustomExtensions } =
     repository.eslint;
   if (!usesEslint || usesOxlint) {
     return [];
   }
 
-  const compatiblePluginNames = pluginNames.filter(
-    (pluginName) => !unsupportedPluginNames.includes(pluginName),
-  );
+  const sets = getSignalSets(repository);
+  const compatiblePluginNames = [
+    ...setDifference(sets.eslint.pluginNames, sets.eslint.unsupportedPluginNames),
+  ];
   const severity: "warning" | "suggestion" =
     unsupportedPluginNames.length > 0 || usesCustomExtensions ? "suggestion" : "warning";
   const compatibilityNote =

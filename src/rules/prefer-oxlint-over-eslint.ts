@@ -3,6 +3,7 @@ import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { workflowUsesLintTool } from "./shared/workflow-analysis.ts";
+import { getSignalSets, setDifference } from "../repository-signals-utils.ts";
 
 // Sources:
 // - https://oxc.rs/docs/guide/usage/linter.html
@@ -19,7 +20,7 @@ const meta = {
 export const preferOxlintOverEslintRule = {
   meta,
   check(workflow: WorkflowDocument, context: RuleContext) {
-    const { usesEslint, usesOxlint, unsupportedPluginNames, usesCustomExtensions, pluginNames } =
+    const { usesEslint, usesOxlint, unsupportedPluginNames, usesCustomExtensions } =
       context.repository.eslint;
     const workflowUsesEslint = workflowUsesLintTool(workflow, "eslint");
     const workflowUsesOxlint = workflowUsesLintTool(workflow, "oxlint");
@@ -34,9 +35,10 @@ export const preferOxlintOverEslintRule = {
       return [];
     }
 
-    const compatiblePluginNames = pluginNames.filter(
-      (pluginName) => !unsupportedPluginNames.includes(pluginName),
-    );
+    const sets = getSignalSets(context.repository);
+    const compatiblePluginNames = [
+      ...setDifference(sets.eslint.pluginNames, sets.eslint.unsupportedPluginNames),
+    ];
     const severity =
       unsupportedPluginNames.length > 0 || usesCustomExtensions ? "suggestion" : "warning";
     const confidence = "medium";
