@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-export const EMBEDDED_OXLINT_TIMEOUT_MS = 5_000;
+export const EMBEDDED_OXLINT_TIMEOUT_MS = 10_000;
 const MAX_STDOUT_BUFFER_SIZE = 2 * 1024 * 1024;
 const MAX_STDERR_BUFFER_SIZE = 1024 * 1024;
 
@@ -9,6 +9,7 @@ type SpawnedProcess = {
   stderr: Promise<string>;
   exited: Promise<number>;
   timedOut: boolean;
+  signaled: boolean;
 };
 
 export function spawnOxlintProcess(
@@ -76,9 +77,13 @@ export function spawnOxlintProcess(
     });
     proc.on("close", () => resolve(Buffer.concat(chunks).toString()));
   });
+  const stateSignaled = { value: false };
   const exitedPromise = new Promise<number>((resolve) => {
-    proc.on("close", (code) => {
+    proc.on("close", (code, signal) => {
       clearTimeout(killTimer);
+      if (code === null && signal !== null) {
+        stateSignaled.value = true;
+      }
       resolve(code ?? 1);
     });
   });
@@ -89,6 +94,9 @@ export function spawnOxlintProcess(
     exited: exitedPromise,
     get timedOut() {
       return state.timedOut;
+    },
+    get signaled() {
+      return stateSignaled.value;
     },
   } satisfies SpawnedProcess;
 }

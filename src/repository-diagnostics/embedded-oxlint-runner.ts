@@ -58,7 +58,7 @@ export async function runEmbeddedOxlint(
       spawned.exited,
     ]);
 
-    if (spawned.timedOut || exitCode === -1) {
+    if (spawned.timedOut || spawned.signaled || exitCode === -1) {
       return undefined;
     }
 
