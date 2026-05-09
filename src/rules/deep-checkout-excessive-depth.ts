@@ -8,6 +8,7 @@ import {
 } from "./shared/workflow-jobs.ts";
 import { usesSetupAction } from "./shared/workflow-setup-actions.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import {
   withRepositoryShallowCheckoutPrecedent,
   withSimilarWorkflowDeepCheckoutConsensus,
@@ -94,30 +95,29 @@ export const deepCheckoutExcessiveDepthRule = {
           : "Reduce fetch-depth to a lower bounded value such as 100 or less. If this was set for tag-based versioning or changelog generation, prefer `fetch-tags: true` with a bounded depth instead.";
 
         findings.push(
-          withSimilarWorkflowDeepCheckoutConsensus(
-            withRepositoryShallowCheckoutPrecedent(
-              buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {
-                message,
-                why,
-                suggestion,
-                measurementHint:
-                  "Compare checkout duration before and after reducing fetch-depth, and verify any tag/version/changelog step still produces the same result.",
-                aiHandoff: `Inspect ${workflow.relativePath} job "${job.id}" and consider reducing fetch-depth from ${fetchDepth} to a more bounded value (e.g. 100 or less).`,
-                score: 60,
-              }),
+          pipe(
+            withRepositoryShallowCheckoutPrecedent(_context, workflow.relativePath, job.id),
+            withSimilarWorkflowDeepCheckoutConsensus(
               _context,
               workflow.relativePath,
               job.id,
+              {
+                scoreBonus: 5,
+                why: "That makes this look more like an outlier against the repository's usual shallow-checkout practice than a justified deep-history exception.",
+                aiHandoff:
+                  "Use similar jobs in this repository as the baseline checkout shape before keeping a deep fetch-depth for this one.",
+              },
             ),
-            _context,
-            workflow.relativePath,
-            job.id,
-            {
-              scoreBonus: 5,
-              why: "That makes this look more like an outlier against the repository's usual shallow-checkout practice than a justified deep-history exception.",
-              aiHandoff:
-                "Use similar jobs in this repository as the baseline checkout shape before keeping a deep fetch-depth for this one.",
-            },
+          )(
+            buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {
+              message,
+              why,
+              suggestion,
+              measurementHint:
+                "Compare checkout duration before and after reducing fetch-depth, and verify any tag/version/changelog step still produces the same result.",
+              aiHandoff: `Inspect ${workflow.relativePath} job "${job.id}" and consider reducing fetch-depth from ${fetchDepth} to a more bounded value (e.g. 100 or less).`,
+              score: 60,
+            }),
           ),
         );
       }

@@ -15,6 +15,7 @@ import {
   workflowHasPushTrigger,
 } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import {
   withRepositoryTimeoutPrecedent,
   withSimilarWorkflowTimeoutConsensus,
@@ -59,48 +60,47 @@ export const missingTimeoutMinutesRule = {
           !jobHasTimeout(job),
       )
       .map((job) =>
-        withSimilarWorkflowTimeoutConsensus(
-          withRepositoryTimeoutPrecedent(
-            buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
-              severity:
-                (workflowLooksReleaseLike(workflow, job) ||
-                  workflowLooksAgenticLike(workflow, job)) &&
-                !jobHasHeavyStepTimeout(job)
-                  ? "warning"
-                  : undefined,
-              message: `Job "${job.id}" does not define job-level timeout-minutes.`,
-              why: jobHasHeavyStepTimeout(job)
-                ? "This job already times out at least one heavy step, but without a job-level timeout the rest of the job still falls back to the platform default timeout."
-                : workflowLooksAgenticLike(workflow, job)
-                  ? "Without a job-level timeout, a hung agentic or AI-assisted job falls back to the platform default timeout and can keep consuming runner capacity for much longer than intended."
-                  : workflowLooksReleaseLike(workflow, job)
-                    ? "Without a job-level timeout, a hung release-like job falls back to the platform default timeout and can keep holding runner capacity and deployment-critical locks much longer than intended."
-                    : "Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.",
-              suggestion:
-                "Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.",
-              measurementHint:
-                "Force or simulate a hung run and confirm the job is terminated at the configured timeout.",
-              aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and add a sensible timeout-minutes value without breaking legitimate long-running work.`,
-              score:
-                (workflowLooksReleaseLike(workflow, job) ||
-                  workflowLooksAgenticLike(workflow, job)) &&
-                !jobHasHeavyStepTimeout(job)
-                  ? 34
-                  : 28,
-            }),
+        pipe(
+          withRepositoryTimeoutPrecedent(_context, workflow.relativePath, job.id),
+          withSimilarWorkflowTimeoutConsensus(
             _context,
             workflow.relativePath,
             job.id,
+            {
+              scoreBonus: 6,
+              why: "That makes this look less like a consciously unbounded job and more like one timeout policy gap in an otherwise consistent repository.",
+              aiHandoff:
+                "Use similar jobs in this repository as the starting point for the timeout value before tuning for this job's actual wall-clock behavior.",
+            },
           ),
-          _context,
-          workflow.relativePath,
-          job.id,
-          {
-            scoreBonus: 6,
-            why: "That makes this look less like a consciously unbounded job and more like one timeout policy gap in an otherwise consistent repository.",
-            aiHandoff:
-              "Use similar jobs in this repository as the starting point for the timeout value before tuning for this job's actual wall-clock behavior.",
-          },
+        )(
+          buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
+            severity:
+              (workflowLooksReleaseLike(workflow, job) ||
+                workflowLooksAgenticLike(workflow, job)) &&
+              !jobHasHeavyStepTimeout(job)
+                ? "warning"
+                : undefined,
+            message: `Job "${job.id}" does not define job-level timeout-minutes.`,
+            why: jobHasHeavyStepTimeout(job)
+              ? "This job already times out at least one heavy step, but without a job-level timeout the rest of the job still falls back to the platform default timeout."
+              : workflowLooksAgenticLike(workflow, job)
+                ? "Without a job-level timeout, a hung agentic or AI-assisted job falls back to the platform default timeout and can keep consuming runner capacity for much longer than intended."
+                : workflowLooksReleaseLike(workflow, job)
+                  ? "Without a job-level timeout, a hung release-like job falls back to the platform default timeout and can keep holding runner capacity and deployment-critical locks much longer than intended."
+                  : "Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.",
+            suggestion:
+              "Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.",
+            measurementHint:
+              "Force or simulate a hung run and confirm the job is terminated at the configured timeout.",
+            aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and add a sensible timeout-minutes value without breaking legitimate long-running work.`,
+            score:
+              (workflowLooksReleaseLike(workflow, job) ||
+                workflowLooksAgenticLike(workflow, job)) &&
+              !jobHasHeavyStepTimeout(job)
+                ? 34
+                : 28,
+          }),
         ),
       );
   },

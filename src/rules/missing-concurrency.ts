@@ -1,6 +1,6 @@
-import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
+import type { RuleMeta } from "../types.ts";
 import {
   isHeavyWorkflow,
   workflowLooksAgenticLike,
@@ -13,12 +13,10 @@ import {
   workflowHasTriggerPathFilter,
 } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import {
-  withRepositoryConcurrencyPrecedent,
-  withSimilarWorkflowConcurrencyConsensus,
-} from "./shared/similar-workflow-consensus.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
+import { withRepositoryConcurrencyPrecedent } from "./shared/similar-workflow-consensus-precedents.ts";
+import { withSimilarWorkflowConcurrencyConsensus } from "./shared/similar-workflow-consensus-consensus.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
-import { compose } from "./shared/diagnostic-transform.ts";
 
 const meta = {
   id: "missing-concurrency",
@@ -32,7 +30,7 @@ const meta = {
 export const missingConcurrencyRule = {
   meta,
   nodeTypes: ["trigger"],
-  check(workflow: WorkflowDocument, _context: RuleContext) {
+  check(workflow: WorkflowDocument, context: RuleContext) {
     const hasPullRequest = workflowHasPullRequestTrigger(workflow);
     const hasPush = workflowHasPushTrigger(workflow);
     const hasNarrowTrigger = workflowHasTriggerPathFilter(workflow);
@@ -68,22 +66,20 @@ export const missingConcurrencyRule = {
       score: agentic ? 62 : 58,
     });
 
-    const transform = compose(
-      (d: Diagnostic) => withRepositoryConcurrencyPrecedent(d, _context, workflow.relativePath),
-      (d: Diagnostic) =>
-        withSimilarWorkflowConcurrencyConsensus(d, _context, workflow.relativePath, {
-          scoreBonus: 8,
-          why: "That makes this look more like a repository-local normalization gap than a one-off design choice.",
-          aiHandoff:
-            "Prefer the repository's existing concurrency pattern over inventing a new grouping strategy unless this workflow has clearly different cancellation requirements.",
-        }),
-      (d: Diagnostic) =>
-        withStackedDiffContext(d, _context, {
-          scoreBonus: 10,
-          why: "Concurrency is more valuable because superseded runs from restacks can otherwise keep consuming runner time.",
-          aiHandoff:
-            "Use a concurrency group scoped to the workflow and PR/head ref so newer restack runs cancel older runs from the same branch without canceling unrelated PRs.",
-        }),
+    const transform = pipe(
+      withRepositoryConcurrencyPrecedent(context, workflow.relativePath),
+      withSimilarWorkflowConcurrencyConsensus(context, workflow.relativePath, {
+        scoreBonus: 8,
+        why: "That makes this look more like a repository-local normalization gap than a one-off design choice.",
+        aiHandoff:
+          "Prefer the repository's existing concurrency pattern over inventing a new grouping strategy unless this workflow has clearly different cancellation requirements.",
+      }),
+      withStackedDiffContext(context, {
+        scoreBonus: 10,
+        why: "Concurrency is more valuable because superseded runs from restacks can otherwise keep consuming runner time.",
+        aiHandoff:
+          "Use a concurrency group scoped to the workflow and PR/head ref so newer restack runs cancel older runs from the same branch without canceling unrelated PRs.",
+      }),
     );
 
     return [transform(base)];

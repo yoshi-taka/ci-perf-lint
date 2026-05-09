@@ -4,6 +4,7 @@ import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import type { YAMLMap } from "yaml";
 import { getScalarValue, getStringOrArrayValue } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositoryReleaseDownstreamGuardPrecedent } from "./shared/similar-workflow-consensus.ts";
 import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
 
@@ -134,7 +135,7 @@ export const missingReleaseDownstreamSuccessGuardRule = {
       }
 
       findings.push(
-        withRepositoryReleaseDownstreamGuardPrecedent(
+        pipe(withRepositoryReleaseDownstreamGuardPrecedent(_context, workflow.relativePath, job.id))(
           buildDiagnostic(workflow, meta, job.ifNode ?? job.idNode ?? job.node, {
             severity:
               hasFailureAndCancellationGuard || !hasStatusFunction(ifText)
@@ -152,9 +153,6 @@ export const missingReleaseDownstreamSuccessGuardRule = {
             aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and confirm which upstream jobs truly must succeed versus which may be intentionally skipped before tightening its release downstream guard.`,
             score: hasFailureAndCancellationGuard ? 9 : 73,
           }),
-          _context,
-          workflow.relativePath,
-          job.id,
         ),
       );
     }

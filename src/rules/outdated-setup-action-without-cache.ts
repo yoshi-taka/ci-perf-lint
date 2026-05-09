@@ -2,6 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import { hasDependencyCacheConfig } from "./shared/workflow-caches.ts";
 import { isOutdatedSetupAction } from "./shared/workflow-setup-actions.ts";
 import { withRepositorySetupCachePrecedent } from "./shared/similar-workflow-consensus.ts";
@@ -25,7 +26,7 @@ export const outdatedSetupActionWithoutCacheRule = {
         }
 
         findings.push(
-          withRepositorySetupCachePrecedent(
+          pipe(withRepositorySetupCachePrecedent(context, workflow.relativePath, job.id))(
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
               message: `${step.uses} is old and no cache configuration is visible.`,
               why: "The performance win is not the version bump by itself; it is using a current setup action to enable the package-manager cache close to the language setup step. Without visible cache configuration, dependency downloads and installs are more likely to be paid again on each run.",
@@ -36,9 +37,6 @@ export const outdatedSetupActionWithoutCacheRule = {
               aiHandoff: `Review ${workflow.relativePath} and upgrade ${step.uses} to a current major version together with cache enablement.`,
               score: 85,
             }),
-            context,
-            workflow.relativePath,
-            job.id,
           ),
         );
       }

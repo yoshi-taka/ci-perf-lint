@@ -2,6 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositoryBlobNoneReleasePrecedent } from "./shared/similar-workflow-consensus.ts";
 import { getLoweredWorkflowStepText } from "./shared/workflow-step-text.ts";
 import { hasHistoryDependentCommand } from "./shared/workflow-jobs.ts";
@@ -188,7 +189,7 @@ function evaluateJobForBlobNone(
     return undefined;
   }
 
-  return withRepositoryBlobNoneReleasePrecedent(
+  return pipe(withRepositoryBlobNoneReleasePrecedent(context, workflow.relativePath, job.id))(
     buildDiagnostic(workflow, meta, checkout.withNode ?? checkout.usesNode ?? checkout.node, {
       message: `Job "${job.id}" keeps enough git history for metadata work, but checkout still downloads file blobs eagerly.`,
       why: `fetch-depth controls how many commits and trees are fetched; blobs are the file contents attached to those commits. This job appears to focus on commit, tag, version, or release metadata${scopePrefixes.length > 0 ? ` while touching only ${scopePrefixes.map((prefix) => `"${prefix}"`).join(", ")}` : ""}, so \`filter: blob:none\` can keep the same history depth while avoiding most file-content transfer until a file is actually read.`,
@@ -201,9 +202,6 @@ function evaluateJobForBlobNone(
       aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether checkout can use filter: blob:none while preserving its commit, tag, release-notes, or versioning behavior.`,
       score: hasSparseCheckout(checkout) ? 74 : 68,
     }),
-    context,
-    workflow.relativePath,
-    job.id,
   );
 }
 

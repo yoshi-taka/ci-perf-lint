@@ -13,6 +13,7 @@ import { getLoweredWorkflowStepText } from "./shared/workflow-step-text.ts";
 import { usesSetupAction } from "./shared/workflow-setup-actions.ts";
 import { getCheckoutStep } from "./shared/workflow-analysis.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositorySparseCheckoutPrecedent } from "./shared/similar-workflow-consensus.ts";
 
 const meta = {
@@ -173,7 +174,7 @@ export const preferSparseCheckoutForScopedWorkflowRule = {
       const hasFullHistorySignal = hasExplicitFullHistorySignal(job, checkout);
 
       findings.push(
-        withRepositorySparseCheckoutPrecedent(
+        pipe(withRepositorySparseCheckoutPrecedent(_context, workflow.relativePath, job.id))(
           buildDiagnostic(workflow, meta, checkout.withNode ?? checkout.usesNode ?? checkout.node, {
             severity: usesMultipleCheckouts ? "suggestion" : undefined,
             message: hasFullHistorySignal
@@ -197,9 +198,6 @@ export const preferSparseCheckoutForScopedWorkflowRule = {
               : `Review ${workflow.relativePath} job "${job.id}" and consider adding sparse-checkout for the visible working-tree paths it uses without breaking its branch, release, or git-metadata behavior.`,
             score: usesMultipleCheckouts ? 39 : 72,
           }),
-          _context,
-          workflow.relativePath,
-          job.id,
         ),
       );
     }

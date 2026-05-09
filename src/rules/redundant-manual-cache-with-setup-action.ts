@@ -10,6 +10,7 @@ import {
   setupActionHasBuiltInCacheForFamily,
 } from "./shared/workflow-caches.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositorySingleCacheStrategyPrecedent } from "./shared/similar-workflow-consensus.ts";
 
 const meta = {
@@ -43,7 +44,7 @@ export const redundantManualCacheWithSetupActionRule = {
         }
 
         findings.push(
-          withRepositorySingleCacheStrategyPrecedent(
+          pipe(withRepositorySingleCacheStrategyPrecedent(_context, workflow.relativePath, job.id))(
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
               message: `${step.uses} already handles ${overlappingFamilies.join(", ")} caching in job "${job.id}", but the job also defines a matching manual cache step.`,
               why: "Layering built-in cache and manual cache for the same dependency family can add maintenance cost and duplicate restore/save work.",
@@ -54,9 +55,6 @@ export const redundantManualCacheWithSetupActionRule = {
               aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and remove overlapping manual cache steps when ${step.uses} already covers the same dependency family.`,
               score: 61,
             }),
-            _context,
-            workflow.relativePath,
-            job.id,
           ),
         );
       }

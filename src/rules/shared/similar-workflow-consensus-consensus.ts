@@ -1,5 +1,6 @@
 import type { Diagnostic } from "../../types.ts";
 import type { RuleContext } from "../../rule-engine.ts";
+import type { DiagnosticTransform } from "./diagnostic-transform.ts";
 import {
   type SimilarWorkflowConsensusAdjustment,
   withJobConsensus,
@@ -7,138 +8,138 @@ import {
 } from "./similar-workflow-consensus-shared.ts";
 
 export function withSimilarWorkflowConcurrencyConsensus(
-  diagnostic: Diagnostic,
   context: RuleContext,
   workflowPath: string,
   adjustment: SimilarWorkflowConsensusAdjustment,
-): Diagnostic {
-  return withWorkflowConsensus(
-    diagnostic,
-    context.repository.similarWorkflows.concurrency.find(
-      (entry) => entry.workflowPath === workflowPath,
-    ),
-    adjustment,
-    {
-      peerText: "Similar workflows already using concurrency include",
-      why: (evidence, peerText) =>
-        `In this repository, ${evidence.peerCount} similar workflows already use concurrency.${peerText}`,
-      aiHandoff:
-        "Match the established concurrency pattern already used in similar workflows where it fits this workflow's trigger semantics.",
-    },
-  );
+): DiagnosticTransform {
+  return (diagnostic: Diagnostic) =>
+    withWorkflowConsensus(
+      diagnostic,
+      context.repository.similarWorkflows.concurrency.find(
+        (entry) => entry.workflowPath === workflowPath,
+      ),
+      adjustment,
+      {
+        peerText: "Similar workflows already using concurrency include",
+        why: (evidence, peerText) =>
+          `In this repository, ${evidence.peerCount} similar workflows already use concurrency.${peerText}`,
+        aiHandoff:
+          "Match the established concurrency pattern already used in similar workflows where it fits this workflow's trigger semantics.",
+      },
+    );
 }
 
 export function withSimilarWorkflowTimeoutConsensus(
-  diagnostic: Diagnostic,
   context: RuleContext,
   workflowPath: string,
   jobId: string,
   adjustment: SimilarWorkflowConsensusAdjustment,
-): Diagnostic {
-  return withJobConsensus(
-    diagnostic,
-    context.repository.similarWorkflows.timeoutMinutes.find(
-      (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
-    ),
-    adjustment,
-    {
-      peerText: "Similar jobs already using timeout-minutes include",
-      why: (evidence, peerText) =>
-        `In this repository, ${evidence.peerCount} similar heavy jobs already define job-level timeout-minutes.${peerText}`,
-      aiHandoff:
-        "Align with the timeout pattern already used by similar heavy jobs where that matches the job's runtime expectations.",
-    },
-  );
+): DiagnosticTransform {
+  return (diagnostic: Diagnostic) =>
+    withJobConsensus(
+      diagnostic,
+      context.repository.similarWorkflows.timeoutMinutes.find(
+        (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
+      ),
+      adjustment,
+      {
+        peerText: "Similar jobs already using timeout-minutes include",
+        why: (evidence, peerText) =>
+          `In this repository, ${evidence.peerCount} similar heavy jobs already define job-level timeout-minutes.${peerText}`,
+        aiHandoff:
+          "Align with the timeout pattern already used by similar heavy jobs where that matches the job's runtime expectations.",
+      },
+    );
 }
 
 export function withSimilarWorkflowDependencyCacheConsensus(
-  diagnostic: Diagnostic,
   context: RuleContext,
   workflowPath: string,
   jobId: string,
   adjustment: SimilarWorkflowConsensusAdjustment,
-): Diagnostic {
-  return withJobConsensus(
-    diagnostic,
-    context.repository.similarWorkflows.dependencyCache.find(
-      (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
-    ),
-    adjustment,
-    {
-      peerText: "Similar jobs already using dependency cache include",
-      why: (evidence, peerText) =>
-        `In this repository, ${evidence.peerCount} similar jobs already use dependency caching.${peerText}`,
-      aiHandoff:
-        "Prefer the cache strategy already used by similar jobs before introducing a new cache shape.",
-    },
-  );
+): DiagnosticTransform {
+  return (diagnostic: Diagnostic) =>
+    withJobConsensus(
+      diagnostic,
+      context.repository.similarWorkflows.dependencyCache.find(
+        (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
+      ),
+      adjustment,
+      {
+        peerText: "Similar jobs already using dependency cache include",
+        why: (evidence, peerText) =>
+          `In this repository, ${evidence.peerCount} similar jobs already use dependency caching.${peerText}`,
+        aiHandoff:
+          "Prefer the cache strategy already used by similar jobs before introducing a new cache shape.",
+      },
+    );
 }
 
 export function withSimilarWorkflowDeepCheckoutConsensus(
-  diagnostic: Diagnostic,
   context: RuleContext,
   workflowPath: string,
   jobId: string,
   adjustment: SimilarWorkflowConsensusAdjustment,
-): Diagnostic {
-  return withJobConsensus(
-    diagnostic,
-    context.repository.similarWorkflows.deepCheckout.find(
-      (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
-    ),
-    adjustment,
-    {
-      peerText: "Similar jobs already using shallow checkout include",
-      why: (evidence, peerText) =>
-        `In this repository, ${evidence.peerCount} similar jobs already avoid full-history checkout.${peerText}`,
-      aiHandoff:
-        "Match the repository's existing shallow-checkout pattern unless this job truly needs full git history.",
-    },
-  );
+): DiagnosticTransform {
+  return (diagnostic: Diagnostic) =>
+    withJobConsensus(
+      diagnostic,
+      context.repository.similarWorkflows.deepCheckout.find(
+        (entry) => entry.workflowPath === workflowPath && entry.jobId === jobId,
+      ),
+      adjustment,
+      {
+        peerText: "Similar jobs already using shallow checkout include",
+        why: (evidence, peerText) =>
+          `In this repository, ${evidence.peerCount} similar jobs already avoid full-history checkout.${peerText}`,
+        aiHandoff:
+          "Match the repository's existing shallow-checkout pattern unless this job truly needs full git history.",
+      },
+    );
 }
 
 export function withSimilarWorkflowPathsFilterConsensus(
-  diagnostic: Diagnostic,
   context: RuleContext,
   workflowPath: string,
   adjustment: SimilarWorkflowConsensusAdjustment,
-): Diagnostic {
-  return withWorkflowConsensus(
-    diagnostic,
-    context.repository.similarWorkflows.pathsFilter.find(
-      (entry) => entry.workflowPath === workflowPath,
-    ),
-    adjustment,
-    {
-      peerText: "Similar workflows already using trigger path filters include",
-      why: (evidence, peerText) =>
-        `In this repository, ${evidence.peerCount} similar workflows already narrow triggers with paths or paths-ignore.${peerText}`,
-      aiHandoff:
-        "Prefer the repository's existing trigger-filter style where it fits this workflow.",
-    },
-  );
+): DiagnosticTransform {
+  return (diagnostic: Diagnostic) =>
+    withWorkflowConsensus(
+      diagnostic,
+      context.repository.similarWorkflows.pathsFilter.find(
+        (entry) => entry.workflowPath === workflowPath,
+      ),
+      adjustment,
+      {
+        peerText: "Similar workflows already using trigger path filters include",
+        why: (evidence, peerText) =>
+          `In this repository, ${evidence.peerCount} similar workflows already narrow triggers with paths or paths-ignore.${peerText}`,
+        aiHandoff:
+          "Prefer the repository's existing trigger-filter style where it fits this workflow.",
+      },
+    );
 }
 
 export function withSimilarWorkflowNonCodeIgnoreConsensus(
-  diagnostic: Diagnostic,
   context: RuleContext,
   workflowPath: string,
   adjustment: SimilarWorkflowConsensusAdjustment,
-): Diagnostic {
-  return withWorkflowConsensus(
-    diagnostic,
-    context.repository.similarWorkflows.nonCodeIgnore.find(
-      (entry) => entry.workflowPath === workflowPath,
-    ),
-    adjustment,
-    {
-      peerText: "Similar workflows already ignoring obvious non-code changes include",
-      why: (evidence, peerText) =>
-        `In this repository, ${evidence.peerCount} similar workflows already ignore obvious non-code changes.${peerText}`,
-      aiHandoff:
-        "Prefer the repository's existing non-code ignore patterns where they fit this workflow.",
-    },
-  );
+): DiagnosticTransform {
+  return (diagnostic: Diagnostic) =>
+    withWorkflowConsensus(
+      diagnostic,
+      context.repository.similarWorkflows.nonCodeIgnore.find(
+        (entry) => entry.workflowPath === workflowPath,
+      ),
+      adjustment,
+      {
+        peerText: "Similar workflows already ignoring obvious non-code changes include",
+        why: (evidence, peerText) =>
+          `In this repository, ${evidence.peerCount} similar workflows already ignore obvious non-code changes.${peerText}`,
+        aiHandoff:
+          "Prefer the repository's existing non-code ignore patterns where they fit this workflow.",
+      },
+    );
 }
 
 export function detectClusterInconsistency<T>(

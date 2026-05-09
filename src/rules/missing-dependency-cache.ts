@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { type DependencyFamily, detectInstallCommand } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import {
   withRepositoryDependencyCachePrecedent,
   withSimilarWorkflowDependencyCacheConsensus,
@@ -78,31 +79,30 @@ export const missingDependencyCacheRule = {
         }
 
         findings.push(
-          withSimilarWorkflowDependencyCacheConsensus(
-            withRepositoryDependencyCachePrecedent(
-              buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
-                message: `${step.uses} is used without visible dependency caching in job "${job.id}".`,
-                why: "Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths.",
-                suggestion:
-                  "If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.",
-                measurementHint:
-                  "Compare total job duration, not just install duration, before and after enabling cache.",
-                aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether dependency caching for ${step.uses} actually improves total job time on this CI path before keeping the change.`,
-                score: 43,
-              }),
+          pipe(
+            withRepositoryDependencyCachePrecedent(_context, workflow.relativePath, job.id),
+            withSimilarWorkflowDependencyCacheConsensus(
               _context,
               workflow.relativePath,
               job.id,
+              {
+                scoreBonus: 6,
+                why: "That makes the missing cache look more like one repository-local drift point than a deliberate no-cache policy.",
+                aiHandoff:
+                  "Start from the cache configuration already used by similar jobs in this repository, then verify that it improves total wall-clock time before keeping it.",
+              },
             ),
-            _context,
-            workflow.relativePath,
-            job.id,
-            {
-              scoreBonus: 6,
-              why: "That makes the missing cache look more like one repository-local drift point than a deliberate no-cache policy.",
-              aiHandoff:
-                "Start from the cache configuration already used by similar jobs in this repository, then verify that it improves total wall-clock time before keeping it.",
-            },
+          )(
+            buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
+              message: `${step.uses} is used without visible dependency caching in job "${job.id}".`,
+              why: "Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths.",
+              suggestion:
+                "If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.",
+              measurementHint:
+                "Compare total job duration, not just install duration, before and after enabling cache.",
+              aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether dependency caching for ${step.uses} actually improves total job time on this CI path before keeping the change.`,
+              score: 43,
+            }),
           ),
         );
       }

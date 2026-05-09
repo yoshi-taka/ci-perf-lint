@@ -8,6 +8,7 @@ import {
 } from "./shared/workflow-jobs.ts";
 import { usesSetupAction } from "./shared/workflow-setup-actions.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import {
   withRepositoryShallowCheckoutPrecedent,
   withSimilarWorkflowDeepCheckoutConsensus,
@@ -90,30 +91,29 @@ export const deepCheckoutWithoutNeedRule = {
           : "Confirm whether full history is required. If not, use the default shallow checkout. If this was added for tag-based versioning or changelog generation, prefer `fetch-tags: true` with a bounded `fetch-depth` such as 100 or 1000 where possible. If recent history is required, consider a bounded depth such as 100 or 1000. If history is required but file contents are not needed eagerly, keep the history depth and consider `filter: blob:none` instead.";
 
         findings.push(
-          withSimilarWorkflowDeepCheckoutConsensus(
-            withRepositoryShallowCheckoutPrecedent(
-              buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {
-                message,
-                why,
-                suggestion,
-                measurementHint:
-                  "Compare checkout duration before and after the change, and verify any tag/version/changelog step still produces the same result.",
-                aiHandoff: `Inspect ${workflow.relativePath} job "${job.id}" and evaluate whether fetch-depth: 0 can be replaced with a bounded depth (e.g. 100 or 1000) or fetch-tags: true with a shallower checkout.`,
-                score: 70,
-              }),
+          pipe(
+            withRepositoryShallowCheckoutPrecedent(_context, workflow.relativePath, job.id),
+            withSimilarWorkflowDeepCheckoutConsensus(
               _context,
               workflow.relativePath,
               job.id,
+              {
+                scoreBonus: 7,
+                why: "That makes this look more like an outlier against the repository's usual shallow-checkout practice than a justified history-heavy exception.",
+                aiHandoff:
+                  "Use similar jobs in this repository as the baseline checkout shape before keeping full history for this one.",
+              },
             ),
-            _context,
-            workflow.relativePath,
-            job.id,
-            {
-              scoreBonus: 7,
-              why: "That makes this look more like an outlier against the repository's usual shallow-checkout practice than a justified history-heavy exception.",
-              aiHandoff:
-                "Use similar jobs in this repository as the baseline checkout shape before keeping full history for this one.",
-            },
+          )(
+            buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {
+              message,
+              why,
+              suggestion,
+              measurementHint:
+                "Compare checkout duration before and after the change, and verify any tag/version/changelog step still produces the same result.",
+              aiHandoff: `Inspect ${workflow.relativePath} job "${job.id}" and evaluate whether fetch-depth: 0 can be replaced with a bounded depth (e.g. 100 or 1000) or fetch-tags: true with a shallower checkout.`,
+              score: 70,
+            }),
           ),
         );
       }

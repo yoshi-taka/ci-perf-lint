@@ -8,6 +8,7 @@ import {
   workflowHasScheduleTrigger,
 } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositoryThrottledSchedulePrecedent } from "./shared/similar-workflow-consensus.ts";
 
 const meta = {
@@ -92,7 +93,7 @@ export const scheduledHeavyWorkflowWithoutThrottlingRule = {
     }
 
     return [
-      withRepositoryThrottledSchedulePrecedent(
+      pipe(withRepositoryThrottledSchedulePrecedent(_context, workflow.relativePath))(
         buildDiagnostic(workflow, meta, workflow.onNode ?? workflow.root, {
           message: `Heavy scheduled workflow "${workflow.name ?? workflow.relativePath}" runs more often than every 3 hours.`,
           why: workflowLooksNightlyLike(workflow)
@@ -105,8 +106,6 @@ export const scheduledHeavyWorkflowWithoutThrottlingRule = {
           aiHandoff: `Review ${workflow.relativePath} and confirm whether its current cron frequency is still justified. If not, test a slower schedule or a visible no-change skip path and keep the change only if it reduces CI cost without losing needed coverage.`,
           score: 32,
         }),
-        _context,
-        workflow.relativePath,
       ),
     ];
   },
