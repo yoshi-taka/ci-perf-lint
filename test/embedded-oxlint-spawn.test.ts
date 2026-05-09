@@ -3,7 +3,7 @@ import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxl
 import { spawnOxlintProcess } from "../src/repository-diagnostics/embedded-oxlint-spawn.ts";
 import { runEmbeddedOxlint } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
 import { accessSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -37,17 +37,23 @@ describe("embedded oxlint fixture retry", () => {
   test("retries with fixture ignores after a silent failure", async () => {
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), "apl-oxlint-fixture-retry-"));
     try {
-      const fixtureDir = path.join(tmpDir, "test", "bundler", "transpiler", "fixtures");
-      await mkdir(fixtureDir, { recursive: true });
-      const filePath = path.join(fixtureDir, "607.js");
-      let content = "let counter = 0;\n";
-      for (let i = 1; i <= 607; i++) {
-        content +=
-          "for (let i = 0; i < 1; i++) for (let i = 0; i < 1; i++) for (let i = 0; i < 1; i++) for (let i = 0; i < 1; i++)\n";
-      }
-      await writeFile(filePath, content);
+      const calls: string[][] = [];
+      const fakeSpawn = (cmd: string[]) => {
+        calls.push(cmd);
+        const exitCode = calls.length === 1 ? 1 : 0;
+        return {
+          stdout: Promise.resolve(""),
+          stderr: Promise.resolve(""),
+          exited: Promise.resolve(exitCode),
+          timedOut: false,
+        };
+      };
 
-      expect(runEmbeddedOxlint(tmpDir, "non-import")).resolves.toEqual([]);
+      await expect(
+        runEmbeddedOxlint(tmpDir, "non-import", undefined, undefined, fakeSpawn),
+      ).resolves.toEqual([]);
+      expect(calls).toHaveLength(2);
+      expect(calls[1]!.join(" ")).toContain("**/fixtures/**");
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }
