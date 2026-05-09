@@ -15,14 +15,3 @@ const compose =
 export function pipe(...transforms: DiagnosticTransform[]): DiagnosticTransform {
   return compose(...transforms);
 }
-
-function applyIf(condition: boolean, transform: DiagnosticTransform): DiagnosticTransform {
-  return condition ? transform : (d) => d;
-}
-
-function applyWhen<T>(
-  value: T | undefined,
-  factory: (value: T) => DiagnosticTransform,
-): DiagnosticTransform {
-  return value !== undefined ? factory(value) : (d) => d;
-}
