@@ -23,7 +23,7 @@ async function getRulesByScope(): Promise<Record<string, readonly AnyRuleModule[
 export interface RuleContext {
   repository: RepositorySignals;
   scanContext?: RepositoryScanContext;
-  workflowSemantics?: WorkflowSemantics;
+  workflowSemantics?: WorkflowSemantics | ReadonlyMap<WorkflowDocument, WorkflowSemantics>;
 }
 
 interface RuleModule {
@@ -259,4 +259,102 @@ function deduplicateByPathLine(diagnostics: Diagnostic[]): Diagnostic[] {
   }
 
   return [...seen.values()];
+}
+
+interface ScoredWorkflow {
+  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument;
+  score: number;
+}
+
+export async function evaluateRulesCoarseToFine(
+  workflows: (WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument)[],
+  context: RuleContext,
+  warnings?: AnalysisWarning[],
+  findingCounts?: Map<string, number>,
+  ruleFilter?: (rule: AnyRuleModule) => boolean,
+): Promise<Diagnostic[]> {
+  if (workflows.length === 0) {
+    return [];
+  }
+  const isBuildkite = isPipelineDocument(workflows[0]!);
+  const isGitlab = isGitlabCiDocument(workflows[0]!);
+  const isCircle = isCircleCiDocument(workflows[0]!);
+
+  const rulesByScope = await getRulesByScope();
+  const allRules = [
+    ...(rulesByScope["github-actions"] ?? []),
+    ...(rulesByScope.buildkite ?? []),
+    ...(rulesByScope["gitlab-ci"] ?? []),
+    ...(rulesByScope.circleci ?? []),
+    ...(rulesByScope.all ?? []),
+  ];
+
+  const workflowResults = workflows.map(() => [] as Diagnostic[]);
+  const workflowIndexByRef = new Map<
+    WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
+    number
+  >();
+  for (const [index, workflow] of workflows.entries()) {
+    workflowIndexByRef.set(workflow, index);
+  }
+
+  for (const rule of allRules) {
+    if (ruleFilter && !ruleFilter(rule)) {
+      continue;
+    }
+    const { maxFindings, precheckBudget = 20 } = rule.meta;
+
+    const checkFn = getRuleCheckFn(rule, isBuildkite, isGitlab, isCircle);
+    const precheck = rule.meta.precheck;
+
+    let candidates: ScoredWorkflow[];
+    if (precheck) {
+      const scored = workflows.map((w) => ({ workflow: w, score: precheck(w) }));
+      candidates = scored
+        .filter((s) => s.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, precheckBudget);
+    } else {
+      candidates = workflows.map((w) => ({ workflow: w, score: 1 }));
+    }
+
+    for (const { workflow } of candidates) {
+      prewarmStepAnalysisCaches(workflow);
+      if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
+        continue;
+      }
+      const workflowSemantics =
+        context.workflowSemantics instanceof Map
+          ? context.workflowSemantics.get(workflow as WorkflowDocument)
+          : context.workflowSemantics;
+      const perWorkflowContext: RuleContext =
+        workflowSemantics !== undefined ? { ...context, workflowSemantics } : context;
+      try {
+        const diagnostics = await checkFn(workflow, perWorkflowContext);
+        if (maxFindings !== undefined && diagnostics.length > maxFindings) {
+          diagnostics.length = maxFindings;
+        }
+        const workflowIndex = workflowIndexByRef.get(workflow);
+        if (workflowIndex !== undefined) {
+          workflowResults[workflowIndex]!.push(...diagnostics);
+        }
+        if (findingCounts) {
+          findingCounts.set(
+            rule.meta.id,
+            (findingCounts.get(rule.meta.id) ?? 0) + diagnostics.length,
+          );
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        if (warnings) {
+          warnings.push({
+            source: workflow.relativePath,
+            message: `Rule ${rule.meta.id} failed: ${detail}`,
+          });
+        }
+      }
+    }
+  }
+
+  return deduplicateByPathLine(workflowResults.flat());
 }

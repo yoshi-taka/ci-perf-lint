@@ -8,12 +8,16 @@ import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { detectRedundantBootstrapToolFromText, usesLanguageInstall } from "./shared/tools.ts";
 import { collectCommandEntries } from "./shared/any-step.ts";
 
+const NPX_RE =
+  /\bnpx\b|\bnpm\s+bootstrap\b|\bpnpx\b|\bbunx\b|\byarn\s+dlx\b|\budu\s+dlx\b|\budu\s+tool\s+run\b|\buvx\b|\buv\s+tool\s+run\b/;
+
 const meta = {
   id: "redundant-npx-or-bootstrap",
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/redundant-npx-or-bootstrap.md",
   scope: "all",
+  precheck: (wf) => (wf.source ? (NPX_RE.test(wf.source) ? 1 : 0) : 0),
 } satisfies RuleMeta;
 
 export const redundantNpxOrBootstrapRule = {

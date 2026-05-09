@@ -6,6 +6,8 @@ import { evaluateRules, type RuleContext } from "../src/rule-engine.ts";
 import { parseWorkflow } from "../src/workflow.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
 import type { AnalysisWarning } from "../src/types.ts";
+import { preferNodeRunOverNpmRunRule } from "../src/rules/prefer-node-run-over-npm-run.ts";
+import { preferBuildxBakeForMultipleImagesRule } from "../src/rules/prefer-buildx-bake-for-multiple-images.ts";
 
 function createSignals(): RepositorySignals {
   return {
@@ -159,6 +161,28 @@ async function createWorkflowDoc(
 }
 
 describe("evaluateRules", () => {
+  test("prefer-node-run-over-npm-run precheck is source-only", () => {
+    expect(
+      preferNodeRunOverNpmRunRule.meta.precheck({ source: "steps:\n  - run: npm run build\n" }),
+    ).toBe(1);
+    expect(
+      preferNodeRunOverNpmRunRule.meta.precheck({ source: "steps:\n  - run: echo hello\n" }),
+    ).toBe(0);
+  });
+
+  test("prefer-buildx-bake-for-multiple-images precheck counts repeated builds", () => {
+    expect(
+      preferBuildxBakeForMultipleImagesRule.meta.precheck({
+        source: "- run: docker buildx build a\n- run: docker buildx build b\n",
+      }),
+    ).toBe(1);
+    expect(
+      preferBuildxBakeForMultipleImagesRule.meta.precheck({
+        source: "- run: docker buildx build a\n",
+      }),
+    ).toBe(0);
+  });
+
   test("returns diagnostics for a valid workflow", async () => {
     const { workflow, cleanup } = await createWorkflowDoc(
       "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hello\n",

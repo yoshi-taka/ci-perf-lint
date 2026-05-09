@@ -2,7 +2,7 @@ import type { Diagnostic } from "../../types.ts";
 
 export type DiagnosticTransform = (diagnostic: Diagnostic) => Diagnostic;
 
-export const compose =
+const compose =
   (...transforms: DiagnosticTransform[]): DiagnosticTransform =>
   (diagnostic) => {
     let result = diagnostic;
@@ -16,11 +16,11 @@ export function pipe(...transforms: DiagnosticTransform[]): DiagnosticTransform 
   return compose(...transforms);
 }
 
-export function applyIf(condition: boolean, transform: DiagnosticTransform): DiagnosticTransform {
+function applyIf(condition: boolean, transform: DiagnosticTransform): DiagnosticTransform {
   return condition ? transform : (d) => d;
 }
 
-export function applyWhen<T>(
+function applyWhen<T>(
   value: T | undefined,
   factory: (value: T) => DiagnosticTransform,
 ): DiagnosticTransform {

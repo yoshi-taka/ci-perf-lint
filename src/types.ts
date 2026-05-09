@@ -85,4 +85,6 @@ export interface RuleMeta {
   requires?: {
     isHeavy?: boolean;
   };
+  precheck?: (workflow: { source?: string }) => number;
+  precheckBudget?: number;
 }

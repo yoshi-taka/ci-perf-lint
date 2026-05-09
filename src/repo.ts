@@ -21,7 +21,7 @@ import {
 } from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
-import { evaluateRules } from "./rule-engine.ts";
+import { evaluateRules, evaluateRulesCoarseToFine } from "./rule-engine.ts";
 import { buildWorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
@@ -290,14 +290,40 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           },
           analysisWarnings,
           ruleFindingCounts,
-          repositoryOnly ? (rule) => repositoryScopeWorkflowRuleIds.has(rule.meta.id) : undefined,
+          repositoryOnly
+            ? (rule) => repositoryScopeWorkflowRuleIds.has(rule.meta.id)
+            : (rule) => !rule.meta.precheck,
         ).then((findings) =>
           findings.filter((finding) =>
             findingIncludedInScope(finding, workflowOnly, repositoryOnly),
           ),
         ),
       ),
-    ).then((results) => results.flat()),
+    )
+      .then((results) => results.flat())
+      .then((workflowFindings) =>
+        repositoryOnly
+          ? workflowFindings
+          : evaluateRulesCoarseToFine(
+              wfList,
+              {
+                ...ruleContext,
+                workflowSemantics: semanticsByWorkflow as ReadonlyMap<
+                  WorkflowDocument,
+                  WorkflowSemantics
+                >,
+              },
+              analysisWarnings,
+              ruleFindingCounts,
+              (rule) => !!rule.meta.precheck,
+            )
+              .then((findings) =>
+                findings.filter((finding) =>
+                  findingIncludedInScope(finding, workflowOnly, repositoryOnly),
+                ),
+              )
+              .then((precheckedFindings) => [...workflowFindings, ...precheckedFindings]),
+      ),
     workflowOnly
       ? ([] as Diagnostic[])
       : collectRepositoryDiagnostics({

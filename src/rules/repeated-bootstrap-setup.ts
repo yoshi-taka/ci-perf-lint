@@ -1,6 +1,7 @@
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
+import type { WorkflowSemantics } from "./shared/workflow-semantics.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { buildWorkflowSemantics } from "./shared/workflow-semantics.ts";
 
@@ -23,7 +24,10 @@ interface BootstrapGroup {
 export const repeatedBootstrapSetupRule = {
   meta,
   check(workflow: WorkflowDocument, context: RuleContext) {
-    const semantics = context.workflowSemantics ?? buildWorkflowSemantics(workflow);
+    const semantics: WorkflowSemantics =
+      context.workflowSemantics instanceof Map
+        ? (context.workflowSemantics.get(workflow) ?? buildWorkflowSemantics(workflow))
+        : (context.workflowSemantics ?? buildWorkflowSemantics(workflow));
     const groups = new Map<string, BootstrapGroup>();
 
     for (const job of workflow.jobs) {

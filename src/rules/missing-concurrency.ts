@@ -14,8 +14,10 @@ import {
 } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
-import { withRepositoryConcurrencyPrecedent } from "./shared/similar-workflow-consensus-precedents.ts";
-import { withSimilarWorkflowConcurrencyConsensus } from "./shared/similar-workflow-consensus-consensus.ts";
+import {
+  withRepositoryConcurrencyPrecedent,
+  withSimilarWorkflowConcurrencyConsensus,
+} from "./shared/similar-workflow-consensus.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
 
 const meta = {

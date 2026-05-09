@@ -162,10 +162,7 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
   return semantics;
 }
 
-export function getJobSemantics(
-  workflow: WorkflowDocument,
-  jobId: string,
-): JobMetadata | undefined {
+function getJobSemantics(workflow: WorkflowDocument, jobId: string): JobMetadata | undefined {
   const semantics = buildWorkflowSemantics(workflow);
   return semantics.jobs.find((j) => j.id === jobId);
 }

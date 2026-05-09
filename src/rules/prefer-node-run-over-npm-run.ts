@@ -16,6 +16,7 @@ const meta = {
   confidence: "medium",
   docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
   scope: "all",
+  precheck: (workflow) => (workflow.source?.includes("npm run") ? 1 : 0),
 } satisfies RuleMeta;
 
 function parseVisibleNodeMajor(version: unknown): number | undefined {

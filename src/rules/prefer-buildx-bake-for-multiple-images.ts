@@ -9,6 +9,10 @@ const meta = {
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-buildx-bake-for-multiple-images.md",
+  precheck: (workflow) => {
+    const matches = workflow.source?.match(/\bdocker\s+(?:buildx\s+build|build)\b/gi)?.length ?? 0;
+    return matches >= 2 ? 1 : 0;
+  },
 } satisfies RuleMeta;
 
 export const preferBuildxBakeForMultipleImagesRule = {

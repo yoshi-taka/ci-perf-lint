@@ -9,6 +9,10 @@ const meta = {
   severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/docker-build-without-layer-cache.md",
+  precheck: (workflow) =>
+    workflow.source?.includes("docker/build-push-action") || workflow.source?.includes("--push")
+      ? 1
+      : 0,
 } satisfies RuleMeta;
 
 function stepUsesDockerOrDepotBuildPushAction(step: WorkflowStep): boolean {

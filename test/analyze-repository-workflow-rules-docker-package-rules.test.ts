@@ -1,10 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { analyzeRepository } from "../src/repo.ts";
 import { fixtures } from "./fixtures.ts";
+import { dockerBuildWithoutLayerCacheRule } from "../src/rules/docker-build-without-layer-cache.ts";
 
 const baseOptions = { targetPath: ".", topCount: 20, mode: "strict" as const };
 
 describe("analyzeRepository workflow and execution rules: dockerfile package and cache-mount rules", () => {
+  test("docker-build-without-layer-cache precheck is source-only", () => {
+    expect(
+      dockerBuildWithoutLayerCacheRule.meta.precheck({ source: "docker/build-push-action@v6" }),
+    ).toBe(1);
+    expect(dockerBuildWithoutLayerCacheRule.meta.precheck({ source: "echo hello" })).toBe(0);
+  });
+
   test("warns when Rust Dockerfile installs cargo tools without locked resolution and builds release without cache mounts", async () => {
     const report = await analyzeRepository({
       cwd: fixtures.dockerRustUncachedLike,
