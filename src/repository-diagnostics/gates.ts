@@ -263,6 +263,42 @@ function repositoryLikelyUsesRust(context: RepositoryDiagnosticContext): boolean
   );
 }
 
+function quickTestJavaScriptTooling(context: RepositoryDiagnosticContext): boolean | undefined {
+  const { repository } = context;
+  if (
+    repository.typescript.versionSpec !== undefined ||
+    repository.jest.versionSpec !== undefined ||
+    repository.jest.jsdomVersionSpec !== undefined ||
+    repository.frameworks.usesNextjs ||
+    repository.frameworks.usesVite ||
+    repository.frameworks.usesStorybook ||
+    repository.frameworks.usesTurbo
+  ) {
+    return true;
+  }
+  return undefined;
+}
+
+function quickTestJavaScriptFrameworks(context: RepositoryDiagnosticContext): boolean | undefined {
+  const { frameworks, tailwind, jest } = context.repository;
+  if (
+    frameworks.usesNextjs ||
+    frameworks.usesStorybook ||
+    tailwind.usesTailwind ||
+    jest.versionSpec !== undefined
+  ) {
+    return true;
+  }
+  return undefined;
+}
+
+function quickTestRust(context: RepositoryDiagnosticContext): boolean | undefined {
+  if (context.repository.rust.hasCargoToml) {
+    return true;
+  }
+  return undefined;
+}
+
 export async function collectRepositoryDiagnosticGateState(
   context: RepositoryDiagnosticContext,
 ): Promise<RepositoryDiagnosticGateState> {
@@ -281,18 +317,18 @@ export async function collectRepositoryDiagnosticGateState(
     timedGate("large-files", () => repositoryLooksLargeFilesHeavy(context.scanContext)),
     timedGate("pytest", () => repositoryLooksPytestHeavy(context.scanContext, context.workflows)),
     timedGate("renovate", () => repositoryHasRenovateConfig(context.scanContext)),
-    repositoryLikelyUsesJavaScriptTooling(context)
-      ? Promise.resolve(true)
+    quickTestJavaScriptTooling(context) !== undefined
+      ? Promise.resolve(quickTestJavaScriptTooling(context)!)
       : timedGate("javascript-tooling", () => looksLikeJavaScriptRepository(context.scanContext)),
     repositoryHasJavaScriptBuildConfigEvidence(context.scanContext),
     repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
-    repositoryLikelyUsesJavaScriptFrameworks(context)
-      ? Promise.resolve(true)
+    quickTestJavaScriptFrameworks(context) !== undefined
+      ? Promise.resolve(quickTestJavaScriptFrameworks(context)!)
       : timedGate("javascript-frameworks", () =>
           looksLikeJavaScriptFrameworksRepository(context.scanContext),
         ),
-    repositoryLikelyUsesRust(context)
-      ? Promise.resolve(true)
+    quickTestRust(context) !== undefined
+      ? Promise.resolve(quickTestRust(context)!)
       : timedGate("rust", () => looksLikeRustRepository(context.scanContext)),
     timedGate("cdk-manifest", () => repositoryHasCdkManifest(context.scanContext)),
   ]);
