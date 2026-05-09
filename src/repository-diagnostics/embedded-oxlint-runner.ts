@@ -114,12 +114,10 @@ export async function runEmbeddedOxlint(
       result = await runOxlint(cmd);
     }
 
-    // Try 2: bunx oxlint fallback — only when bundled binary exists but crashed.
-    // Bun's .bun/ cache layout sometimes fails to resolve oxlint's native
-    // NAPI-RS binding (@oxlint/binding-darwin-arm64) from the JS wrapper,
-    // causing a SIGILL crash. bunx uses a different install path where
-    // module resolution works correctly.
-    if (bundledResolved && result !== undefined && result.exitCode !== 0) {
+    // Try 2: bunx oxlint fallback — bundled path failed (timeout, crash, or
+    // Bun cache symlink issue with native binding resolution).
+    const bundledFailed = bundledResolved && result?.exitCode !== 0;
+    if (bundledFailed) {
       if (typeof Bun !== "undefined") {
         const bunxCmd = ["bunx", "--bun", "oxlint", ...oxlintArgs];
         const bunxResult = await runOxlint(bunxCmd);
