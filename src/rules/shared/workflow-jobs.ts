@@ -1,6 +1,6 @@
 import type { WorkflowDocument, WorkflowJob } from "../../workflow.ts";
 import type { YAMLMap } from "yaml";
-import { getNode, getScalarValue, getMapValue, getStringOrArrayValue } from "../../workflow.ts";
+import { getScalarValue, getMapValue } from "../../workflow.ts";
 import { getJobFacts, getWorkflowFacts } from "./workflow-analysis.ts";
 
 export function isHeavyWorkflow(workflow: WorkflowDocument): boolean {
@@ -64,94 +64,24 @@ function isYamlMap(node: unknown): node is YAMLMap<unknown, unknown> {
   return Boolean(node && typeof node === "object" && "items" in (node as Record<string, unknown>));
 }
 
-function getRunsOnLabels(job: WorkflowJob): string[] {
-  if (!isYamlMap(job.node)) {
-    const runsOn = job.raw["runs-on"];
-    if (typeof runsOn === "string") {
-      return [runsOn];
-    }
-    if (Array.isArray(runsOn)) {
-      return runsOn.filter((e): e is string => typeof e === "string");
-    }
-    return [];
-  }
-  const runsOn = getStringOrArrayValue(job.node, "runs-on");
-  if (typeof runsOn === "string") {
-    return [runsOn];
-  }
-  if (Array.isArray(runsOn)) {
-    return runsOn.filter((entry): entry is string => typeof entry === "string");
-  }
-  return [];
-}
-
 export function jobRunsOnHostedUbuntu(job: WorkflowJob): boolean {
-  return getRunsOnLabels(job).some((label) => /^ubuntu-/i.test(label));
+  return getJobFacts(job).runsOnSpec.isUbuntu;
 }
 
 export function jobRunsOnHostedWindows(job: WorkflowJob): boolean {
-  return getRunsOnLabels(job).some((label) => /^windows-/i.test(label));
+  return getJobFacts(job).runsOnSpec.isWindows;
 }
 
 export function jobRunsOnHostedMacos(job: WorkflowJob): boolean {
-  return getRunsOnLabels(job).some((label) => /^macos-/i.test(label));
+  return getJobFacts(job).runsOnSpec.isMacos;
 }
 
-const standardHostedRunnerLabels = new Set([
-  "ubuntu-latest",
-  "ubuntu-24.04",
-  "ubuntu-22.04",
-  "ubuntu-20.04",
-  "windows-latest",
-  "windows-2025",
-  "windows-2022",
-  "windows-2019",
-  "macos-latest",
-  "macos-14",
-  "macos-15",
-  "macos-26",
-  "macos-15-intel",
-  "macos-26-intel",
-]);
-
 export function jobRunsOnStandardHostedRunner(job: WorkflowJob): boolean {
-  if (!isYamlMap(job.node)) {
-    const runsOn = job.raw["runs-on"];
-    if (typeof runsOn === "string") {
-      return standardHostedRunnerLabels.has(runsOn.toLowerCase());
-    }
-    if (Array.isArray(runsOn)) {
-      const labels = runsOn
-        .filter((e): e is string => typeof e === "string")
-        .map((l) => l.toLowerCase());
-      return labels.length > 0 && labels.every((l) => standardHostedRunnerLabels.has(l));
-    }
-    return false;
-  }
-  const runsOn = getStringOrArrayValue(job.node, "runs-on");
-  if (typeof runsOn === "string") {
-    return standardHostedRunnerLabels.has(runsOn.toLowerCase());
-  }
-
-  if (Array.isArray(runsOn)) {
-    const labels = runsOn
-      .filter((entry): entry is string => typeof entry === "string")
-      .map((label) => label.toLowerCase());
-    if (labels.length === 0) {
-      return false;
-    }
-
-    return labels.every((label) => standardHostedRunnerLabels.has(label));
-  }
-
-  return false;
+  return getJobFacts(job).runsOnSpec.isStandardHosted;
 }
 
 export function jobUsesContainer(job: WorkflowJob): boolean {
-  if (!isYamlMap(job.node)) {
-    return Boolean(job.raw.container);
-  }
-  return getNode(job.node, "container") !== undefined;
+  return getJobFacts(job).runsOnSpec.usesContainer;
 }
 
 export function hasHistoryDependentCommand(job: WorkflowJob): boolean {

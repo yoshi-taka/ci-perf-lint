@@ -4,8 +4,10 @@ import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "../../circleci-workflow.ts";
 import type { SetupActionKind } from "./tools.ts";
 import type { TriggerFacts } from "./trigger-facts.ts";
+import type { RunsOnSpec } from "./runs-on-facts.ts";
 import { getTriggerFacts } from "./trigger-facts.ts";
 import { getStepFacts } from "./step-facts.ts";
+import { getRunsOnSpec } from "./runs-on-facts.ts";
 import { detectLintTool, detectPythonTool } from "./tools.ts";
 
 const dockerBuildxBakePattern = /\bdocker\s+buildx\s+bake\b|\bdocker-buildx\s+bake\b/i;
@@ -50,6 +52,7 @@ export interface JobFacts {
   hasTimeout: boolean;
   dockerUsage: boolean;
   setupActions: readonly SetupActionKind[];
+  runsOnSpec: RunsOnSpec;
 }
 
 export interface WorkflowFacts {
@@ -252,6 +255,7 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     hasTimeout: jobHasTimeout,
     dockerUsage: hasBuildxBake || hasDockerBuild,
     setupActions,
+    runsOnSpec: getRunsOnSpec(job),
   };
   jobFactsCache.set(job, facts);
   return facts;

@@ -1,9 +1,8 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta, Severity } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
-import type { YAMLMap } from "yaml";
-import { getStringOrArrayValue } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { jobRunsOnArmLikeRunner } from "./shared/runs-on-facts.ts";
 
 const meta = {
   id: "prefer-native-arm-runner-over-qemu",
@@ -22,30 +21,6 @@ function usesDockerBuildPushAction(step: WorkflowStep): boolean {
   return (
     typeof step.uses === "string" && step.uses.toLowerCase().startsWith("docker/build-push-action@")
   );
-}
-
-function isYamlMap(node: unknown): node is YAMLMap<unknown, unknown> {
-  return Boolean(node && typeof node === "object" && "items" in (node as Record<string, unknown>));
-}
-
-function jobRunsOnArmLikeRunner(job: WorkflowJob): boolean {
-  const labels: string[] = [];
-  if (isYamlMap(job.node)) {
-    const runsOn = getStringOrArrayValue(job.node, "runs-on");
-    if (typeof runsOn === "string") {
-      labels.push(runsOn);
-    } else if (Array.isArray(runsOn)) {
-      labels.push(...runsOn.filter((e): e is string => typeof e === "string"));
-    }
-  } else {
-    const runsOn = job.raw["runs-on"];
-    if (typeof runsOn === "string") {
-      labels.push(runsOn);
-    } else if (Array.isArray(runsOn)) {
-      labels.push(...runsOn.filter((e): e is string => typeof e === "string"));
-    }
-  }
-  return labels.some((label) => /\b(?:arm|arm64|aarch64)\b/i.test(label));
 }
 
 function normalizePlatformsText(value: unknown): string {
