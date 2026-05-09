@@ -41,31 +41,45 @@ export async function runEmbeddedOxlint(
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<OxlintDiagnostic[] | undefined> {
-  try {
-    const startedAt = performance.now();
-    const localWarnings: AnalysisWarning[] = [];
-    const context = scanContext ?? new RepositoryScanContext(repoRoot, localWarnings);
-    const source = embeddedOxlintLabel(kind);
-    const oxlintPath = await bundledOxlintBinPath();
-    if (!oxlintPath) {
-      context.warn(
-        source,
-        "Oxlint package not found via module resolution. Skipping oxlint-based diagnostics. Install oxlint or ensure the package is available in node_modules.",
-      );
-      warnings?.push(...localWarnings);
-      return undefined;
-    }
-    if (!(await context.pathExists(oxlintPath))) {
-      context.warn(
-        source,
-        `Oxlint binary not found at resolved path: ${oxlintPath}. Skipping oxlint-based diagnostics.`,
-      );
-      warnings?.push(...localWarnings);
+  async function runOxlint(
+    cmd: string[],
+  ): Promise<
+    { diagnostics: OxlintDiagnostic[]; exitCode: number; stderrText: string } | undefined
+  > {
+    const spawned = spawnOxlintProcess(cmd, repoRoot);
+    const [stdoutText, stderrText, exitCode] = await Promise.all([
+      spawned.stdout,
+      spawned.stderr,
+      spawned.exited,
+    ]);
+
+    if (exitCode === -1) {
       return undefined;
     }
 
+    if (exitCode !== 0) {
+      return { diagnostics: [], exitCode, stderrText };
+    }
+
+    const diagnostics: OxlintDiagnostic[] = [];
+    for (const line of stdoutText.split("\n")) {
+      if (!line) {
+        continue;
+      }
+      const parsed = parseOxlintLine(line);
+      if (parsed) {
+        diagnostics.push(parsed);
+      }
+    }
+
+    return { diagnostics, exitCode, stderrText };
+  }
+
+  try {
+    const localWarnings: AnalysisWarning[] = [];
+    const context = scanContext ?? new RepositoryScanContext(repoRoot, localWarnings);
+    const source = embeddedOxlintLabel(kind);
     const configPath = await writeEmbeddedOxlintConfig(kind);
-    const spawnStartedAt = performance.now();
     const ignorePatternFlags = embeddedOxlintDefaultIgnorePatterns.flatMap((pattern) => [
       "--ignore-pattern",
       pattern,
@@ -81,14 +95,44 @@ export async function runEmbeddedOxlint(
       ...ignorePatternFlags,
       ".",
     ];
-    const cmd =
-      typeof Bun !== "undefined"
-        ? ["bun", bundledOxlintJsPath(oxlintPath), ...oxlintArgs]
-        : [oxlintPath, ...oxlintArgs];
-    const { stdout, stderr, exited } = spawnOxlintProcess(cmd, repoRoot);
-    const [stdoutText, stderrText, exitCode] = await Promise.all([stdout, stderr, exited]);
 
-    if (exitCode === -1 || (exitCode !== 0 && exitCode > 128)) {
+    const startedAt = performance.now();
+    let result:
+      | { diagnostics: OxlintDiagnostic[]; exitCode: number; stderrText: string }
+      | undefined;
+    let usedFallback = false;
+
+    // Try 1: bundled oxlint via node_modules (JS wrapper + native .node addon)
+    const oxlintPath = await bundledOxlintBinPath();
+    let bundledResolved = false;
+    if (oxlintPath && (await context.pathExists(oxlintPath))) {
+      bundledResolved = true;
+      const cmd =
+        typeof Bun !== "undefined"
+          ? ["bun", bundledOxlintJsPath(oxlintPath), ...oxlintArgs]
+          : [oxlintPath, ...oxlintArgs];
+      result = await runOxlint(cmd);
+    }
+
+    // Try 2: bunx oxlint fallback — only when bundled binary exists but crashed.
+    // Bun's .bun/ cache layout sometimes fails to resolve oxlint's native
+    // NAPI-RS binding (@oxlint/binding-darwin-arm64) from the JS wrapper,
+    // causing a SIGILL crash. bunx uses a different install path where
+    // module resolution works correctly.
+    if (bundledResolved && result !== undefined && result.exitCode !== 0) {
+      if (typeof Bun !== "undefined") {
+        const bunxCmd = ["bunx", "--bun", "oxlint", ...oxlintArgs];
+        const bunxResult = await runOxlint(bunxCmd);
+        if (bunxResult?.exitCode === 0) {
+          result = bunxResult;
+          usedFallback = true;
+        }
+      }
+    }
+
+    const elapsedMs = performance.now() - startedAt;
+
+    if (result === undefined) {
       const skipped =
         kind === "import"
           ? "import restriction and extension checks"
@@ -96,45 +140,41 @@ export async function runEmbeddedOxlint(
       stderrWarn(
         `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
       );
-      return [];
+      return undefined;
     }
 
-    if (stderrText.trim().length > 0) {
+    if (result.exitCode !== 0) {
+      const skipped =
+        kind === "import"
+          ? "import restriction and extension checks"
+          : "barrel file and snapshot checks";
+      const code = result.exitCode;
+      if (code > 128) {
+        stderrWarn(
+          `[${source}] Oxlint process exited with signal ${code - 128} (code ${code}). ${skipped} skipped for ${repoRoot}.\n`,
+        );
+      } else {
+        stderrWarn(
+          `[${source}] Oxlint process exited with code ${code}. ${skipped} skipped for ${repoRoot}.\n`,
+        );
+      }
+      return undefined;
+    }
+
+    if (result.stderrText.trim().length > 0) {
       context.warn(
         source,
-        `Embedded Oxlint stderr output while scanning ${repoRoot}: ${stderrText.slice(0, 500)}`,
+        `Embedded Oxlint stderr output while scanning ${repoRoot}: ${result.stderrText.slice(0, 500)}`,
       );
     }
-
-    const diagnostics: OxlintDiagnostic[] = [];
-    for (const line of stdoutText.split("\n")) {
-      if (!line) {
-        continue;
-      }
-      const parsed = parseOxlintLine(line);
-      if (parsed) {
-        diagnostics.push(parsed);
-      }
-    }
-
-    if (exitCode !== 0 && diagnostics.length === 0) {
-      context.warn(
-        source,
-        `Embedded Oxlint exited with code ${exitCode} and produced no output while scanning ${repoRoot}.`,
-      );
-      warnings?.push(...localWarnings);
-      return [];
-    }
-
-    const spawnElapsed = performance.now() - spawnStartedAt;
 
     if (timingsEnabled()) {
       process.stderr.write(
-        `[timing] ${source} spawn=${spawnElapsed.toFixed(1)}ms diagnostics=${diagnostics.length} total=${(performance.now() - startedAt).toFixed(1)}ms\n`,
+        `[timing] ${source} time=${elapsedMs.toFixed(1)}ms diagnostics=${result.diagnostics.length}${usedFallback ? " (via bunx)" : ""}\n`,
       );
     }
     warnings?.push(...localWarnings);
-    return diagnostics;
+    return result.diagnostics;
   } catch (error) {
     const localWarnings: AnalysisWarning[] = [];
     const context = new RepositoryScanContext(repoRoot, localWarnings);
