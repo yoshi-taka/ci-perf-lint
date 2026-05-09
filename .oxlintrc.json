@@ -65,8 +65,7 @@
     {
       "files": ["**/*.test.*", "**/*.spec.*"],
       "rules": {
-        "import/no-cycle": "off",
-        "typescript/await-thenable": "off"
+        "import/no-cycle": "off"
       }
     },
     {
