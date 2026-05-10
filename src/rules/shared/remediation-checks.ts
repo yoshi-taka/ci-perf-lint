@@ -1,4 +1,4 @@
-import type { Diagnostic, ImpliedCheck, RuleMeta } from "../../types.ts";
+import type { AnalysisWarning, Diagnostic, ImpliedCheck, RuleMeta } from "../../types.ts";
 
 const ruleMetaRegistry = new Map<string, RuleMeta>();
 
@@ -7,6 +7,79 @@ export function registerAllRuleMetaForRemediation(rules: readonly { meta: RuleMe
     ruleMetaRegistry.set(rule.meta.id, rule.meta);
   }
 }
+
+// ──────────────────────────────────────────────
+// INFERENCE GRAPH — first-class implication structure
+// ──────────────────────────────────────────────
+
+export interface InferenceGraph {
+  forwards: ReadonlyMap<string, readonly string[]>;
+  reverse: ReadonlyMap<string, readonly string[]>;
+}
+
+export function buildInferenceGraph(rules: readonly { meta: RuleMeta }[]): InferenceGraph {
+  const forwards = new Map<string, string[]>();
+  const reverse = new Map<string, string[]>();
+
+  for (const rule of rules) {
+    const implied = rule.meta.impliedChecks;
+    if (implied && implied.length > 0) {
+      forwards.set(rule.meta.id, [...implied]);
+    }
+  }
+
+  for (const rule of rules) {
+    for (const implied of rule.meta.impliedChecks ?? []) {
+      const sources = reverse.get(implied) ?? [];
+      sources.push(rule.meta.id);
+      reverse.set(implied, sources);
+    }
+  }
+
+  return { forwards, reverse };
+}
+
+// ──────────────────────────────────────────────
+// IMPLICATION-AWARE CONSISTENCY
+// ──────────────────────────────────────────────
+
+export function detectImplicationDrift(
+  firedRuleIds: Set<string>,
+  evaluatedRuleIds: Set<string>,
+  graph: InferenceGraph,
+): AnalysisWarning[] {
+  const warnings: AnalysisWarning[] = [];
+
+  for (const [sourceId, impliedIds] of graph.forwards) {
+    if (!firedRuleIds.has(sourceId)) {
+      continue;
+    }
+
+    for (const impliedId of impliedIds) {
+      if (firedRuleIds.has(impliedId)) {
+        continue;
+      }
+
+      if (evaluatedRuleIds.has(impliedId)) {
+        warnings.push({
+          source: "rule-engine",
+          message: `Rule ${sourceId} fired but implied rule ${impliedId} produced no findings — possible semantic drift or rule configuration mismatch.`,
+        });
+      } else {
+        warnings.push({
+          source: "rule-engine",
+          message: `Rule ${sourceId} fired but implied rule ${impliedId} was not evaluated — the implication may be stale or the target rule may be gated by unmet required features.`,
+        });
+      }
+    }
+  }
+
+  return warnings;
+}
+
+// ──────────────────────────────────────────────
+// EXISTING: computeImpliedChecks (remediation layer)
+// ──────────────────────────────────────────────
 
 export function computeImpliedChecks(findings: Diagnostic[]): ImpliedCheck[] {
   const seenRuleIds = new Set(findings.map((f) => f.ruleId));

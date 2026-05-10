@@ -11,6 +11,7 @@ import type { RepositoryFileIndex } from "./rules/shared/repository-file-index.t
 import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
 import { classifySingularity, type SingularityTracker } from "./rules/shared/singularity.ts";
 import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
+import { buildInferenceGraph, detectImplicationDrift } from "./rules/shared/remediation-checks.ts";
 
 type WorkflowNodeKind = "trigger" | "concurrency";
 
@@ -213,7 +214,9 @@ export async function evaluateRules(
     run: () => Promise<Diagnostic[]>;
   }
 
+  const inferenceGraph = buildInferenceGraph(allRules);
   const tasks: RuleTask[] = [];
+  const evaluatedRuleIds = new Set<string>();
   const workflowPath = workflow.relativePath;
 
   for (const rule of allRules) {
@@ -234,6 +237,7 @@ export async function evaluateRules(
     }
 
     const checkFn = getRuleCheckFn(rule, isBuildkite, isGitlab, isCircle);
+    evaluatedRuleIds.add(rule.meta.id);
     tasks.push({ rule, run: () => Promise.resolve(checkFn(workflow, context)) });
   }
 
@@ -260,20 +264,36 @@ export async function evaluateRules(
 
   const ruleResults: Diagnostic[] = [];
   const idMaxFindings = new Map<string, number>();
+  const firedRuleIds = new Set<string>();
 
   for (const { diagnostics, rule } of settled) {
     const { maxFindings } = rule.meta;
     if (maxFindings !== undefined) {
       idMaxFindings.set(rule.meta.id, maxFindings);
     }
+    if (diagnostics.length > 0) {
+      firedRuleIds.add(rule.meta.id);
+    }
     ruleResults.push(...diagnostics);
   }
 
+  if (warnings) {
+    const drift = detectImplicationDrift(firedRuleIds, evaluatedRuleIds, inferenceGraph);
+    warnings.push(...drift);
+  }
+
   if (findingCounts || idMaxFindings.size > 0) {
+    const impliedIds = new Set<string>();
+    for (const [, impliedList] of inferenceGraph.forwards) {
+      for (const id of impliedList) {
+        impliedIds.add(id);
+      }
+    }
+
     const caps = new Map<string, number>();
     const filtered = ruleResults.filter((d) => {
       const max = idMaxFindings.get(d.ruleId);
-      if (max === undefined) {
+      if (max === undefined || impliedIds.has(d.ruleId)) {
         return true;
       }
       const count = caps.get(d.ruleId) ?? 0;
@@ -337,6 +357,10 @@ export async function evaluateRulesCoarseToFine(
     ...(rulesByScope.all ?? []),
   ];
 
+  const inferenceGraph = buildInferenceGraph(allRules);
+  const evaluatedRuleIds = new Set<string>();
+  const firedRuleIds = new Set<string>();
+
   const workflowResults = workflows.map(() => [] as Diagnostic[]);
   const workflowIndexByRef = new Map<
     WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
@@ -355,6 +379,8 @@ export async function evaluateRulesCoarseToFine(
     if (context.singularities?.isQuarantined(ruleId)) {
       continue;
     }
+
+    evaluatedRuleIds.add(ruleId);
 
     const { maxFindings, precheckBudget = 20 } = rule.meta;
 
@@ -395,6 +421,9 @@ export async function evaluateRulesCoarseToFine(
         workflowSemantics !== undefined ? { ...context, workflowSemantics } : context;
       try {
         const diagnostics = await checkFn(workflow, perWorkflowContext);
+        if (diagnostics.length > 0) {
+          firedRuleIds.add(ruleId);
+        }
         if (maxFindings !== undefined && diagnostics.length > maxFindings) {
           diagnostics.length = maxFindings;
         }
@@ -417,6 +446,11 @@ export async function evaluateRulesCoarseToFine(
         }
       }
     }
+  }
+
+  if (warnings) {
+    const drift = detectImplicationDrift(firedRuleIds, evaluatedRuleIds, inferenceGraph);
+    warnings.push(...drift);
   }
 
   return deduplicateByPathLine(workflowResults.flat());
