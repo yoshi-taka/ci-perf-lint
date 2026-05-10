@@ -78,9 +78,6 @@ export async function runEmbeddedOxlint(
     }
 
     if (spawned.timedOut) {
-      if (diagnostics.length > 0) {
-        return { diagnostics, exitCode, stderrText };
-      }
       return { diagnostics, exitCode, stderrText, timedOut: true };
     }
 
@@ -177,15 +174,20 @@ export async function runEmbeddedOxlint(
       return undefined;
     }
 
-    if (result.timedOut && result.diagnostics.length === 0) {
+    if (result.timedOut) {
       const skipped =
         kind === "import"
           ? "import restriction and extension checks"
           : "barrel file and snapshot checks";
+      if (result.diagnostics.length === 0) {
+        stderrWarn(
+          `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
+        );
+        return undefined;
+      }
       stderrWarn(
-        `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
+        `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. Partial results (${result.diagnostics.length} findings) returned for ${repoRoot}.\n`,
       );
-      return undefined;
     }
 
     if (result.exitCode !== 0 && result.diagnostics.length === 0) {
