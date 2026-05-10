@@ -4,10 +4,17 @@
 // Models cron schedules as harmonic components and
 // detects constructive interference (resonance) between
 // overlapping periodic schedules.
+//
+// Features:
+//   - exact phase-aligned overlaps (LCM-based)
+//   - near-integer frequency ratios (beat periods)
+//   - proximity overlaps (crons firing within tolerance)
+//   - day-of-week mutual exclusivity
 
 export interface CronComponent {
   interval: number;
   phase: number;
+  dayMask: number;
   raw: string;
 }
 
@@ -17,8 +24,17 @@ export interface ResonancePair {
   phaseA: number;
   phaseB: number;
   lcm: number;
-  overlaps: boolean;
-  overlapsPerDay: number;
+  exactOverlap: boolean;
+  exactOverlapsPerDay: number;
+  proximityMinutes: number;
+  dayOverlapFraction: number;
+  harmonicRatio: HarmonicRatio | null;
+}
+
+export interface HarmonicRatio {
+  nearestInteger: number;
+  deviation: number;
+  beatPeriodMinutes: number;
 }
 
 export interface ScheduleSpectrum {
@@ -26,9 +42,12 @@ export interface ScheduleSpectrum {
   minInterval: number;
   fundamentalPeriod: number;
   resonances: ResonancePair[];
-  resonanceEventsPerDay: number;
+  exactEventsPerDay: number;
+  proximityScore: number;
   contentionRisk: number;
 }
+
+const PROXIMITY_TOLERANCE = 5;
 
 // ──────────────────────────────────────────────
 // 1. CRON PARSING
@@ -100,16 +119,63 @@ function extractCronPhase(cron: string): number {
   return minuteNum;
 }
 
+const DAY_MASK_ALL = 0x7f;
+
+function parseDayOfWeek(field: string | undefined): number {
+  if (!field || field === "*") {
+    return DAY_MASK_ALL;
+  }
+
+  const dayIndex = (d: number): number => {
+    const idx = d === 7 ? 0 : d;
+    return 1 << idx;
+  };
+
+  let mask = 0;
+  const segments = field.split(",");
+  for (const seg of segments) {
+    const range = /^(\d+)-(\d+)$/.exec(seg.trim());
+    if (range) {
+      const lo = Number.parseInt(range[1]!, 10);
+      const hi = Number.parseInt(range[2]!, 10);
+      for (let d = lo; d <= hi; d++) {
+        mask |= dayIndex(d);
+      }
+    } else {
+      const d = Number.parseInt(seg.trim(), 10);
+      if (!Number.isNaN(d)) {
+        mask |= dayIndex(d);
+      }
+    }
+  }
+  return mask;
+}
+
+function popcount(mask: number): number {
+  let c = 0;
+  while (mask) {
+    c += mask & 1;
+    mask >>>= 1;
+  }
+  return c;
+}
+
 function parseCronComponent(cron: string): CronComponent | undefined {
   const interval = estimateCronInterval(cron);
   if (interval === undefined) {
     return undefined;
   }
-  return { interval, phase: extractCronPhase(cron), raw: cron };
+  const parts = cron.trim().split(/\s+/);
+  return {
+    interval,
+    phase: extractCronPhase(cron),
+    dayMask: parseDayOfWeek(parts[4]),
+    raw: cron,
+  };
 }
 
 // ──────────────────────────────────────────────
-// 2. HARMONIC SPECTRUM
+// 2. ARITHMETIC HELPERS
 // ──────────────────────────────────────────────
 
 function computeGcd(a: number, b: number): number {
@@ -130,12 +196,44 @@ function computeLcm(a: number, b: number): number {
   return (a / computeGcd(a, b)) * b;
 }
 
-function phasesOverlap(phaseA: number, phaseB: number, gcd: number): boolean {
-  if (gcd === 0) {
-    return phaseA === phaseB;
+// ──────────────────────────────────────────────
+// 3. HARMONIC RATIO — near-integer frequency
+// ──────────────────────────────────────────────
+
+function detectHarmonicRatio(intervalA: number, intervalB: number): HarmonicRatio | null {
+  const smaller = Math.min(intervalA, intervalB);
+  const larger = Math.max(intervalA, intervalB);
+  const ratio = larger / smaller;
+  const nearestInteger = Math.round(ratio);
+  if (nearestInteger === 0) {
+    return null;
   }
-  return Math.abs(phaseA - phaseB) % gcd === 0;
+
+  const deviation = Math.abs(ratio - nearestInteger) / ratio;
+  if (deviation > 0.1) {
+    return null;
+  }
+
+  const beatPeriodMinutes = Math.abs((smaller * larger) / (larger - nearestInteger * smaller));
+
+  return { nearestInteger, deviation, beatPeriodMinutes };
 }
+
+// ──────────────────────────────────────────────
+// 4. PROXIMITY — firing distance between crons
+// ──────────────────────────────────────────────
+
+function computeProximityMinutes(phaseA: number, phaseB: number, gcd: number): number {
+  if (gcd === 0) {
+    return Math.abs(phaseA - phaseB);
+  }
+  const d = Math.abs(phaseA - phaseB) % gcd;
+  return Math.min(d, gcd - d);
+}
+
+// ──────────────────────────────────────────────
+// 5. SPECTRUM BUILDER
+// ──────────────────────────────────────────────
 
 export function buildScheduleSpectrum(crons: string[]): ScheduleSpectrum {
   const components: CronComponent[] = [];
@@ -154,14 +252,29 @@ export function buildScheduleSpectrum(crons: string[]): ScheduleSpectrum {
   const fundamentalPeriod = allIntervals.reduce((g, i) => computeGcd(g, i), allIntervals[0] ?? 0);
 
   const resonances: ResonancePair[] = [];
+  let proximityCount = 0;
+  let pairCount = 0;
 
   for (let i = 0; i < components.length; i++) {
     for (let j = i + 1; j < components.length; j++) {
       const a = components[i]!;
       const b = components[j]!;
+      pairCount++;
+
       const g = computeGcd(a.interval, b.interval);
       const lcm = computeLcm(a.interval, b.interval);
-      const overlap = phasesOverlap(a.phase, b.phase, g);
+      const phaseGap = computeProximityMinutes(a.phase, b.phase, g);
+      const exactOverlap = phaseGap === 0;
+      const isProximate = phaseGap <= PROXIMITY_TOLERANCE;
+      if (isProximate) {
+        proximityCount++;
+      }
+
+      const dayOverlap = a.dayMask & b.dayMask;
+      const dayOverlapFraction = popcount(dayOverlap) / 7;
+
+      const harmonicRatio =
+        a.interval !== b.interval ? detectHarmonicRatio(a.interval, b.interval) : null;
 
       resonances.push({
         intervalA: a.interval,
@@ -169,21 +282,26 @@ export function buildScheduleSpectrum(crons: string[]): ScheduleSpectrum {
         phaseA: a.phase,
         phaseB: b.phase,
         lcm,
-        overlaps: overlap,
-        overlapsPerDay: overlap ? 1440 / lcm : 0,
+        exactOverlap,
+        exactOverlapsPerDay: exactOverlap && dayOverlap > 0 ? (1440 / lcm) * dayOverlapFraction : 0,
+        proximityMinutes: phaseGap,
+        dayOverlapFraction,
+        harmonicRatio,
       });
     }
   }
 
-  const resonanceEventsPerDay = resonances.reduce((sum, r) => sum + r.overlapsPerDay, 0);
-  const contentionRisk = Math.min(1, resonanceEventsPerDay / 24);
+  const exactEventsPerDay = resonances.reduce((sum, r) => sum + r.exactOverlapsPerDay, 0);
+  const proximityScore = pairCount > 0 ? proximityCount / pairCount : 0;
+  const contentionRisk = Math.min(1, exactEventsPerDay / 6);
 
   return {
     components,
     minInterval,
     fundamentalPeriod,
     resonances,
-    resonanceEventsPerDay,
+    exactEventsPerDay,
+    proximityScore,
     contentionRisk,
   };
 }

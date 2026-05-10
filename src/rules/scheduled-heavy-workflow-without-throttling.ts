@@ -11,7 +11,7 @@ import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositoryThrottledSchedulePrecedent } from "./shared/similar-workflow-consensus.ts";
 import { buildScheduleSpectrum, estimateCronInterval } from "./shared/schedule-harmonics.ts";
 
-const RESONANCE_EVENTS_THRESHOLD = 3;
+const EXACT_OVERLAP_THRESHOLD = 1;
 const MINUTE_INTERVAL_THRESHOLD = 180;
 
 const meta = {
@@ -46,7 +46,7 @@ export const scheduledHeavyWorkflowWithoutThrottlingRule = {
     const crons = getWorkflowScheduleCrons(workflow);
     const spectrum = buildScheduleSpectrum(crons);
     const hasFastInterval = spectrum.minInterval < MINUTE_INTERVAL_THRESHOLD;
-    const hasResonance = spectrum.resonanceEventsPerDay >= RESONANCE_EVENTS_THRESHOLD;
+    const hasResonance = spectrum.exactEventsPerDay >= EXACT_OVERLAP_THRESHOLD;
 
     if (!hasFastInterval && !hasResonance) {
       return [];
@@ -56,7 +56,7 @@ export const scheduledHeavyWorkflowWithoutThrottlingRule = {
     const nightly = workflowLooksNightlyLike(workflow);
 
     const resonanceDetail = hasResonance
-      ? ` ${spectrum.resonanceEventsPerDay.toFixed(1)} overlapping triggers per day across ${spectrum.components.length} schedules.`
+      ? ` ${spectrum.exactEventsPerDay.toFixed(1)} overlapping triggers per day across ${spectrum.components.length} schedules.`
       : "";
 
     return [
