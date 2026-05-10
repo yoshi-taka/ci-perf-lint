@@ -1,7 +1,6 @@
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import { isHeavyWorkflow, workflowLooksMetaCheckLike } from "./shared/workflow-jobs.ts";
 import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
@@ -15,6 +14,12 @@ const meta = {
   severity: "suggestion",
   confidence: "high",
   docsPath: "docs/rules/missing-path-ignore-for-non-code.md",
+  requiredFeatures: {
+    workflowFacts: {
+      isHeavyWorkflow: true,
+      looksMetaCheckLike: false,
+    },
+  },
 } satisfies RuleMeta;
 
 export const missingPathIgnoreForNonCodeRule = {
@@ -27,12 +32,7 @@ export const missingPathIgnoreForNonCodeRule = {
       return [];
     }
 
-    if (
-      !isHeavyWorkflow(workflow) ||
-      ts.hasNonCodeIgnore ||
-      ts.hasTriggerPathFilter ||
-      workflowLooksMetaCheckLike(workflow)
-    ) {
+    if (ts.hasNonCodeIgnore || ts.hasTriggerPathFilter) {
       return [];
     }
 

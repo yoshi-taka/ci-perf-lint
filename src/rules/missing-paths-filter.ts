@@ -1,7 +1,6 @@
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import { isHeavyWorkflow, workflowLooksMetaCheckLike } from "./shared/workflow-jobs.ts";
 import {
   withRepositoryPathsFilterPrecedent,
   withSimilarWorkflowPathsFilterConsensus,
@@ -16,6 +15,12 @@ const meta = {
   severity: "suggestion",
   confidence: "high",
   docsPath: "docs/rules/missing-paths-filter.md",
+  requiredFeatures: {
+    workflowFacts: {
+      isHeavyWorkflow: true,
+      looksMetaCheckLike: false,
+    },
+  },
 } satisfies RuleMeta;
 
 export const missingPathsFilterRule = {
@@ -28,11 +33,7 @@ export const missingPathsFilterRule = {
       return [];
     }
 
-    if (
-      !isHeavyWorkflow(workflow) ||
-      ts.hasTriggerPathFilter ||
-      workflowLooksMetaCheckLike(workflow)
-    ) {
+    if (ts.hasTriggerPathFilter) {
       return [];
     }
 

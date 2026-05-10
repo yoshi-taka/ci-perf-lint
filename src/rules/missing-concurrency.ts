@@ -1,11 +1,7 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { RuleMeta } from "../types.ts";
-import {
-  isHeavyWorkflow,
-  workflowLooksAgenticLike,
-  workflowHasConcurrency,
-} from "./shared/workflow-jobs.ts";
+import { workflowLooksAgenticLike } from "./shared/workflow-jobs.ts";
 import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
@@ -21,7 +17,12 @@ const meta = {
   confidence: "high",
   docsPath: "docs/rules/missing-concurrency.md",
   maxFindings: 3,
-  requires: { isHeavy: true },
+  requiredFeatures: {
+    workflowFacts: {
+      isHeavyWorkflow: true,
+      hasConcurrency: false,
+    },
+  },
   impliedChecks: ["missing-timeout-minutes"],
 } satisfies RuleMeta;
 
@@ -44,10 +45,6 @@ export const missingConcurrencyRule = {
     }
 
     const agentic = workflowLooksAgenticLike(workflow);
-
-    if (!isHeavyWorkflow(workflow) || workflowHasConcurrency(workflow)) {
-      return [];
-    }
 
     const base = buildDiagnostic(workflow, meta, workflow.onNode ?? workflow.nameNode, {
       message: "The workflow has no workflow-level or job-level concurrency setting.",

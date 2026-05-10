@@ -1,8 +1,8 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta, SourceLocation } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import type { RepositoryCorpusIndex } from "../rules/shared/repository-corpus-index.ts";
 
 const meta = {
   id: "tox-without-tox-uv",
@@ -37,34 +37,30 @@ const toxConfigFileNames = ["tox.ini", "pyproject.toml", "setup.cfg"] as const;
 export async function collectToxWithoutToxUvDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
-  workflows: WorkflowDocument[],
-  _warnings?: AnalysisWarning[],
+  warnings: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
+  corpusIndex?: RepositoryCorpusIndex,
 ): Promise<Diagnostic[]> {
   if (!repository.python.usesTox) {
     return [];
   }
 
-  const context = scanContext ?? new RepositoryScanContext(repoRoot, _warnings ?? []);
+  const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings);
 
   let anyWorkflowRunsTox = false;
   let anyWorkflowHasToxUv = false;
 
-  for (const workflow of workflows) {
-    for (const job of workflow.jobs) {
-      for (const step of job.steps) {
-        const run = step.run ?? "";
-        if (stepIsToxRun(run)) {
-          anyWorkflowRunsTox = true;
-        }
-        if (!anyWorkflowHasToxUv && toxUvInstallPattern.test(run)) {
-          anyWorkflowHasToxUv = true;
-        }
-      }
+  const toxSteps = corpusIndex?.stepsMatchingText(toxRunPattern) ?? [];
+  for (const rs of toxSteps) {
+    const run = rs.step.run ?? "";
+    if (stepIsToxRun(run)) {
+      anyWorkflowRunsTox = true;
+    }
+    if (!anyWorkflowHasToxUv && toxUvInstallPattern.test(run)) {
+      anyWorkflowHasToxUv = true;
     }
   }
 
-  // If tox is used in CI and tox-uv is already installed, skip
   if (anyWorkflowRunsTox && anyWorkflowHasToxUv) {
     return [];
   }

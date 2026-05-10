@@ -1,4 +1,4 @@
-import type { AnalysisWarning, Diagnostic, RuleMeta } from "./types.ts";
+import type { AnalysisWarning, Diagnostic, RequiredFeatures, RuleMeta } from "./types.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
 import type { WorkflowDocument } from "./workflow.ts";
@@ -10,6 +10,7 @@ import type { RepositoryPrecedentIndex } from "./rules/shared/repository-precede
 import type { RepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
 import { classifySingularity, type SingularityTracker } from "./rules/shared/singularity.ts";
+import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
 
 type WorkflowNodeKind = "trigger" | "concurrency";
 
@@ -156,6 +157,36 @@ function runConcurrent<T, R>(
   return Promise.all(workers).then(() => results);
 }
 
+function matchesFeatureMask(
+  features: RequiredFeatures | undefined,
+  workflow: WorkflowDocument,
+): boolean {
+  if (!features) {
+    return true;
+  }
+
+  const wfFacts = getWorkflowFacts(workflow);
+
+  if (features.workflowFacts) {
+    for (const [key, required] of Object.entries(features.workflowFacts)) {
+      const actual = (wfFacts as unknown as Record<string, unknown>)[key];
+      if (actual !== required) {
+        return false;
+      }
+    }
+  }
+
+  if (features.toolPresence) {
+    for (const [key, required] of Object.entries(features.toolPresence)) {
+      if ((wfFacts.toolPresence.get(key) ?? false) !== required) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 export async function evaluateRules(
   workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
   context: RuleContext,
@@ -191,6 +222,10 @@ export async function evaluateRules(
     }
 
     if (context.singularities?.isQuarantined(rule.meta.id)) {
+      continue;
+    }
+
+    if (!matchesFeatureMask(rule.meta.requiredFeatures, workflow as WorkflowDocument)) {
       continue;
     }
 
@@ -341,6 +376,10 @@ export async function evaluateRulesCoarseToFine(
       const workflowPath = workflow.relativePath;
 
       if (context.singularities?.hasPoleTrigger(ruleId, workflowPath)) {
+        continue;
+      }
+
+      if (!matchesFeatureMask(rule.meta.requiredFeatures, workflow as WorkflowDocument)) {
         continue;
       }
 

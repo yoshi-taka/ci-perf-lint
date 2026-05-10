@@ -8,13 +8,18 @@ import {
   normalizeRunCommand,
 } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { jobHasMatrix, workflowLooksMetaCheckLike } from "./shared/workflow-jobs.ts";
+import { jobHasMatrix } from "./shared/workflow-jobs.ts";
 
 const meta = {
   id: "duplicate-install-or-lint",
   severity: "suggestion",
   confidence: "medium",
   docsPath: "docs/rules/duplicate-install-or-lint.md",
+  requiredFeatures: {
+    workflowFacts: {
+      looksMetaCheckLike: false,
+    },
+  },
 } satisfies RuleMeta;
 
 interface JobPattern {
@@ -25,10 +30,6 @@ interface JobPattern {
 export const duplicateInstallOrLintRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    if (workflowLooksMetaCheckLike(workflow)) {
-      return [];
-    }
-
     const patterns = new Map<string, JobPattern[]>();
 
     for (const job of workflow.jobs) {

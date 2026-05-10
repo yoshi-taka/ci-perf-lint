@@ -1,7 +1,6 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import { isHeavyWorkflow } from "./shared/workflow-jobs.ts";
 import {
   getWorkflowScheduleCrons,
   workflowHasManualOnlyTrigger,
@@ -16,6 +15,11 @@ const meta = {
   severity: "suggestion",
   confidence: "medium",
   docsPath: "docs/rules/scheduled-heavy-workflow-without-throttling.md",
+  requiredFeatures: {
+    workflowFacts: {
+      isHeavyWorkflow: true,
+    },
+  },
 } satisfies RuleMeta;
 
 export function estimateScheduleMinutes(cron: string): number | undefined {
@@ -75,11 +79,7 @@ export const scheduledHeavyWorkflowWithoutThrottlingRule = {
   meta,
   nodeTypes: ["trigger"],
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    if (
-      workflowHasManualOnlyTrigger(workflow) ||
-      !workflowHasScheduleTrigger(workflow) ||
-      !isHeavyWorkflow(workflow)
-    ) {
+    if (workflowHasManualOnlyTrigger(workflow) || !workflowHasScheduleTrigger(workflow)) {
       return [];
     }
 

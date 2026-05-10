@@ -107,6 +107,11 @@ export interface ImpliedCheck {
   reason: string;
 }
 
+export interface RequiredFeatures {
+  readonly workflowFacts?: Readonly<Record<string, boolean>>;
+  readonly toolPresence?: Readonly<Record<string, boolean>>;
+}
+
 export interface RuleMeta {
   id: string;
   severity: Severity;
@@ -117,6 +122,7 @@ export interface RuleMeta {
   requires?: {
     isHeavy?: boolean;
   };
+  requiredFeatures?: RequiredFeatures;
   precheck?: (workflow: { source?: string }) => number;
   precheckBudget?: number;
   impliedChecks?: string[];

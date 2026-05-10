@@ -5,7 +5,153 @@ import type { WorkflowDocument } from "../workflow.ts";
 import { getWorkflowFacts, getJobFacts } from "../rules/shared/workflow-analysis.ts";
 import { getStepFacts } from "../rules/shared/step-facts.ts";
 
-function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+const BAND_BITS = 128;
+
+type SemanticBand = "trigger" | "shape" | "runtime" | "tool";
+
+const BANDS: readonly SemanticBand[] = ["trigger", "shape", "runtime", "tool"];
+
+interface BandedFeatureSummary {
+  readonly bandMasks: ReadonlyMap<SemanticBand, bigint>;
+  readonly features: ReadonlySet<string>;
+}
+
+function featureBand(feature: string): SemanticBand {
+  if (
+    feature.startsWith("trigger:") ||
+    feature.startsWith("push:") ||
+    feature.startsWith("filter:")
+  ) {
+    return "trigger";
+  }
+  if (feature.startsWith("runner:")) {
+    return "runtime";
+  }
+  if (
+    feature.startsWith("tool:") ||
+    feature.startsWith("setup:") ||
+    feature.startsWith("install:") ||
+    feature.startsWith("uses:")
+  ) {
+    return "tool";
+  }
+  return "shape";
+}
+
+function hashToBit(feature: string): bigint {
+  let hash = 0;
+  for (let i = 0; i < feature.length; i++) {
+    hash = (hash << 5) - hash + feature.charCodeAt(i);
+    hash |= 0;
+  }
+  return 1n << BigInt(Math.abs(hash) % BAND_BITS);
+}
+
+function buildBandedFeatureSummary(workflow: WorkflowDocument): BandedFeatureSummary {
+  const features = new Set<string>();
+  const bandMasks = new Map<SemanticBand, bigint>();
+
+  for (const band of BANDS) {
+    bandMasks.set(band, 0n);
+  }
+
+  function add(feature: string): void {
+    features.add(feature);
+    const band = featureBand(feature);
+    const mask = bandMasks.get(band) ?? 0n;
+    bandMasks.set(band, mask | hashToBit(feature));
+  }
+
+  const wff = getWorkflowFacts(workflow);
+  const tf = wff.triggerFacts;
+  if (tf.hasPush) {
+    add("trigger:push");
+  }
+  if (tf.hasPullRequest) {
+    add("trigger:pr");
+  }
+  if (tf.hasSchedule) {
+    add("trigger:schedule");
+  }
+  if (tf.hasWorkflowDispatch) {
+    add("trigger:dispatch");
+  }
+  if (tf.hasWorkflowCall) {
+    add("trigger:workflow_call");
+  }
+  if (tf.push.hasTagOnly) {
+    add("push:tag_only");
+  }
+  if (tf.push.hasBranchPush) {
+    add("push:branch");
+  }
+  if (tf.hasTriggerPathFilter) {
+    add("filter:path");
+  }
+  if (wff.hasConcurrency) {
+    add("shape:concurrency");
+  }
+  if (wff.isHeavyWorkflow) {
+    add("shape:heavy");
+  }
+  if (wff.looksReleaseLike) {
+    add("shape:release");
+  }
+  if (wff.looksMetaCheckLike) {
+    add("shape:meta");
+  }
+  if (wff.looksAgenticLike) {
+    add("shape:agentic");
+  }
+
+  for (const job of workflow.jobs) {
+    const jf = getJobFacts(job);
+    const loweredId = job.id.toLowerCase();
+    if (/\bbuild\b/.test(loweredId)) {
+      add("kind:build");
+    }
+    if (/\btest\b/.test(loweredId)) {
+      add("kind:test");
+    }
+    if (/\blint\b/.test(loweredId)) {
+      add("kind:lint");
+    }
+    if (/\bdeploy\b/.test(loweredId)) {
+      add("kind:deploy");
+    }
+    if (/\brelease\b/.test(loweredId)) {
+      add("kind:release");
+    }
+    if (jf.dockerUsage) {
+      add("tool:docker");
+    }
+    if (jf.hasTimeout) {
+      add("job:timeout");
+    }
+    if (jf.runsOnSpec.labels.length > 0) {
+      add(`runner:${jf.runsOnSpec.labels.join("-")}`);
+    }
+
+    for (const step of job.steps) {
+      const sf = getStepFacts(step);
+      if (sf.setupActionKind) {
+        add(`setup:${sf.setupActionKind}`);
+      }
+      if (sf.installCommand) {
+        add(`install:${sf.installCommand}`);
+      }
+      if (step.uses) {
+        const atIndex = step.uses.indexOf("@");
+        const prefix = atIndex > 0 ? step.uses.slice(0, atIndex) : step.uses;
+        add(`uses:${prefix}`);
+      }
+    }
+  }
+
+  return { bandMasks, features };
+}
+
+function jaccardSimilarity(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
   let shared = 0;
   for (const item of a) {
     if (b.has(item)) {
@@ -16,96 +162,27 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   return union === 0 ? 0 : shared / union;
 }
 
-function buildWorkflowFeatureSet(workflow: WorkflowDocument): Set<string> {
-  const features = new Set<string>();
+function bandIncompatible(a: BandedFeatureSummary, b: BandedFeatureSummary): boolean {
+  for (const band of BANDS) {
+    const aMask = a.bandMasks.get(band) ?? 0n;
+    const bMask = b.bandMasks.get(band) ?? 0n;
+    if (aMask !== 0n && bMask !== 0n && (aMask & bMask) === 0n) {
+      return true;
+    }
+  }
+  return false;
+}
 
-  const wff = getWorkflowFacts(workflow);
-  const tf = wff.triggerFacts;
-  if (tf.hasPush) {
-    features.add("trigger:push");
+function bandedJaccardSimilarity(
+  a: BandedFeatureSummary,
+  b: BandedFeatureSummary,
+  threshold: number,
+): number | undefined {
+  if (bandIncompatible(a, b)) {
+    return undefined;
   }
-  if (tf.hasPullRequest) {
-    features.add("trigger:pr");
-  }
-  if (tf.hasSchedule) {
-    features.add("trigger:schedule");
-  }
-  if (tf.hasWorkflowDispatch) {
-    features.add("trigger:dispatch");
-  }
-  if (tf.hasWorkflowCall) {
-    features.add("trigger:workflow_call");
-  }
-  if (tf.push.hasTagOnly) {
-    features.add("push:tag_only");
-  }
-  if (tf.push.hasBranchPush) {
-    features.add("push:branch");
-  }
-  if (tf.hasTriggerPathFilter) {
-    features.add("filter:path");
-  }
-  if (wff.hasConcurrency) {
-    features.add("shape:concurrency");
-  }
-  if (wff.isHeavyWorkflow) {
-    features.add("shape:heavy");
-  }
-  if (wff.looksReleaseLike) {
-    features.add("shape:release");
-  }
-  if (wff.looksMetaCheckLike) {
-    features.add("shape:meta");
-  }
-  if (wff.looksAgenticLike) {
-    features.add("shape:agentic");
-  }
-
-  for (const job of workflow.jobs) {
-    const jf = getJobFacts(job);
-    const loweredId = job.id.toLowerCase();
-    if (/\bbuild\b/.test(loweredId)) {
-      features.add("kind:build");
-    }
-    if (/\btest\b/.test(loweredId)) {
-      features.add("kind:test");
-    }
-    if (/\blint\b/.test(loweredId)) {
-      features.add("kind:lint");
-    }
-    if (/\bdeploy\b/.test(loweredId)) {
-      features.add("kind:deploy");
-    }
-    if (/\brelease\b/.test(loweredId)) {
-      features.add("kind:release");
-    }
-    if (jf.dockerUsage) {
-      features.add("tool:docker");
-    }
-    if (jf.hasTimeout) {
-      features.add("job:timeout");
-    }
-    if (jf.runsOnSpec.labels.length > 0) {
-      features.add(`runner:${jf.runsOnSpec.labels.join("-")}`);
-    }
-
-    for (const step of job.steps) {
-      const sf = getStepFacts(step);
-      if (sf.setupActionKind) {
-        features.add(`setup:${sf.setupActionKind}`);
-      }
-      if (sf.installCommand) {
-        features.add(`install:${sf.installCommand}`);
-      }
-      if (step.uses) {
-        const atIndex = step.uses.indexOf("@");
-        const prefix = atIndex > 0 ? step.uses.slice(0, atIndex) : step.uses;
-        features.add(`uses:${prefix}`);
-      }
-    }
-  }
-
-  return features;
+  const sim = jaccardSimilarity(a.features, b.features);
+  return sim >= threshold ? sim : undefined;
 }
 
 async function estimateFileMtimeMs(filePath: string): Promise<number> {
@@ -127,10 +204,10 @@ function templateScore(workflow: WorkflowDocument): number {
 
 function centralityScore(
   workflowPath: string,
-  featuresByPath: Map<string, Set<string>>,
+  featureSummaries: Map<string, BandedFeatureSummary>,
   members: string[],
 ): number {
-  const wf = featuresByPath.get(workflowPath);
+  const wf = featureSummaries.get(workflowPath);
   if (!wf || members.length < 2) {
     return 0;
   }
@@ -140,9 +217,9 @@ function centralityScore(
     if (other === workflowPath) {
       continue;
     }
-    const of = featuresByPath.get(other);
+    const of = featureSummaries.get(other);
     if (of) {
-      total += jaccardSimilarity(wf, of);
+      total += jaccardSimilarity(wf.features, of.features);
       count++;
     }
   }
@@ -162,7 +239,7 @@ function outboundEdgeScore(workflowPath: string, edges: SimilarityEdge[]): numbe
 async function estimateSourceWorkflow(
   members: string[],
   workflowDocs: Map<string, WorkflowDocument>,
-  featureSets: Map<string, Set<string>>,
+  featureSummaries: Map<string, BandedFeatureSummary>,
   edges: SimilarityEdge[],
   repoRoot: string,
 ): Promise<{ source: string; confidence: "high" | "medium" | "low"; reason: string }> {
@@ -204,7 +281,7 @@ async function estimateSourceWorkflow(
       templateScores.set(m, ts);
     }
 
-    const cs = centralityScore(m, featureSets, members);
+    const cs = centralityScore(m, featureSummaries, members);
     centralityScores.set(m, cs);
     if (cs > maxCentrality) {
       maxCentrality = cs;
@@ -308,20 +385,20 @@ function bfsPropagationDepth(source: string, members: string[], edges: Similarit
 interface DiffusionMetricsParams {
   members: string[];
   allWorkflowPaths: string[];
-  featureSetsByPath: Map<string, Set<string>>;
+  featureSummaries: Map<string, BandedFeatureSummary>;
   edges: SimilarityEdge[];
   source: string;
   memberFindings: Map<string, Diagnostic[]>;
 }
 
 function computeDiffusionMetrics(params: DiffusionMetricsParams): DiffusionMetrics {
-  const { members, allWorkflowPaths, featureSetsByPath, edges, source, memberFindings } = params;
+  const { members, allWorkflowPaths, featureSummaries, edges, source, memberFindings } = params;
   const totalCount = allWorkflowPaths.length;
   const diffusionCoefficient = totalCount > 0 ? members.length / totalCount : 0;
 
   const centralityByPath = new Map<string, number>();
   for (const m of members) {
-    centralityByPath.set(m, centralityScore(m, featureSetsByPath, members));
+    centralityByPath.set(m, centralityScore(m, featureSummaries, members));
   }
   const maxCentrality = Math.max(...centralityByPath.values(), 1);
 
@@ -372,9 +449,9 @@ export async function buildPropagationClusters(
     list.push(finding);
   }
 
-  const featureSetsByPath = new Map<string, Set<string>>();
+  const featureSummaries = new Map<string, BandedFeatureSummary>();
   for (const w of workflows) {
-    featureSetsByPath.set(w.relativePath, buildWorkflowFeatureSet(w));
+    featureSummaries.set(w.relativePath, buildBandedFeatureSummary(w));
   }
 
   const clusters: PropagationCluster[] = [];
@@ -384,17 +461,17 @@ export async function buildPropagationClusters(
 
     const edges: SimilarityEdge[] = [];
     for (let i = 0; i < memberPaths.length; i++) {
-      const aFeatures = featureSetsByPath.get(memberPaths[i]!);
-      if (!aFeatures) {
+      const aSummary = featureSummaries.get(memberPaths[i]!);
+      if (!aSummary) {
         continue;
       }
       for (let j = i + 1; j < memberPaths.length; j++) {
-        const bFeatures = featureSetsByPath.get(memberPaths[j]!);
-        if (!bFeatures) {
+        const bSummary = featureSummaries.get(memberPaths[j]!);
+        if (!bSummary) {
           continue;
         }
-        const sim = jaccardSimilarity(aFeatures, bFeatures);
-        if (sim >= EDGE_SIMILARITY_THRESHOLD) {
+        const sim = bandedJaccardSimilarity(aSummary, bSummary, EDGE_SIMILARITY_THRESHOLD);
+        if (sim !== undefined) {
           edges.push({ source: memberPaths[i]!, target: memberPaths[j]!, similarity: sim });
         }
       }
@@ -403,7 +480,7 @@ export async function buildPropagationClusters(
     const { source, confidence, reason } = await estimateSourceWorkflow(
       memberPaths,
       workflowByPath,
-      featureSetsByPath,
+      featureSummaries,
       edges,
       repoRoot,
     );
@@ -421,7 +498,7 @@ export async function buildPropagationClusters(
     const metrics = computeDiffusionMetrics({
       members: memberPaths,
       allWorkflowPaths,
-      featureSetsByPath,
+      featureSummaries,
       edges,
       source,
       memberFindings,

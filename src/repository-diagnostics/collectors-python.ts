@@ -117,7 +117,7 @@ export const pythonDiagnosticCollectors = [
   {
     id: "tox-without-tox-uv",
     gate: gates.pythonHeavy,
-    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
-      collectToxWithoutToxUvDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+    collect: ({ repoRoot, repository, warnings, scanContext, corpusIndex }) =>
+      collectToxWithoutToxUvDiagnostics(repoRoot, repository, warnings, scanContext, corpusIndex),
   },
 ] satisfies readonly RepositoryDiagnosticCollector[];
