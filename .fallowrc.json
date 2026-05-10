@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "ignorePatterns": ["dist/**", "site/**", "test/fixtures/**", "fuzz/**", "profile-*.ts", "scripts/**", "src/rules/shared/evidence-propagation.ts", "src/rules/shared/finding-sheet.ts", "src/rules/shared/singularity.ts", "src/rules/shared/workflow-interaction.ts"],
   "ignoreDependencies": ["bun"],
-  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts"],
+  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts", "src/rules/shared/predicate.ts"],
   "health": {
     "maxCyclomatic": 25,
     "maxCognitive": 35,

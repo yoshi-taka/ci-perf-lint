@@ -9,17 +9,14 @@ import {
 } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobHasMatrix } from "./shared/workflow-jobs.ts";
+import { workflowFact } from "./shared/predicate.ts";
 
 const meta = {
   id: "duplicate-install-or-lint",
   severity: "suggestion",
   confidence: "medium",
   docsPath: "docs/rules/duplicate-install-or-lint.md",
-  requiredFeatures: {
-    workflowFacts: {
-      looksMetaCheckLike: false,
-    },
-  },
+  skipIf: workflowFact("looksMetaCheckLike", true),
 } satisfies RuleMeta;
 
 interface JobPattern {

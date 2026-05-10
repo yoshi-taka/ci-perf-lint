@@ -64,6 +64,24 @@ export interface WorkflowSummary {
   findings: Diagnostic[];
 }
 
+export type AbstentionReason =
+  | "opaque-body"
+  | "dynamic-value"
+  | "external-dependency"
+  | "cross-boundary"
+  | "condition-not-met"
+  | "recursion-depth-exceeded";
+
+export type EpistemicStatus = "known-absent" | "unknown";
+
+export interface RuleAbstention {
+  ruleId: string;
+  jobId: string;
+  reason: AbstentionReason;
+  detail?: string;
+  epistemicStatus: EpistemicStatus;
+}
+
 export interface MeasureCompleteness {
   totalWorkflows: number;
   evaluatedWorkflows: number;
@@ -72,6 +90,7 @@ export interface MeasureCompleteness {
   maxFindingsHitRules: string[];
   parserFailures?: string[];
   workflowOnlyRules?: string[];
+  abstentions?: RuleAbstention[];
 }
 
 export interface MeasureCompletenessTracker {
@@ -82,6 +101,8 @@ export interface MeasureCompletenessTracker {
   maxFindingsHitRules: Set<string>;
   parserFailures: Set<string>;
   workflowOnlyRules: Set<string>;
+  abstentions: RuleAbstention[];
+  abstain: (abstention: Omit<RuleAbstention, "epistemicStatus">, status?: EpistemicStatus) => void;
 }
 
 export interface AnalysisWarning {
@@ -162,6 +183,8 @@ export interface RequiredFeatures {
   readonly toolPresence?: Readonly<Record<string, boolean>>;
 }
 
+import type { Predicate } from "./rules/shared/predicate.ts";
+
 export interface RuleMeta {
   id: string;
   severity: Severity;
@@ -173,6 +196,7 @@ export interface RuleMeta {
     isHeavy?: boolean;
   };
   requiredFeatures?: RequiredFeatures;
+  skipIf?: Predicate;
   precheck?: (workflow: { source?: string }) => number;
   precheckBudget?: number;
   impliedChecks?: string[];

@@ -9,18 +9,14 @@ import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
+import { and, workflowFact, or, not } from "./shared/predicate.ts";
 
 const meta = {
   id: "missing-paths-filter",
   severity: "suggestion",
   confidence: "high",
   docsPath: "docs/rules/missing-paths-filter.md",
-  requiredFeatures: {
-    workflowFacts: {
-      isHeavyWorkflow: true,
-      looksMetaCheckLike: false,
-    },
-  },
+  skipIf: or(workflowFact("isHeavyWorkflow", false), workflowFact("looksMetaCheckLike", true)),
 } satisfies RuleMeta;
 
 export const missingPathsFilterRule = {

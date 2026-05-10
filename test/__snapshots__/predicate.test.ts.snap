@@ -1,0 +1,19 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Decision table generation decision table snapshot: isHeavy and concurrency 1`] = `
+"| wf:isHeavyWorkflow=true | wf:hasConcurrency=false | expected |
+|---|---|---|
+| F | F | F |
+| T | F | F |
+| F | T | F |
+| T | T | T |"
+`;
+
+exports[`Decision table generation decision table snapshot: meta-check exclusion 1`] = `
+"| wf:isHeavyWorkflow=true | wf:looksMetaCheckLike=false | expected |
+|---|---|---|
+| F | F | F |
+| T | F | F |
+| F | T | F |
+| T | T | T |"
+`;

@@ -4,6 +4,8 @@ import type {
   MeasureCompletenessTracker,
   RequiredFeatures,
   RuleMeta,
+  RuleAbstention,
+  EpistemicStatus,
 } from "./types.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
@@ -18,6 +20,7 @@ import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.
 import { classifySingularity, type SingularityTracker } from "./rules/shared/singularity.ts";
 import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
 import { buildInferenceGraph, detectImplicationDrift } from "./rules/shared/remediation-checks.ts";
+import { evaluate as evaluatePredicate, type Predicate } from "./rules/shared/predicate.ts";
 
 type WorkflowNodeKind = "trigger" | "concurrency";
 
@@ -50,6 +53,7 @@ export interface RuleContext {
   fileIndex?: RepositoryFileIndex;
   singularities?: SingularityTracker;
   measureCompleteness?: MeasureCompletenessTracker;
+  abstain?: (abstention: Omit<RuleAbstention, "epistemicStatus">, status?: EpistemicStatus) => void;
 }
 
 interface RuleModule {
@@ -177,6 +181,16 @@ function ruleMatchesScope(
     return isCircle;
   }
   return !isBuildkite && !isGitlab && !isCircle;
+}
+
+function shouldSkipForWorkflow(pred: Predicate, workflow: WorkflowDocument): boolean {
+  const wfFacts = getWorkflowFacts(workflow);
+  const ctx = {
+    workflow,
+    workflowFacts: wfFacts,
+    source: workflow.source ?? "",
+  };
+  return evaluatePredicate(pred, ctx);
 }
 
 function runConcurrent<T, R>(
@@ -312,6 +326,18 @@ export async function evaluateRules(
         kind: "gate-skipped",
         source: workflowPath,
         message: `Rule ${rule.meta.id} was not evaluated because its scope does not apply to this document.`,
+      });
+      continue;
+    }
+
+    const rmeta: RuleMeta = rule.meta;
+    const skipPred = rmeta.skipIf;
+    if (skipPred && shouldSkipForWorkflow(skipPred, workflow as WorkflowDocument)) {
+      context.measureCompleteness?.skippedGates.add(rule.meta.id);
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: workflowPath,
+        message: `Rule ${rule.meta.id} was not evaluated because its skipIf predicate matched.`,
       });
       continue;
     }
@@ -544,6 +570,18 @@ export async function evaluateRulesCoarseToFine(
           kind: "gate-skipped",
           source: workflowPath,
           message: `Rule ${ruleId} was not evaluated for ${workflowPath} because the workflow feature mask did not match.`,
+        });
+        continue;
+      }
+
+      const rmetaB: RuleMeta = rule.meta;
+      const skipPred = rmetaB.skipIf;
+      if (skipPred && shouldSkipForWorkflow(skipPred, workflow as WorkflowDocument)) {
+        context.measureCompleteness?.skippedGates.add(ruleId);
+        pushAnalysisWarning(warnings, {
+          kind: "gate-skipped",
+          source: workflowPath,
+          message: `Rule ${ruleId} was not evaluated for ${workflowPath} because its skipIf predicate matched.`,
         });
         continue;
       }

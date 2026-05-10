@@ -10,6 +10,7 @@ import {
   withSimilarWorkflowConcurrencyConsensus,
 } from "./shared/similar-workflow-consensus.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
+import { and, workflowFact, or } from "./shared/predicate.ts";
 
 const meta = {
   id: "missing-concurrency",
@@ -17,12 +18,7 @@ const meta = {
   confidence: "high",
   docsPath: "docs/rules/missing-concurrency.md",
   maxFindings: 3,
-  requiredFeatures: {
-    workflowFacts: {
-      isHeavyWorkflow: true,
-      hasConcurrency: false,
-    },
-  },
+  skipIf: or(workflowFact("isHeavyWorkflow", false), workflowFact("hasConcurrency", true)),
   impliedChecks: ["missing-timeout-minutes"],
 } satisfies RuleMeta;
 
@@ -33,14 +29,36 @@ export const missingConcurrencyRule = {
     const ts = getTriggerSemantics(workflow);
 
     if (!ts.hasPullRequest && !ts.hasPush) {
+      context.abstain?.(
+        {
+          ruleId: meta.id,
+          jobId: "",
+          reason: "condition-not-met",
+          detail: "no PR or push trigger",
+        },
+        "known-absent",
+      );
       return [];
     }
 
     if (!ts.hasPullRequest && ts.hasTagOnlyPush) {
+      context.abstain?.(
+        { ruleId: meta.id, jobId: "", reason: "condition-not-met", detail: "tag-only push" },
+        "known-absent",
+      );
       return [];
     }
 
     if (!ts.hasPullRequest && ts.hasPush && ts.hasTriggerPathFilter) {
+      context.abstain?.(
+        {
+          ruleId: meta.id,
+          jobId: "",
+          reason: "condition-not-met",
+          detail: "push with path filter",
+        },
+        "known-absent",
+      );
       return [];
     }
 

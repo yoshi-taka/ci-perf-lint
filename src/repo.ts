@@ -11,9 +11,11 @@ import type {
   AnalysisWarning,
   AuditMode,
   Diagnostic,
+  EpistemicStatus,
   MeasureCompleteness,
   MeasureCompletenessTracker,
   ReportData,
+  RuleAbstention,
   WorkflowSummary,
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
@@ -214,6 +216,13 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     maxFindingsHitRules: new Set<string>(),
     parserFailures: new Set<string>(),
     workflowOnlyRules: new Set<string>(),
+    abstentions: [],
+    abstain(
+      abstention: Omit<RuleAbstention, "epistemicStatus">,
+      status: EpistemicStatus = "unknown",
+    ): void {
+      this.abstentions.push({ ...abstention, epistemicStatus: status });
+    },
   };
 
   const parsedWorkflowResults: PromiseSettledResult<ParsedWorkflowDocument>[] = new Array(
@@ -316,6 +325,12 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     precedentIndex,
     fileIndex,
     measureCompleteness,
+    abstain(
+      abstention: Omit<RuleAbstention, "epistemicStatus">,
+      status: EpistemicStatus = "unknown",
+    ): void {
+      measureCompleteness.abstentions.push({ ...abstention, epistemicStatus: status });
+    },
   };
 
   const semanticsByWorkflow = new Map<ParsedWorkflowDocument, WorkflowSemantics>();
@@ -480,6 +495,8 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
       measureCompleteness.workflowOnlyRules.size > 0
         ? [...measureCompleteness.workflowOnlyRules].sort()
         : undefined,
+    abstentions:
+      measureCompleteness.abstentions.length > 0 ? measureCompleteness.abstentions : undefined,
   };
   if (process.env.CI_PERF_LINT_DUMP_STATE === "1") {
     process.stderr.write(

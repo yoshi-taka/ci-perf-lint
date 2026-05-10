@@ -1,9 +1,5 @@
 import type { WorkflowDocument } from "../../workflow.ts";
 
-// ──────────────────────────────────────────────
-// 1. TYPES — step position with job metadata
-// ──────────────────────────────────────────────
-
 export interface StepPosition {
   globalIndex: number;
   jobId: string;
@@ -21,10 +17,6 @@ interface WorkflowStepSequence {
   boundaries: JobBoundary[];
   stepCount: number;
 }
-
-// ──────────────────────────────────────────────
-// 2. SEQUENCE BUILDER — build positions + boundaries
-// ──────────────────────────────────────────────
 
 export function buildStepSequence(workflow: WorkflowDocument): WorkflowStepSequence {
   const positions: StepPosition[] = [];
@@ -55,41 +47,57 @@ export function buildStepSequence(workflow: WorkflowDocument): WorkflowStepSeque
   return { positions, boundaries, stepCount: globalIndex };
 }
 
-// ──────────────────────────────────────────────
-// 3. HANN PROXIMITY — base semantic proximity
-// ──────────────────────────────────────────────
+// ── Proximity kernel functions ────────────────
 
 const DEFAULT_PROXIMITY_WINDOW = 15;
 const DEFAULT_BOUNDARY_WINDOW = 8;
 
-function hannWindow(n: number, windowSize: number): number {
+const PROXIMITY_WINDOW_HALF_COS_TABLE = buildHalfCosineTable(DEFAULT_PROXIMITY_WINDOW);
+const BOUNDARY_HANN_TABLE = buildBoundaryHannTable(DEFAULT_BOUNDARY_WINDOW);
+
+function buildHalfCosineTable(windowSize: number): Float64Array {
+  const table = new Float64Array(windowSize + 1);
+  for (let i = 0; i <= windowSize; i++) {
+    table[i] = 0.5 * (1 + Math.cos((Math.PI * i) / windowSize));
+  }
+  return table;
+}
+
+function buildBoundaryHannTable(windowSize: number): Float64Array {
+  const halfWindow = windowSize / 2;
+  const table = new Float64Array(windowSize + 1);
+  for (let i = 0; i <= windowSize; i++) {
+    if (i > halfWindow / 2) {
+      table[i] = 1;
+    } else {
+      table[i] = 0.5 * (1 - Math.cos((4 * Math.PI * i) / windowSize));
+    }
+  }
+  return table;
+}
+
+function cosineProximity(n: number, windowSize: number): number {
   if (n < 0 || n > windowSize) {
     return 0;
   }
-  return 0.5 * (1 - Math.cos((2 * Math.PI * n) / windowSize));
-}
-
-function hannProximity(n: number, windowSize: number): number {
-  if (n < 0 || n > windowSize) {
-    return 0;
+  if (windowSize === DEFAULT_PROXIMITY_WINDOW) {
+    return PROXIMITY_WINDOW_HALF_COS_TABLE[n]!;
   }
   return 0.5 * (1 + Math.cos((Math.PI * n) / windowSize));
 }
 
-// ──────────────────────────────────────────────
-// 4. CROSS-JOB ATTENUATION — soft boundary model
-// ──────────────────────────────────────────────
-
 function crossJobAttenuation(distToBoundary: number, windowSize: number): number {
-  if (distToBoundary >= windowSize / 2) {
+  if (distToBoundary < 0 || distToBoundary > windowSize / 2) {
+    return distToBoundary >= windowSize / 2 ? 1 : 0;
+  }
+  if (windowSize === DEFAULT_BOUNDARY_WINDOW) {
+    return BOUNDARY_HANN_TABLE[distToBoundary]!;
+  }
+  if (distToBoundary > windowSize / 4) {
     return 1;
   }
-  return hannWindow(distToBoundary, windowSize / 2);
+  return 0.5 * (1 - Math.cos((4 * Math.PI * distToBoundary) / windowSize));
 }
-
-// ──────────────────────────────────────────────
-// 5. PAIRWISE PROXIMITY — main computation
-// ──────────────────────────────────────────────
 
 export function computePairProximity(
   pos1: StepPosition,
@@ -99,7 +107,7 @@ export function computePairProximity(
   boundaryWindow = DEFAULT_BOUNDARY_WINDOW,
 ): number {
   const distance = Math.abs(pos1.globalIndex - pos2.globalIndex);
-  const baseWeight = hannProximity(distance, proximityWindow);
+  const baseWeight = cosineProximity(distance, proximityWindow);
   if (baseWeight === 0) {
     return 0;
   }

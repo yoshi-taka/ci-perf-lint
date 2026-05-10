@@ -6,6 +6,7 @@ import type {
   RenderOptions,
   ReportData,
   WorkflowSummary,
+  RuleAbstention,
 } from "./types.ts";
 
 const maxRenderedAffectedLocations = 5;
@@ -280,6 +281,12 @@ function renderText(report: ReportData, options: RenderOptions = {}): string {
     for (const check of report.remediationChecks) {
       lines.push(`   ${check.sourceRuleId} → ${check.impliedRuleId}: ${check.reason}`);
     }
+  }
+
+  const abstentionLines = renderAbstentionSummary(report, options);
+  if (abstentionLines.length > 0) {
+    lines.push("");
+    lines.push(...abstentionLines);
   }
 
   return lines.join("\n");
@@ -659,4 +666,61 @@ export function renderReport(
     default:
       return renderText(report, options);
   }
+}
+
+function renderAbstentionSummary(report: ReportData, options: RenderOptions): string[] {
+  const abstentions = report.measureCompleteness?.abstentions;
+  if (!abstentions || abstentions.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [];
+  const unknownCount = abstentions.filter((a) => a.epistemicStatus === "unknown").length;
+  const knownAbsentCount = abstentions.filter((a) => a.epistemicStatus === "known-absent").length;
+
+  lines.push(maybeColor(ansi.bold, "Analysis coverage:", options));
+
+  if (unknownCount > 0) {
+    const opaqueCount = abstentions.filter((a) => a.reason === "opaque-body").length;
+    const dynamicCount = abstentions.filter((a) => a.reason === "dynamic-value").length;
+    const externalCount = abstentions.filter((a) => a.reason === "external-dependency").length;
+    const crossBoundaryCount = abstentions.filter((a) => a.reason === "cross-boundary").length;
+
+    const hints: string[] = [];
+    if (opaqueCount > 0) {
+      hints.push(`${opaqueCount} opaque scripts`);
+    }
+    if (dynamicCount > 0) {
+      hints.push(`${dynamicCount} dynamic values`);
+    }
+    if (externalCount > 0) {
+      hints.push(`${externalCount} external dependencies`);
+    }
+    if (crossBoundaryCount > 0) {
+      hints.push(`${crossBoundaryCount} cross-boundary references`);
+    }
+
+    lines.push(
+      `   ${maybeColor(ansi.warning, `${unknownCount} unknown`, options)} — could not fully analyze: ${hints.join(", ")}.`,
+    );
+  }
+
+  if (knownAbsentCount > 0) {
+    const byReason = new Map<string, number>();
+    for (const a of abstentions) {
+      if (a.epistemicStatus === "known-absent") {
+        byReason.set(a.reason, (byReason.get(a.reason) ?? 0) + 1);
+      }
+    }
+    const details = [...byReason.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([reason, count]) => `${count} ${reason.replace("-", " ")}`)
+      .join(", ");
+    lines.push(
+      `   ${maybeColor(ansi.dim, `${knownAbsentCount} skipped (intentionally)`, options)} — ${details}.`,
+    );
+  }
+
+  lines.push("");
+  return lines;
 }
