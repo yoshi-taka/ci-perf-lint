@@ -82,7 +82,7 @@
       "line": 20,
       "column": 15
     },
-    "message": "actions/setup-python@v6 is used without visible dependency caching in job \"python_missing\".",
+    "message": "actions/setup-python@v6 is used without visible dependency caching for pip in job \"python_missing\".",
     "why": "Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths. This repository already uses dependency caching in `.github/workflows/cache.yml:go_default_cache`, `.github/workflows/cache.yml:node_auto_cache`, `.github/workflows/cache.yml:python_manual_cache`. That makes the missing cache look more like one repository-local drift point than a deliberate no-cache policy. In this repository, 3 similar jobs already use dependency caching. Similar jobs already using dependency cache include `.github/workflows/cache.yml:node_auto_cache`, `.github/workflows/cache.yml:python_manual_cache`, `.github/workflows/cache.yml:ruby_builtin_cache`.",
     "suggestion": "If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.",
     "measurementHint": "Compare total job duration, not just install duration, before and after enabling cache.",
@@ -100,7 +100,7 @@
       "line": 34,
       "column": 15
     },
-    "message": "actions/setup-java@v5 is used without visible dependency caching in job \"java_missing\".",
+    "message": "actions/setup-java@v5 is used without visible dependency caching for maven in job \"java_missing\".",
     "why": "Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths. This repository already uses dependency caching in `.github/workflows/cache.yml:go_default_cache`, `.github/workflows/cache.yml:node_auto_cache`, `.github/workflows/cache.yml:python_manual_cache`.",
     "suggestion": "If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.",
     "measurementHint": "Compare total job duration, not just install duration, before and after enabling cache.",
@@ -118,7 +118,7 @@
       "line": 44,
       "column": 15
     },
-    "message": "actions/setup-dotnet@v5 is used without visible dependency caching in job \"dotnet_missing\".",
+    "message": "actions/setup-dotnet@v5 is used without visible dependency caching for nuget in job \"dotnet_missing\".",
     "why": "Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths. This repository already uses dependency caching in `.github/workflows/cache.yml:go_default_cache`, `.github/workflows/cache.yml:node_auto_cache`, `.github/workflows/cache.yml:python_manual_cache`.",
     "suggestion": "If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.",
     "measurementHint": "Compare total job duration, not just install duration, before and after enabling cache.",

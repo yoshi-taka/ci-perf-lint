@@ -1,6 +1,6 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowDocument } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { type DependencyFamily, detectInstallCommand } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
@@ -8,12 +8,73 @@ import {
   withRepositoryDependencyCachePrecedent,
   withSimilarWorkflowDependencyCacheConsensus,
 } from "./shared/similar-workflow-consensus.ts";
-import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
 import {
-  manualCacheStepMatchesDependencyFamily,
+  getSetupActionKind,
+  getDependencyFamiliesUsedBySetupAction,
+} from "./shared/workflow-setup-actions.ts";
+import {
+  isManualCacheStep,
   setupActionHasBuiltInCacheForFamily,
 } from "./shared/workflow-caches.ts";
 import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
+
+const FAMILY_CACHE_MATCHERS: Record<DependencyFamily, string[]> = {
+  npm: [".npm", "npm-cache"],
+  pnpm: [".pnpm-store", "pnpm-store", "store/v3"],
+  yarn: [".yarn/cache", ".yarn/install-state", "yarn-cache"],
+  bun: [".bun", "bun/install/cache"],
+  pip: [".cache/pip", "pip-cache"],
+  pipenv: ["pipenv", "virtualenvs"],
+  poetry: ["poetry", "virtualenvs"],
+  uv: ["uv", ".cache/uv"],
+  go: ["go/pkg/mod", ".cache/go-build"],
+  maven: [".m2/repository"],
+  gradle: [".gradle/caches", ".gradle/wrapper"],
+  sbt: [".ivy2/cache", "coursier", ".sbt"],
+  bundler: ["vendor/bundle", ".bundle", "rubygems", "gems"],
+  nuget: [".nuget/packages"],
+};
+
+function getCachePathText(step: WorkflowStep): string {
+  const pathValue = step.with?.path;
+  return getStringList(pathValue).join("\n").toLowerCase();
+}
+
+function getStringList(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string");
+  }
+  return [];
+}
+
+function manualCacheMatchesFamily(step: WorkflowStep, family: DependencyFamily): boolean {
+  const pathText = getCachePathText(step);
+  if (pathText.length === 0) {
+    return false;
+  }
+  return FAMILY_CACHE_MATCHERS[family].some((pattern) => pathText.includes(pattern));
+}
+
+function computeManualCacheCoverage(
+  steps: WorkflowStep[],
+  families: Set<DependencyFamily>,
+): Set<DependencyFamily> {
+  const covered = new Set<DependencyFamily>();
+  for (const step of steps) {
+    if (!isManualCacheStep(step)) {
+      continue;
+    }
+    for (const family of families) {
+      if (manualCacheMatchesFamily(step, family)) {
+        covered.add(family);
+      }
+    }
+  }
+  return covered;
+}
 
 const meta = {
   id: "missing-dependency-cache",
@@ -42,40 +103,28 @@ export const missingDependencyCacheRule = {
         continue;
       }
 
+      const cachedByManual = computeManualCacheCoverage(job.steps, installFamilies);
+
       for (const step of job.steps) {
         const action = getSetupActionKind(step);
         if (!action) {
           continue;
         }
 
-        const supportedInstallFamilies = [...installFamilies].filter((family) => {
-          switch (action) {
-            case "node":
-              return family === "npm" || family === "pnpm" || family === "yarn";
-            case "python":
-              return family === "pip" || family === "pipenv" || family === "poetry";
-            case "go":
-              return family === "go";
-            case "java":
-              return family === "maven" || family === "gradle" || family === "sbt";
-            case "ruby":
-              return family === "bundler";
-            case "dotnet":
-              return family === "nuget";
-          }
-        });
-        if (supportedInstallFamilies.length === 0) {
+        const supportedFamilies = getDependencyFamiliesUsedBySetupAction(action).filter((f) =>
+          installFamilies.has(f),
+        );
+        if (supportedFamilies.length === 0) {
           continue;
         }
 
-        const allFamiliesCached = supportedInstallFamilies.every(
-          (family) =>
-            setupActionHasBuiltInCacheForFamily(step, family) ||
-            job.steps.some((candidate) =>
-              manualCacheStepMatchesDependencyFamily(candidate, family),
-            ),
+        const cachedByBuiltIn = supportedFamilies.filter((f) =>
+          setupActionHasBuiltInCacheForFamily(step, f),
         );
-        if (allFamiliesCached) {
+
+        const cached = new Set<DependencyFamily>([...cachedByBuiltIn, ...cachedByManual]);
+        const uncached = supportedFamilies.filter((f) => !cached.has(f));
+        if (uncached.length === 0) {
           continue;
         }
 
@@ -90,7 +139,7 @@ export const missingDependencyCacheRule = {
             }),
           )(
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
-              message: `${step.uses} is used without visible dependency caching in job "${job.id}".`,
+              message: `${step.uses} is used without visible dependency caching for ${uncached.join(", ")} in job "${job.id}".`,
               why: "Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths.",
               suggestion:
                 "If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.",
