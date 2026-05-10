@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import fc from "fast-check";
 import YAML from "yaml";
-import { parseWorkflow, getLocation } from "../src/workflow.ts";
+import { parseWorkflow, getLocation, getStringOrArrayValue } from "../src/workflow.ts";
 
 const shortString = fc.string({ maxLength: 20 });
 const jobId = fc.stringMatching(/^[a-zA-Z_][a-zA-Z0-9_-]{0,15}$/);
@@ -23,18 +23,22 @@ const jobArbitrary = fc.record({
   uses: fc.option(fc.string({ maxLength: 50 }), { nil: undefined }),
 });
 
+const triggerTypes = ["push", "pull_request", "workflow_dispatch", "schedule"] as const;
+
+const onArbitrary = fc.option(
+  fc.oneof(
+    fc.constantFrom(...triggerTypes),
+    fc.record({ push: fc.option(fc.record({ branches: fc.option(fc.constant(["main"])) })) }),
+    fc.record({ pull_request: fc.option(fc.constant(null)) }),
+    fc.record({ workflow_dispatch: fc.option(fc.constant(null)) }),
+    fc.array(fc.constantFrom(...triggerTypes), { minLength: 1, maxLength: 4 }),
+  ),
+  { nil: undefined },
+);
+
 const workflowArbitrary = fc.record({
   name: fc.option(shortString, { nil: undefined }),
-  on: fc.option(
-    fc.oneof(
-      fc.constant("push"),
-      fc.record({ push: fc.option(fc.record({ branches: fc.option(fc.constant(["main"])) })) }),
-      fc.record({ pull_request: fc.option(fc.constant(null)) }),
-      fc.record({ workflow_dispatch: fc.option(fc.constant(null)) }),
-      fc.constantFrom("push", "pull_request", "workflow_dispatch"),
-    ),
-    { nil: undefined },
-  ),
+  on: onArbitrary,
   jobs: fc.option(fc.dictionary(jobId, jobArbitrary, { minKeys: 0, maxKeys: 5 }), {
     nil: undefined,
   }),
@@ -128,6 +132,34 @@ describe("fuzz: parseWorkflow", () => {
       { numRuns: 200, interruptAfterTimeLimit: 8000 },
     );
   }, 12000);
+
+  test("on field in any form parses without error and getStringOrArrayValue returns correct type", () => {
+    fc.assert(
+      fc.property(workflowArbitrary, (workflowObj) => {
+        const yamlString = YAML.stringify(workflowObj);
+        let doc: ReturnType<typeof parseWorkflow>;
+        try {
+          doc = parseWorkflow("/fuzz/workflow.yml", "/fuzz", yamlString);
+        } catch {
+          return;
+        }
+        const parsedOn = doc.on;
+        if (parsedOn === undefined) {
+          return;
+        }
+        const stringOrArray = getStringOrArrayValue(doc.root!, "on");
+        if (typeof parsedOn === "string") {
+          expect(stringOrArray).toBe(parsedOn);
+        } else if (Array.isArray(parsedOn)) {
+          expect(Array.isArray(stringOrArray)).toBe(true);
+          if (stringOrArray !== undefined) {
+            expect(stringOrArray).toEqual(parsedOn);
+          }
+        }
+      }),
+      { numRuns: 500, interruptAfterTimeLimit: 10000 },
+    );
+  }, 15000);
 
   test("getLocation with undefined node returns fallback (line 1)", () => {
     fc.assert(
