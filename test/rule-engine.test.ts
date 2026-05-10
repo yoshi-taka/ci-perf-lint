@@ -882,4 +882,76 @@ describe("evaluateRulesCoarseToFine", () => {
     expect(result).toEqual([]);
     await cleanup();
   });
+
+  test("coarse-to-fine dedup across same path and line", async () => {
+    const yaml = [
+      "name: Build",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const doc = await createWorkflowDoc(yaml);
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRulesCoarseToFine([doc.workflow, doc.workflow], context);
+    const keys = result.map((d) => `${d.location.path}:${d.location.line}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    await doc.cleanup();
+  });
+
+  test("coarse-to-fine with findingCounts accumulates per-rule counts", async () => {
+    const yaml = [
+      "name: Build",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const doc = await createWorkflowDoc(yaml);
+    const findingCounts = new Map<string, number>();
+    const context: RuleContext = { repository: createSignals() };
+    await evaluateRulesCoarseToFine(
+      [doc.workflow, doc.workflow],
+      context,
+      undefined,
+      findingCounts,
+    );
+    expect(findingCounts.size).toBeGreaterThan(0);
+    await doc.cleanup();
+  });
+
+  test("coarse-to-fine with ruleFilter excluding all and warnings does not crash", async () => {
+    const yaml = [
+      "name: Build",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const { workflow, cleanup } = await createWorkflowDoc(yaml);
+    const warnings: AnalysisWarning[] = [];
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRulesCoarseToFine(
+      [workflow],
+      context,
+      warnings,
+      undefined,
+      () => false,
+    );
+    expect(result).toEqual([]);
+    expect(Array.isArray(warnings)).toBe(true);
+    await cleanup();
+  });
 });

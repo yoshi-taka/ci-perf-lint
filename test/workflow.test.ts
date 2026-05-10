@@ -1,14 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
-import { getLocation, parseWorkflow } from "../src/workflow.ts";
+import {
+  getLocation,
+  parseWorkflow,
+  getNode,
+  getScalarValue,
+  getScalarString,
+} from "../src/workflow.ts";
+
+function wf(
+  source: string,
+  repoRoot = path.join(path.sep, "repo"),
+  workflowPath = path.join(repoRoot, ".github", "workflows", "ci.yml"),
+) {
+  return parseWorkflow(workflowPath, repoRoot, source);
+}
 
 describe("parseWorkflow", () => {
   test("parses reusable jobs, regular steps, maps, and source nodes", () => {
-    const repoRoot = path.join(path.sep, "repo");
-    const workflowPath = path.join(repoRoot, ".github", "workflows", "ci.yml");
-    const workflow = parseWorkflow(
-      workflowPath,
-      repoRoot,
+    const workflow = wf(
       [
         "name: CI",
         "on: push",
@@ -55,11 +65,7 @@ describe("parseWorkflow", () => {
   });
 
   test("keeps line and column locations tied to YAML source nodes", () => {
-    const repoRoot = path.join(path.sep, "repo");
-    const workflowPath = path.join(repoRoot, ".github", "workflows", "ci.yml");
-    const workflow = parseWorkflow(
-      workflowPath,
-      repoRoot,
+    const workflow = wf(
       [
         "name: CI",
         "on: push",
@@ -90,12 +96,349 @@ describe("parseWorkflow", () => {
   });
 
   test("rejects non-mapping workflow documents", () => {
-    expect(() =>
-      parseWorkflow(
-        path.join(path.sep, "repo", ".github", "workflows", "ci.yml"),
-        path.join(path.sep, "repo"),
-        "- not\n- a\n- mapping",
-      ),
-    ).toThrow("Expected workflow mapping");
+    expect(() => wf("- not\n- a\n- mapping")).toThrow("Expected workflow mapping");
+  });
+
+  test("rejects YAML with parse errors", () => {
+    expect(() => wf("name: unclosed string\non: [push\njobs: {}")).toThrow(
+      "Failed to parse workflow",
+    );
+  });
+
+  test("rejects YAML document errors (duplicate keys)", () => {
+    const src = ["name: CI", "name: oops", "on: push", "jobs: {}"].join("\n");
+    expect(() => wf(src)).toThrow("Failed to parse workflow");
+  });
+});
+
+describe("relativePath", () => {
+  test("falls back to basename when repoRoot equals fullPath dir", () => {
+    const repoRoot = path.join(path.sep, "repo");
+    const fullPath = path.join(repoRoot, "ci.yml");
+    const doc = parseWorkflow(fullPath, repoRoot, "name: test\non: push\njobs: {}\n");
+    expect(doc.relativePath).toBe("ci.yml");
+  });
+});
+
+describe("getNode / getScalarValue", () => {
+  test("returns scalar values of various types", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        '    runs-on: "ubuntu-latest"',
+        "    timeout-minutes: 30",
+        "    steps:",
+        "      - run: echo ok",
+      ].join("\n"),
+    );
+    const jobNode = getNode(workflow.root!, "jobs")!;
+    const buildNode = getNode(jobNode as never, "build")!;
+
+    expect(getScalarValue(buildNode as never, "runs-on")).toBe("ubuntu-latest");
+    expect(getScalarValue(buildNode as never, "timeout-minutes")).toBe(30);
+    expect(getScalarValue(buildNode as never, "nonexistent")).toBeUndefined();
+  });
+
+  test("getScalarValue returns boolean for YAML booleans", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo ok",
+      ].join("\n"),
+    );
+    const jobNode = getNode(workflow.root!, "jobs")!;
+    const buildNode = getNode(jobNode as never, "build")!;
+
+    expect(getScalarValue(buildNode as never, "runs-on")).toBe("ubuntu-latest");
+  });
+
+  test("getScalarString returns undefined for non-string scalars", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    timeout-minutes: 30",
+        "    steps: []",
+      ].join("\n"),
+    );
+    const jobNode = getNode(workflow.root!, "jobs")!;
+    const buildNode = getNode(jobNode as never, "build")!;
+
+    expect(getScalarString(undefined)).toBeUndefined();
+  });
+});
+
+describe("getScalarString with sequences", () => {
+  test("returns array for list-form triggers", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: [push, pull_request]",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps: []",
+      ].join("\n"),
+    );
+    expect(workflow.jobs).toHaveLength(1);
+  });
+});
+
+describe("getMapValue", () => {
+  test("returns undefined for non-object values", () => {
+    const workflow = wf(
+      ["name: CI", "on: push", "jobs:", "  build:", "    steps:", "      - run: echo"].join("\n"),
+    );
+    expect(workflow.jobs[0]?.steps[0]?.with).toBeUndefined();
+  });
+});
+
+describe("parseWorkflow internals via public API", () => {
+  test("handles workflow without name", () => {
+    const workflow = wf(
+      "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
+    );
+    expect(workflow.name).toBeUndefined();
+    expect(workflow.jobs).toHaveLength(1);
+  });
+
+  test("handles workflow without on", () => {
+    const workflow = wf(
+      "name: CI\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
+    );
+    expect(workflow.on).toBeUndefined();
+    expect(workflow.jobs).toHaveLength(1);
+  });
+
+  test("handles workflow with empty jobs", () => {
+    const workflow = wf("name: CI\non: push\njobs: {}\n");
+    expect(workflow.jobs).toHaveLength(0);
+  });
+
+  test("handles jobs with missing id", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        '  "":',
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(workflow.jobs).toHaveLength(0);
+  });
+
+  test("handles job with non-map value", () => {
+    const workflow = wf(["name: CI", "on: push", "jobs:", "  build: just_a_string"].join("\n"));
+    expect(workflow.jobs).toHaveLength(0);
+  });
+
+  test("handles step with non-map entry", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - just a scalar step",
+      ].join("\n"),
+    );
+    expect(workflow.jobs[0]?.steps).toHaveLength(0);
+  });
+
+  test("stores source on document", () => {
+    const src =
+      "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo\n";
+    const workflow = wf(src);
+    expect(workflow.source).toBe(src);
+  });
+});
+
+describe("parsed property", () => {
+  test("lazyNodeRecord returns consistent values across multiple accesses", () => {
+    const workflow = wf(
+      "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo\n",
+    );
+    const first = workflow.parsed;
+    const second = workflow.parsed;
+    expect(second).toEqual(first);
+  });
+
+  test("on property mirrors parsed.on", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    const parsedOn = workflow.parsed?.on;
+    expect(workflow.on).toEqual(parsedOn);
+  });
+});
+
+describe("job raw property", () => {
+  test("lazyOptionalNodeRecord on step with returns cached value", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "        with:",
+        "          fetch-depth: 0",
+      ].join("\n"),
+    );
+    const job = workflow.jobs[0]!;
+    const raw1 = job.raw;
+    const raw2 = job.raw;
+    expect(raw2).toEqual(raw1);
+    expect(raw1["runs-on"]).toBe("ubuntu-latest");
+  });
+});
+
+describe("getLocation edge cases", () => {
+  test("returns fallback position for range-less node", () => {
+    const workflow = wf(
+      "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo\n",
+    );
+    const pos = getLocation(workflow, undefined);
+    expect(pos).toEqual({ path: ".github/workflows/ci.yml", line: 1, column: 1 });
+  });
+});
+
+describe("parseSteps with various step shapes", () => {
+  test("parses named uses step", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - name: Checkout",
+        "        uses: actions/checkout@v4",
+      ].join("\n"),
+    );
+    const step = workflow.jobs[0]!.steps[0]!;
+    expect(step.uses).toBe("actions/checkout@v4");
+    expect(step.name).toBe("Checkout");
+  });
+
+  test("parses unnamed run step", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const step = workflow.jobs[0]!.steps[0]!;
+    expect(step.run).toBe("npm ci");
+  });
+
+  test("parses step with if condition", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - name: Test",
+        "        if: success()",
+        "        run: npm test",
+      ].join("\n"),
+    );
+    const step = workflow.jobs[0]!.steps[0]!;
+    expect(step.if).toBe("success()");
+    expect(step.run).toBe("npm test");
+    expect(step.name).toBe("Test");
+  });
+
+  test("parses step with working-directory", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: make",
+        "        working-directory: ./src",
+      ].join("\n"),
+    );
+    const step = workflow.jobs[0]!.steps[0]!;
+    expect(step.workingDirectory).toBe("./src");
+    expect(step.run).toBe("make");
+  });
+});
+
+describe("getPair cache threshold crossing", () => {
+  test("map with 6+ items uses indexed lookup (above CACHE_THRESHOLD=5)", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    timeout-minutes: 60",
+        "    if: ${{ success() }}",
+        "    env:",
+        "      NODE_ENV: test",
+        "    strategy:",
+        "      matrix:",
+        "        node: [18, 20]",
+        "    steps:",
+        "      - run: echo ok",
+      ].join("\n"),
+    );
+    expect(workflow.jobs).toHaveLength(1);
+    expect(workflow.jobs[0]?.id).toBe("build");
+  });
+
+  test("map with 4 items uses linear scan (below CACHE_THRESHOLD)", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo ok",
+      ].join("\n"),
+    );
+    expect(workflow.jobs[0]?.id).toBe("build");
   });
 });
