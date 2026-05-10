@@ -318,7 +318,8 @@ export async function collectRepositoryDiagnosticGateState(
     ],
   );
   state.hasLargeFiles = largeFilesEvidence.value;
-  state.hasPytest = meetsMinimum(pytestEvidence, "medium");
+  const pytestGate = meetsMinimum(pytestEvidence, "medium");
+  state.hasPytest = pytestGate.value;
   state.hasRenovateConfig = hasRenovateConfig;
   state.hasCdkManifest = hasCdkManifest;
   observability.observed.push("hasLargeFiles", "hasPytest", "hasRenovateConfig", "hasCdkManifest");
