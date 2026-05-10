@@ -4,6 +4,13 @@ import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { detectLintTool, normalizeRunCommand } from "./shared/tools.ts";
 import { jobHasMatrix } from "./shared/workflow-jobs.ts";
+import {
+  buildStepSequence,
+  computePairProximity,
+  type StepPosition,
+} from "./shared/step-proximity.ts";
+
+const REPEATED_PROXIMITY_THRESHOLD = 0.3;
 
 const meta = {
   id: "repeated-lint-in-same-workflow",
@@ -15,11 +22,18 @@ const meta = {
 interface ToolOccurrence {
   jobId: string;
   step: WorkflowStep;
+  position: StepPosition;
 }
 
 export const repeatedLintInSameWorkflowRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
+    const seq = buildStepSequence(workflow);
+    const positionByJobStep = new Map<string, StepPosition>();
+    for (const pos of seq.positions) {
+      positionByJobStep.set(`${pos.jobId}:${pos.jobStepIndex}`, pos);
+    }
+
     const occurrencesByTool = new Map<string, ToolOccurrence[]>();
 
     for (const job of workflow.jobs) {
@@ -29,7 +43,8 @@ export const repeatedLintInSameWorkflowRule = {
 
       const seenSignaturesInJob = new Set<string>();
 
-      for (const step of job.steps) {
+      for (let stepIdx = 0; stepIdx < job.steps.length; stepIdx++) {
+        const step = job.steps[stepIdx]!;
         const tool = detectLintTool(step);
         if (!tool) {
           continue;
@@ -42,16 +57,39 @@ export const repeatedLintInSameWorkflowRule = {
         }
 
         seenSignaturesInJob.add(key);
+        const pos = positionByJobStep.get(`${job.id}:${stepIdx}`);
+        if (!pos) {
+          continue;
+        }
+
         const occurrences = occurrencesByTool.get(key) ?? [];
-        occurrences.push({ jobId: job.id, step });
+        occurrences.push({ jobId: job.id, step, position: pos });
         occurrencesByTool.set(key, occurrences);
       }
     }
 
     return [...occurrencesByTool.entries()]
-      .filter(([, occurrences]) => occurrences.length >= 2)
+      .filter(([, occurrences]) => {
+        if (occurrences.length < 2) {
+          return false;
+        }
+        let maxProx = 0;
+        for (let i = 0; i < occurrences.length; i++) {
+          for (let j = i + 1; j < occurrences.length; j++) {
+            const prox = computePairProximity(
+              occurrences[i]!.position,
+              occurrences[j]!.position,
+              seq.boundaries,
+            );
+            if (prox > maxProx) {
+              maxProx = prox;
+            }
+          }
+        }
+        return maxProx >= REPEATED_PROXIMITY_THRESHOLD;
+      })
       .map(([tool, occurrences]) => {
-        const jobIds = occurrences.map((occurrence) => occurrence.jobId).sort();
+        const jobIds = occurrences.map((occ) => occ.jobId).sort();
         const firstOccurrence = occurrences[0]!;
         return buildDiagnostic(
           workflow,
