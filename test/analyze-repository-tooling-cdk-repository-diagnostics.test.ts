@@ -1,13 +1,23 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fixtures } from "./fixtures.ts";
 import { getFixtureReport, tempDirs } from "./repository-diagnostics-test-helpers.ts";
 
 const originalBunSpawnSync = Bun.spawnSync;
+const originalDisableOxlint = process.env.CI_PERF_LINT_DISABLE_OXLINT;
+
+beforeEach(() => {
+  process.env.CI_PERF_LINT_DISABLE_OXLINT = "1";
+});
 
 afterEach(() => {
   Bun.spawnSync = originalBunSpawnSync;
+  if (originalDisableOxlint === undefined) {
+    delete process.env.CI_PERF_LINT_DISABLE_OXLINT;
+  } else {
+    process.env.CI_PERF_LINT_DISABLE_OXLINT = originalDisableOxlint;
+  }
 });
 
 describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnostics", () => {

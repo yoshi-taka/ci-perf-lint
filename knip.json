@@ -7,14 +7,10 @@
     "src/rules/shared/tools.ts": ["exports"],
     "src/rules/shared/any-step.ts": ["exports", "types"],
     "src/repository-diagnostics/embedded-oxlint-runner.ts": ["exports", "types"],
-    "src/repository-diagnostics/embedded-oxlint-runner.ts": ["exports", "types"],
     "src/repository-diagnostics/embedded-oxlint-path.ts": ["exports"],
     "src/repository-similar-workflows-similarity.ts": ["exports"],
     "src/rules/shared/similar-workflow-consensus-consensus.ts": ["exports"],
-    "src/rules/shared/evidence-propagation.ts": ["exports"],
-    "src/rules/shared/finding-sheet.ts": ["exports"],
-    "src/rules/shared/singularity.ts": ["exports"],
-    "src/rules/shared/workflow-interaction.ts": ["exports"]
+    "src/rules/shared/evidence-propagation.ts": ["exports"]
   },
   "ignoreExportsUsedInFile": true,
   "workspaces": {

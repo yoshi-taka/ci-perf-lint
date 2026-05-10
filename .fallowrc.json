@@ -28,6 +28,7 @@
     { "file": "src/repository-diagnostics/embedded-oxlint-runner.ts", "exports": ["embeddedOxlintNodeFallbackCommand", "shouldRetryEmbeddedOxlintWithNode"] },
     { "file": "src/severity-promotion.ts", "exports": ["severityPromotionRules"] },
     { "file": "src/repository-similar-workflows-similarity.ts", "exports": ["collectConnectedComponents"] },
-    { "file": "src/rules/shared/similar-workflow-consensus-consensus.ts", "exports": ["detectClusterInconsistency"] }
+    { "file": "src/rules/shared/similar-workflow-consensus-consensus.ts", "exports": ["detectClusterInconsistency"] },
+    { "file": "src/rules/shared/singularity.ts", "exports": ["SingularityTracker"] }
   ]
 }
