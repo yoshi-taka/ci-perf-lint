@@ -9,6 +9,7 @@ import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import type { RepositoryPrecedentIndex } from "./rules/shared/repository-precedent-index.ts";
 import type { RepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
+import { classifySingularity, type SingularityTracker } from "./rules/shared/singularity.ts";
 
 type WorkflowNodeKind = "trigger" | "concurrency";
 
@@ -28,6 +29,7 @@ export interface RuleContext {
   workflowSemantics?: WorkflowSemantics | ReadonlyMap<WorkflowDocument, WorkflowSemantics>;
   precedentIndex?: RepositoryPrecedentIndex;
   fileIndex?: RepositoryFileIndex;
+  singularities?: SingularityTracker;
 }
 
 interface RuleModule {
@@ -181,9 +183,14 @@ export async function evaluateRules(
   }
 
   const tasks: RuleTask[] = [];
+  const workflowPath = workflow.relativePath;
 
   for (const rule of allRules) {
     if (ruleFilter && !ruleFilter(rule)) {
+      continue;
+    }
+
+    if (context.singularities?.isQuarantined(rule.meta.id)) {
       continue;
     }
 
@@ -201,11 +208,13 @@ export async function evaluateRules(
       try {
         return { diagnostics: await task.run(), rule: task.rule };
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
+        const failure = classifySingularity(error, task.rule.meta.id, workflowPath);
+        context.singularities?.record(failure);
         if (warnings) {
+          const detail = error instanceof Error ? error.message : String(error);
           warnings.push({
-            source: workflow.relativePath,
-            message: `Rule ${task.rule.meta.id} failed: ${detail}`,
+            source: workflowPath,
+            message: `[${failure.class}] Rule ${task.rule.meta.id} failed: ${detail}`,
           });
         }
         return { diagnostics: [], rule: task.rule };
@@ -306,6 +315,12 @@ export async function evaluateRulesCoarseToFine(
     if (ruleFilter && !ruleFilter(rule)) {
       continue;
     }
+
+    const ruleId = rule.meta.id;
+    if (context.singularities?.isQuarantined(ruleId)) {
+      continue;
+    }
+
     const { maxFindings, precheckBudget = 20 } = rule.meta;
 
     const checkFn = getRuleCheckFn(rule, isBuildkite, isGitlab, isCircle);
@@ -323,6 +338,12 @@ export async function evaluateRulesCoarseToFine(
     }
 
     for (const { workflow } of candidates) {
+      const workflowPath = workflow.relativePath;
+
+      if (context.singularities?.hasPoleTrigger(ruleId, workflowPath)) {
+        continue;
+      }
+
       prewarmStepAnalysisCaches(workflow);
       if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
         continue;
@@ -343,17 +364,16 @@ export async function evaluateRulesCoarseToFine(
           workflowResults[workflowIndex]!.push(...diagnostics);
         }
         if (findingCounts) {
-          findingCounts.set(
-            rule.meta.id,
-            (findingCounts.get(rule.meta.id) ?? 0) + diagnostics.length,
-          );
+          findingCounts.set(ruleId, (findingCounts.get(ruleId) ?? 0) + diagnostics.length);
         }
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
+        const failure = classifySingularity(error, ruleId, workflowPath);
+        context.singularities?.record(failure);
         if (warnings) {
+          const detail = error instanceof Error ? error.message : String(error);
           warnings.push({
-            source: workflow.relativePath,
-            message: `Rule ${rule.meta.id} failed: ${detail}`,
+            source: workflowPath,
+            message: `[${failure.class}] Rule ${ruleId} failed: ${detail}`,
           });
         }
       }
