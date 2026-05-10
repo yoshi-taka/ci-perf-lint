@@ -81,6 +81,7 @@ import { preferStandardArmRunnerForPortableToolingRule } from "./prefer-standard
 import { preferSetupBunForLightweightNodeToolingRule } from "./prefer-setup-bun-for-lightweight-node-tooling.ts";
 import { preferSetupUvForLightweightPythonToolingRule } from "./prefer-setup-uv-for-lightweight-python-tooling.ts";
 import { preferZstdCompressionForPushedDockerImagesRule } from "./prefer-zstd-compression-for-pushed-docker-images.ts";
+import { railsDbSchemaLoadOverMigrateRule } from "./rails-db-schema-load-over-migrate.ts";
 import { preferRuffImportSortingOverIsortRule } from "./prefer-ruff-import-sorting-over-isort.ts";
 import { redundantNpxOrBootstrapRule } from "./redundant-npx-or-bootstrap.ts";
 import { redundantInstallForPreinstalledCliRule } from "./redundant-install-for-preinstalled-cli.ts";
@@ -171,6 +172,7 @@ export const allRules = [
   preferSetupUvForLightweightPythonToolingRule,
   preferUvPipOverPipRule,
   preferZstdCompressionForPushedDockerImagesRule,
+  railsDbSchemaLoadOverMigrateRule,
   preferRuffFormatOverBlackRule,
   preferRuffImportSortingOverIsortRule,
   repeatedInstallInSameJobRule,

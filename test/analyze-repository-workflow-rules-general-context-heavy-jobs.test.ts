@@ -388,4 +388,34 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
 
     expect(report.findings.some((candidate) => candidate.ruleId === "db-io-reduce")).toBe(false);
   });
+
+  test("warns when Rails CI job uses db:migrate for ephemeral test database setup", async () => {
+    const report = await getFixtureReport(fixtures.railsDbSchemaLoadOverMigrateLike, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const findings = report.findings.filter(
+      (candidate) => candidate.ruleId === "rails-db-schema-load-over-migrate",
+    );
+
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    const finding = findings.find((f) => f.message.includes("db:migrate"));
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("db:schema:load");
+    expect(finding?.severity).toBe("warning");
+  });
+
+  test("does not warn when Rails CI job uses db:schema:load instead of db:migrate", async () => {
+    const report = await getFixtureReport(fixtures.railsDbSchemaLoadOverMigrateOk, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some((candidate) => candidate.ruleId === "rails-db-schema-load-over-migrate"),
+    ).toBe(false);
+  });
 });

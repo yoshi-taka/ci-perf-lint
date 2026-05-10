@@ -125,6 +125,7 @@ Current rule registry:
 - `prefer-uv-pip-over-pip`
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`
+- `rails-db-schema-load-over-migrate`
 - `pytest-norecursedirs-override`
 - `pytest-testpaths-unconfigured`
 - `pytest-xdist-installed-but-not-used`

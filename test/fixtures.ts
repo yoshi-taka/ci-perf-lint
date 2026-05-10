@@ -162,6 +162,8 @@ const fixtureNames = {
   qemuMultiPlatformLike: "qemu-multi-platform-like",
   qemuShellBuildxLike: "qemu-shell-buildx-like",
   qemuUnusedLike: "qemu-unused-like",
+  railsDbSchemaLoadOverMigrateLike: "rails-db-schema-load-over-migrate-like",
+  railsDbSchemaLoadOverMigrateOk: "rails-db-schema-load-over-migrate-ok",
   consensusCacheLike: "consensus-cache-like",
   consensusDeepCheckoutLike: "consensus-deep-checkout-like",
   precedentCacheLike: "precedent-cache-like",
