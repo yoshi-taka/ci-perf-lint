@@ -1,40 +1,44 @@
 import type { Node } from "yaml";
-import type { Confidence, Diagnostic, RuleMeta, Severity, SourceLocation } from "./types.ts";
-import type { RepositorySignals } from "./repository-signals-types.ts";
-import { getLocation, type WorkflowDocument } from "./workflow.ts";
-import { getPipelineLocation, type PipelineDocument } from "./buildkite-workflow.ts";
-import { getGitlabCiLocation, type GitlabCiDocument } from "./gitlab-ci-workflow.ts";
-import { getCircleCiLocation, type CircleCiDocument } from "./circleci-workflow.ts";
-
-type CIWorkflow = WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument;
+import type { Confidence, RuleMeta, Severity, SourceLocation } from "./types.ts";
+import {
+  composeDiagnosticSources,
+  diagnosticSourceToRef,
+  type ProvenancedDiagnostic,
+  type DiagnosticSource,
+  type DiagnosticSourceRef,
+  type RepositoryDiagnosticSource,
+  type WorkflowDiagnosticSource,
+} from "./diagnostic-source.ts";
 
 // ──────────────────────────────────────────────
 // 1. SOURCE REFERENCE — structured locality
 // ──────────────────────────────────────────────
 
-interface SourceRef {
-  workflowPath: string;
-  jobId?: string;
-  stepIndex?: number;
-}
+type SourceRef = DiagnosticSourceRef;
 
 function formatWorkflowPath(path: string): string {
   return `\`${path}\``;
 }
 
-function formatJobRef(id: string): string {
-  return `"${id}"`;
-}
-
-function formatWorkflowJobRef(workflowPath: string, jobId: string): string {
-  return `${formatWorkflowPath(workflowPath)} job ${formatJobRef(jobId)}`;
-}
-
 function formatSourceRef(ref: SourceRef): string {
-  if (ref.jobId) {
-    return formatWorkflowJobRef(ref.workflowPath, ref.jobId);
+  if (ref.kind === "composite" && ref.sources) {
+    const composite = composeDiagnosticSources(
+      ...(ref.sources as unknown as [DiagnosticSource, ...DiagnosticSource[]]),
+    );
+    return composite.sources.map(formatSourceRef).join(" and ");
   }
-  return formatWorkflowPath(ref.workflowPath);
+
+  if (ref.kind === "repository") {
+    return ref.workflowPath
+      ? `repository via ${formatWorkflowPath(ref.workflowPath)}`
+      : "repository";
+  }
+
+  if (ref.kind === "workflow" && ref.workflowPath) {
+    return formatWorkflowPath(ref.workflowPath);
+  }
+
+  return ref.workflowPath ? formatWorkflowPath(ref.workflowPath) : "";
 }
 
 // ──────────────────────────────────────────────
@@ -91,8 +95,12 @@ function renderSuggestion(op: RepairOp): string {
   return `${prefix} ${op.target} in ${scopeText}.`;
 }
 
-export function renderAiHandoff(op: RepairOp, ruleId: string, source?: SourceRef): string {
-  const sourceStr = source ? formatSourceRef(source) : "";
+export function renderAiHandoff(
+  op: RepairOp,
+  ruleId: string,
+  source?: DiagnosticSource | SourceRef,
+): string {
+  const sourceStr = source ? formatSourceRef(source as SourceRef) : "";
   const prefix = sourceStr ? `Review ${sourceStr} for ${ruleId}.` : `Review for ${ruleId}.`;
 
   if (op.action === "review") {
@@ -135,79 +143,130 @@ export interface DiagnosticBlueprint {
   score: number;
 }
 
-function isGitlabCiDocument(doc: CIWorkflow): doc is GitlabCiDocument {
-  return "kind" in doc && doc.kind === "gitlab-ci";
+interface LegacyWorkflowDiagnosticDetails {
+  scope?: "workflow" | "repository";
+  message: string;
+  why: string;
+  suggestion: string;
+  measurementHint: string;
+  aiHandoff: string;
+  score: number;
+  severity?: Severity;
+  confidence?: Confidence;
+  location?: SourceLocation;
 }
 
-function isCircleCiDocument(doc: CIWorkflow): doc is CircleCiDocument {
-  return "kind" in doc && doc.kind === "circleci";
+interface LegacyRepositoryDiagnosticDetails {
+  message: string;
+  why: string;
+  suggestion: string;
+  measurementHint: string;
+  aiHandoff: string;
+  score: number;
+  location: SourceLocation;
+  severity?: Severity;
+  confidence?: Confidence;
 }
 
-function resolveDiagnosticLocation(workflow: CIWorkflow, node: Node | undefined): SourceLocation {
-  const isPipeline = "steps" in workflow && !("jobs" in workflow);
-  const isGitlab = isGitlabCiDocument(workflow);
-  const isCircle = isCircleCiDocument(workflow);
-  return isPipeline
-    ? getPipelineLocation(workflow, node)
-    : isGitlab
-      ? getGitlabCiLocation(workflow, node)
-      : isCircle
-        ? getCircleCiLocation(workflow, node)
-        : getLocation(workflow, node);
+function resolveWorkflowSourceLocation(
+  source: WorkflowDiagnosticSource,
+  _node: Node | undefined,
+): SourceLocation {
+  return source.location;
+}
+
+function resolveRepositorySourceLocation(source: RepositoryDiagnosticSource): SourceLocation {
+  return source.location;
 }
 
 // ──────────────────────────────────────────────
-// 5. MAIN REIFICATION ENTRY POINTS
+// 4. MAIN REIFICATION ENTRY POINTS
 // ──────────────────────────────────────────────
 
-export function reifyDiagnostic(
+export function reifyDiagnosticFromSource(
   meta: RuleMeta,
-  workflow: CIWorkflow,
+  source: WorkflowDiagnosticSource,
   node: Node | undefined,
-  blueprint: DiagnosticBlueprint,
+  details: LegacyWorkflowDiagnosticDetails | DiagnosticBlueprint,
   overrides?: {
     severity?: Severity;
     confidence?: Confidence;
     location?: SourceLocation;
   },
-): Diagnostic {
+): ProvenancedDiagnostic<WorkflowDiagnosticSource> {
   const severity = overrides?.severity ?? meta.severity;
   const confidence = overrides?.confidence ?? meta.confidence;
-  const docLocation = overrides?.location ?? resolveDiagnosticLocation(workflow, node);
-  const sourceRef: SourceRef = { workflowPath: workflow.relativePath };
+  const docLocation = overrides?.location ?? resolveWorkflowSourceLocation(source, node);
+  const sourceRef = diagnosticSourceToRef(source);
+
+  if ("repair" in details) {
+    return {
+      ruleId: meta.id,
+      severity,
+      confidence,
+      docsPath: meta.docsPath,
+      workflow: source.workflowPath,
+      location: docLocation,
+      message: details.message,
+      why: details.why,
+      suggestion: renderSuggestion(details.repair),
+      measurementHint: details.measurementHint,
+      aiHandoff: renderAiHandoff(details.repair, meta.id, sourceRef),
+      score: details.score,
+      repair: details.repair,
+      source,
+    };
+  }
 
   return {
     ruleId: meta.id,
     severity,
     confidence,
     docsPath: meta.docsPath,
-    workflow: workflow.relativePath,
+    workflow: source.workflowPath,
     location: docLocation,
-    message: blueprint.message,
-    why: blueprint.why,
-    suggestion: renderSuggestion(blueprint.repair),
-    measurementHint: blueprint.measurementHint,
-    aiHandoff: renderAiHandoff(blueprint.repair, meta.id, sourceRef),
-    score: blueprint.score,
-    repair: blueprint.repair,
+    message: details.message,
+    why: details.why,
+    suggestion: details.suggestion,
+    measurementHint: details.measurementHint,
+    aiHandoff: details.aiHandoff,
+    score: details.score,
+    source,
   };
 }
 
-export function reifyRepositoryDiagnostic(
-  repository: RepositorySignals,
+export function reifyRepositoryDiagnosticFromSource(
   meta: RuleMeta,
-  blueprint: DiagnosticBlueprint,
-  location: SourceLocation,
+  source: RepositoryDiagnosticSource,
+  details: LegacyRepositoryDiagnosticDetails | DiagnosticBlueprint,
   overrides?: {
     severity?: Severity;
     confidence?: Confidence;
   },
-): Diagnostic {
+): ProvenancedDiagnostic<RepositoryDiagnosticSource> {
   const severity = overrides?.severity ?? meta.severity;
   const confidence = overrides?.confidence ?? meta.confidence;
-  const fallbackPath = ".github/workflows/ci.yml";
-  const wfPath = repository.primaryWorkflowPath ?? fallbackPath;
-  const sourceRef: SourceRef = { workflowPath: wfPath };
+  const sourceRef = diagnosticSourceToRef(source);
+
+  if ("repair" in details) {
+    return {
+      ruleId: meta.id,
+      severity,
+      confidence,
+      scope: "repository",
+      docsPath: meta.docsPath,
+      workflow: source.workflowPath,
+      location: resolveRepositorySourceLocation(source),
+      message: details.message,
+      why: details.why,
+      suggestion: renderSuggestion(details.repair),
+      measurementHint: details.measurementHint,
+      aiHandoff: renderAiHandoff(details.repair, meta.id, sourceRef),
+      score: details.score,
+      repair: details.repair,
+      source,
+    };
+  }
 
   return {
     ruleId: meta.id,
@@ -215,14 +274,14 @@ export function reifyRepositoryDiagnostic(
     confidence,
     scope: "repository",
     docsPath: meta.docsPath,
-    workflow: wfPath,
-    location,
-    message: blueprint.message,
-    why: blueprint.why,
-    suggestion: renderSuggestion(blueprint.repair),
-    measurementHint: blueprint.measurementHint,
-    aiHandoff: renderAiHandoff(blueprint.repair, meta.id, sourceRef),
-    score: blueprint.score,
-    repair: blueprint.repair,
+    workflow: source.workflowPath,
+    location: resolveRepositorySourceLocation(source),
+    message: details.message,
+    why: details.why,
+    suggestion: details.suggestion,
+    measurementHint: details.measurementHint,
+    aiHandoff: details.aiHandoff,
+    score: details.score,
+    source,
   };
 }

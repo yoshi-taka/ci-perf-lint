@@ -5,6 +5,7 @@ import type {
   OutputFormat,
   RenderOptions,
   ReportData,
+  WorkflowSummary,
 } from "./types.ts";
 
 const maxRenderedAffectedLocations = 5;
@@ -590,6 +591,27 @@ function renderFindingsOnlyHandoff(report: ReportData, options: RenderOptions): 
   return lines.join("\n");
 }
 
+function stripDiagnosticSource(diagnostic: Diagnostic): Diagnostic {
+  const { source: _source, ...rest } = diagnostic;
+  return rest;
+}
+
+function stripWorkflowSummarySources(summary: WorkflowSummary): WorkflowSummary {
+  return {
+    ...summary,
+    findings: summary.findings.map(stripDiagnosticSource),
+  };
+}
+
+function sanitizeReportForJson(report: ReportData): ReportData {
+  return {
+    ...report,
+    topFindings: report.topFindings.map(stripDiagnosticSource),
+    findings: report.findings.map(stripDiagnosticSource),
+    workflows: report.workflows.map(stripWorkflowSummarySources),
+  };
+}
+
 export function renderReport(
   report: ReportData,
   format: OutputFormat,
@@ -605,7 +627,7 @@ export function renderReport(
     if (options.findingsOnly) {
       switch (format) {
         case "json":
-          return JSON.stringify(report.findings, null, 2);
+          return JSON.stringify(report.findings.map(stripDiagnosticSource), null, 2);
         case "markdown":
         default:
           return renderFindingsOnlyMarkdown(report);
@@ -613,7 +635,7 @@ export function renderReport(
     }
     switch (format) {
       case "json":
-        return JSON.stringify(report, null, 2);
+        return JSON.stringify(sanitizeReportForJson(report), null, 2);
       case "markdown":
       default:
         return renderMarkdown(report, plainOptions);

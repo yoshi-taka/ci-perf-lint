@@ -65,8 +65,8 @@ Current rule registry:
 - `missing-timeout-minutes`
 - `missing-turbo-cache`
 - `native-dependency-may-fall-back-to-source-build`
-- `npm-audit-in-ci`
 - `nox-without-uv-backend`
+- `npm-audit-in-ci`
 - `npm-ci-over-npm-install`
 - `outdated-datadog-lambda-extension`
 - `outdated-setup-action-without-cache`
@@ -127,12 +127,11 @@ Current rule registry:
 - `prefer-uv-pip-over-pip`
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`
-- `rails-db-schema-load-over-migrate`
-- `ruby-setup-ruby-missing-bundler-cache`
 - `pytest-norecursedirs-override`
 - `pytest-testpaths-unconfigured`
 - `pytest-xdist-installed-but-not-used`
 - `python-top-level-heavy-client-init`
+- `rails-db-schema-load-over-migrate`
 - `recommend-rspack-over-webpack`
 - `recommend-swc-over-babel`
 - `recommend-webpack-4-latest-patch`
@@ -144,9 +143,11 @@ Current rule registry:
 - `renovate-aws-sdk-grouping`
 - `renovate-cdk-deps-grouping`
 - `renovate-rebase-when-unconfigured`
+- `repeated-bootstrap-setup`
 - `repeated-build-in-same-workflow`
 - `repeated-install-in-same-job`
 - `repeated-lint-in-same-workflow`
+- `ruby-setup-ruby-missing-bundler-cache`
 - `scheduled-heavy-workflow-without-throttling`
 - `setup-node-cache-dependency-path-unset`
 - `tailwind-content-config`
@@ -160,8 +161,8 @@ Current rule registry:
 - `ts-loader-fork-ts-checker`
 - `ungated-heavy-job`
 - `unnecessary-app-install-for-lint-job`
-- `unnecessary-npm-global-upgrade-before-npm-install`
 - `unnecessary-checkout-when-only-using-artifacts`
+- `unnecessary-npm-global-upgrade-before-npm-install`
 - `wasteful-npm-global-install`
 - `wasteful-package-install-in-container`
 

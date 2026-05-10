@@ -76,7 +76,6 @@
     "ruleId": "prefer-oxlint-over-eslint",
     "severity": "warning",
     "confidence": "medium",
-    "scope": "repository",
     "docsPath": "docs/rules/prefer-oxlint-over-eslint.md",
     "workflow": ".github/workflows/ci.yml",
     "location": {

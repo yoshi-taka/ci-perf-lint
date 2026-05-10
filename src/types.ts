@@ -1,4 +1,5 @@
 import type { RepairOp } from "./reification.ts";
+import type { DiagnosticSource, DiagnosticSourceKind } from "./diagnostic-source.ts";
 
 export type Severity = "error" | "warning" | "suggestion";
 export type Confidence = "high" | "medium";
@@ -29,6 +30,7 @@ export interface Diagnostic {
   docsPath: string;
   workflow: string;
   location: SourceLocation;
+  source?: DiagnosticSource;
   message: string;
   why: string;
   suggestion: string;
@@ -44,6 +46,7 @@ export interface AggregatedFinding {
   workflows: string[];
   docsPath: string;
   scope?: "workflow" | "repository";
+  sourceKinds?: DiagnosticSourceKind[];
   messages: string[];
   aiHandoffs?: string[];
   locations: string[];

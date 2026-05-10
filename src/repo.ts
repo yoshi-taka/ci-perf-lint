@@ -420,7 +420,13 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   scanContext.clearCaches();
 
   const promotedFindings = applySeverityPromotion(allFindings, mode);
-  const findings = promotedFindings.filter((finding) => findingIncludedInMode(finding, mode));
+  const findings = promotedFindings
+    .map((finding) =>
+      finding.scope === undefined && finding.source?.kind === "repository"
+        ? { ...finding, scope: "repository" as const }
+        : finding,
+    )
+    .filter((finding) => findingIncludedInMode(finding, mode));
 
   findings.splice(0, findings.length, ...applyLimitedActionsPriority(findings));
   findings.sort(compareFindings);

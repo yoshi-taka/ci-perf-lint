@@ -4,7 +4,7 @@ import path from "node:path";
 import type { ReportData } from "../src/types.ts";
 
 const CACHE_DIR = path.resolve(import.meta.dir, "..", ".fixture-cache");
-const FIXTURE_CACHE_SCHEMA_VERSION = 3;
+const FIXTURE_CACHE_SCHEMA_VERSION = 4;
 
 interface CacheEntry {
   key: string;

@@ -1,4 +1,5 @@
 import type { AggregatedFinding, Diagnostic } from "./types.ts";
+import type { DiagnosticSourceKind } from "./diagnostic-source.ts";
 import type { RepairOp } from "./reification.ts";
 import { mergeSingleJobCrossWorkflowEntries } from "./finding-grouping.ts";
 import { extractQuotedJobName } from "./shared/message-parsing.ts";
@@ -9,12 +10,16 @@ type MutableAggregatedFinding = AggregatedFinding & {
   locationSet: Set<string>;
   workflowSet: Set<string>;
   jobSet: Set<string>;
+  sourceKindSet: Set<DiagnosticSourceKind>;
   memberFindings: Diagnostic[];
   repair?: RepairOp;
 };
 
 function mergeCrossWorkflowAggregatedFindings<
-  T extends AggregatedFinding & { memberFindings: Diagnostic[] },
+  T extends AggregatedFinding & {
+    memberFindings: Diagnostic[];
+    sourceKindSet: Set<DiagnosticSourceKind>;
+  },
 >(findings: T[]): T[] {
   return mergeSingleJobCrossWorkflowEntries(
     findings,
@@ -23,10 +28,17 @@ function mergeCrossWorkflowAggregatedFindings<
       mergeUniqueValues(target.workflows, source.workflows);
       mergeUniqueValues(target.locations, source.locations);
       mergeUniqueValues(target.messages, source.messages);
+      if (source.scope === "repository") {
+        target.scope = "repository";
+      }
       target.aiHandoffs ??= [];
       source.aiHandoffs ??= [];
       mergeUniqueValues(target.aiHandoffs, source.aiHandoffs);
       mergeUniqueValues(target.jobs, source.jobs);
+      for (const kind of source.sourceKindSet) {
+        target.sourceKindSet.add(kind);
+      }
+      mergeUniqueValues((target.sourceKinds ??= []), source.sourceKinds ?? []);
       target.memberFindings.push(...source.memberFindings);
     },
     (finding) =>
@@ -60,14 +72,21 @@ function createMutableAggregatedFinding(
     locationSet: new Set([location]),
     workflowSet: new Set(finding.scope === "repository" ? [finding.workflow] : []),
     jobSet: new Set(jobName ? [jobName] : []),
+    sourceKindSet: new Set(finding.source ? [finding.source.kind] : []),
     memberFindings: [finding],
     repair: finding.repair,
   };
 }
 
 function toAggregatedFinding(
-  finding: AggregatedFinding & { memberFindings: Diagnostic[]; repair?: RepairOp },
+  finding: AggregatedFinding & {
+    memberFindings: Diagnostic[];
+    repair?: RepairOp;
+    sourceKindSet: Set<DiagnosticSourceKind>;
+  },
 ): AggregatedFinding {
+  const sourceKinds: DiagnosticSourceKind[] = [...finding.sourceKindSet];
+
   return {
     ruleId: finding.ruleId,
     workflow: finding.workflow,
@@ -78,6 +97,7 @@ function toAggregatedFinding(
     aiHandoffs: finding.aiHandoffs,
     locations: finding.locations,
     jobs: finding.jobs,
+    sourceKinds,
     why: finding.why,
     suggestion: finding.suggestion,
     measurementHint: finding.measurementHint,
@@ -134,6 +154,7 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
       pushUniqueValue(existing.aiHandoffs, existing.aiHandoffSet, finding.aiHandoff);
       pushUniqueValue(existing.locations, existing.locationSet, location);
       pushUniqueValue(existing.workflows, existing.workflowSet, finding.workflow);
+      pushUniqueValue((existing.sourceKinds ??= []), existing.sourceKindSet, finding.source?.kind);
       if (existing.firstIndex !== index) {
         existing.memberFindings.push(finding);
       }
@@ -151,6 +172,7 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
     pushUniqueValue(existing.workflows, existing.workflowSet, finding.workflow);
     pushUniqueValue(existing.locations, existing.locationSet, location);
     pushUniqueValue(existing.jobs, existing.jobSet, jobName);
+    pushUniqueValue((existing.sourceKinds ??= []), existing.sourceKindSet, finding.source?.kind);
     if (existing.firstIndex !== index) {
       existing.memberFindings.push(finding);
     }
@@ -175,10 +197,15 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
     mergeUniqueValues(wfEntry.workflows, repoEntry.workflows);
     mergeUniqueValues(wfEntry.locations, repoEntry.locations);
     mergeUniqueValues(wfEntry.messages, repoEntry.messages);
+    wfEntry.scope = "repository";
     wfEntry.aiHandoffs ??= [];
     repoEntry.aiHandoffs ??= [];
     mergeUniqueValues(wfEntry.aiHandoffs, repoEntry.aiHandoffs);
     mergeUniqueValues(wfEntry.jobs, repoEntry.jobs);
+    for (const kind of repoEntry.sourceKindSet) {
+      wfEntry.sourceKindSet.add(kind);
+    }
+    mergeUniqueValues((wfEntry.sourceKinds ??= []), repoEntry.sourceKinds ?? []);
     wfEntry.memberFindings.push(...repoEntry.memberFindings);
     wfEntry.firstIndex = Math.min(wfEntry.firstIndex, repoEntry.firstIndex);
     repositoryGrouped.delete(repoKey);

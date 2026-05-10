@@ -1,6 +1,7 @@
-import type { Confidence, Diagnostic, RuleMeta, Severity, SourceLocation } from "../types.ts";
+import type { Confidence, RuleMeta, Severity, SourceLocation } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
-import { reifyRepositoryDiagnostic, type DiagnosticBlueprint } from "../reification.ts";
+import type { ProvenancedDiagnostic, RepositoryDiagnosticSource } from "../diagnostic-source.ts";
+import { reifyRepositoryDiagnosticFromSource, type DiagnosticBlueprint } from "../reification.ts";
 
 interface LegacyRepositoryDetails {
   message: string;
@@ -28,28 +29,31 @@ export function buildRepositoryDiagnostic(
     severity?: Severity;
     confidence?: Confidence;
   },
-): Diagnostic {
+): ProvenancedDiagnostic<RepositoryDiagnosticSource> {
   if (isBlueprintDetails(details)) {
-    return reifyRepositoryDiagnostic(repository, meta, details, details.location, {
-      severity: details.severity,
-      confidence: details.confidence,
-    });
+    return reifyRepositoryDiagnosticFromSource(
+      meta,
+      {
+        kind: "repository",
+        workflowPath: repository.primaryWorkflowPath ?? fallbackRepositoryWorkflowPath,
+        location: details.location,
+      },
+      details,
+      {
+        severity: details.severity,
+        confidence: details.confidence,
+      },
+    );
   }
   const severity = details.severity ?? meta.severity;
   const confidence = details.confidence ?? meta.confidence;
-  return {
-    ruleId: meta.id,
+  const source: RepositoryDiagnosticSource = {
+    kind: "repository",
+    workflowPath: repository.primaryWorkflowPath ?? fallbackRepositoryWorkflowPath,
+    location: details.location,
+  };
+  return reifyRepositoryDiagnosticFromSource(meta, source, details, {
     severity,
     confidence,
-    scope: "repository",
-    docsPath: meta.docsPath,
-    workflow: repository.primaryWorkflowPath ?? fallbackRepositoryWorkflowPath,
-    location: details.location,
-    message: details.message,
-    why: details.why,
-    suggestion: details.suggestion,
-    measurementHint: details.measurementHint,
-    aiHandoff: details.aiHandoff,
-    score: details.score,
-  };
+  });
 }

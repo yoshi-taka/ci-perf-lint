@@ -1,10 +1,11 @@
 import type { Node } from "yaml";
-import type { Confidence, Diagnostic, RuleMeta, Severity, SourceLocation } from "../../types.ts";
+import type { Confidence, RuleMeta, Severity, SourceLocation } from "../../types.ts";
+import type { ProvenancedDiagnostic, WorkflowDiagnosticSource } from "../../diagnostic-source.ts";
 import { getLocation, type WorkflowDocument } from "../../workflow.ts";
 import { getPipelineLocation, type PipelineDocument } from "../../buildkite-workflow.ts";
 import { getGitlabCiLocation, type GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 import { getCircleCiLocation, type CircleCiDocument } from "../../circleci-workflow.ts";
-import { reifyDiagnostic, type DiagnosticBlueprint } from "../../reification.ts";
+import { reifyDiagnosticFromSource, type DiagnosticBlueprint } from "../../reification.ts";
 
 type CIWorkflow = WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument;
 
@@ -44,13 +45,33 @@ export function buildDiagnostic(
     confidence?: Confidence;
     location?: SourceLocation;
   },
-): Diagnostic {
+): ProvenancedDiagnostic<WorkflowDiagnosticSource> {
   if (isBlueprintDetails(details)) {
-    return reifyDiagnostic(meta, workflow, node, details, {
-      severity: details.severity,
-      confidence: details.confidence,
-      location: details.location,
-    });
+    const isPipeline = "steps" in workflow && !("jobs" in workflow);
+    const isGitlab = isGitlabCiDocument(workflow);
+    const isCircle = isCircleCiDocument(workflow);
+    const docLocation = isPipeline
+      ? getPipelineLocation(workflow, node)
+      : isGitlab
+        ? getGitlabCiLocation(workflow, node)
+        : isCircle
+          ? getCircleCiLocation(workflow, node)
+          : getLocation(workflow, node);
+    return reifyDiagnosticFromSource(
+      meta,
+      {
+        kind: "workflow",
+        workflowPath: workflow.relativePath,
+        location: docLocation,
+      },
+      node,
+      details,
+      {
+        severity: details.severity,
+        confidence: details.confidence,
+        location: details.location ?? docLocation,
+      },
+    );
   }
 
   const severity = details.severity ?? meta.severity;
@@ -65,19 +86,14 @@ export function buildDiagnostic(
       : isCircle
         ? getCircleCiLocation(workflow, node)
         : getLocation(workflow, node);
-  return {
-    ruleId: meta.id,
+  const source: WorkflowDiagnosticSource = {
+    kind: "workflow",
+    workflowPath: workflow.relativePath,
+    location: docLocation,
+  };
+  return reifyDiagnosticFromSource(meta, source, node, details, {
     severity,
     confidence,
-    scope: details.scope,
-    docsPath: meta.docsPath,
-    workflow: workflow.relativePath,
-    location: details.location ?? docLocation,
-    message: details.message,
-    why: details.why,
-    suggestion: details.suggestion,
-    measurementHint: details.measurementHint,
-    aiHandoff: details.aiHandoff,
-    score: details.score,
-  };
+    location: details.location,
+  });
 }
