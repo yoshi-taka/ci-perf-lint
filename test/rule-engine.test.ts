@@ -1167,4 +1167,94 @@ describe("metamorphic: evaluateRulesCoarseToFine", () => {
     }
     await doc.cleanup();
   });
+
+  test("adding duplicate workflow does not change deduped result set", async () => {
+    const yaml = [
+      "name: Build",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const doc = await createWorkflowDoc(yaml);
+    const ctx: RuleContext = { repository: signals };
+    const rSingle = await evaluateRulesCoarseToFine([doc.workflow], ctx);
+    const rDup = await evaluateRulesCoarseToFine([doc.workflow, doc.workflow], ctx);
+    const keysSingle = new Set(rSingle.map((d) => `${d.location.path}:${d.location.line}`));
+    const keysDup = new Set(rDup.map((d) => `${d.location.path}:${d.location.line}`));
+    expect(keysDup.size).toBe(keysSingle.size);
+    for (const key of keysSingle) {
+      expect(keysDup.has(key)).toBe(true);
+    }
+    await doc.cleanup();
+  });
+});
+
+describe("differential: evaluateRules vs evaluateRulesCoarseToFine", () => {
+  const signals = createSignals();
+
+  test("single workflow produces same ruleId set from both entry points", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const ctx: RuleContext = { repository: signals };
+    const rSingle = await evaluateRules(workflow, ctx);
+    const rMulti = await evaluateRulesCoarseToFine([workflow], ctx);
+    const idsSingle = new Set(rSingle.map((d) => `${d.ruleId}:${d.location.path}:${d.location.line}:${d.message}`));
+    const idsMulti = new Set(rMulti.map((d) => `${d.ruleId}:${d.location.path}:${d.location.line}:${d.message}`));
+    expect(idsMulti.size).toBe(idsSingle.size);
+    for (const key of idsSingle) {
+      expect(idsMulti.has(key)).toBe(true);
+    }
+    await cleanup();
+  });
+});
+
+describe("differential: rule filter subset property", () => {
+  const signals = createSignals();
+
+  test("filtered results are a subset of unfiltered results by ruleId", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const ctx: RuleContext = { repository: signals };
+    const full = await evaluateRules(workflow, ctx);
+    const filtered = await evaluateRules(
+      workflow,
+      ctx,
+      undefined,
+      undefined,
+      (r) => r.meta.id.startsWith("missing-"),
+    );
+    const fullIds = new Set(full.map((d) => d.ruleId));
+    for (const d of filtered) {
+      expect(fullIds.has(d.ruleId)).toBe(true);
+      expect(d.ruleId.startsWith("missing-")).toBe(true);
+    }
+    await cleanup();
+  });
 });

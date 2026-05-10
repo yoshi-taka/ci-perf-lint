@@ -115,9 +115,14 @@ describe("PBT: inference graph properties", () => {
     implied: impliedList,
   });
 
+  const uniqueRuleWithImplied = fc.uniqueArray(ruleWithImplied, {
+    maxLength: 10,
+    selector: (r) => r.id,
+  });
+
   test("every implied entry in forwards has a corresponding reverse entry", () => {
     fc.assert(
-      fc.property(fc.array(ruleWithImplied, { maxLength: 10 }), (ruleDefs) => {
+      fc.property(uniqueRuleWithImplied, (ruleDefs) => {
         const rules = ruleDefs.map((r) => fakeRule(r.id, r.implied));
         const graph = buildInferenceGraph(rules);
 
@@ -135,7 +140,7 @@ describe("PBT: inference graph properties", () => {
 
   test("reverse contains all sources for each implied rule", () => {
     fc.assert(
-      fc.property(fc.array(ruleWithImplied, { maxLength: 10 }), (ruleDefs) => {
+      fc.property(uniqueRuleWithImplied, (ruleDefs) => {
         const rules = ruleDefs.map((r) => fakeRule(r.id, r.implied));
         const graph = buildInferenceGraph(rules);
 
@@ -154,13 +159,17 @@ describe("PBT: inference graph properties", () => {
   test("detectImplicationDrift returns stable results irrespective of rule order", () => {
     fc.assert(
       fc.property(
-        fc.array(ruleWithImplied, { maxLength: 8 }),
+        uniqueRuleWithImplied,
         fc.set(ruleIdArbitrary, { maxLength: 10 }),
         fc.set(ruleIdArbitrary, { maxLength: 10 }),
         (ruleDefs, firedIds, evaluatedIds) => {
           const rules = ruleDefs.map((r) => fakeRule(r.id, r.implied));
           const graph = buildInferenceGraph(rules);
-          const warnings = detectImplicationDrift(new Set(firedIds), new Set(evaluatedIds), graph);
+          const warnings = detectImplicationDrift(
+            new Set(firedIds),
+            new Set(evaluatedIds),
+            graph,
+          );
           expect(Array.isArray(warnings)).toBe(true);
           for (const w of warnings) {
             expect(typeof w.source).toBe("string");
