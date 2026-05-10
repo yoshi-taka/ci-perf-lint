@@ -48,6 +48,9 @@ export async function runEmbeddedOxlint(
   scanContext?: RepositoryScanContext,
   spawnOxlint = spawnOxlintProcess,
 ): Promise<OxlintDiagnostic[] | undefined> {
+  if (process.env.CI_PERF_LINT_DISABLE_OXLINT === "1") {
+    return undefined;
+  }
   type OxlintRunResult = {
     diagnostics: OxlintDiagnostic[];
     exitCode: number;
