@@ -1074,3 +1074,97 @@ describe("getRuleCheckFn scope dispatch (orthogonal array)", () => {
     expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(true);
   });
 });
+
+describe("metamorphic: evaluateRules", () => {
+  const signals = createSignals();
+
+  test("repeated call returns same ruleId set for same workflow", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const ctx: RuleContext = { repository: signals };
+    const r1 = await evaluateRules(workflow, ctx);
+    const r2 = await evaluateRules(workflow, ctx);
+    const ids1 = r1.map((d) => d.ruleId).sort();
+    const ids2 = r2.map((d) => d.ruleId).sort();
+    expect(ids2).toEqual(ids1);
+    await cleanup();
+  });
+});
+
+describe("metamorphic: evaluateRulesCoarseToFine", () => {
+  const signals = createSignals();
+
+  test("workflow order does not affect ruleId set", async () => {
+    const yamlA = [
+      "name: Alpha",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const yamlB = [
+      "name: Beta",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  test:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const docA = await createWorkflowDoc(yamlA);
+    const docB = await createWorkflowDoc(yamlB);
+    const ctx: RuleContext = { repository: signals };
+    const rAB = await evaluateRulesCoarseToFine([docA.workflow, docB.workflow], ctx);
+    const rBA = await evaluateRulesCoarseToFine([docB.workflow, docA.workflow], ctx);
+    const idsAB = new Set(rAB.map((d) => `${d.ruleId}:${d.location.path}:${d.location.line}`));
+    const idsBA = new Set(rBA.map((d) => `${d.ruleId}:${d.location.path}:${d.location.line}`));
+    expect(idsBA.size).toBe(idsAB.size);
+    for (const key of idsAB) {
+      expect(idsBA.has(key)).toBe(true);
+    }
+    await docA.cleanup();
+    await docB.cleanup();
+  });
+
+  test("adding duplicate workflow does not change deduped result set", async () => {
+    const yaml = [
+      "name: Build",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const doc = await createWorkflowDoc(yaml);
+    const ctx: RuleContext = { repository: signals };
+    const rSingle = await evaluateRulesCoarseToFine([doc.workflow], ctx);
+    const rDup = await evaluateRulesCoarseToFine([doc.workflow, doc.workflow], ctx);
+    const keysSingle = new Set(rSingle.map((d) => `${d.location.path}:${d.location.line}`));
+    const keysDup = new Set(rDup.map((d) => `${d.location.path}:${d.location.line}`));
+    expect(keysDup.size).toBe(keysSingle.size);
+    for (const key of keysSingle) {
+      expect(keysDup.has(key)).toBe(true);
+    }
+    await doc.cleanup();
+  });
+});

@@ -724,3 +724,52 @@ describe("orthogonal array: parseWorkflow pairwise coverage", () => {
     });
   }
 });
+
+describe("metamorphic: YAML key reordering", () => {
+  const baseYaml = [
+    "name: CI",
+    "on: push",
+    "concurrency:",
+    "  group: test",
+    "jobs:",
+    "  build:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - run: echo",
+  ].join("\n");
+
+  const permutations = [
+    ["name", "on", "concurrency", "jobs"],
+    ["on", "name", "jobs", "concurrency"],
+    ["jobs", "on", "concurrency", "name"],
+    ["concurrency", "jobs", "name", "on"],
+    ["on", "jobs", "name", "concurrency"],
+  ];
+
+  const baseDoc = wf(baseYaml);
+
+  for (const order of permutations) {
+    test(`key order [${order.join(", ")}] preserves jobs and name`, () => {
+      const lines: string[] = [];
+      const map: Record<string, string[]> = {
+        name: ["name: CI"],
+        on: ["on: push"],
+        concurrency: ["concurrency:", "  group: test"],
+        jobs: [
+          "jobs:",
+          "  build:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - run: echo",
+        ],
+      };
+      for (const key of order) {
+        lines.push(...map[key]!);
+      }
+      const reordered = wf(lines.join("\n"));
+      expect(reordered.name).toBe(baseDoc.name);
+      expect(reordered.jobs).toHaveLength(baseDoc.jobs.length);
+      expect(reordered.jobs[0]?.steps).toHaveLength(1);
+    });
+  }
+});
