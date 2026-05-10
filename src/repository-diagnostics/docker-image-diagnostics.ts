@@ -1,11 +1,8 @@
 import type { AnalysisWarning, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
-import {
-  collectDockerfileData,
-  type DockerBuildTarget,
-  normalizeRelativePath,
-} from "./docker-build-targets.ts";
+import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
+import { type DockerBuildTarget, normalizeRelativePath } from "./docker-build-targets.ts";
 import { collectDockerfileStageAliases } from "./dockerfile-instructions.ts";
 import {
   type NodeDockerfileLockfileKind,
@@ -21,12 +18,14 @@ import {
 } from "./docker-install-context-probes.ts";
 import { collectDockerInstallCacheMountDiagnostics } from "./docker-install-cache-mount-diagnostics.ts";
 
+// eslint-disable-next-line max-params
 export async function collectDockerfileImageSizeDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
   targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
+  featureIndex?: RepositoryFeatureIndex,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
   const diagnostics: Diagnostic[] = [];
@@ -38,7 +37,9 @@ export async function collectDockerfileImageSizeDiagnostics(
     }
     seenDockerfiles.add(target.dockerfilePath);
 
-    const dockerfileData = await collectDockerfileData(context, target.dockerfilePath);
+    const dockerfileData = featureIndex
+      ? await featureIndex.getDockerfileData(target.dockerfilePath, context)
+      : undefined;
     if (!dockerfileData) {
       continue;
     }
@@ -72,12 +73,14 @@ export async function collectDockerfileImageSizeDiagnostics(
   return diagnostics;
 }
 
+// eslint-disable-next-line max-params
 export async function collectNodeDockerfileInstallDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
   targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
+  featureIndex?: RepositoryFeatureIndex,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
   const diagnostics: Diagnostic[] = [];
@@ -94,7 +97,9 @@ export async function collectNodeDockerfileInstallDiagnostics(
       continue;
     }
 
-    const dockerfileData = await collectDockerfileData(context, target.dockerfilePath);
+    const dockerfileData = featureIndex
+      ? await featureIndex.getDockerfileData(target.dockerfilePath, context)
+      : undefined;
     if (!dockerfileData) {
       continue;
     }

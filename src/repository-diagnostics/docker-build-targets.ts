@@ -15,7 +15,7 @@ export interface DockerBuildTarget {
   dockerfilePath: string;
 }
 
-interface CollectedDockerfileData {
+export interface CollectedDockerfileData {
   text: string;
   lines: string[];
   instructions: CollectedDockerfileInstruction[];

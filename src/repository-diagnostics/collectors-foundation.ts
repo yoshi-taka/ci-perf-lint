@@ -9,8 +9,12 @@ export const dockerDiagnosticCollectors = [
   {
     id: "docker-build-diagnostics",
     gate: gateKeys.dockerHeavy,
-    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
-      collectDockerBuildDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+    collect: ({ repoRoot, repository, workflows, warnings, scanContext, featureIndex }) =>
+      collectDockerBuildDiagnostics(repoRoot, repository, workflows, {
+        warnings,
+        scanContext,
+        featureIndex,
+      }),
   },
 ] satisfies readonly RepositoryDiagnosticCollector[];
 

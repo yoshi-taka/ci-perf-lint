@@ -2,8 +2,9 @@ import path from "node:path";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
+import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import { collectDockerfileData, type DockerBuildTarget } from "./docker-build-targets.ts";
+import type { DockerBuildTarget } from "./docker-build-targets.ts";
 
 const meta = {
   id: "docker-cache-copy-path-mismatch",
@@ -41,12 +42,14 @@ function lookupCandidates(source: string): string[] | undefined {
   return GRADLE_MAVEN_FILES.get(basename);
 }
 
+// eslint-disable-next-line max-params
 export async function collectDockerCacheCopyPathMismatchDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
   targets: DockerBuildTarget[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
+  featureIndex?: RepositoryFeatureIndex,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
   const diagnostics: Diagnostic[] = [];
@@ -58,7 +61,9 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
     }
     seen.add(target.dockerfilePath);
 
-    const data = await collectDockerfileData(context, target.dockerfilePath);
+    const data = featureIndex
+      ? await featureIndex.getDockerfileData(target.dockerfilePath, context)
+      : undefined;
     if (!data) {
       continue;
     }

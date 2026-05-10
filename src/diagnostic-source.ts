@@ -38,6 +38,7 @@ export type ProvenancedDiagnostic<S extends DiagnosticSource = DiagnosticSource>
 };
 
 export function composeDiagnosticSources<
+  // fallow-ignore unused-exports
   const Sources extends readonly [DiagnosticSource, ...DiagnosticSource[]],
 >(...sources: Sources): CompositeDiagnosticSource<Sources> {
   return {
@@ -47,6 +48,7 @@ export function composeDiagnosticSources<
 }
 
 export function diagnosticSourceToRef(source: DiagnosticSource): DiagnosticSourceRef {
+  // fallow-ignore unused-exports
   if (source.kind === "composite") {
     return {
       kind: "composite",

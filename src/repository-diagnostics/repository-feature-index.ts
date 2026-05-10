@@ -2,7 +2,7 @@ import type { AnalysisWarning } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
-import type { DockerBuildTarget } from "./docker-build-targets.ts";
+import type { DockerBuildTarget, CollectedDockerfileData } from "./docker-build-targets.ts";
 
 export type EcosystemFeature =
   | "javascript"
@@ -53,6 +53,11 @@ export interface RepositoryFeatureIndex {
     scanContext: RepositoryScanContext,
     warnings?: AnalysisWarning[],
   ): Promise<DockerBuildTarget[]>;
+
+  getDockerfileData(
+    dockerfilePath: string,
+    scanContext: RepositoryScanContext,
+  ): Promise<CollectedDockerfileData | undefined>;
 }
 
 const DOCKER_BUILD_PUSH_ACTION_RE = /docker\/build-push-action@/i;
@@ -146,6 +151,7 @@ export function buildRepositoryFeatureIndex(
   }
 
   let dockerBuildTargetsPromise: Promise<DockerBuildTarget[]> | undefined;
+  const dockerfileDataCache = new Map<string, Promise<CollectedDockerfileData | undefined>>();
 
   return {
     ecosystems,
@@ -174,6 +180,24 @@ export function buildRepositoryFeatureIndex(
         return collectDockerBuildTargets(repoRoot, [...workflows], warnings, scanContext);
       })();
       return dockerBuildTargetsPromise;
+    },
+
+    async getDockerfileData(
+      dockerfilePath: string,
+      scanContext: RepositoryScanContext,
+    ): Promise<CollectedDockerfileData | undefined> {
+      const cached = dockerfileDataCache.get(dockerfilePath);
+      if (cached) {
+        return cached;
+      }
+
+      const dataLoad = (async () => {
+        const { collectDockerfileData: fetchDockerfileData } =
+          await import("./docker-build-targets.ts");
+        return fetchDockerfileData(scanContext, dockerfilePath);
+      })();
+      dockerfileDataCache.set(dockerfilePath, dataLoad);
+      return dataLoad;
     },
   };
 }

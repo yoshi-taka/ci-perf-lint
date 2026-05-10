@@ -1,9 +1,18 @@
 import type { Confidence, RuleMeta, Severity, SourceLocation } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { ProvenancedDiagnostic, RepositoryDiagnosticSource } from "../diagnostic-source.ts";
-import { reifyRepositoryDiagnosticFromSource, type DiagnosticBlueprint } from "../reification.ts";
+import {
+  reifyRepositoryDiagnosticFromSource,
+  type DiagnosticDetails,
+  type LegacyDiagnosticDetails,
+  type BlueprintDiagnosticDetails,
+  getDetailTag,
+  type RepairOp,
+} from "../reification.ts";
 
-interface LegacyRepositoryDetails {
+const fallbackRepositoryWorkflowPath = ".github/workflows/ci.yml";
+
+interface LegacyRepositoryDetailsInput {
   message: string;
   why: string;
   suggestion: string;
@@ -11,49 +20,113 @@ interface LegacyRepositoryDetails {
   aiHandoff: string;
   score: number;
   location: SourceLocation;
+  severity?: Severity;
+  confidence?: Confidence;
 }
 
-const fallbackRepositoryWorkflowPath = ".github/workflows/ci.yml";
+interface BlueprintRepositoryDetailsInput {
+  message: string;
+  why: string;
+  repair: RepairOp;
+  measurementHint: string;
+  score: number;
+  location: SourceLocation;
+  severity?: Severity;
+  confidence?: Confidence;
+}
 
 function isBlueprintDetails(
-  details: LegacyRepositoryDetails | DiagnosticBlueprint,
-): details is DiagnosticBlueprint {
+  details: LegacyRepositoryDetailsInput | BlueprintRepositoryDetailsInput,
+): details is BlueprintRepositoryDetailsInput {
   return "repair" in details;
+}
+
+function toTaggedDetails(
+  details: LegacyRepositoryDetailsInput | BlueprintRepositoryDetailsInput,
+): DiagnosticDetails {
+  if (isBlueprintDetails(details)) {
+    return {
+      _tag: "blueprint",
+      message: details.message,
+      why: details.why,
+      repair: details.repair,
+      measurementHint: details.measurementHint,
+      score: details.score,
+      severity: details.severity,
+      confidence: details.confidence,
+      location: details.location,
+    };
+  }
+  return {
+    _tag: "legacy",
+    scope: "repository",
+    message: details.message,
+    why: details.why,
+    suggestion: details.suggestion,
+    measurementHint: details.measurementHint,
+    aiHandoff: details.aiHandoff,
+    score: details.score,
+    severity: details.severity,
+    confidence: details.confidence,
+    location: details.location,
+  };
 }
 
 export function buildRepositoryDiagnostic(
   repository: RepositorySignals,
   meta: RuleMeta,
-  details: (LegacyRepositoryDetails | DiagnosticBlueprint) & {
-    location: SourceLocation;
-    severity?: Severity;
-    confidence?: Confidence;
-  },
+  details: LegacyRepositoryDetailsInput | BlueprintRepositoryDetailsInput,
 ): ProvenancedDiagnostic<RepositoryDiagnosticSource> {
-  if (isBlueprintDetails(details)) {
+  const taggedDetails = toTaggedDetails(details);
+
+  if (getDetailTag(taggedDetails) === "blueprint") {
+    const blueprintDetails = taggedDetails as BlueprintDiagnosticDetails;
+    const location = blueprintDetails.location!;
     return reifyRepositoryDiagnosticFromSource(
       meta,
       {
         kind: "repository",
         workflowPath: repository.primaryWorkflowPath ?? fallbackRepositoryWorkflowPath,
-        location: details.location,
+        location,
       },
-      details,
       {
-        severity: details.severity,
-        confidence: details.confidence,
+        message: blueprintDetails.message,
+        why: blueprintDetails.why,
+        repair: blueprintDetails.repair,
+        measurementHint: blueprintDetails.measurementHint,
+        score: blueprintDetails.score,
+      },
+      {
+        severity: blueprintDetails.severity,
+        confidence: blueprintDetails.confidence,
       },
     );
   }
-  const severity = details.severity ?? meta.severity;
-  const confidence = details.confidence ?? meta.confidence;
+
+  const legacyDetails = taggedDetails as LegacyDiagnosticDetails;
+  const severity = legacyDetails.severity ?? meta.severity;
+  const confidence = legacyDetails.confidence ?? meta.confidence;
+  const location = legacyDetails.location!;
   const source: RepositoryDiagnosticSource = {
     kind: "repository",
     workflowPath: repository.primaryWorkflowPath ?? fallbackRepositoryWorkflowPath,
-    location: details.location,
+    location,
   };
-  return reifyRepositoryDiagnosticFromSource(meta, source, details, {
-    severity,
-    confidence,
-  });
+  return reifyRepositoryDiagnosticFromSource(
+    meta,
+    source,
+    {
+      message: legacyDetails.message,
+      why: legacyDetails.why,
+      suggestion: legacyDetails.suggestion,
+      measurementHint: legacyDetails.measurementHint,
+      aiHandoff: legacyDetails.aiHandoff,
+      score: legacyDetails.score,
+      location,
+    },
+    {
+      severity,
+      confidence,
+    },
+  );
 }

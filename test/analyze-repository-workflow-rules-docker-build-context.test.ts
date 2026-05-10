@@ -661,4 +661,56 @@ describe("analyzeRepository workflow and execution rules: docker build and docke
 
     expect(report).toBeDefined();
   });
+
+  test("shared Docker feature index parses Dockerfile once for multiple rules", async () => {
+    const fixtureRoot = await tempDirs.create("apl-shared-docker-index-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "docker.yml"),
+      [
+        "name: docker",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: docker/build-push-action@v6",
+        "        with:",
+        "          context: .",
+        "      - run: docker build -f Dockerfile .",
+      ].join("\n"),
+    );
+
+    await writeFile(
+      path.join(fixtureRoot, "Dockerfile"),
+      [
+        "FROM node:22",
+        "COPY package.json .",
+        "RUN npm ci",
+        "COPY --link . .",
+        "RUN npm run build",
+        "FROM node:22",
+        "COPY --link dist/ ./dist/",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const allDockerFindings = report.findings.filter(
+      (f) =>
+        f.ruleId === "dockerfile-copies-all-before-deps" ||
+        f.ruleId === "dockerfile-copy-link-without-cache-benefit" ||
+        f.ruleId === "missing-dockerignore-for-build-context",
+    );
+
+    expect(allDockerFindings.length).toBeGreaterThan(0);
+  });
 });

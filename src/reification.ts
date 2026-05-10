@@ -143,6 +143,76 @@ export interface DiagnosticBlueprint {
   score: number;
 }
 
+// ──────────────────────────────────────────────
+// 3a. TAGGED DIAGNOSTIC DETAILS — explicit variants
+// ──────────────────────────────────────────────
+
+type DetailTag = "legacy" | "blueprint";
+
+export interface LegacyDiagnosticDetails {
+  readonly _tag: "legacy";
+  readonly scope?: "workflow" | "repository";
+  readonly message: string;
+  readonly why: string;
+  readonly suggestion: string;
+  readonly measurementHint: string;
+  readonly aiHandoff: string;
+  readonly score: number;
+  readonly severity?: Severity;
+  readonly confidence?: Confidence;
+  readonly location?: SourceLocation;
+}
+
+export interface BlueprintDiagnosticDetails {
+  readonly _tag: "blueprint";
+  readonly message: string;
+  readonly why: string;
+  readonly repair: RepairOp;
+  readonly measurementHint: string;
+  readonly score: number;
+  readonly severity?: Severity;
+  readonly confidence?: Confidence;
+  readonly location?: SourceLocation;
+}
+
+export type DiagnosticDetails = LegacyDiagnosticDetails | BlueprintDiagnosticDetails;
+
+export function createLegacyDetails(
+  // fallow-ignore unused-exports
+  details: Omit<LegacyDiagnosticDetails, "_tag">,
+): LegacyDiagnosticDetails {
+  return { _tag: "legacy", ...details };
+}
+
+export function createBlueprintDetails(
+  // fallow-ignore unused-exports
+  details: Omit<BlueprintDiagnosticDetails, "_tag">,
+): BlueprintDiagnosticDetails {
+  return { _tag: "blueprint", ...details };
+}
+
+type DiagnosticDetailsVisitor<R> = {
+  onLegacy: (details: LegacyDiagnosticDetails) => R;
+  onBlueprint: (details: BlueprintDiagnosticDetails) => R;
+};
+
+export function foldDiagnosticDetails<R>(
+  // fallow-ignore unused-exports
+  details: DiagnosticDetails,
+  visitor: DiagnosticDetailsVisitor<R>,
+): R {
+  switch (details._tag) {
+    case "legacy":
+      return visitor.onLegacy(details);
+    case "blueprint":
+      return visitor.onBlueprint(details);
+  }
+}
+
+export function getDetailTag(details: DiagnosticDetails): DetailTag {
+  return details._tag;
+}
+
 interface LegacyWorkflowDiagnosticDetails {
   scope?: "workflow" | "repository";
   message: string;
