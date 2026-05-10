@@ -2,10 +2,10 @@ import { hashContent } from "./hash.ts";
 import type { AnalysisWarning } from "./types.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import {
-  collectJobSummaries,
   collectRepositoryPrecedentSignals,
   collectSimilarWorkflowSignals,
 } from "./repository-similar-workflows.ts";
+import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts";
 import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
 import { isHeavyWorkflow } from "./rules/shared/workflows.ts";
 import type { WorkflowDocument } from "./workflow.ts";
@@ -306,6 +306,7 @@ async function hasBabelSignalEvidence(
 export async function collectRepositorySignals(
   repoRoot: string,
   workflows: WorkflowDocument[],
+  sharedJobSummaries: JobSummary[],
   scanContext?: RepositoryScanContext,
 ): Promise<{ signals: RepositorySignals; warnings: AnalysisWarning[] }> {
   const fingerprint = workflowFingerprint(workflows);
@@ -659,8 +660,6 @@ export async function collectRepositorySignals(
           hasToolVersions: false,
         }),
   ]);
-
-  const sharedJobSummaries = collectJobSummaries(workflows);
 
   const result = {
     fingerprint,

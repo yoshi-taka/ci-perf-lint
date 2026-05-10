@@ -8,17 +8,13 @@ import {
   collectPeerIndexes,
   encodeFeatureMasks,
 } from "./repository-similar-workflows-similarity.ts";
-import {
-  collectJobSummaries,
-  type JobSummary,
-} from "./repository-similar-workflows-job-summaries.ts";
+import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts";
 import {
   collectRepositoryPrecedentSignals as collectRepositoryPrecedentSignalsFromPrecedents,
   type RepositoryPrecedentSignals,
 } from "./repository-similar-workflows-precedents.ts";
 import { collectWorkflowSummary } from "./repository-similar-workflows-workflow-summaries.ts";
 
-export { collectJobSummaries } from "./repository-similar-workflows-job-summaries.ts";
 export type { RepositoryPrecedentSignals } from "./repository-similar-workflows-precedents.ts";
 
 const minimumPeerCount = 3;
@@ -91,10 +87,10 @@ function collectPeerLabels<T>(
 
 export function collectSimilarWorkflowSignals(
   workflows: WorkflowDocument[],
-  sharedJobSummaries?: JobSummary[],
+  sharedJobSummaries: JobSummary[],
 ): SimilarWorkflowSignals {
   const workflowSummaries = workflows.map((workflow) => collectWorkflowSummary(workflow));
-  const jobSummaries = sharedJobSummaries ?? collectJobSummaries(workflows);
+  const jobSummaries = sharedJobSummaries;
   encodeFeatureMasks(workflowSummaries);
   encodeFeatureMasks(jobSummaries);
   const workflowPeerIndexes = collectPeerIndexes(
@@ -333,10 +329,7 @@ export function collectSimilarWorkflowSignals(
 
 export function collectRepositoryPrecedentSignals(
   workflows: WorkflowDocument[],
-  sharedJobSummaries?: JobSummary[],
+  sharedJobSummaries: JobSummary[],
 ): RepositoryPrecedentSignals {
-  return collectRepositoryPrecedentSignalsFromPrecedents(
-    workflows,
-    sharedJobSummaries ?? collectJobSummaries(workflows),
-  );
+  return collectRepositoryPrecedentSignalsFromPrecedents(workflows, sharedJobSummaries);
 }

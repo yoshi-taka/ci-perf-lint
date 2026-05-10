@@ -13,6 +13,7 @@ import {
 import { getScalarString, parseWorkflow } from "../src/workflow.ts";
 import { evaluateRules } from "../src/rule-engine.ts";
 import { collectRepositorySignals } from "../src/repository-signals.ts";
+import { collectJobSummaries } from "../src/repository-similar-workflows-job-summaries.ts";
 import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 import type { AnalysisWarning } from "../src/types.ts";
 
@@ -135,7 +136,13 @@ async function main(): Promise<void> {
 
   const warnings: AnalysisWarning[] = [];
   const scanContext = new RepositoryScanContext(repoRoot, warnings);
-  const { signals } = await collectRepositorySignals(repoRoot, [originalDoc], scanContext);
+  const jobSummaries = collectJobSummaries([originalDoc]);
+  const { signals } = await collectRepositorySignals(
+    repoRoot,
+    [originalDoc],
+    jobSummaries,
+    scanContext,
+  );
 
   const initialStepMap = new Map<number, Set<number> | undefined>();
   for (let i = 0; i < origJobCount; i++) {

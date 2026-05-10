@@ -20,6 +20,8 @@ import {
   collectEmbeddedOxlintDiagnosticsByCode,
 } from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
+import { collectJobSummaries } from "./repository-similar-workflows-job-summaries.ts";
+import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import { evaluateRules, evaluateRulesCoarseToFine } from "./rule-engine.ts";
 import { buildWorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
@@ -79,6 +81,7 @@ interface AnalyzeOptions {
 interface ScannedRepo {
   readonly parsedWorkflows: readonly ParsedWorkflowDocument[];
   readonly githubWorkflows: readonly WorkflowDocument[];
+  readonly jobSummaries: JobSummary[];
   readonly signals: RepositorySignals;
   readonly scanContext: RepositoryScanContext;
   readonly repoRoot: string;
@@ -230,9 +233,11 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     (w): w is WorkflowDocument => "jobs" in w && !("kind" in w),
   );
 
+  const jobSummaries = collectJobSummaries(githubWorkflows);
   const repositoryAnalysis = await collectRepositorySignals(
     target.repoRoot,
     githubWorkflows,
+    jobSummaries,
     scanContext,
   );
   timer.mark("collect-repository-signals");
@@ -241,6 +246,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   return {
     parsedWorkflows,
     githubWorkflows,
+    jobSummaries,
     signals: repositoryAnalysis.signals,
     scanContext,
     repoRoot: target.repoRoot,
