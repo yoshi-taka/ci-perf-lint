@@ -1,0 +1,5 @@
+steps:
+  - label: "ci"
+    command: npm install -g npm
+  - label: "ci"
+    command: npm ci

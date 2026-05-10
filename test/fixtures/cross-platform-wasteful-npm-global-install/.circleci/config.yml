@@ -1,0 +1,14 @@
+version: 2.1
+jobs:
+  ci:
+    docker:
+      - image: node:22
+    steps:
+      - checkout
+      - run: yarn install
+      - run: npm install -g npm
+workflows:
+  version: 2
+  all:
+    jobs:
+      - ci

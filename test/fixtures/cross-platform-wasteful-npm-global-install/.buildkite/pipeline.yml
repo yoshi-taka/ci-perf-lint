@@ -1,0 +1,5 @@
+steps:
+  - label: "ci"
+    command: yarn install
+  - label: "ci"
+    command: npm install -g npm

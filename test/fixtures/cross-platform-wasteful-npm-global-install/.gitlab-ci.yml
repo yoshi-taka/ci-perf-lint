@@ -1,0 +1,5 @@
+ci:
+  image: node:22
+  script:
+    - yarn install
+    - npm install -g npm

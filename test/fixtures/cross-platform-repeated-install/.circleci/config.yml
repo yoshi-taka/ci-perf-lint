@@ -1,0 +1,14 @@
+version: 2.1
+jobs:
+  ci:
+    docker:
+      - image: node:22
+    steps:
+      - checkout
+      - run: npm ci
+      - run: npm ci
+workflows:
+  version: 2
+  all:
+    jobs:
+      - ci
