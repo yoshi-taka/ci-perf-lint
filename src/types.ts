@@ -62,6 +62,15 @@ export interface WorkflowSummary {
 }
 
 export interface AnalysisWarning {
+  kind:
+    | "rule-error"
+    | "collector-error"
+    | "gate-skipped"
+    | "workflow-only"
+    | "max-findings-hit"
+    | "empty-result"
+    | "remediation-drift"
+    | "scan-warning";
   source: string;
   message: string;
 }

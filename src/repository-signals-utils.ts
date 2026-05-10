@@ -1,4 +1,5 @@
 import type { RepositorySignals } from "./repository-signals-types.ts";
+export { setDifference } from "./set-algebra.ts";
 
 export interface RepositorySignalSets {
   eslint: {
@@ -52,14 +53,4 @@ export function getSignalSets(signals: RepositorySignals): RepositorySignalSets 
 
   signalSetsCache.set(signals, sets);
   return sets;
-}
-
-export function setDifference<T>(a: Set<T>, b: Set<T>): Set<T> {
-  const result = new Set<T>();
-  for (const item of a) {
-    if (!b.has(item)) {
-      result.add(item);
-    }
-  }
-  return result;
 }

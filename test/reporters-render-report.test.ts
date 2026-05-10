@@ -9,6 +9,36 @@ import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 
+const sampleRepoExploratoryReport = getFixtureReport(fixtures.sampleRepo, {
+  targetPath: ".",
+  topCount: 5,
+  mode: "exploratory",
+});
+
+const sampleRepoTop3ExploratoryReport = getFixtureReport(fixtures.sampleRepo, {
+  targetPath: ".",
+  topCount: 3,
+  mode: "exploratory",
+});
+
+const releaseGuardManyLikeReport = getFixtureReport(fixtures.releaseGuardManyLike, {
+  targetPath: ".",
+  topCount: 5,
+  mode: "strict",
+});
+
+const cleanNoFindingsReport = getFixtureReport(fixtures.cleanNoFindings, {
+  targetPath: ".",
+  topCount: 3,
+  mode: "strict",
+});
+
+const huskyLikeStrictReport = getFixtureReport(fixtures.huskyLike, {
+  targetPath: ".",
+  topCount: 20,
+  mode: "strict",
+});
+
 afterEach(async () => {
   await tempDirs.cleanup();
 });
@@ -22,11 +52,7 @@ function getFixtureReport(
 
 describe("renderReport", () => {
   test("renders markdown report with handoff section", async () => {
-    const report = await getFixtureReport(fixtures.sampleRepo, {
-      targetPath: ".",
-      topCount: 3,
-      mode: "exploratory",
-    });
+    const report = await sampleRepoTop3ExploratoryReport;
 
     const markdown = renderReport(report, "markdown");
 
@@ -36,11 +62,7 @@ describe("renderReport", () => {
   });
 
   test("renders consolidated handoff output", async () => {
-    const report = await getFixtureReport(fixtures.sampleRepo, {
-      targetPath: ".",
-      topCount: 3,
-      mode: "exploratory",
-    });
+    const report = await sampleRepoTop3ExploratoryReport;
 
     const handoff = renderReport(report, "handoff", { topCount: 3, mode: "exploratory" });
 
@@ -73,11 +95,7 @@ describe("renderReport", () => {
   });
 
   test("aggregates repeated workflow-rule handoff guidance into one line", async () => {
-    const report = await getFixtureReport(fixtures.releaseGuardManyLike, {
-      targetPath: ".",
-      topCount: 5,
-      mode: "strict",
-    });
+    const report = await releaseGuardManyLikeReport;
 
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
 
@@ -90,11 +108,7 @@ describe("renderReport", () => {
   });
 
   test("aggregates repeated findings in the handoff findings section too", async () => {
-    const report = await getFixtureReport(fixtures.releaseGuardManyLike, {
-      targetPath: ".",
-      topCount: 5,
-      mode: "strict",
-    });
+    const report = await releaseGuardManyLikeReport;
 
     const handoff = renderReport(report, "handoff", { topCount: 5, mode: "strict" });
 
@@ -357,11 +371,7 @@ describe("renderReport", () => {
   });
 
   test("renders concise no-findings handoff output", async () => {
-    const report = await getFixtureReport(fixtures.cleanNoFindings, {
-      targetPath: ".",
-      topCount: 3,
-      mode: "strict",
-    });
+    const report = await cleanNoFindingsReport;
 
     const handoff = renderReport(report, "handoff");
 
@@ -374,11 +384,7 @@ describe("renderReport", () => {
   });
 
   test("renders concise no-findings text and markdown output", async () => {
-    const report = await getFixtureReport(fixtures.cleanNoFindings, {
-      targetPath: ".",
-      topCount: 3,
-      mode: "strict",
-    });
+    const report = await cleanNoFindingsReport;
 
     const text = renderReport(report, "text");
     const markdown = renderReport(report, "markdown");
@@ -396,11 +402,7 @@ describe("renderReport", () => {
   });
 
   test("renders findings-only output", async () => {
-    const report = await getFixtureReport(fixtures.sampleRepo, {
-      targetPath: ".",
-      topCount: 5,
-      mode: "exploratory",
-    });
+    const report = await sampleRepoExploratoryReport;
 
     const text = renderReport(report, "text", { findingsOnly: true });
     const json = renderReport(report, "json", { findingsOnly: true });
@@ -412,10 +414,7 @@ describe("renderReport", () => {
   });
 
   test("renders findings-only output with the actual source location when it differs from the workflow", async () => {
-    const report = await getFixtureReport(fixtures.huskyLike, {
-      targetPath: ".",
-      topCount: 20,
-    });
+    const report = await huskyLikeStrictReport;
 
     const text = renderReport(report, "text", { findingsOnly: true });
     const handoff = renderReport(report, "handoff", { findingsOnly: true, mode: "strict" });
@@ -425,11 +424,7 @@ describe("renderReport", () => {
   });
 
   test("renders handoff guidance with evidence location first for repo-aware husky findings", async () => {
-    const report = await getFixtureReport(fixtures.huskyLike, {
-      targetPath: ".",
-      topCount: 20,
-      mode: "strict",
-    });
+    const report = await huskyLikeStrictReport;
 
     const handoff = renderReport(report, "handoff", { topCount: 20, mode: "strict" });
 
@@ -501,11 +496,7 @@ describe("renderReport", () => {
   });
 
   test("renders concise no-findings findings-only handoff output", async () => {
-    const report = await getFixtureReport(fixtures.cleanNoFindings, {
-      targetPath: ".",
-      topCount: 5,
-      mode: "strict",
-    });
+    const report = await cleanNoFindingsReport;
 
     const handoff = renderReport(report, "handoff", { findingsOnly: true, mode: "strict" });
 
@@ -514,11 +505,7 @@ describe("renderReport", () => {
   });
 
   test("renders concise no-findings findings-only text and markdown output", async () => {
-    const report = await getFixtureReport(fixtures.cleanNoFindings, {
-      targetPath: ".",
-      topCount: 5,
-      mode: "strict",
-    });
+    const report = await cleanNoFindingsReport;
 
     const text = renderReport(report, "text", { findingsOnly: true });
     const markdown = renderReport(report, "markdown", { findingsOnly: true });
@@ -528,11 +515,7 @@ describe("renderReport", () => {
   });
 
   test("labels findings-only handoff as the full list for the current mode", async () => {
-    const report = await getFixtureReport(fixtures.sampleRepo, {
-      targetPath: ".",
-      topCount: 5,
-      mode: "exploratory",
-    });
+    const report = await sampleRepoExploratoryReport;
 
     const handoff = renderReport(report, "handoff", { findingsOnly: true, mode: "exploratory" });
 
@@ -540,11 +523,7 @@ describe("renderReport", () => {
   });
 
   test("keeps default text output focused on findings instead of duplicating handoff guidance", async () => {
-    const report = await getFixtureReport(fixtures.sampleRepo, {
-      targetPath: ".",
-      topCount: 5,
-      mode: "exploratory",
-    });
+    const report = await sampleRepoExploratoryReport;
 
     const text = renderReport(report, "text");
 
@@ -593,22 +572,14 @@ describe("renderReport", () => {
     const ttyOpts = { colors: true, hyperlinks: true, cwd: "/repo" };
 
     test("colors rule IDs cyan in text format", async () => {
-      const report = await getFixtureReport(fixtures.sampleRepo, {
-        targetPath: ".",
-        topCount: 5,
-        mode: "exploratory",
-      });
+      const report = await sampleRepoExploratoryReport;
       const text = renderReport(report, "text", ttyOpts);
       expect(text).toContain("\x1b[36m");
       expect(text).toContain("\x1b[0m");
     });
 
     test("colors rule IDs cyan in handoff format", async () => {
-      const report = await getFixtureReport(fixtures.sampleRepo, {
-        targetPath: ".",
-        topCount: 5,
-        mode: "exploratory",
-      });
+      const report = await sampleRepoExploratoryReport;
       const handoff = renderReport(report, "handoff", {
         ...ttyOpts,
         topCount: 5,
@@ -618,32 +589,20 @@ describe("renderReport", () => {
     });
 
     test("dims source locations in text format", async () => {
-      const report = await getFixtureReport(fixtures.sampleRepo, {
-        targetPath: ".",
-        topCount: 5,
-        mode: "exploratory",
-      });
+      const report = await sampleRepoExploratoryReport;
       const text = renderReport(report, "text", ttyOpts);
       expect(text).toContain("\x1b[90m");
     });
 
     test("applies OSC8 hyperlinks to source locations", async () => {
-      const report = await getFixtureReport(fixtures.sampleRepo, {
-        targetPath: ".",
-        topCount: 5,
-        mode: "exploratory",
-      });
+      const report = await sampleRepoExploratoryReport;
       const text = renderReport(report, "text", ttyOpts);
       expect(text).toContain("\x1b]8;;file://");
       expect(text).toContain("\x1b]8;;\x1b\\");
     });
 
     test("applies OSC8 hyperlinks to docs URLs", async () => {
-      const report = await getFixtureReport(fixtures.sampleRepo, {
-        targetPath: ".",
-        topCount: 5,
-        mode: "exploratory",
-      });
+      const report = await sampleRepoExploratoryReport;
       const text = renderReport(report, "text", ttyOpts);
       expect(text).toContain("\x1b]8;;https://ci-perf-lint.veritycost.com");
     });
@@ -685,31 +644,19 @@ describe("renderReport", () => {
     });
 
     test("no ANSI codes when colors flag is off", async () => {
-      const report = await getFixtureReport(fixtures.sampleRepo, {
-        targetPath: ".",
-        topCount: 5,
-        mode: "exploratory",
-      });
+      const report = await sampleRepoExploratoryReport;
       const text = renderReport(report, "text");
       expect(text).not.toContain("\x1b[");
     });
 
     test("no ANSI codes in markdown output even with TTY flags", async () => {
-      const report = await getFixtureReport(fixtures.sampleRepo, {
-        targetPath: ".",
-        topCount: 5,
-        mode: "exploratory",
-      });
+      const report = await sampleRepoExploratoryReport;
       const md = renderReport(report, "markdown", ttyOpts);
       expect(md).not.toContain("\x1b[");
     });
 
     test("no ANSI codes in JSON output even with TTY flags", async () => {
-      const report = await getFixtureReport(fixtures.sampleRepo, {
-        targetPath: ".",
-        topCount: 5,
-        mode: "exploratory",
-      });
+      const report = await sampleRepoExploratoryReport;
       const json = renderReport(report, "json", ttyOpts);
       expect(json).not.toContain("\x1b[");
     });
@@ -862,11 +809,7 @@ describe("renderReport", () => {
     });
 
     test("colors --mode exploratory in no-findings text", async () => {
-      const report = await getFixtureReport(fixtures.cleanNoFindings, {
-        targetPath: ".",
-        topCount: 3,
-        mode: "strict",
-      });
+      const report = await cleanNoFindingsReport;
       const text = renderReport(report, "text", { ...ttyOpts, topCount: 3, mode: "strict" });
       expect(text).toContain("\x1b[32m--mode exploratory\x1b[0m");
     });

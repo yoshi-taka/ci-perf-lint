@@ -62,11 +62,13 @@ export function detectImplicationDrift(
 
       if (evaluatedRuleIds.has(impliedId)) {
         warnings.push({
+          kind: "remediation-drift",
           source: "rule-engine",
           message: `Rule ${sourceId} fired but implied rule ${impliedId} produced no findings — possible semantic drift or rule configuration mismatch.`,
         });
       } else {
         warnings.push({
+          kind: "remediation-drift",
           source: "rule-engine",
           message: `Rule ${sourceId} fired but implied rule ${impliedId} was not evaluated — the implication may be stale or the target rule may be gated by unmet required features.`,
         });

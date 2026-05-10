@@ -2,6 +2,7 @@ import path from "node:path";
 import type { AnalysisWarning, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
+import { setIntersection } from "../set-algebra.ts";
 import {
   collectDockerfileData,
   type DockerBuildTarget,
@@ -93,19 +94,18 @@ export async function collectDockerignoreDiagnostics(
       }
 
       const visibleFiles = await listVisibleFiles(context, target.contextPath);
-      const noisyRoots = visibleFiles.filter((name) =>
-        [
-          ".git",
-          ".github",
-          "node_modules",
-          "dist",
-          "build",
-          ".next",
-          ".turbo",
-          "coverage",
-          ...experimentalArtifactDirs,
-        ].includes(name),
-      );
+      const noisyRootNames = new Set([
+        ".git",
+        ".github",
+        "node_modules",
+        "dist",
+        "build",
+        ".next",
+        ".turbo",
+        "coverage",
+        ...experimentalArtifactDirs,
+      ]);
+      const noisyRoots = [...setIntersection(visibleFiles, noisyRootNames)];
       const uncoveredRoots = noisyRoots.filter(
         (name) => !dockerignoreCoversRoot(dockerignoreText, name),
       );

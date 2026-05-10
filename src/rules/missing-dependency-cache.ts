@@ -4,6 +4,7 @@ import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { type DependencyFamily, detectInstallCommand } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
+import { isSubset, setDifference, setUnion } from "../set-algebra.ts";
 import {
   withRepositoryDependencyCachePrecedent,
   withSimilarWorkflowDependencyCacheConsensus,
@@ -122,9 +123,12 @@ export const missingDependencyCacheRule = {
           setupActionHasBuiltInCacheForFamily(step, f),
         );
 
-        const cached = new Set<DependencyFamily>([...cachedByBuiltIn, ...cachedByManual]);
-        const uncached = supportedFamilies.filter((f) => !cached.has(f));
-        if (uncached.length === 0) {
+        const cached = setUnion<DependencyFamily>(cachedByBuiltIn, cachedByManual);
+        if (isSubset(supportedFamilies, cached)) {
+          continue;
+        }
+        const uncached = setDifference(supportedFamilies, cached);
+        if (uncached.size === 0) {
           continue;
         }
 
@@ -139,7 +143,7 @@ export const missingDependencyCacheRule = {
             }),
           )(
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
-              message: `${step.uses} is used without visible dependency caching for ${uncached.join(", ")} in job "${job.id}".`,
+              message: `${step.uses} is used without visible dependency caching for ${[...uncached].join(", ")} in job "${job.id}".`,
               why: "Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths.",
               suggestion:
                 "If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.",

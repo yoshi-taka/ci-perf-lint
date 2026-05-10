@@ -155,7 +155,7 @@ export class RepositoryScanContext {
   }
 
   warn(source: string, message: string): void {
-    this.warnings.push({ source, message });
+    this.warnings.push({ kind: "scan-warning", source, message });
   }
 
   resolve(...parts: string[]): string {

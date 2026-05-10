@@ -103,7 +103,7 @@ function uniqueWarnings(warnings: AnalysisWarning[]): AnalysisWarning[] {
   const deduped: AnalysisWarning[] = [];
 
   for (const warning of warnings) {
-    const key = `${warning.source}\n${warning.message}`;
+    const key = `${warning.kind}\n${warning.source}\n${warning.message}`;
     if (seen.has(key)) {
       continue;
     }
@@ -113,6 +113,10 @@ function uniqueWarnings(warnings: AnalysisWarning[]): AnalysisWarning[] {
   }
 
   return deduped;
+}
+
+function analysisWarningsEnabled(): boolean {
+  return process.env.CI_PERF_LINT_DUMP_STATE === "1";
 }
 
 async function parseWorkflowFile(
@@ -180,9 +184,9 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     }
   }
   const shouldPrewarmEmbeddedOxlint =
+    !workflowOnly &&
     process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM !== "1" &&
-    (await scanContext.pathExists(scanContext.resolve("package.json"))) &&
-    !workflowOnly;
+    (await scanContext.pathExists(scanContext.resolve("package.json")));
   if (shouldPrewarmEmbeddedOxlint) {
     void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot, undefined, scanContext);
     void collectEmbeddedOxlintDiagnosticsByCode(
@@ -223,6 +227,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     } else {
       const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
       analysisWarnings.push({
+        kind: "scan-warning",
         source: allWorkflowFiles[index] ?? "unknown",
         message: `Failed to parse workflow: ${detail}`,
       });
@@ -349,7 +354,16 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
               .then((precheckedFindings) => [...workflowFindings, ...precheckedFindings]),
       ),
     workflowOnly
-      ? ([] as Diagnostic[])
+      ? (() => {
+          if (analysisWarningsEnabled()) {
+            analysisWarnings.push({
+              kind: "workflow-only",
+              source: "collectRepositoryDiagnostics",
+              message: "Repository diagnostics were skipped because workflowOnly=true.",
+            });
+          }
+          return [] as Diagnostic[];
+        })()
       : collectRepositoryDiagnostics({
           repoRoot,
           repository: ruleContext.repository,
@@ -420,6 +434,22 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   timer.mark("aggregate-report");
   timer.flush();
 
+  const uniqueAnalysisWarnings = uniqueWarnings(analysisWarnings);
+  if (analysisWarningsEnabled()) {
+    process.stderr.write(
+      JSON.stringify({
+        type: "repo-analysis-state",
+        workflowOnly,
+        repositoryOnly,
+        warningCount: uniqueAnalysisWarnings.length,
+        warnings: uniqueAnalysisWarnings,
+        findingCount: findings.length,
+        aggregatedFindingCount: aggregatedFindings.aggregatedFindings.length,
+      }),
+    );
+    process.stderr.write("\n");
+  }
+
   return {
     targetPath: inputPath,
     workflowCount: workflows.length,
@@ -430,7 +460,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     workflows,
     fixFirst,
     aiHandoff,
-    analysisWarnings: uniqueWarnings(analysisWarnings),
+    analysisWarnings: uniqueAnalysisWarnings,
     propagationClusters,
     remediationChecks,
   };

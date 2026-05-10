@@ -39,6 +39,10 @@ function dumpStateEnabled(): boolean {
   return process.env.CI_PERF_LINT_DUMP_STATE === "1";
 }
 
+function analysisWarningsEnabled(): boolean {
+  return process.env.CI_PERF_LINT_DUMP_STATE === "1";
+}
+
 function extractSignals(
   repository: RepositoryDiagnosticContext["repository"],
 ): Record<string, unknown> {
@@ -60,6 +64,19 @@ export async function collectRepositoryDiagnostics(
   const applicableCollectors = repositoryDiagnosticCollectors.filter((collector) =>
     collectorGateMatches(collector.gate, gateState),
   );
+
+  if (analysisWarningsEnabled()) {
+    for (const collector of repositoryDiagnosticCollectors) {
+      if (applicableCollectors.includes(collector)) {
+        continue;
+      }
+      context.warnings.push({
+        kind: "gate-skipped",
+        source: collector.id,
+        message: `Collector ${collector.id} was not run because its gate did not match.`,
+      });
+    }
+  }
   if (timingsEnabled()) {
     process.stderr.write(
       `[timing] diagnostics gates=${gateElapsed.toFixed(1)}ms collectors=${applicableCollectors.length}\n`,
@@ -88,6 +105,14 @@ export async function collectRepositoryDiagnostics(
 
   for (const [index, result] of results.entries()) {
     if (result.status === "fulfilled") {
+      if (analysisWarningsEnabled() && result.value.length === 0) {
+        const collector = applicableCollectors[index];
+        context.warnings.push({
+          kind: "empty-result",
+          source: collector?.id ?? "unknown",
+          message: `Collector ${collector?.id ?? "unknown"} ran and found nothing.`,
+        });
+      }
       diagnostics.push(...result.value);
       continue;
     }
@@ -95,6 +120,7 @@ export async function collectRepositoryDiagnostics(
     const collector = applicableCollectors[index];
     const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
     context.warnings.push({
+      kind: "collector-error",
       source: "collectRepositoryDiagnostics",
       message: `Collector ${collector?.id ?? "unknown"} failed: ${detail}`,
     });
@@ -121,6 +147,7 @@ export async function collectRepositoryDiagnostics(
         totalCollectors: repositoryDiagnosticCollectors.length,
         collectors: collectorResults,
         signals: extractSignals(context.repository),
+        warnings: context.warnings,
         totalFindings: diagnostics.length,
       }),
     );

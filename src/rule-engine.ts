@@ -17,12 +17,23 @@ type WorkflowNodeKind = "trigger" | "concurrency";
 
 let _rulesByScope: Record<string, readonly AnyRuleModule[]> | null = null;
 
+const analysisWarningsEnabled = process.env.CI_PERF_LINT_DUMP_STATE === "1";
+
 async function getRulesByScope(): Promise<Record<string, readonly AnyRuleModule[]>> {
   if (!_rulesByScope) {
     const mod = await import("./rules/index.ts");
     _rulesByScope = mod.rulesByScope;
   }
   return _rulesByScope;
+}
+
+function pushAnalysisWarning(
+  warnings: AnalysisWarning[] | undefined,
+  warning: AnalysisWarning,
+): void {
+  if (analysisWarningsEnabled && warnings) {
+    warnings.push(warning);
+  }
 }
 
 export interface RuleContext {
@@ -139,6 +150,28 @@ function workflowContainsKind(
   return true;
 }
 
+function ruleMatchesScope(
+  rule: AnyRuleModule,
+  isBuildkite: boolean,
+  isGitlab: boolean,
+  isCircle: boolean,
+): boolean {
+  const scope = rule.meta.scope ?? "github-actions";
+  if (scope === "all") {
+    return true;
+  }
+  if (scope === "buildkite") {
+    return isBuildkite;
+  }
+  if (scope === "gitlab-ci") {
+    return isGitlab;
+  }
+  if (scope === "circleci") {
+    return isCircle;
+  }
+  return !isBuildkite && !isGitlab && !isCircle;
+}
+
 function runConcurrent<T, R>(
   items: T[],
   fn: (item: T) => Promise<R>,
@@ -214,6 +247,12 @@ export async function evaluateRules(
     run: () => Promise<Diagnostic[]>;
   }
 
+  interface RuleRunResult {
+    rule: AnyRuleModule;
+    diagnostics: Diagnostic[];
+    errored: boolean;
+  }
+
   const inferenceGraph = buildInferenceGraph(allRules);
   const tasks: RuleTask[] = [];
   const evaluatedRuleIds = new Set<string>();
@@ -221,18 +260,47 @@ export async function evaluateRules(
 
   for (const rule of allRules) {
     if (ruleFilter && !ruleFilter(rule)) {
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: workflowPath,
+        message: `Rule ${rule.meta.id} was not evaluated because the rule filter excluded it.`,
+      });
       continue;
     }
 
     if (context.singularities?.isQuarantined(rule.meta.id)) {
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: workflowPath,
+        message: `Rule ${rule.meta.id} was not evaluated because it is quarantined by singularity handling.`,
+      });
       continue;
     }
 
     if (!matchesFeatureMask(rule.meta.requiredFeatures, workflow as WorkflowDocument)) {
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: workflowPath,
+        message: `Rule ${rule.meta.id} was not evaluated because the workflow feature mask did not match.`,
+      });
       continue;
     }
 
     if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: workflowPath,
+        message: `Rule ${rule.meta.id} was not evaluated because the workflow node types did not match its scope.`,
+      });
+      continue;
+    }
+
+    if (!ruleMatchesScope(rule, isBuildkite, isGitlab, isCircle)) {
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: workflowPath,
+        message: `Rule ${rule.meta.id} was not evaluated because its scope does not apply to this document.`,
+      });
       continue;
     }
 
@@ -245,18 +313,19 @@ export async function evaluateRules(
     tasks,
     async (task) => {
       try {
-        return { diagnostics: await task.run(), rule: task.rule };
+        return { diagnostics: await task.run(), rule: task.rule, errored: false };
       } catch (error) {
         const failure = classifySingularity(error, task.rule.meta.id, workflowPath);
         context.singularities?.record(failure);
         if (warnings) {
           const detail = error instanceof Error ? error.message : String(error);
           warnings.push({
+            kind: "rule-error",
             source: workflowPath,
             message: `[${failure.class}] Rule ${task.rule.meta.id} failed: ${detail}`,
           });
         }
-        return { diagnostics: [], rule: task.rule };
+        return { diagnostics: [], rule: task.rule, errored: true };
       }
     },
     4,
@@ -266,13 +335,19 @@ export async function evaluateRules(
   const idMaxFindings = new Map<string, number>();
   const firedRuleIds = new Set<string>();
 
-  for (const { diagnostics, rule } of settled) {
+  for (const { diagnostics, rule, errored } of settled as RuleRunResult[]) {
     const { maxFindings } = rule.meta;
     if (maxFindings !== undefined) {
       idMaxFindings.set(rule.meta.id, maxFindings);
     }
     if (diagnostics.length > 0) {
       firedRuleIds.add(rule.meta.id);
+    } else if (!errored) {
+      pushAnalysisWarning(warnings, {
+        kind: "empty-result",
+        source: `${workflowPath}#${rule.meta.id}`,
+        message: `Rule ${rule.meta.id} ran and found nothing for ${workflowPath}.`,
+      });
     }
     ruleResults.push(...diagnostics);
   }
@@ -291,6 +366,7 @@ export async function evaluateRules(
     }
 
     const caps = new Map<string, number>();
+    const cappedCounts = new Map<string, number>();
     const filtered = ruleResults.filter((d) => {
       const max = idMaxFindings.get(d.ruleId);
       if (max === undefined || impliedIds.has(d.ruleId)) {
@@ -298,11 +374,23 @@ export async function evaluateRules(
       }
       const count = caps.get(d.ruleId) ?? 0;
       if (count >= max) {
+        cappedCounts.set(d.ruleId, (cappedCounts.get(d.ruleId) ?? 0) + 1);
         return false;
       }
       caps.set(d.ruleId, count + 1);
       return true;
     });
+
+    for (const [ruleId, suppressed] of cappedCounts) {
+      const max = idMaxFindings.get(ruleId);
+      if (warnings && max !== undefined) {
+        pushAnalysisWarning(warnings, {
+          kind: "max-findings-hit",
+          source: workflowPath,
+          message: `Rule ${ruleId} produced more than ${max} findings and ${suppressed} were suppressed by maxFindings.`,
+        });
+      }
+    }
 
     if (findingCounts) {
       for (const [id, count] of caps) {
@@ -372,11 +460,21 @@ export async function evaluateRulesCoarseToFine(
 
   for (const rule of allRules) {
     if (ruleFilter && !ruleFilter(rule)) {
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: rule.meta.id,
+        message: `Rule ${rule.meta.id} was not evaluated because the rule filter excluded it.`,
+      });
       continue;
     }
 
     const ruleId = rule.meta.id;
     if (context.singularities?.isQuarantined(ruleId)) {
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: ruleId,
+        message: `Rule ${ruleId} was not evaluated because it is quarantined by singularity handling.`,
+      });
       continue;
     }
 
@@ -398,19 +496,43 @@ export async function evaluateRulesCoarseToFine(
       candidates = workflows.map((w) => ({ workflow: w, score: 1 }));
     }
 
+    if (candidates.length === 0) {
+      pushAnalysisWarning(warnings, {
+        kind: "gate-skipped",
+        source: ruleId,
+        message: `Rule ${ruleId} was not evaluated because its precheck selected no workflows.`,
+      });
+      continue;
+    }
+
     for (const { workflow } of candidates) {
       const workflowPath = workflow.relativePath;
 
       if (context.singularities?.hasPoleTrigger(ruleId, workflowPath)) {
+        pushAnalysisWarning(warnings, {
+          kind: "gate-skipped",
+          source: workflowPath,
+          message: `Rule ${ruleId} was not evaluated for ${workflowPath} because the workflow is quarantined for this rule.`,
+        });
         continue;
       }
 
       if (!matchesFeatureMask(rule.meta.requiredFeatures, workflow as WorkflowDocument)) {
+        pushAnalysisWarning(warnings, {
+          kind: "gate-skipped",
+          source: workflowPath,
+          message: `Rule ${ruleId} was not evaluated for ${workflowPath} because the workflow feature mask did not match.`,
+        });
         continue;
       }
 
       prewarmStepAnalysisCaches(workflow);
       if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
+        pushAnalysisWarning(warnings, {
+          kind: "gate-skipped",
+          source: workflowPath,
+          message: `Rule ${ruleId} was not evaluated for ${workflowPath} because the workflow node types did not match its scope.`,
+        });
         continue;
       }
       const workflowSemantics =
@@ -419,12 +541,19 @@ export async function evaluateRulesCoarseToFine(
           : context.workflowSemantics;
       const perWorkflowContext: RuleContext =
         workflowSemantics !== undefined ? { ...context, workflowSemantics } : context;
+      let errored = false;
+      let diagnostics: Diagnostic[] = [];
       try {
-        const diagnostics = await checkFn(workflow, perWorkflowContext);
+        diagnostics = await checkFn(workflow, perWorkflowContext);
         if (diagnostics.length > 0) {
           firedRuleIds.add(ruleId);
         }
         if (maxFindings !== undefined && diagnostics.length > maxFindings) {
+          pushAnalysisWarning(warnings, {
+            kind: "max-findings-hit",
+            source: workflowPath,
+            message: `Rule ${ruleId} produced ${diagnostics.length} findings and was capped at ${maxFindings}.`,
+          });
           diagnostics.length = maxFindings;
         }
         const workflowIndex = workflowIndexByRef.get(workflow);
@@ -435,15 +564,24 @@ export async function evaluateRulesCoarseToFine(
           findingCounts.set(ruleId, (findingCounts.get(ruleId) ?? 0) + diagnostics.length);
         }
       } catch (error) {
+        errored = true;
         const failure = classifySingularity(error, ruleId, workflowPath);
         context.singularities?.record(failure);
         if (warnings) {
           const detail = error instanceof Error ? error.message : String(error);
           warnings.push({
+            kind: "rule-error",
             source: workflowPath,
             message: `[${failure.class}] Rule ${ruleId} failed: ${detail}`,
           });
         }
+      }
+      if (!errored && diagnostics.length === 0) {
+        pushAnalysisWarning(warnings, {
+          kind: "empty-result",
+          source: `${workflowPath}#${ruleId}`,
+          message: `Rule ${ruleId} ran and found nothing for ${workflowPath}.`,
+        });
       }
     }
   }

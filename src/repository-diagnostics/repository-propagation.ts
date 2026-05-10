@@ -4,6 +4,7 @@ import type { Diagnostic, DiffusionMetrics, SimilarityEdge, PropagationCluster }
 import type { WorkflowDocument } from "../workflow.ts";
 import { getWorkflowFacts, getJobFacts } from "../rules/shared/workflow-analysis.ts";
 import { getStepFacts } from "../rules/shared/step-facts.ts";
+import { jaccardIndex } from "../set-algebra.ts";
 
 const BAND_BITS = 128;
 
@@ -151,17 +152,6 @@ function buildBandedFeatureSummary(workflow: WorkflowDocument): BandedFeatureSum
   return { bandMasks, features };
 }
 
-function jaccardSimilarity(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
-  let shared = 0;
-  for (const item of a) {
-    if (b.has(item)) {
-      shared++;
-    }
-  }
-  const union = a.size + b.size - shared;
-  return union === 0 ? 0 : shared / union;
-}
-
 function bandIncompatible(a: BandedFeatureSummary, b: BandedFeatureSummary): boolean {
   for (const band of BANDS) {
     const aMask = a.bandMasks.get(band) ?? 0n;
@@ -181,7 +171,7 @@ function bandedJaccardSimilarity(
   if (bandIncompatible(a, b)) {
     return undefined;
   }
-  const sim = jaccardSimilarity(a.features, b.features);
+  const sim = jaccardIndex(a.features, b.features);
   return sim >= threshold ? sim : undefined;
 }
 
@@ -219,7 +209,7 @@ function centralityScore(
     }
     const of = featureSummaries.get(other);
     if (of) {
-      total += jaccardSimilarity(wf.features, of.features);
+      total += jaccardIndex(wf.features, of.features);
       count++;
     }
   }

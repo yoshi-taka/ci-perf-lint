@@ -161,6 +161,7 @@ const reportDataArb = fc.record({
   aiHandoff: fc.array(fc.string({ maxLength: 100 }), { maxLength: 5 }),
   analysisWarnings: fc.array(
     fc.record({
+      kind: fc.constant("scan-warning" as const),
       source: fc.string({ maxLength: 40 }),
       message: fc.string({ maxLength: 100 }),
     }),

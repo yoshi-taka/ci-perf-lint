@@ -344,7 +344,11 @@ export async function collectRepositorySignals(
       return value;
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      warnings.push({ source: "collectRepositorySignals", message: `${label} failed: ${detail}` });
+      warnings.push({
+        kind: "scan-warning",
+        source: "collectRepositorySignals",
+        message: `${label} failed: ${detail}`,
+      });
       if (timingsEnabled()) {
         process.stderr.write(
           `[timing] collectRepositorySignals ${label}=${(performance.now() - signalStartedAt).toFixed(1)}ms(fallback)\n`,

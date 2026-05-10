@@ -2,6 +2,7 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { setIntersection } from "../set-algebra.ts";
 import {
   asRecord,
   hasAutomerge,
@@ -21,8 +22,12 @@ const meta = {
 
 function hasDefaultAwsSdkGrouping(config: Record<string, unknown>): boolean {
   const presets = getExtends(config);
-  const awsSdkGroupingPresets = ["config:recommended", "config:best-practices", "group:monorepos"];
-  return presets.some((p) => awsSdkGroupingPresets.includes(p));
+  const awsSdkGroupingPresets = new Set([
+    "config:recommended",
+    "config:best-practices",
+    "group:monorepos",
+  ]);
+  return setIntersection(presets, awsSdkGroupingPresets).size > 0;
 }
 
 function includesAwsSdkReference(value: unknown): boolean {

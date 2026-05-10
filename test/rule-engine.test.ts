@@ -1214,8 +1214,12 @@ describe("differential: evaluateRules vs evaluateRulesCoarseToFine", () => {
     const ctx: RuleContext = { repository: signals };
     const rSingle = await evaluateRules(workflow, ctx);
     const rMulti = await evaluateRulesCoarseToFine([workflow], ctx);
-    const idsSingle = new Set(rSingle.map((d) => `${d.ruleId}:${d.location.path}:${d.location.line}:${d.message}`));
-    const idsMulti = new Set(rMulti.map((d) => `${d.ruleId}:${d.location.path}:${d.location.line}:${d.message}`));
+    const idsSingle = new Set(
+      rSingle.map((d) => `${d.ruleId}:${d.location.path}:${d.location.line}:${d.message}`),
+    );
+    const idsMulti = new Set(
+      rMulti.map((d) => `${d.ruleId}:${d.location.path}:${d.location.line}:${d.message}`),
+    );
     expect(idsMulti.size).toBe(idsSingle.size);
     for (const key of idsSingle) {
       expect(idsMulti.has(key)).toBe(true);
@@ -1243,12 +1247,8 @@ describe("differential: rule filter subset property", () => {
     );
     const ctx: RuleContext = { repository: signals };
     const full = await evaluateRules(workflow, ctx);
-    const filtered = await evaluateRules(
-      workflow,
-      ctx,
-      undefined,
-      undefined,
-      (r) => r.meta.id.startsWith("missing-"),
+    const filtered = await evaluateRules(workflow, ctx, undefined, undefined, (r) =>
+      r.meta.id.startsWith("missing-"),
     );
     const fullIds = new Set(full.map((d) => d.ruleId));
     for (const d of filtered) {

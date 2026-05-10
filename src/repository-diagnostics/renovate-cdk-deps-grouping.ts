@@ -2,6 +2,7 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { setIntersection } from "../set-algebra.ts";
 import {
   asRecord,
   hasAutomerge,
@@ -21,13 +22,13 @@ const meta = {
 
 function hasDefaultCdkGrouping(config: Record<string, unknown>): boolean {
   const presets = getExtends(config);
-  const cdkGroupingPresets = [
+  const cdkGroupingPresets = new Set([
     "config:recommended",
     "config:best-practices",
     "group:monorepos",
     "group:aws-cdkMonorepo",
-  ];
-  return presets.some((p) => cdkGroupingPresets.includes(p));
+  ]);
+  return setIntersection(presets, cdkGroupingPresets).size > 0;
 }
 
 function includesCdkReference(value: unknown): boolean {

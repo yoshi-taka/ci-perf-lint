@@ -213,7 +213,7 @@ describe("metamorphic relations", () => {
       workflows: [],
       fixFirst: ["base fix"],
       aiHandoff: ["base handoff"],
-      analysisWarnings: [{ source: "base", message: "base warning" }],
+      analysisWarnings: [{ kind: "scan-warning", source: "base", message: "base warning" }],
       propagationClusters: [],
       remediationChecks: [],
     };
@@ -233,7 +233,7 @@ describe("metamorphic relations", () => {
       ],
       fixFirst: ["different fix"],
       aiHandoff: ["different handoff"],
-      analysisWarnings: [{ source: "mutated", message: "mutated warning" }],
+      analysisWarnings: [{ kind: "scan-warning", source: "mutated", message: "mutated warning" }],
       propagationClusters: [],
       remediationChecks: [],
     };
@@ -309,7 +309,7 @@ describe("metamorphic relations", () => {
       workflows: [],
       fixFirst: ["fix"],
       aiHandoff: ["handoff"],
-      analysisWarnings: [{ source: "s", message: "m" }],
+      analysisWarnings: [{ kind: "scan-warning", source: "s", message: "m" }],
       propagationClusters: [],
       remediationChecks: [],
     };

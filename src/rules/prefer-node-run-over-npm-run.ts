@@ -9,6 +9,7 @@ import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
 import { detectSimpleNpmRunFromText } from "./shared/command-patterns.ts";
+import { setIntersection } from "../set-algebra.ts";
 
 const meta = {
   id: "prefer-node-run-over-npm-run",
@@ -111,9 +112,9 @@ function stepTargetsNodeRunCapableVersion(step: WorkflowStep): boolean {
 
 function npmCompatibilityEvidence(repository: RepositorySignals, script: string): string {
   const evidence: string[] = [];
-  const lifecycleHooks = [`pre${script}`, `post${script}`].filter((hook) =>
-    repository.npm.lifecycleHookScripts.includes(hook),
-  );
+  const lifecycleHooks = [
+    ...setIntersection([`pre${script}`, `post${script}`], repository.npm.lifecycleHookScripts),
+  ];
 
   if (lifecycleHooks.length > 0) {
     evidence.push(`lifecycle hooks ${lifecycleHooks.join("/")}`);

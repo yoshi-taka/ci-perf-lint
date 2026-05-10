@@ -165,11 +165,7 @@ describe("PBT: inference graph properties", () => {
         (ruleDefs, firedIds, evaluatedIds) => {
           const rules = ruleDefs.map((r) => fakeRule(r.id, r.implied));
           const graph = buildInferenceGraph(rules);
-          const warnings = detectImplicationDrift(
-            new Set(firedIds),
-            new Set(evaluatedIds),
-            graph,
-          );
+          const warnings = detectImplicationDrift(new Set(firedIds), new Set(evaluatedIds), graph);
           expect(Array.isArray(warnings)).toBe(true);
           for (const w of warnings) {
             expect(typeof w.source).toBe("string");

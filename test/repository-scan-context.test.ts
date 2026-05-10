@@ -183,6 +183,7 @@ describe("RepositoryScanContext", () => {
     expect(entry.value).toBeUndefined();
     expect(context.warnings).toEqual([
       {
+        kind: "scan-warning",
         source: packageJsonPath,
         message: "Expected a JSON object while collecting repository signals.",
       },

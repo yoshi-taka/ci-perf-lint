@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobUsesContainer } from "./shared/workflow-jobs.ts";
+import { setDifference } from "../set-algebra.ts";
 
 const meta = {
   id: "wasteful-package-install-in-container",
@@ -99,7 +100,7 @@ export const wastefulPackageInstallInContainerRule = {
         }
 
         const used = packagesUsedLater(packages, job.steps, i);
-        const unused = packages.filter((pkg) => !used.has(pkg));
+        const unused = [...setDifference(packages, used)];
         if (unused.length === 0) {
           continue;
         }
