@@ -107,6 +107,14 @@ describe("migrations: framework milestones and bundler migration", () => {
       suggestion: "at least 7.2.x",
       why: ["YJIT"],
     },
+    {
+      name: "Ruby 3.3 from 3.2 builds",
+      fixture: fixtures.preferRuby33YjitLike,
+      ruleId: "prefer-ruby-33-yjit",
+      message: "below the 3.3 YJIT milestone",
+      suggestion: "at least 3.3.x",
+      why: ["production-ready"],
+    },
   ] as const;
 
   test.each(frameworkMilestonePositiveCases.map((testCase) => [testCase.name, testCase] as const))(
@@ -174,6 +182,11 @@ describe("migrations: framework milestones and bundler migration", () => {
       name: "Rails once already on 7.2",
       fixture: fixtures.preferRailsPerformanceMilestoneOk72,
       ruleId: "prefer-rails-performance-milestone",
+    },
+    {
+      name: "Ruby once already on 3.3",
+      fixture: fixtures.preferRuby33YjitOk,
+      ruleId: "prefer-ruby-33-yjit",
     },
   ] as const;
 

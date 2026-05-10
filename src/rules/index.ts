@@ -83,6 +83,7 @@ import { preferSetupUvForLightweightPythonToolingRule } from "./prefer-setup-uv-
 import { preferZstdCompressionForPushedDockerImagesRule } from "./prefer-zstd-compression-for-pushed-docker-images.ts";
 import { railsDbSchemaLoadOverMigrateRule } from "./rails-db-schema-load-over-migrate.ts";
 import { preferRailsPerformanceMilestoneRule } from "./prefer-rails-performance-milestone.ts";
+import { preferRuby33YjitRule } from "./prefer-ruby-33-yjit.ts";
 import { preferRuffImportSortingOverIsortRule } from "./prefer-ruff-import-sorting-over-isort.ts";
 import { rubySetupRubyMissingBundlerCacheRule } from "./ruby-setup-ruby-missing-bundler-cache.ts";
 import { redundantNpxOrBootstrapRule } from "./redundant-npx-or-bootstrap.ts";
@@ -161,6 +162,7 @@ export const allRules = [
   preferNextjs13MinorPerformanceMilestoneRule,
   preferNextjs14MinorPerformanceMilestoneRule,
   preferRailsPerformanceMilestoneRule,
+  preferRuby33YjitRule,
   preferStorybook6MinorPerformanceMilestoneRule,
   preferStorybook7MinorPerformanceMilestoneRule,
   preferTailwindV4UpgradeToolRule,

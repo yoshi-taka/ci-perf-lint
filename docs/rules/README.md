@@ -112,6 +112,7 @@ Current rule registry:
 - `prefer-oxlint-over-eslint`
 - `prefer-pydantic-v2`
 - `prefer-rails-performance-milestone`
+- `prefer-ruby-33-yjit`
 - `prefer-ruff-format-over-black`
 - `prefer-ruff-import-sorting-over-isort`
 - `prefer-setup-bun-for-lightweight-node-tooling`
