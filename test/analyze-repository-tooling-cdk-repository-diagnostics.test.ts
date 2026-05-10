@@ -164,6 +164,7 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
       path.join(workflowDir, "ci.yml"),
       "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-node@v4\n",
     );
+    await writeFile(path.join(fixtureRoot, ".ruby-version"), "3.3.0\n");
 
     const report = await getFixtureReport(fixtureRoot, {
       targetPath: ".",
