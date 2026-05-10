@@ -9,6 +9,9 @@ import {
   type AnyRuleModule,
 } from "../src/rule-engine.ts";
 import { parseWorkflow } from "../src/workflow.ts";
+import { parsePipeline } from "../src/buildkite-workflow.ts";
+import { parseGitlabCi } from "../src/gitlab-ci-workflow.ts";
+import { parseCircleCi } from "../src/circleci-workflow.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
 import type { AnalysisWarning } from "../src/types.ts";
 import { SingularityTracker } from "../src/rules/shared/singularity.ts";
@@ -954,5 +957,120 @@ describe("evaluateRulesCoarseToFine", () => {
     expect(result).toEqual([]);
     expect(Array.isArray(warnings)).toBe(true);
     await cleanup();
+  });
+});
+
+describe("getRuleCheckFn scope dispatch (orthogonal array)", () => {
+  const ghaYaml = [
+    "name: Build",
+    "on:",
+    "  push:",
+    "jobs:",
+    "  build:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - uses: actions/setup-node@v4",
+    "        with:",
+    "          node-version: 22",
+    "      - run: npm run build",
+  ].join("\n");
+
+  const pipelineYaml = ["steps:", "  - command: npm run build", "    label: Build"].join("\n");
+
+  const gitlabYaml = ["build:", "  script:", "    - npm run build"].join("\n");
+
+  const circleYaml = [
+    "version: 2.1",
+    "jobs:",
+    "  build:",
+    "    docker:",
+    "      - image: cimg/node:22",
+    "    steps:",
+    "      - run: npm run build",
+  ].join("\n");
+
+  const repoRoot = path.join(path.sep, "repo");
+  const context: RuleContext = { repository: createSignals() };
+
+  const docs = [
+    {
+      type: "github-actions" as const,
+      doc: parseWorkflow(path.join(repoRoot, ".github/workflows/ci.yml"), repoRoot, ghaYaml),
+    },
+    {
+      type: "buildkite" as const,
+      doc: parsePipeline(path.join(repoRoot, ".buildkite/pipeline.yml"), repoRoot, pipelineYaml),
+    },
+    {
+      type: "gitlab-ci" as const,
+      doc: parseGitlabCi(path.join(repoRoot, ".gitlab-ci.yml"), repoRoot, gitlabYaml),
+    },
+    {
+      type: "circleci" as const,
+      doc: parseCircleCi(path.join(repoRoot, ".circleci/config.yml"), repoRoot, circleYaml),
+    },
+  ];
+
+  const allScopeRuleFilter = (r: AnyRuleModule) => r.meta.id === "prefer-node-run-over-npm-run";
+
+  for (const { type, doc } of docs) {
+    test(`scope=all rule fires for ${type} document`, async () => {
+      const result = await evaluateRules(
+        doc as never,
+        context,
+        undefined,
+        undefined,
+        allScopeRuleFilter,
+      );
+      expect(result.some((d) => d.ruleId === "prefer-node-run-over-npm-run")).toBe(true);
+    });
+  }
+
+  test("default (github-actions) rule does not fire for buildkite document", async () => {
+    const bkDoc = docs.find((d) => d.type === "buildkite")!.doc;
+    const result = await evaluateRules(
+      bkDoc as never,
+      context,
+      undefined,
+      undefined,
+      (r) => r.meta.id === "missing-concurrency",
+    );
+    expect(result).toEqual([]);
+  });
+
+  test("default (github-actions) rule does not fire for gitlab-ci document", async () => {
+    const glDoc = docs.find((d) => d.type === "gitlab-ci")!.doc;
+    const result = await evaluateRules(
+      glDoc as never,
+      context,
+      undefined,
+      undefined,
+      (r) => r.meta.id === "missing-concurrency",
+    );
+    expect(result).toEqual([]);
+  });
+
+  test("default (github-actions) rule does not fire for circleci document", async () => {
+    const ciDoc = docs.find((d) => d.type === "circleci")!.doc;
+    const result = await evaluateRules(
+      ciDoc as never,
+      context,
+      undefined,
+      undefined,
+      (r) => r.meta.id === "missing-concurrency",
+    );
+    expect(result).toEqual([]);
+  });
+
+  test("default (github-actions) rule fires for github-actions document", async () => {
+    const ghaDoc = docs.find((d) => d.type === "github-actions")!.doc;
+    const result = await evaluateRules(
+      ghaDoc as never,
+      context,
+      undefined,
+      undefined,
+      (r) => r.meta.id === "missing-concurrency",
+    );
+    expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(true);
   });
 });
