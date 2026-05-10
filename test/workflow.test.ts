@@ -595,3 +595,132 @@ describe("getLocation: missing equivalence classes", () => {
     expect(pos.line).toBeGreaterThanOrEqual(1);
   });
 });
+
+function makeJobYaml(
+  id: string,
+  stepShape: "none" | "run" | "uses",
+  propsCount: "<5" | "≥6",
+): string[] {
+  const lines = [`  ${id}:`, "    runs-on: ubuntu-latest"];
+  if (propsCount === "≥6") {
+    lines.push("    timeout-minutes: 30");
+    lines.push("    if: ${{ success() }}");
+    lines.push("    env:");
+    lines.push("      NODE_ENV: test");
+    lines.push("    strategy:");
+    lines.push("      matrix:");
+    lines.push("        node: [18]");
+    lines.push("    container:");
+    lines.push("      image: node:18");
+  }
+  if (stepShape === "none") {
+    lines.push("    steps: []");
+  } else if (stepShape === "run") {
+    lines.push("    steps:");
+    lines.push("      - run: echo ok");
+  } else {
+    lines.push("    steps:");
+    lines.push("      - name: Checkout");
+    lines.push("        uses: actions/checkout@v4");
+    lines.push("        with:");
+    lines.push("          fetch-depth: 1");
+  }
+  return lines;
+}
+
+type OnForm = "string" | "object" | "seq" | "missing";
+type JobCount = "0" | "1" | "6+";
+type StepShape = "none" | "run" | "uses";
+type Concurrency = "yes" | "no";
+type PropsCount = "<5" | "≥6";
+
+interface OARow {
+  on: OnForm;
+  jobs: JobCount;
+  step: StepShape;
+  conc: Concurrency;
+  props: PropsCount;
+}
+
+const oaRows: OARow[] = [
+  { on: "string", jobs: "0", step: "none", conc: "no", props: "<5" },
+  { on: "string", jobs: "1", step: "run", conc: "no", props: "≥6" },
+  { on: "string", jobs: "6+", step: "uses", conc: "yes", props: "<5" },
+  { on: "object", jobs: "0", step: "run", conc: "yes", props: "<5" },
+  { on: "object", jobs: "1", step: "uses", conc: "no", props: "<5" },
+  { on: "object", jobs: "6+", step: "none", conc: "no", props: "≥6" },
+  { on: "seq", jobs: "0", step: "uses", conc: "no", props: "≥6" },
+  { on: "seq", jobs: "1", step: "none", conc: "yes", props: "≥6" },
+  { on: "seq", jobs: "6+", step: "run", conc: "yes", props: "<5" },
+  { on: "missing", jobs: "0", step: "uses", conc: "yes", props: "≥6" },
+  { on: "missing", jobs: "1", step: "run", conc: "yes", props: "≥6" },
+  { on: "missing", jobs: "6+", step: "none", conc: "no", props: "<5" },
+];
+
+function buildWorkflowYaml(row: OARow): string {
+  const lines: string[] = [];
+  if (row.on === "string") {
+    lines.push("name: CI");
+    lines.push("on: push");
+  } else if (row.on === "object") {
+    lines.push("name: CI");
+    lines.push("on:");
+    lines.push("  push:");
+  } else if (row.on === "seq") {
+    lines.push("name: CI");
+    lines.push("on: [push, pull_request]");
+  } else {
+    lines.push("name: CI");
+  }
+
+  if (row.conc === "yes") {
+    lines.push("concurrency:");
+    lines.push("  group: test");
+  }
+
+  if (row.jobs === "0") {
+    lines.push("jobs: {}");
+  } else if (row.jobs === "1") {
+    lines.push("jobs:");
+    lines.push(...makeJobYaml("build", row.step, row.props));
+  } else {
+    lines.push("jobs:");
+    for (let i = 1; i <= 6; i++) {
+      lines.push(...makeJobYaml(`job${i}`, row.step, row.props));
+    }
+  }
+
+  return lines.join("\n");
+}
+
+describe("orthogonal array: parseWorkflow pairwise coverage", () => {
+  for (let i = 0; i < oaRows.length; i++) {
+    const row = oaRows[i]!;
+    test(`row${i + 1}: on=${row.on} jobs=${row.jobs} step=${row.step} conc=${row.conc} props=${row.props}`, () => {
+      const src = buildWorkflowYaml(row);
+      let workflow: ReturnType<typeof parseWorkflow>;
+      try {
+        workflow = wf(src);
+      } catch {
+        expect(src).toBeDefined();
+        return;
+      }
+      if (row.on === "missing") {
+        expect(workflow.on).toBeUndefined();
+      } else {
+        expect(workflow.on).toBeDefined();
+      }
+      if (row.jobs === "0") {
+        expect(workflow.jobs).toHaveLength(0);
+      } else if (row.jobs === "1") {
+        expect(workflow.jobs).toHaveLength(1);
+      } else {
+        expect(workflow.jobs).toHaveLength(6);
+      }
+      if (row.conc === "yes") {
+        expect(workflow.concurrencyNode).toBeDefined();
+      }
+      expect(workflow.source).toBe(src);
+    });
+  }
+});
