@@ -3,9 +3,11 @@ import type { Diagnostic } from "../types.ts";
 import type {
   GatedContext,
   GateKey,
+  ProofForGate,
   RepositoryDiagnosticContext,
   RepositoryDiagnosticGateState,
 } from "./collector-types.ts";
+import { buildTypedContext, assertGateProof } from "./collector-types.ts";
 import {
   buildCollectorCooccurrenceDebug,
   orderCollectorsForDiagnostics,
@@ -37,7 +39,7 @@ export const repositoryDiagnosticCollectors = [
     gate: gateKeys.gradle,
     collect: (context: GatedContext<"hasGradle">) =>
       collectGradleParallelNotEnabledDiagnostics(context),
-  },
+  } as const,
 ] as const;
 
 function gateKeyToPredicate(gate: GateKey): (state: RepositoryDiagnosticGateState) => boolean {
@@ -92,9 +94,6 @@ export async function collectRepositoryDiagnostics(
   const { state: gateState, observability: gateObservability } = gateResolution;
   const gateElapsed = performance.now() - gateStateStartedAt;
   const proofs = buildGateProofs(gateState);
-  const provenContext = { ...context, proofs } as RepositoryDiagnosticContext & {
-    proofs: typeof proofs;
-  };
   const applicableCollectors = repositoryDiagnosticCollectors.filter((collector) =>
     gateKeyToPredicate(collector.gate)(gateState),
   );
@@ -136,7 +135,17 @@ export async function collectRepositoryDiagnostics(
   const results = await Promise.allSettled(
     scheduledCollectors.map((collector) => {
       const startedAt = performance.now();
-      const result = collector.collect(provenContext);
+      const typedProof = assertGateProof(collector.gate, proofs);
+      const typedContext = buildTypedContext(
+        context,
+        collector.gate as GateKey,
+        typedProof.__proof as ProofForGate<typeof collector.gate>,
+      );
+      const result: Diagnostic[] | Promise<Diagnostic[]> = (
+        collector as {
+          collect: (ctx: typeof typedContext) => Diagnostic[] | Promise<Diagnostic[]>;
+        }
+      ).collect(typedContext);
       if (result instanceof Promise) {
         if (timingsEnabled()) {
           return result.then((value) => {
