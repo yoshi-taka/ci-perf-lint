@@ -187,13 +187,83 @@ function applyTransformMetadata(
   diagnostic: Diagnostic,
   metadata: DiagnosticTransformMetadata,
 ): Diagnostic {
+  const existing = (
+    diagnostic as Diagnostic & { [diagnosticTransformMetadataKey]?: DiagnosticTransformMetadata }
+  )[diagnosticTransformMetadataKey];
+  if (
+    existing &&
+    existing.labels.length === metadata.labels.length &&
+    existing.axes.length === metadata.axes.length
+  ) {
+    return diagnostic;
+  }
   return Object.defineProperty(diagnostic, diagnosticTransformMetadataKey, {
     value: metadata,
     enumerable: false,
-    configurable: false,
-    writable: false,
+    configurable: true,
+    writable: true,
   });
 }
+
+const globalTransformLabels = new Map<string, Set<string>>();
+
+function diagKey(d: {
+  ruleId: string;
+  workflow: string;
+  location: { path: string; line: number };
+}): string {
+  return `${d.ruleId}:${d.workflow}:${d.location.path}:${d.location.line}`;
+}
+
+export function hasAppliedTransform(diagnostic: Diagnostic, label: string): boolean {
+  return globalTransformLabels.get(diagKey(diagnostic))?.has(label) ?? false;
+}
+
+export function markTransformApplied(diagnostic: Diagnostic, label: string): Diagnostic {
+  const key = diagKey(diagnostic);
+  let entry = globalTransformLabels.get(key);
+  if (!entry) {
+    entry = new Set();
+    globalTransformLabels.set(key, entry);
+  }
+  entry.add(label);
+  return diagnostic;
+}
+
+export function getAppliedTransformLabels(diagnostic: Diagnostic): readonly string[] {
+  const entry = globalTransformLabels.get(diagKey(diagnostic));
+  return entry ? [...entry] : [];
+}
+
+export function resetTransformTracking(): void {
+  globalTransformLabels.clear();
+}
+
+function assertIdempotentTransform(
+  transform: DiagnosticTransform,
+  label: string,
+  diagnostic: Diagnostic,
+): void {
+  if (process.env.CI_PERF_LINT_TRANSFORM_ASSERT === "1") {
+    const once = transform(diagnostic);
+    const key = `${diagKey(once)}:${label}`;
+    if (assertStore.has(key)) {
+      return;
+    }
+    assertStore.add(key);
+    const twice = transform(once);
+    if (twice.score !== once.score) {
+      throw new Error(
+        `[idempotency] transform "${label}" re-applied: score ${once.score} → ${twice.score}`,
+      );
+    }
+    if (twice.why !== once.why) {
+      throw new Error(`[idempotency] transform "${label}" re-applied: why changed`);
+    }
+  }
+}
+
+const assertStore = new Set<string>();
 
 export function getDiagnosticTransformMetadata(
   diagnostic: Diagnostic,
@@ -234,10 +304,24 @@ function composeTagged(...taggedTransforms: readonly TaggedTransform[]): TaggedD
     return makeTaggedIdentityDiagnosticTransform();
   }
 
+  const localApplied = new Map<string, Set<string>>();
+
   const transform = (diagnostic: Diagnostic) => {
     let result = diagnostic;
     for (const taggedTransform of normalized) {
+      const key = diagKey(result);
+      const applied = localApplied.get(key);
+      if (applied?.has(taggedTransform.label)) {
+        continue;
+      }
       result = taggedTransform.transform(result);
+      const resultKey = diagKey(result);
+      let entry = localApplied.get(resultKey);
+      if (!entry) {
+        entry = new Set();
+        localApplied.set(resultKey, entry);
+      }
+      entry.add(taggedTransform.label);
     }
     return applyTransformMetadata(result, {
       axes: normalized.flatMap((taggedTransform) => taggedTransform.axes),

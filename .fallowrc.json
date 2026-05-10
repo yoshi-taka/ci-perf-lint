@@ -15,6 +15,7 @@
   },
   "usedClassMembers": ["clear"],
   "ignoreExports": [
+    { "file": "src/rules/shared/diagnostic-transform.ts", "exports": ["hasAppliedTransform", "markTransformApplied", "getAppliedTransformLabels", "resetTransformTracking"] },
     { "file": "src/cli-option-resolver.ts", "exports": ["similarFlagDistanceLimit", "levenshteinDistance"] },
     { "file": "src/repo-finding-utils.ts", "exports": ["isActionsFinding", "promoteStrictFallbackSuggestions"] },
     { "file": "src/reporters-render.ts", "exports": ["affectedLocationLimit", "renderBacktickedListWithRemainder"] },
