@@ -418,4 +418,64 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
       report.findings.some((candidate) => candidate.ruleId === "rails-db-schema-load-over-migrate"),
     ).toBe(false);
   });
+
+  test("warns when ruby/setup-ruby is used without bundler-cache and bundle install runs manually", async () => {
+    const report = await getFixtureReport(fixtures.rubySetupRubyMissingBundlerCacheLike, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const findings = report.findings.filter(
+      (candidate) => candidate.ruleId === "ruby-setup-ruby-missing-bundler-cache",
+    );
+
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    const finding = findings.find((f) => f.message.includes("ruby/setup-ruby"));
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("bundler-cache");
+    expect(finding?.severity).toBe("warning");
+  });
+
+  test("does not warn when ruby/setup-ruby has bundler-cache: true", async () => {
+    const report = await getFixtureReport(fixtures.rubySetupRubyMissingBundlerCacheOk, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "ruby-setup-ruby-missing-bundler-cache",
+      ),
+    ).toBe(false);
+  });
+
+  test("does not warn when job runs inside a container", async () => {
+    const report = await getFixtureReport(fixtures.rubySetupRubyMissingBundlerCacheOkContainer, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "ruby-setup-ruby-missing-bundler-cache",
+      ),
+    ).toBe(false);
+  });
+
+  test("does not warn when job has custom bundler cache via actions/cache", async () => {
+    const report = await getFixtureReport(fixtures.rubySetupRubyMissingBundlerCacheOkCustomCache, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "ruby-setup-ruby-missing-bundler-cache",
+      ),
+    ).toBe(false);
+  });
 });

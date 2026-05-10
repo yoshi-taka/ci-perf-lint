@@ -126,6 +126,7 @@ Current rule registry:
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`
 - `rails-db-schema-load-over-migrate`
+- `ruby-setup-ruby-missing-bundler-cache`
 - `pytest-norecursedirs-override`
 - `pytest-testpaths-unconfigured`
 - `pytest-xdist-installed-but-not-used`

@@ -340,6 +340,11 @@ const fixtureNames = {
   crossPlatformDockerNocache: "cross-platform-docker-nocache",
   npmAuditInCiLike: "npm-audit-in-ci-like",
   npmAuditInCiOk: "npm-audit-in-ci-ok",
+  rubySetupRubyMissingBundlerCacheLike: "ruby-setup-ruby-missing-bundler-cache-like",
+  rubySetupRubyMissingBundlerCacheOk: "ruby-setup-ruby-missing-bundler-cache-ok",
+  rubySetupRubyMissingBundlerCacheOkContainer: "ruby-setup-ruby-missing-bundler-cache-ok-container",
+  rubySetupRubyMissingBundlerCacheOkCustomCache:
+    "ruby-setup-ruby-missing-bundler-cache-ok-custom-cache",
 } as const;
 
 const cache = new Map<string, string>();

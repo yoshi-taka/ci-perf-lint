@@ -83,6 +83,7 @@ import { preferSetupUvForLightweightPythonToolingRule } from "./prefer-setup-uv-
 import { preferZstdCompressionForPushedDockerImagesRule } from "./prefer-zstd-compression-for-pushed-docker-images.ts";
 import { railsDbSchemaLoadOverMigrateRule } from "./rails-db-schema-load-over-migrate.ts";
 import { preferRuffImportSortingOverIsortRule } from "./prefer-ruff-import-sorting-over-isort.ts";
+import { rubySetupRubyMissingBundlerCacheRule } from "./ruby-setup-ruby-missing-bundler-cache.ts";
 import { redundantNpxOrBootstrapRule } from "./redundant-npx-or-bootstrap.ts";
 import { redundantInstallForPreinstalledCliRule } from "./redundant-install-for-preinstalled-cli.ts";
 import { redundantManualCacheWithSetupActionRule } from "./redundant-manual-cache-with-setup-action.ts";
@@ -173,6 +174,7 @@ export const allRules = [
   preferUvPipOverPipRule,
   preferZstdCompressionForPushedDockerImagesRule,
   railsDbSchemaLoadOverMigrateRule,
+  rubySetupRubyMissingBundlerCacheRule,
   preferRuffFormatOverBlackRule,
   preferRuffImportSortingOverIsortRule,
   repeatedInstallInSameJobRule,
