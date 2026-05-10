@@ -32,7 +32,7 @@ function renderStructuredWorkflowHandoff(finding: AggregatedFinding): string | u
     return undefined;
   }
 
-  const source = { workflowPath: finding.workflow };
+  const source = { kind: "workflow" as const, workflowPath: finding.workflow };
   return renderAiHandoff(finding.repair, finding.ruleId, source);
 }
 
