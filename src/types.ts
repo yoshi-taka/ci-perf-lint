@@ -145,8 +145,20 @@ export interface ImpliedCheck {
   reason: string;
 }
 
+type _WorkflowFactsProjectionKeys = {
+  isHeavyWorkflow: boolean;
+  hasConcurrency: boolean;
+  looksMetaCheckLike: boolean;
+  looksAgenticLike: boolean;
+  looksReleaseLike: boolean;
+};
+
+export type WorkflowFactsProjection = Readonly<
+  Partial<Record<keyof _WorkflowFactsProjectionKeys, boolean>>
+>;
+
 export interface RequiredFeatures {
-  readonly workflowFacts?: Readonly<Record<string, boolean>>;
+  readonly workflowFacts?: WorkflowFactsProjection;
   readonly toolPresence?: Readonly<Record<string, boolean>>;
 }
 
