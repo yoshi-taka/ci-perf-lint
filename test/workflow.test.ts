@@ -6,6 +6,8 @@ import {
   getNode,
   getScalarValue,
   getScalarString,
+  getStringOrArrayValue,
+  getMapValue,
 } from "../src/workflow.ts";
 
 function wf(
@@ -160,20 +162,7 @@ describe("getNode / getScalarValue", () => {
     expect(getScalarValue(buildNode as never, "runs-on")).toBe("ubuntu-latest");
   });
 
-  test("getScalarString returns undefined for non-string scalars", () => {
-    const workflow = wf(
-      [
-        "name: CI",
-        "on: push",
-        "jobs:",
-        "  build:",
-        "    timeout-minutes: 30",
-        "    steps: []",
-      ].join("\n"),
-    );
-    const jobNode = getNode(workflow.root!, "jobs")!;
-    const buildNode = getNode(jobNode as never, "build")!;
-
+  test("getScalarString undefined returns undefined", () => {
     expect(getScalarString(undefined)).toBeUndefined();
   });
 });
@@ -440,5 +429,169 @@ describe("getPair cache threshold crossing", () => {
       ].join("\n"),
     );
     expect(workflow.jobs[0]?.id).toBe("build");
+  });
+});
+
+describe("getScalarValue: remaining equivalence classes", () => {
+  test("returns boolean for YAML boolean value", () => {
+    const workflow = wf(
+      [
+        "debug: true",
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(getScalarValue(workflow.root!, "debug")).toBe(true);
+  });
+
+  test("returns undefined for non-scalar pair value", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(getScalarValue(workflow.root!, "jobs")).toBeUndefined();
+  });
+
+  test("returns undefined for missing key in map", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(getScalarValue(workflow.root!, "nonexistent")).toBeUndefined();
+  });
+});
+
+describe("getScalarString: remaining equivalence classes", () => {
+  test("returns string from Scalar node (isScalar path)", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(getScalarString(workflow.nameNode)).toBe("CI");
+  });
+
+  test("returns undefined for non-string Scalar value", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    timeout-minutes: 30",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    const jobNode = getNode(workflow.root!, "jobs")!;
+    const buildNode = getNode(jobNode as never, "build")!;
+    const timeoutNode = getNode(buildNode as never, "timeout-minutes");
+    expect(getScalarString(timeoutNode)).toBeUndefined();
+  });
+});
+
+describe("getStringOrArrayValue: equivalence classes", () => {
+  test("returns array for list-form trigger", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: [push, pull_request]",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(getStringOrArrayValue(workflow.root!, "on")).toEqual(["push", "pull_request"]);
+  });
+
+  test("returns string for scalar trigger", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(getStringOrArrayValue(workflow.root!, "on")).toBe("push");
+  });
+
+  test("returns undefined for missing key", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(getStringOrArrayValue(workflow.root!, "on")).toBeUndefined();
+  });
+});
+
+describe("getMapValue: equivalence classes", () => {
+  test("returns undefined when value is not an object", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    expect(getMapValue(workflow.root!, "name")).toBeUndefined();
+  });
+});
+
+describe("getLocation: missing equivalence classes", () => {
+  test("returns fallback for range-less node", () => {
+    const workflow = wf(
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo",
+      ].join("\n"),
+    );
+    const pos = getLocation(workflow, workflow.jobsNode?.items[0] as never);
+    expect(pos.line).toBeGreaterThanOrEqual(1);
   });
 });
