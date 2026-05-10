@@ -11,6 +11,7 @@ import {
   isScalar,
   isSeq,
 } from "yaml";
+import { lazyNodeRecord, nodeToRecord } from "./lazy-node-record.ts";
 import type { SourceLocation } from "./types.ts";
 
 type YamlNode = Node | Pair<unknown, unknown>;
@@ -80,13 +81,6 @@ export interface PipelineDocument {
   steps: PipelineStep[];
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return undefined;
-}
-
 function getPairIndex(map: YAMLMap<unknown, unknown>): Map<string, Pair<unknown, unknown>> {
   const cached = yamlMapPairIndexCache.get(map);
   if (cached) {
@@ -126,15 +120,6 @@ function getScalarString(value: unknown): string | undefined {
   return undefined;
 }
 
-function getPlainRecord(node: Node | undefined): Record<string, unknown> | undefined {
-  if (!node) {
-    return undefined;
-  }
-
-  const value = node.toJSON();
-  return asRecord(value);
-}
-
 function getMap(node: Node | undefined): YAMLMap<unknown, unknown> | undefined {
   if (node && isMap(node)) {
     return node;
@@ -168,7 +153,7 @@ function parsePlugins(node: Node | undefined): Record<string, unknown>[] | undef
       continue;
     }
     const value = isNode(item) ? item.toJSON() : item;
-    const record = asRecord(value);
+    const record = nodeToRecord(value as Node);
     if (record) {
       plugins.push(record);
     }
@@ -238,9 +223,9 @@ function parseStep(item: unknown): PipelineStep {
     timeoutNode,
     plugins: pluginsNode ? parsePlugins(pluginsNode) : undefined,
     pluginsNode,
-    env: envNode ? getPlainRecord(envNode) : undefined,
+    env: envNode ? nodeToRecord(envNode) : undefined,
     envNode,
-    agents: agentsNode ? getPlainRecord(agentsNode) : undefined,
+    agents: agentsNode ? nodeToRecord(agentsNode) : undefined,
     agentsNode,
     branches: getScalarString(branchesNode),
     branchesNode,
@@ -248,7 +233,7 @@ function parseStep(item: unknown): PipelineStep {
     dependsOnNode,
     parallelism: isNaN(parallelismNum ?? NaN) ? undefined : parallelismNum,
     parallelismNode,
-    retry: retryNode ? getPlainRecord(retryNode) : undefined,
+    retry: retryNode ? nodeToRecord(retryNode) : undefined,
     retryNode,
     skip: skipResult,
     skipNode,
@@ -277,21 +262,6 @@ function parseSteps(node: Node | undefined): PipelineStep[] {
   }
 
   return steps;
-}
-
-function lazyNodeRecord(node: Node | undefined): () => Record<string, unknown> {
-  let cached: Record<string, unknown> | undefined;
-  let loaded = false;
-
-  return () => {
-    if (loaded) {
-      return cached ?? {};
-    }
-
-    loaded = true;
-    cached = asRecord(node?.toJSON()) ?? {};
-    return cached;
-  };
 }
 
 export function parsePipeline(
@@ -365,9 +335,9 @@ export function parsePipeline(
     root,
     name: root ? getScalarString(nameNode) : undefined,
     nameNode,
-    env: envNode ? getPlainRecord(envNode) : undefined,
+    env: envNode ? nodeToRecord(envNode) : undefined,
     envNode,
-    agents: agentsNode ? getPlainRecord(agentsNode) : undefined,
+    agents: agentsNode ? nodeToRecord(agentsNode) : undefined,
     agentsNode,
     stepsNode,
     steps,

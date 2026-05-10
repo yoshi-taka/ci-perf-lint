@@ -11,6 +11,7 @@ import {
   isScalar,
   isSeq,
 } from "yaml";
+import { lazyNodeRecord, nodeToRecord } from "./lazy-node-record.ts";
 import type { SourceLocation } from "./types.ts";
 
 type YamlNode = Node | Pair<unknown, unknown>;
@@ -90,13 +91,6 @@ export interface GitlabCiDocument {
   jobs: GitlabCiJob[];
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return undefined;
-}
-
 function getPairIndex(map: YAMLMap<unknown, unknown>): Map<string, Pair<unknown, unknown>> {
   const cached = yamlMapPairIndexCache.get(map);
   if (cached) {
@@ -131,14 +125,6 @@ function getScalarString(value: unknown): string | undefined {
     return value.value;
   }
   return undefined;
-}
-
-function getPlainRecord(node: Node | undefined): Record<string, unknown> | undefined {
-  if (!node) {
-    return undefined;
-  }
-  const value = node.toJSON();
-  return asRecord(value);
 }
 
 function getMap(node: Node | undefined): YAMLMap<unknown, unknown> | undefined {
@@ -223,19 +209,6 @@ function parseJob(item: YAMLMap<unknown, unknown>, jobName: string): GitlabCiJob
   };
 }
 
-function lazyNodeRecord(node: Node | undefined): () => Record<string, unknown> {
-  let cached: Record<string, unknown> | undefined;
-  let loaded = false;
-  return () => {
-    if (loaded) {
-      return cached ?? {};
-    }
-    loaded = true;
-    cached = asRecord(node?.toJSON()) ?? {};
-    return cached;
-  };
-}
-
 export function parseGitlabCi(
   fullPath: string,
   repoRoot: string,
@@ -315,11 +288,11 @@ export function parseGitlabCi(
     root,
     stages,
     stagesNode,
-    variables: variablesNode ? getPlainRecord(variablesNode) : undefined,
+    variables: variablesNode ? nodeToRecord(variablesNode) : undefined,
     variablesNode,
-    default: defaultNode ? getPlainRecord(defaultNode) : undefined,
+    default: defaultNode ? nodeToRecord(defaultNode) : undefined,
     defaultNode,
-    cache: cacheNode ? getPlainRecord(cacheNode) : undefined,
+    cache: cacheNode ? nodeToRecord(cacheNode) : undefined,
     cacheNode,
     jobs,
   };

@@ -11,6 +11,7 @@ import {
   isScalar,
   isSeq,
 } from "yaml";
+import { lazyNodeRecord, nodeToRecord } from "./lazy-node-record.ts";
 import type { SourceLocation } from "./types.ts";
 
 type YamlNode = Node | Pair<unknown, unknown>;
@@ -131,17 +132,6 @@ function getScalarString(value: unknown): string | undefined {
   }
   if (isScalar(value) && typeof value.value === "string") {
     return value.value;
-  }
-  return undefined;
-}
-
-function getPlainRecord(node: Node | undefined): Record<string, unknown> | undefined {
-  if (!node) {
-    return undefined;
-  }
-  const value = node.toJSON();
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
   }
   return undefined;
 }
@@ -300,19 +290,6 @@ function parseSteps(seq: Node | undefined): CircleCiStep[] {
   return steps;
 }
 
-function lazyNodeRecord(node: Node | undefined): () => Record<string, unknown> {
-  let cached: Record<string, unknown> | undefined;
-  let loaded = false;
-  return () => {
-    if (loaded) {
-      return cached ?? {};
-    }
-    loaded = true;
-    cached = getPlainRecord(node) ?? {};
-    return cached;
-  };
-}
-
 export function parseCircleCi(
   fullPath: string,
   repoRoot: string,
@@ -402,7 +379,7 @@ export function parseCircleCi(
       resourceClassNode,
       parallelism: isNaN(parallelismNum ?? NaN) ? undefined : parallelismNum,
       parallelismNode,
-      environment: environmentNode ? getPlainRecord(environmentNode) : undefined,
+      environment: environmentNode ? nodeToRecord(environmentNode) : undefined,
       environmentNode,
       steps,
     });

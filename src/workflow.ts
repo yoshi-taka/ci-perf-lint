@@ -11,6 +11,7 @@ import {
   isScalar,
   isSeq,
 } from "yaml";
+import { lazyNodeRecord, lazyOptionalNodeRecord } from "./lazy-node-record.ts";
 import type { SourceLocation } from "./types.ts";
 
 type YamlNode = Node | Pair<unknown, unknown>;
@@ -19,6 +20,11 @@ const yamlMapPairIndexCache = new WeakMap<
   YAMLMap<unknown, unknown>,
   Map<string, Pair<unknown, unknown>>
 >();
+
+const CACHE_THRESHOLD = 5;
+const MAX_WORKFLOW_SOURCE_BYTES = 5_000_000;
+const MAX_WORKFLOW_JOBS = 500;
+const MAX_WORKFLOW_STEPS_PER_JOB = 2_000;
 
 function parseTimingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
@@ -68,18 +74,6 @@ export interface WorkflowDocument {
   jobsNode?: YAMLMap<unknown, unknown>;
   jobs: WorkflowJob[];
 }
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return undefined;
-}
-
-const CACHE_THRESHOLD = 5;
-const MAX_WORKFLOW_SOURCE_BYTES = 5_000_000;
-const MAX_WORKFLOW_JOBS = 500;
-const MAX_WORKFLOW_STEPS_PER_JOB = 2_000;
 
 function getPair(map: YAMLMap<unknown, unknown>, key: string): Pair<unknown, unknown> | undefined {
   if (map.items.length <= CACHE_THRESHOLD) {
@@ -228,36 +222,6 @@ function parseSteps(node: Node | undefined): WorkflowStep[] {
   }
 
   return steps;
-}
-
-function lazyNodeRecord(node: Node | undefined): () => Record<string, unknown> {
-  let cached: Record<string, unknown> | undefined;
-  let loaded = false;
-
-  return () => {
-    if (loaded) {
-      return cached ?? {};
-    }
-
-    loaded = true;
-    cached = asRecord(node?.toJSON()) ?? {};
-    return cached;
-  };
-}
-
-function lazyOptionalNodeRecord(node: Node | undefined): () => Record<string, unknown> | undefined {
-  let cached: Record<string, unknown> | undefined;
-  let loaded = false;
-
-  return () => {
-    if (loaded) {
-      return cached;
-    }
-
-    loaded = true;
-    cached = asRecord(node?.toJSON());
-    return cached;
-  };
 }
 
 export function parseWorkflow(
