@@ -4,7 +4,7 @@ import type { RuleMeta } from "../types.ts";
 import { workflowLooksAgenticLike } from "./shared/workflow-jobs.ts";
 import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { pipe } from "./shared/diagnostic-transform.ts";
+import { taggedPipe } from "./shared/diagnostic-transform.ts";
 import {
   withRepositoryConcurrencyPrecedent,
   withSimilarWorkflowConcurrencyConsensus,
@@ -59,20 +59,32 @@ export const missingConcurrencyRule = {
       score: agentic ? 62 : 58,
     });
 
-    const transform = pipe(
-      withRepositoryConcurrencyPrecedent(context, workflow.relativePath),
-      withSimilarWorkflowConcurrencyConsensus(context, workflow.relativePath, {
-        scoreBonus: 8,
-        why: "That makes this look more like a repository-local normalization gap than a one-off design choice.",
-        aiHandoff:
-          "Prefer the repository's existing concurrency pattern over inventing a new grouping strategy unless this workflow has clearly different cancellation requirements.",
-      }),
-      withStackedDiffContext(context, {
-        scoreBonus: 10,
-        why: "Concurrency is more valuable because superseded runs from restacks can otherwise keep consuming runner time.",
-        aiHandoff:
-          "Use a concurrency group scoped to the workflow and PR/head ref so newer restack runs cancel older runs from the same branch without canceling unrelated PRs.",
-      }),
+    const transform = taggedPipe(
+      {
+        transform: withRepositoryConcurrencyPrecedent(context, workflow.relativePath),
+        axes: ["why"],
+        label: "repo-precedent",
+      },
+      {
+        transform: withSimilarWorkflowConcurrencyConsensus(context, workflow.relativePath, {
+          scoreBonus: 8,
+          why: "That makes this look more like a repository-local normalization gap than a one-off design choice.",
+          aiHandoff:
+            "Prefer the repository's existing concurrency pattern over inventing a new grouping strategy unless this workflow has clearly different cancellation requirements.",
+        }),
+        axes: ["score"],
+        label: "consensus",
+      },
+      {
+        transform: withStackedDiffContext(context, {
+          scoreBonus: 10,
+          why: "Concurrency is more valuable because superseded runs from restacks can otherwise keep consuming runner time.",
+          aiHandoff:
+            "Use a concurrency group scoped to the workflow and PR/head ref so newer restack runs cancel older runs from the same branch without canceling unrelated PRs.",
+        }),
+        axes: ["why", "aiHandoff"],
+        label: "stacked-diff",
+      },
     );
 
     return [transform(base)];

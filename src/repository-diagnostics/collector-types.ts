@@ -29,6 +29,16 @@ export interface RepositoryDiagnosticGateState {
   hasGradle: boolean;
 }
 
+export interface RepositoryDiagnosticGateObservability {
+  observed: string[];
+  derivedFalse: { gate: string; dueTo: string[] }[];
+}
+
+export interface RepositoryDiagnosticGateResolution {
+  state: RepositoryDiagnosticGateState;
+  observability: RepositoryDiagnosticGateObservability;
+}
+
 export interface RepositoryDiagnosticContext {
   repoRoot: string;
   repository: RepositorySignals;

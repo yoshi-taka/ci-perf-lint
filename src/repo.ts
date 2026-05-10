@@ -42,6 +42,7 @@ import {
   computeImpliedChecks,
   registerAllRuleMetaForRemediation,
 } from "./rules/shared/remediation-checks.ts";
+import { getDiagnosticTransformMetadata } from "./rules/shared/diagnostic-transform.ts";
 import { allRules } from "./rules/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
 import { stderrWarn } from "./stderr-warn.ts";
@@ -453,6 +454,11 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   timer.mark("aggregate-report");
   timer.flush();
 
+  const debugFindings = findings.map((finding) => {
+    const transformMetadata = getDiagnosticTransformMetadata(finding);
+    return transformMetadata ? { ...finding, transformMetadata } : finding;
+  });
+
   const uniqueAnalysisWarnings = uniqueWarnings(analysisWarnings);
   const measureCompletenessReport: MeasureCompleteness = {
     totalWorkflows: measureCompleteness.totalWorkflows,
@@ -479,6 +485,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
         warnings: uniqueAnalysisWarnings,
         findingCount: findings.length,
         aggregatedFindingCount: aggregatedFindings.aggregatedFindings.length,
+        findings: debugFindings,
         measureCompleteness: measureCompletenessReport,
       }),
     );

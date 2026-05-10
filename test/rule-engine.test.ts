@@ -13,8 +13,9 @@ import { parsePipeline } from "../src/buildkite-workflow.ts";
 import { parseGitlabCi } from "../src/gitlab-ci-workflow.ts";
 import { parseCircleCi } from "../src/circleci-workflow.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
-import type { AnalysisWarning } from "../src/types.ts";
+import type { AnalysisWarning, Diagnostic } from "../src/types.ts";
 import { SingularityTracker } from "../src/rules/shared/singularity.ts";
+import { getDiagnosticTransformMetadata } from "../src/rules/shared/diagnostic-transform.ts";
 import { preferNodeRunOverNpmRunRule } from "../src/rules/prefer-node-run-over-npm-run.ts";
 import { preferBuildxBakeForMultipleImagesRule } from "../src/rules/prefer-buildx-bake-for-multiple-images.ts";
 import { missingConcurrencyRule } from "../src/rules/missing-concurrency.ts";
@@ -173,6 +174,26 @@ function createSignals(): RepositorySignals {
       hasToolVersions: false,
     },
   };
+}
+
+function diagnosticFingerprint(diagnostic: Diagnostic): string {
+  return [
+    diagnostic.workflow,
+    diagnostic.ruleId,
+    diagnostic.location.path,
+    diagnostic.location.line,
+    diagnostic.location.column,
+    diagnostic.message,
+    diagnostic.why,
+    diagnostic.suggestion,
+    diagnostic.aiHandoff,
+    diagnostic.score,
+    diagnostic.scope ?? "workflow",
+  ].join("\u0000");
+}
+
+function fingerprintDiagnostics(diagnostics: Diagnostic[]): string[] {
+  return diagnostics.map(diagnosticFingerprint).sort();
 }
 
 async function createWorkflowDoc(
@@ -359,6 +380,31 @@ describe("evaluateRules", () => {
     const context: RuleContext = { repository: createSignals() };
     const result = await evaluateRules(workflow, context);
     expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(true);
+    await cleanup();
+  });
+
+  test("missing-concurrency carries tagged transform metadata", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRules(workflow, context);
+    const finding = result.find((d) => d.ruleId === "missing-concurrency");
+
+    expect(getDiagnosticTransformMetadata(finding!)).toEqual({
+      axes: ["why", "score", "why", "aiHandoff"],
+      labels: ["repo-precedent", "consensus", "stacked-diff"],
+    });
     await cleanup();
   });
 
@@ -1099,6 +1145,53 @@ describe("metamorphic: evaluateRules", () => {
     const ids2 = r2.map((d) => d.ruleId).sort();
     expect(ids2).toEqual(ids1);
     await cleanup();
+  });
+
+  test("workflow order does not affect findings", async () => {
+    const workflowAYaml = [
+      "name: Alpha",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const workflowBYaml = [
+      "name: Beta",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  lint:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - run: npm run lint",
+      "      - run: npx eslint .",
+    ].join("\n");
+
+    const firstA = await createWorkflowDoc(workflowAYaml);
+    const firstB = await createWorkflowDoc(workflowBYaml);
+    const secondA = await createWorkflowDoc(workflowAYaml);
+    const secondB = await createWorkflowDoc(workflowBYaml);
+
+    const ctxAB: RuleContext = { repository: signals };
+    const ctxBA: RuleContext = { repository: signals };
+
+    const abA = fingerprintDiagnostics(await evaluateRules(firstA.workflow, ctxAB));
+    const abB = fingerprintDiagnostics(await evaluateRules(firstB.workflow, ctxAB));
+
+    const baB = fingerprintDiagnostics(await evaluateRules(secondB.workflow, ctxBA));
+    const baA = fingerprintDiagnostics(await evaluateRules(secondA.workflow, ctxBA));
+
+    expect(baA).toEqual(abA);
+    expect(baB).toEqual(abB);
+
+    await firstA.cleanup();
+    await firstB.cleanup();
+    await secondA.cleanup();
+    await secondB.cleanup();
   });
 });
 

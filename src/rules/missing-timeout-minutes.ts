@@ -15,7 +15,7 @@ import {
   workflowHasPushTrigger,
 } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { pipe } from "./shared/diagnostic-transform.ts";
+import { identityDiagnosticTransform, pipe } from "./shared/diagnostic-transform.ts";
 import {
   withRepositoryTimeoutPrecedent,
   withSimilarWorkflowTimeoutConsensus,
@@ -61,6 +61,7 @@ export const missingTimeoutMinutesRule = {
       )
       .map((job) =>
         pipe(
+          identityDiagnosticTransform,
           withRepositoryTimeoutPrecedent(_context, workflow.relativePath, job.id),
           withSimilarWorkflowTimeoutConsensus(_context, workflow.relativePath, job.id, {
             scoreBonus: 6,

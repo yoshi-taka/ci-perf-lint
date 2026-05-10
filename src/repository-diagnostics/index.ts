@@ -1,6 +1,10 @@
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import type { Diagnostic } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
+import {
+  buildCollectorCooccurrenceDebug,
+  orderCollectorsForDiagnostics,
+} from "./collector-cooccurrence.ts";
 import { cdkDiagnosticCollectors } from "./collectors-cdk.ts";
 import {
   datadogDiagnosticCollectors,
@@ -55,11 +59,29 @@ export async function collectRepositoryDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
   const gateStateStartedAt = performance.now();
-  const gateState = await collectRepositoryDiagnosticGateState(context);
+  const gateResolution = await collectRepositoryDiagnosticGateState(context);
+  const { state: gateState, observability: gateObservability } = gateResolution;
   const gateElapsed = performance.now() - gateStateStartedAt;
   const applicableCollectors = repositoryDiagnosticCollectors.filter((collector) =>
     collectorGateMatches(collector.gate, gateState),
   );
+  const collectorSchedule =
+    applicableCollectors.length > 1
+      ? orderCollectorsForDiagnostics(applicableCollectors.map((collector) => collector.id))
+      : undefined;
+  const scheduleByCollector = new Map(
+    collectorSchedule?.schedule.map((entry) => [entry.collector, entry.score]) ?? [],
+  );
+  const scheduledCollectors = collectorSchedule
+    ? [...applicableCollectors].sort((left, right) => {
+        const leftPriority = scheduleByCollector.get(left.id) ?? 0;
+        const rightPriority = scheduleByCollector.get(right.id) ?? 0;
+        if (rightPriority !== leftPriority) {
+          return rightPriority - leftPriority;
+        }
+        return left.id.localeCompare(right.id);
+      })
+    : applicableCollectors;
 
   for (const collector of repositoryDiagnosticCollectors) {
     if (applicableCollectors.includes(collector)) {
@@ -79,7 +101,7 @@ export async function collectRepositoryDiagnostics(
   }
 
   const results = await Promise.allSettled(
-    applicableCollectors.map((collector) => {
+    scheduledCollectors.map((collector) => {
       const startedAt = performance.now();
       const result = collector.collect(context);
       if (result instanceof Promise) {
@@ -97,22 +119,26 @@ export async function collectRepositoryDiagnostics(
     }),
   );
   const diagnostics: Diagnostic[] = [];
+  const firedCollectors = new Set<string>();
 
   for (const [index, result] of results.entries()) {
     if (result.status === "fulfilled") {
       if (result.value.length === 0) {
-        const collector = applicableCollectors[index];
+        const collector = scheduledCollectors[index];
         context.warnings.push({
           kind: "empty-result",
           source: collector?.id ?? "unknown",
           message: `Collector ${collector?.id ?? "unknown"} ran and found nothing.`,
         });
       }
+      if (result.value.length > 0) {
+        firedCollectors.add(scheduledCollectors[index]?.id ?? "unknown");
+      }
       diagnostics.push(...result.value);
       continue;
     }
 
-    const collector = applicableCollectors[index];
+    const collector = scheduledCollectors[index];
     const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
     context.warnings.push({
       kind: "collector-error",
@@ -125,7 +151,7 @@ export async function collectRepositoryDiagnostics(
     const activeGates = Object.entries(gateState)
       .filter(([_, v]) => v)
       .map(([k]) => k.replace(/^has/, ""));
-    const collectorResults = applicableCollectors.map((c, i) => {
+    const collectorResults = scheduledCollectors.map((c, i) => {
       const r = results[i];
       return {
         id: c.id,
@@ -141,6 +167,9 @@ export async function collectRepositoryDiagnostics(
         collectorCount: applicableCollectors.length,
         totalCollectors: repositoryDiagnosticCollectors.length,
         collectors: collectorResults,
+        collectorCooccurrence: buildCollectorCooccurrenceDebug([...firedCollectors]),
+        collectorSchedule,
+        gateObservability,
         signals: extractSignals(context.repository),
         warnings: context.warnings,
         measureCompleteness: context.measureCompleteness

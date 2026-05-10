@@ -3,6 +3,7 @@ import type {
   GatePredicate,
   RepositoryDiagnosticContext,
   RepositoryDiagnosticGateState,
+  RepositoryDiagnosticGateResolution,
 } from "./collector-types.ts";
 import {
   looksLikeJavaScriptFrameworksRepository,
@@ -148,84 +149,141 @@ async function repositoryHasJavaScriptPackageScriptEvidence(
   return matches.some(Boolean);
 }
 
-function repositoryLikelyUsesJavaScriptLinting(context: RepositoryDiagnosticContext): boolean {
+function repositoryLikelyUsesJavaScriptLinting(
+  context: RepositoryDiagnosticContext,
+  observations: JavaScriptGateObservations,
+): boolean {
   const { eslint, husky } = context.repository;
   return (
+    observations.linting ||
     eslint.usesEslint ||
     eslint.usesOxlint ||
     eslint.hasConfig ||
     eslint.pluginNames.length > 0 ||
     husky.usesHusky ||
-    husky.usesLintStaged ||
-    context.workflows.some(
-      (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasEslintSignal") ?? false,
-    )
+    husky.usesLintStaged
   );
 }
 
-function repositoryLikelyUsesJavaScriptBuildConfig(context: RepositoryDiagnosticContext): boolean {
-  const { frameworks, babel, typescript, jest } = context.repository;
-  return (
-    frameworks.usesNextjs ||
-    frameworks.usesStorybook ||
-    frameworks.usesTurbo ||
-    frameworks.usesNx ||
-    frameworks.usesLerna ||
-    frameworks.usesGradle ||
-    frameworks.usesAngularCli ||
-    babel.usesBabel ||
-    typescript.versionSpec !== undefined ||
-    jest.versionSpec !== undefined ||
-    context.repository.eslint.usesEslint ||
-    context.repository.prettier.usesPrettier ||
-    context.workflows.some(
-      (workflow) =>
-        getWorkflowFacts(workflow).toolPresence.get("hasWebpackOrRspackOrBabel") ?? false,
-    )
+interface JavaScriptGateObservations {
+  tooling: boolean;
+  linting: boolean;
+  buildConfig: boolean;
+  packageScripts: boolean;
+  frameworks: boolean;
+}
+
+function buildJavaScriptGateObservations(
+  context: RepositoryDiagnosticContext,
+): JavaScriptGateObservations {
+  const { eslint, husky, frameworks, babel, typescript, jest, npm, nativePackages, prettier } =
+    context.repository;
+  const workflowHasEslintSignal = context.workflows.some(
+    (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasEslintSignal") ?? false,
   );
+  const workflowHasWebpackOrRspackOrBabel = context.workflows.some(
+    (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasWebpackOrRspackOrBabel") ?? false,
+  );
+  const workflowHasPackageManagerSignal = context.workflows.some(
+    (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasNpmOrPnpmOrYarnOrBun") ?? false,
+  );
+
+  return {
+    tooling:
+      typescript.versionSpec !== undefined ||
+      jest.versionSpec !== undefined ||
+      jest.jsdomVersionSpec !== undefined ||
+      frameworks.usesNextjs ||
+      frameworks.usesVite ||
+      frameworks.usesStorybook ||
+      frameworks.usesTurbo ||
+      eslint.usesEslint ||
+      eslint.usesOxlint ||
+      eslint.hasConfig ||
+      eslint.pluginNames.length > 0 ||
+      husky.usesHusky ||
+      husky.usesLintStaged ||
+      babel.usesBabel ||
+      prettier.usesPrettier ||
+      npm.lifecycleHookScripts.length > 0 ||
+      npm.npmrcFiles.length > 0 ||
+      npm.npmrcRelevantSettings.length > 0 ||
+      npm.packageScriptEnvReferences.length > 0 ||
+      npm.workflowEnvReferences.length > 0 ||
+      nativePackages.node.length > 0 ||
+      workflowHasEslintSignal ||
+      workflowHasWebpackOrRspackOrBabel ||
+      workflowHasPackageManagerSignal,
+    linting:
+      eslint.usesEslint ||
+      eslint.usesOxlint ||
+      eslint.hasConfig ||
+      eslint.pluginNames.length > 0 ||
+      husky.usesHusky ||
+      husky.usesLintStaged ||
+      workflowHasEslintSignal,
+    buildConfig:
+      frameworks.usesNextjs ||
+      frameworks.usesStorybook ||
+      frameworks.usesTurbo ||
+      frameworks.usesNx ||
+      frameworks.usesLerna ||
+      frameworks.usesGradle ||
+      frameworks.usesAngularCli ||
+      babel.usesBabel ||
+      typescript.versionSpec !== undefined ||
+      jest.versionSpec !== undefined ||
+      eslint.usesEslint ||
+      prettier.usesPrettier ||
+      workflowHasWebpackOrRspackOrBabel,
+    packageScripts:
+      npm.lifecycleHookScripts.length > 0 ||
+      npm.npmrcFiles.length > 0 ||
+      npm.npmrcRelevantSettings.length > 0 ||
+      npm.packageScriptEnvReferences.length > 0 ||
+      npm.workflowEnvReferences.length > 0 ||
+      nativePackages.node.length > 0 ||
+      workflowHasPackageManagerSignal,
+    frameworks:
+      frameworks.usesNextjs ||
+      frameworks.usesStorybook ||
+      frameworks.usesTurbo ||
+      frameworks.usesNx ||
+      frameworks.usesLerna ||
+      frameworks.usesGradle ||
+      frameworks.usesAngularCli ||
+      babel.usesBabel ||
+      typescript.versionSpec !== undefined ||
+      jest.versionSpec !== undefined ||
+      workflowHasWebpackOrRspackOrBabel,
+  };
+}
+
+function repositoryLikelyUsesJavaScriptBuildConfig(
+  observations: JavaScriptGateObservations,
+): boolean {
+  return observations.buildConfig;
 }
 
 function repositoryLikelyUsesJavaScriptPackageScripts(
-  context: RepositoryDiagnosticContext,
+  observations: JavaScriptGateObservations,
 ): boolean {
-  const { npm, nativePackages } = context.repository;
-  return (
-    npm.lifecycleHookScripts.length > 0 ||
-    npm.npmrcFiles.length > 0 ||
-    npm.npmrcRelevantSettings.length > 0 ||
-    npm.packageScriptEnvReferences.length > 0 ||
-    npm.workflowEnvReferences.length > 0 ||
-    nativePackages.node.length > 0 ||
-    context.workflows.some(
-      (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasNpmOrPnpmOrYarnOrBun") ?? false,
-    )
-  );
+  return observations.packageScripts;
 }
 
-function quickTestJavaScriptTooling(context: RepositoryDiagnosticContext): boolean | undefined {
-  const { repository } = context;
-  if (
-    repository.typescript.versionSpec !== undefined ||
-    repository.jest.versionSpec !== undefined ||
-    repository.jest.jsdomVersionSpec !== undefined ||
-    repository.frameworks.usesNextjs ||
-    repository.frameworks.usesVite ||
-    repository.frameworks.usesStorybook ||
-    repository.frameworks.usesTurbo
-  ) {
+function quickTestJavaScriptTooling(observations: JavaScriptGateObservations): boolean | undefined {
+  if (observations.tooling) {
     return true;
   }
   return undefined;
 }
 
-function quickTestJavaScriptFrameworks(context: RepositoryDiagnosticContext): boolean | undefined {
-  const { frameworks, tailwind, jest } = context.repository;
-  if (
-    frameworks.usesNextjs ||
-    frameworks.usesStorybook ||
-    tailwind.usesTailwind ||
-    jest.versionSpec !== undefined
-  ) {
+function quickTestJavaScriptFrameworks(
+  context: RepositoryDiagnosticContext,
+  observations: JavaScriptGateObservations,
+): boolean | undefined {
+  const { tailwind, jest } = context.repository;
+  if (observations.frameworks || tailwind.usesTailwind || jest.versionSpec !== undefined) {
     return true;
   }
   return undefined;
@@ -240,25 +298,16 @@ function quickTestRust(context: RepositoryDiagnosticContext): boolean | undefine
 
 export async function collectRepositoryDiagnosticGateState(
   context: RepositoryDiagnosticContext,
-): Promise<RepositoryDiagnosticGateState> {
+): Promise<RepositoryDiagnosticGateResolution> {
   const state: RepositoryDiagnosticGateState = { ...emptyGateState };
+  const observability = {
+    observed: [] as string[],
+    derivedFalse: [] as { gate: string; dueTo: string[] }[],
+  };
+  const jsObservations = buildJavaScriptGateObservations(context);
 
   const signalGates = collectSignalGateState(context.featureIndex);
   Object.assign(state, signalGates);
-
-  const hasTooling = quickTestJavaScriptTooling(context);
-  const hasFrameworks = quickTestJavaScriptFrameworks(context);
-  const hasRustQuick = quickTestRust(context);
-
-  if (hasTooling !== undefined) {
-    state.hasJavaScriptTooling = hasTooling;
-  }
-  if (hasFrameworks !== undefined) {
-    state.hasJavaScriptFrameworks = hasFrameworks;
-  }
-  if (hasRustQuick !== undefined) {
-    state.hasRust = hasRustQuick;
-  }
 
   const [largeFilesEvidence, pytestEvidence, hasRenovateConfig, hasCdkManifest] = await Promise.all(
     [
@@ -272,13 +321,14 @@ export async function collectRepositoryDiagnosticGateState(
   state.hasPytest = meetsMinimum(pytestEvidence, "medium");
   state.hasRenovateConfig = hasRenovateConfig;
   state.hasCdkManifest = hasCdkManifest;
+  observability.observed.push("hasLargeFiles", "hasPytest", "hasRenovateConfig", "hasCdkManifest");
 
   state.hasHusky = context.repository.husky.hookFileCount > 0;
   state.hasGradle = context.repository.frameworks.usesGradle;
 
   const jsToolingGate = await evaluateGate(
     "hasJavaScriptTooling",
-    [() => quickTestJavaScriptTooling(context)],
+    [() => quickTestJavaScriptTooling(jsObservations)],
     async () =>
       (
         await timedGate("javascript-tooling", () =>
@@ -289,6 +339,7 @@ export async function collectRepositoryDiagnosticGateState(
   );
   if (jsToolingGate !== undefined) {
     state.hasJavaScriptTooling = jsToolingGate;
+    observability.observed.push("hasJavaScriptTooling");
   }
 
   const jsBuildConfigEvidence = state.hasJavaScriptTooling
@@ -299,18 +350,18 @@ export async function collectRepositoryDiagnosticGateState(
     : false;
 
   state.hasJavaScriptLinting = state.hasJavaScriptTooling
-    ? repositoryLikelyUsesJavaScriptLinting(context)
+    ? repositoryLikelyUsesJavaScriptLinting(context, jsObservations)
     : false;
   state.hasJavaScriptBuildConfig = state.hasJavaScriptTooling
-    ? repositoryLikelyUsesJavaScriptBuildConfig(context) || jsBuildConfigEvidence
+    ? repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) || jsBuildConfigEvidence
     : false;
   state.hasJavaScriptPackageScripts = state.hasJavaScriptTooling
-    ? repositoryLikelyUsesJavaScriptPackageScripts(context) || jsPackageScriptEvidence
+    ? repositoryLikelyUsesJavaScriptPackageScripts(jsObservations) || jsPackageScriptEvidence
     : false;
 
   const jsFrameworksGate = await evaluateGate(
     "hasJavaScriptFrameworks",
-    [() => quickTestJavaScriptFrameworks(context)],
+    [() => quickTestJavaScriptFrameworks(context, jsObservations)],
     async () =>
       (
         await timedGate("javascript-frameworks", () =>
@@ -335,7 +386,24 @@ export async function collectRepositoryDiagnosticGateState(
     state.hasRust = rustGate;
   }
 
-  return state;
+  if (!state.hasJavaScriptTooling) {
+    observability.derivedFalse.push(
+      ...[
+        "hasJavaScriptLinting",
+        "hasJavaScriptBuildConfig",
+        "hasJavaScriptPackageScripts",
+        "hasJavaScriptFrameworks",
+      ].map((gate) => ({ gate, dueTo: ["hasJavaScriptTooling"] })),
+    );
+  }
+
+  for (const gate of ["hasJavaScriptTooling", "hasJavaScriptFrameworks", "hasRust"] as const) {
+    if (state[gate]) {
+      observability.observed.push(gate);
+    }
+  }
+
+  return { state, observability };
 }
 
 async function evaluateGate(
