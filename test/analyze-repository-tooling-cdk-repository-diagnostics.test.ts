@@ -175,8 +175,9 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
     expect(
       report.findings.some((c) => c.ruleId === "cdk-bucket-deployment-memory-unconfigured"),
     ).toBe(false);
-    // No analysis warnings means rg failure didn't trigger fallback walk
-    expect(report.analysisWarnings).toHaveLength(0);
+    // No parser or scan warnings means rg failure didn't trigger fallback walk
+    expect(report.analysisWarnings.some((warning) => warning.kind === "scan-warning")).toBe(false);
+    expect(report.analysisWarnings.some((warning) => warning.kind === "parser-error")).toBe(false);
   });
 
   test("detects waste files in CDK assets", async () => {

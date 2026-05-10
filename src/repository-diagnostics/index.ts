@@ -39,10 +39,6 @@ function dumpStateEnabled(): boolean {
   return process.env.CI_PERF_LINT_DUMP_STATE === "1";
 }
 
-function analysisWarningsEnabled(): boolean {
-  return process.env.CI_PERF_LINT_DUMP_STATE === "1";
-}
-
 function extractSignals(
   repository: RepositoryDiagnosticContext["repository"],
 ): Record<string, unknown> {
@@ -65,17 +61,16 @@ export async function collectRepositoryDiagnostics(
     collectorGateMatches(collector.gate, gateState),
   );
 
-  if (analysisWarningsEnabled()) {
-    for (const collector of repositoryDiagnosticCollectors) {
-      if (applicableCollectors.includes(collector)) {
-        continue;
-      }
-      context.warnings.push({
-        kind: "gate-skipped",
-        source: collector.id,
-        message: `Collector ${collector.id} was not run because its gate did not match.`,
-      });
+  for (const collector of repositoryDiagnosticCollectors) {
+    if (applicableCollectors.includes(collector)) {
+      continue;
     }
+    context.measureCompleteness?.skippedGates.add(collector.id);
+    context.warnings.push({
+      kind: "gate-skipped",
+      source: collector.id,
+      message: `Collector ${collector.id} was not run because its gate did not match.`,
+    });
   }
   if (timingsEnabled()) {
     process.stderr.write(
@@ -105,7 +100,7 @@ export async function collectRepositoryDiagnostics(
 
   for (const [index, result] of results.entries()) {
     if (result.status === "fulfilled") {
-      if (analysisWarningsEnabled() && result.value.length === 0) {
+      if (result.value.length === 0) {
         const collector = applicableCollectors[index];
         context.warnings.push({
           kind: "empty-result",
@@ -148,6 +143,24 @@ export async function collectRepositoryDiagnostics(
         collectors: collectorResults,
         signals: extractSignals(context.repository),
         warnings: context.warnings,
+        measureCompleteness: context.measureCompleteness
+          ? {
+              totalWorkflows: context.measureCompleteness.totalWorkflows,
+              evaluatedWorkflows: context.measureCompleteness.evaluatedWorkflowPaths.size,
+              skippedRepositoryDiagnostics:
+                context.measureCompleteness.skippedRepositoryDiagnostics,
+              skippedGates: [...context.measureCompleteness.skippedGates].sort(),
+              maxFindingsHitRules: [...context.measureCompleteness.maxFindingsHitRules].sort(),
+              parserFailures:
+                context.measureCompleteness.parserFailures.size > 0
+                  ? [...context.measureCompleteness.parserFailures].sort()
+                  : undefined,
+              workflowOnlyRules:
+                context.measureCompleteness.workflowOnlyRules.size > 0
+                  ? [...context.measureCompleteness.workflowOnlyRules].sort()
+                  : undefined,
+            }
+          : undefined,
         totalFindings: diagnostics.length,
       }),
     );

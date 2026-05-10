@@ -61,6 +61,26 @@ export interface WorkflowSummary {
   findings: Diagnostic[];
 }
 
+export interface MeasureCompleteness {
+  totalWorkflows: number;
+  evaluatedWorkflows: number;
+  skippedRepositoryDiagnostics: boolean;
+  skippedGates: string[];
+  maxFindingsHitRules: string[];
+  parserFailures?: string[];
+  workflowOnlyRules?: string[];
+}
+
+export interface MeasureCompletenessTracker {
+  totalWorkflows: number;
+  evaluatedWorkflowPaths: Set<string>;
+  skippedRepositoryDiagnostics: boolean;
+  skippedGates: Set<string>;
+  maxFindingsHitRules: Set<string>;
+  parserFailures: Set<string>;
+  workflowOnlyRules: Set<string>;
+}
+
 export interface AnalysisWarning {
   kind:
     | "rule-error"
@@ -69,6 +89,7 @@ export interface AnalysisWarning {
     | "workflow-only"
     | "max-findings-hit"
     | "empty-result"
+    | "parser-error"
     | "remediation-drift"
     | "scan-warning";
   source: string;
@@ -110,6 +131,7 @@ export interface ReportData {
   fixFirst: string[];
   aiHandoff: string[];
   analysisWarnings: AnalysisWarning[];
+  measureCompleteness?: MeasureCompleteness;
   propagationClusters: PropagationCluster[];
   remediationChecks: ImpliedCheck[];
 }

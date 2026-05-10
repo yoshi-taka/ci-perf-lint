@@ -11,6 +11,8 @@ import type {
   AnalysisWarning,
   AuditMode,
   Diagnostic,
+  MeasureCompleteness,
+  MeasureCompletenessTracker,
   ReportData,
   WorkflowSummary,
 } from "./types.ts";
@@ -30,7 +32,10 @@ import { buildRepositoryPrecedentIndex } from "./rules/shared/repository-precede
 import { buildRepositoryPredicateIndex } from "./rules/shared/repository-predicate-index.ts";
 import { buildRepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { buildRepositoryCorpusIndex } from "./rules/shared/repository-corpus-index.ts";
-import { collectRepositoryDiagnostics } from "./repository-diagnostics/index.ts";
+import {
+  collectRepositoryDiagnostics,
+  repositoryDiagnosticCollectors,
+} from "./repository-diagnostics/index.ts";
 import { buildPropagationClusters } from "./repository-diagnostics/repository-propagation.ts";
 import { buildRepositoryFeatureIndex } from "./repository-diagnostics/repository-feature-index.ts";
 import {
@@ -92,6 +97,7 @@ interface ScannedRepo {
   readonly mode: AuditMode;
   readonly topCount: number;
   readonly inputPath: string;
+  readonly measureCompleteness: MeasureCompletenessTracker;
 }
 
 function uniqueStrings(values: string[]): string[] {
@@ -113,10 +119,6 @@ function uniqueWarnings(warnings: AnalysisWarning[]): AnalysisWarning[] {
   }
 
   return deduped;
-}
-
-function analysisWarningsEnabled(): boolean {
-  return process.env.CI_PERF_LINT_DUMP_STATE === "1";
 }
 
 async function parseWorkflowFile(
@@ -203,6 +205,16 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   const allWorkflowFiles = await collectWorkflowFiles(target);
   timer.mark("list-workflows");
 
+  const measureCompleteness: MeasureCompletenessTracker = {
+    totalWorkflows: allWorkflowFiles.length,
+    evaluatedWorkflowPaths: new Set<string>(),
+    skippedRepositoryDiagnostics: false,
+    skippedGates: new Set<string>(),
+    maxFindingsHitRules: new Set<string>(),
+    parserFailures: new Set<string>(),
+    workflowOnlyRules: new Set<string>(),
+  };
+
   const parsedWorkflowResults: PromiseSettledResult<ParsedWorkflowDocument>[] = new Array(
     allWorkflowFiles.length,
   );
@@ -227,10 +239,11 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     } else {
       const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
       analysisWarnings.push({
-        kind: "scan-warning",
+        kind: "parser-error",
         source: allWorkflowFiles[index] ?? "unknown",
         message: `Failed to parse workflow: ${detail}`,
       });
+      measureCompleteness.parserFailures.add(allWorkflowFiles[index] ?? "unknown");
     }
   }
 
@@ -262,6 +275,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     mode,
     topCount: options.topCount,
     inputPath,
+    measureCompleteness,
   };
 }
 
@@ -275,6 +289,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     analysisWarnings,
     workflowOnly,
     repositoryOnly,
+    measureCompleteness,
     timer,
     mode,
     topCount,
@@ -299,6 +314,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     scanContext,
     precedentIndex,
     fileIndex,
+    measureCompleteness,
   };
 
   const semanticsByWorkflow = new Map<ParsedWorkflowDocument, WorkflowSemantics>();
@@ -355,12 +371,14 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
       ),
     workflowOnly
       ? (() => {
-          if (analysisWarningsEnabled()) {
-            analysisWarnings.push({
-              kind: "workflow-only",
-              source: "collectRepositoryDiagnostics",
-              message: "Repository diagnostics were skipped because workflowOnly=true.",
-            });
+          analysisWarnings.push({
+            kind: "workflow-only",
+            source: "collectRepositoryDiagnostics",
+            message: "Repository diagnostics were skipped because workflowOnly=true.",
+          });
+          measureCompleteness.skippedRepositoryDiagnostics = true;
+          for (const collector of repositoryDiagnosticCollectors) {
+            measureCompleteness.workflowOnlyRules.add(collector.id);
           }
           return [] as Diagnostic[];
         })()
@@ -378,6 +396,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           predicateIndex,
           featureIndex,
           corpusIndex,
+          measureCompleteness,
         }).then((diags) =>
           diags.filter((finding) => findingIncludedInScope(finding, workflowOnly, repositoryOnly)),
         ),
@@ -435,7 +454,22 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   timer.flush();
 
   const uniqueAnalysisWarnings = uniqueWarnings(analysisWarnings);
-  if (analysisWarningsEnabled()) {
+  const measureCompletenessReport: MeasureCompleteness = {
+    totalWorkflows: measureCompleteness.totalWorkflows,
+    evaluatedWorkflows: measureCompleteness.evaluatedWorkflowPaths.size,
+    skippedRepositoryDiagnostics: measureCompleteness.skippedRepositoryDiagnostics,
+    skippedGates: [...measureCompleteness.skippedGates].sort(),
+    maxFindingsHitRules: [...measureCompleteness.maxFindingsHitRules].sort(),
+    parserFailures:
+      measureCompleteness.parserFailures.size > 0
+        ? [...measureCompleteness.parserFailures].sort()
+        : undefined,
+    workflowOnlyRules:
+      measureCompleteness.workflowOnlyRules.size > 0
+        ? [...measureCompleteness.workflowOnlyRules].sort()
+        : undefined,
+  };
+  if (process.env.CI_PERF_LINT_DUMP_STATE === "1") {
     process.stderr.write(
       JSON.stringify({
         type: "repo-analysis-state",
@@ -445,6 +479,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
         warnings: uniqueAnalysisWarnings,
         findingCount: findings.length,
         aggregatedFindingCount: aggregatedFindings.aggregatedFindings.length,
+        measureCompleteness: measureCompletenessReport,
       }),
     );
     process.stderr.write("\n");
@@ -461,6 +496,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     fixFirst,
     aiHandoff,
     analysisWarnings: uniqueAnalysisWarnings,
+    measureCompleteness: measureCompletenessReport,
     propagationClusters,
     remediationChecks,
   };

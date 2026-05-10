@@ -1,4 +1,10 @@
-import type { AnalysisWarning, Diagnostic, RequiredFeatures, RuleMeta } from "./types.ts";
+import type {
+  AnalysisWarning,
+  Diagnostic,
+  MeasureCompletenessTracker,
+  RequiredFeatures,
+  RuleMeta,
+} from "./types.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
 import type { WorkflowDocument } from "./workflow.ts";
@@ -43,6 +49,7 @@ export interface RuleContext {
   precedentIndex?: RepositoryPrecedentIndex;
   fileIndex?: RepositoryFileIndex;
   singularities?: SingularityTracker;
+  measureCompleteness?: MeasureCompletenessTracker;
 }
 
 interface RuleModule {
@@ -260,6 +267,7 @@ export async function evaluateRules(
 
   for (const rule of allRules) {
     if (ruleFilter && !ruleFilter(rule)) {
+      context.measureCompleteness?.skippedGates.add(rule.meta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: workflowPath,
@@ -269,6 +277,7 @@ export async function evaluateRules(
     }
 
     if (context.singularities?.isQuarantined(rule.meta.id)) {
+      context.measureCompleteness?.skippedGates.add(rule.meta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: workflowPath,
@@ -278,6 +287,7 @@ export async function evaluateRules(
     }
 
     if (!matchesFeatureMask(rule.meta.requiredFeatures, workflow as WorkflowDocument)) {
+      context.measureCompleteness?.skippedGates.add(rule.meta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: workflowPath,
@@ -287,6 +297,7 @@ export async function evaluateRules(
     }
 
     if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
+      context.measureCompleteness?.skippedGates.add(rule.meta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: workflowPath,
@@ -296,6 +307,7 @@ export async function evaluateRules(
     }
 
     if (!ruleMatchesScope(rule, isBuildkite, isGitlab, isCircle)) {
+      context.measureCompleteness?.skippedGates.add(rule.meta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: workflowPath,
@@ -307,6 +319,10 @@ export async function evaluateRules(
     const checkFn = getRuleCheckFn(rule, isBuildkite, isGitlab, isCircle);
     evaluatedRuleIds.add(rule.meta.id);
     tasks.push({ rule, run: () => Promise.resolve(checkFn(workflow, context)) });
+  }
+
+  if (tasks.length > 0) {
+    context.measureCompleteness?.evaluatedWorkflowPaths.add(workflowPath);
   }
 
   const settled = await runConcurrent(
@@ -460,6 +476,7 @@ export async function evaluateRulesCoarseToFine(
 
   for (const rule of allRules) {
     if (ruleFilter && !ruleFilter(rule)) {
+      context.measureCompleteness?.skippedGates.add(rule.meta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: rule.meta.id,
@@ -470,6 +487,7 @@ export async function evaluateRulesCoarseToFine(
 
     const ruleId = rule.meta.id;
     if (context.singularities?.isQuarantined(ruleId)) {
+      context.measureCompleteness?.skippedGates.add(ruleId);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: ruleId,
@@ -497,6 +515,7 @@ export async function evaluateRulesCoarseToFine(
     }
 
     if (candidates.length === 0) {
+      context.measureCompleteness?.skippedGates.add(ruleId);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: ruleId,
@@ -507,8 +526,10 @@ export async function evaluateRulesCoarseToFine(
 
     for (const { workflow } of candidates) {
       const workflowPath = workflow.relativePath;
+      context.measureCompleteness?.evaluatedWorkflowPaths.add(workflowPath);
 
       if (context.singularities?.hasPoleTrigger(ruleId, workflowPath)) {
+        context.measureCompleteness?.skippedGates.add(ruleId);
         pushAnalysisWarning(warnings, {
           kind: "gate-skipped",
           source: workflowPath,
@@ -518,6 +539,7 @@ export async function evaluateRulesCoarseToFine(
       }
 
       if (!matchesFeatureMask(rule.meta.requiredFeatures, workflow as WorkflowDocument)) {
+        context.measureCompleteness?.skippedGates.add(ruleId);
         pushAnalysisWarning(warnings, {
           kind: "gate-skipped",
           source: workflowPath,
@@ -528,6 +550,7 @@ export async function evaluateRulesCoarseToFine(
 
       prewarmStepAnalysisCaches(workflow);
       if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
+        context.measureCompleteness?.skippedGates.add(ruleId);
         pushAnalysisWarning(warnings, {
           kind: "gate-skipped",
           source: workflowPath,
@@ -549,6 +572,7 @@ export async function evaluateRulesCoarseToFine(
           firedRuleIds.add(ruleId);
         }
         if (maxFindings !== undefined && diagnostics.length > maxFindings) {
+          context.measureCompleteness?.maxFindingsHitRules.add(ruleId);
           pushAnalysisWarning(warnings, {
             kind: "max-findings-hit",
             source: workflowPath,

@@ -1,4 +1,4 @@
-import type { AnalysisWarning, Diagnostic } from "../types.ts";
+import type { AnalysisWarning, Diagnostic, MeasureCompletenessTracker } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
@@ -35,6 +35,7 @@ export interface RepositoryDiagnosticContext {
   workflows: WorkflowDocument[];
   workflowSemantics: ReadonlyMap<WorkflowDocument, WorkflowSemantics>;
   warnings: AnalysisWarning[];
+  measureCompleteness?: MeasureCompletenessTracker;
   scanContext: RepositoryScanContext;
   fileIndex: RepositoryFileIndex;
   predicateIndex: RepositoryPredicateIndex;
