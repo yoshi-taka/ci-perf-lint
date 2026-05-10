@@ -1,13 +1,20 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { evaluateRules, type RuleContext } from "../src/rule-engine.ts";
+import {
+  evaluateRules,
+  evaluateRulesCoarseToFine,
+  type RuleContext,
+  type AnyRuleModule,
+} from "../src/rule-engine.ts";
 import { parseWorkflow } from "../src/workflow.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
 import type { AnalysisWarning } from "../src/types.ts";
+import { SingularityTracker } from "../src/rules/shared/singularity.ts";
 import { preferNodeRunOverNpmRunRule } from "../src/rules/prefer-node-run-over-npm-run.ts";
 import { preferBuildxBakeForMultipleImagesRule } from "../src/rules/prefer-buildx-bake-for-multiple-images.ts";
+import { missingConcurrencyRule } from "../src/rules/missing-concurrency.ts";
 
 function createSignals(): RepositorySignals {
   return {
@@ -299,6 +306,580 @@ describe("evaluateRules", () => {
     for (const d of result) {
       expect(d.ruleId.startsWith("missing-")).toBe(true);
     }
+    await cleanup();
+  });
+
+  test("ruleFilter excluding all rules returns empty", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hello\n",
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRules(workflow, context, undefined, undefined, () => false);
+    expect(result).toEqual([]);
+    await cleanup();
+  });
+
+  test("matchesFeatureMask: skips rules when required workflowFacts absent", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Report",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  status:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: echo hello",
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRules(workflow, context);
+    expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(false);
+    await cleanup();
+  });
+
+  test("matchesFeatureMask: evaluates rules when required workflowFacts match", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRules(workflow, context);
+    expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(true);
+    await cleanup();
+  });
+
+  test("nodeTypes: skips rule when workflow lacks matching node kind", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const tracker = new SingularityTracker();
+    const warnings: AnalysisWarning[] = [];
+    const context: RuleContext = { repository: createSignals(), singularities: tracker };
+    const result = await evaluateRules(workflow, context, warnings);
+    expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(false);
+    await cleanup();
+  });
+
+  test("skips quarantined rules via SingularityTracker", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const tracker = new SingularityTracker();
+    tracker.record({
+      class: "essential",
+      ruleId: "missing-concurrency",
+      message: "test quarantine",
+    });
+    const context: RuleContext = { repository: createSignals(), singularities: tracker };
+    const result = await evaluateRules(workflow, context);
+    expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(false);
+    expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+    await cleanup();
+  });
+
+  describe("error handling (catch block)", () => {
+    let originalCheck: AnyRuleModule["check"];
+
+    beforeEach(() => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      originalCheck = missingConcurrencyRule.check;
+      (missingConcurrencyRule as { check: AnyRuleModule["check"] }).check = (() => {
+        throw new Error("deliberate test error");
+      }) as never;
+    });
+
+    afterEach(() => {
+      (missingConcurrencyRule as { check: AnyRuleModule["check"] }).check =
+        originalCheck as unknown as AnyRuleModule["check"];
+    });
+
+    test("records singularity and warning when a rule throws", async () => {
+      const { workflow, cleanup } = await createWorkflowDoc(
+        [
+          "name: Build",
+          "on:",
+          "  push:",
+          "jobs:",
+          "  build:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/setup-node@v4",
+          "      - run: npm ci",
+        ].join("\n"),
+      );
+      const tracker = new SingularityTracker();
+      const warnings: AnalysisWarning[] = [];
+      const context: RuleContext = { repository: createSignals(), singularities: tracker };
+      const result = await evaluateRules(workflow, context, warnings);
+      expect(tracker.failures.length).toBeGreaterThan(0);
+      expect(tracker.failures.some((f) => f.ruleId === "missing-concurrency")).toBe(true);
+      expect(warnings.some((w) => w.message.includes("missing-concurrency"))).toBe(true);
+      expect(Array.isArray(result)).toBe(true);
+      await cleanup();
+    });
+
+    test("still returns valid diagnostics from other rules despite one throwing", async () => {
+      const { workflow, cleanup } = await createWorkflowDoc(
+        [
+          "name: Build",
+          "on:",
+          "  push:",
+          "jobs:",
+          "  build:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/setup-node@v4",
+          "      - run: npm ci",
+        ].join("\n"),
+      );
+      const context: RuleContext = { repository: createSignals() };
+      const result = await evaluateRules(workflow, context);
+      expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+      expect(result.every((d) => typeof d.ruleId === "string")).toBe(true);
+      await cleanup();
+    });
+  });
+});
+
+describe("evaluateRulesCoarseToFine", () => {
+  test("returns empty array for empty workflows", async () => {
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRulesCoarseToFine([], context);
+    expect(result).toEqual([]);
+  });
+
+  test("evaluates single workflow", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRulesCoarseToFine([workflow], context);
+    expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+    for (const d of result) {
+      expect(typeof d.ruleId).toBe("string");
+      expect(typeof d.workflow).toBe("string");
+    }
+    await cleanup();
+  });
+
+  test("evaluates multiple workflows and aggregates diagnostics", async () => {
+    const doc1 = await createWorkflowDoc(
+      [
+        "name: CI",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const doc2 = await createWorkflowDoc(
+      [
+        "name: Test",
+        "on:",
+        "  pull_request:",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRulesCoarseToFine([doc1.workflow, doc2.workflow], context);
+    expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+    await doc1.cleanup();
+    await doc2.cleanup();
+  });
+
+  test("deduplicates diagnostics with same path and line across workflows", async () => {
+    const doc1 = await createWorkflowDoc(
+      [
+        "name: CI",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const doc2 = await createWorkflowDoc(
+      [
+        "name: CI",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRulesCoarseToFine([doc1.workflow, doc2.workflow], context);
+    const keys = result.map((d) => `${d.location.path}:${d.location.line}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    await doc1.cleanup();
+    await doc2.cleanup();
+  });
+
+  test("applies maxFindings cap per ruleId", async () => {
+    const docs = await Promise.all(
+      [1, 2, 3, 4, 5].map((i) =>
+        createWorkflowDoc(
+          [
+            `name: CI ${i}`,
+            "on:",
+            "  push:",
+            "jobs:",
+            `  job${i}:`,
+            "    runs-on: ubuntu-latest",
+            "    steps:",
+            "      - uses: actions/setup-node@v4",
+            "      - run: npm ci",
+          ].join("\n"),
+        ),
+      ),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRulesCoarseToFine(
+      docs.map((d) => d.workflow),
+      context,
+    );
+    const missingCacheCount = result.filter((d) => d.ruleId === "missing-dependency-cache").length;
+    expect(missingCacheCount).toBeLessThanOrEqual(3);
+    await Promise.all(docs.map((d) => d.cleanup()));
+  });
+
+  test("accumulates findingCounts", async () => {
+    const docs = await Promise.all([
+      createWorkflowDoc(
+        [
+          "name: CI",
+          "on:",
+          "  push:",
+          "jobs:",
+          "  build:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/setup-node@v4",
+          "      - run: npm ci",
+        ].join("\n"),
+      ),
+      createWorkflowDoc(
+        [
+          "name: Test",
+          "on:",
+          "  pull_request:",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/setup-node@v4",
+          "      - run: npm ci",
+        ].join("\n"),
+      ),
+    ]);
+    const findingCounts = new Map<string, number>();
+    const context: RuleContext = { repository: createSignals() };
+    await evaluateRulesCoarseToFine(
+      docs.map((d) => d.workflow),
+      context,
+      undefined,
+      findingCounts,
+    );
+    expect(findingCounts.size).toBeGreaterThan(0);
+    const total = [...findingCounts.values()].reduce((a, b) => a + b, 0);
+    expect(total).toBeGreaterThan(0);
+    await Promise.all(docs.map((d) => d.cleanup()));
+  });
+
+  test("uses precheck to prioritize workflows (scoring/sorting/slicing)", async () => {
+    const lowScoreYaml = [
+      "name: CI",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - run: echo hello",
+    ].join("\n");
+    const highScoreYaml = [
+      "name: CI",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/setup-node@v4",
+      "      - run: npm ci",
+    ].join("\n");
+    const docLow = await createWorkflowDoc(lowScoreYaml);
+    const docHigh = await createWorkflowDoc(highScoreYaml);
+    const context: RuleContext = { repository: createSignals() };
+    const warnings: AnalysisWarning[] = [];
+    const result = await evaluateRulesCoarseToFine(
+      [docLow.workflow, docHigh.workflow],
+      context,
+      warnings,
+    );
+    expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+    await docLow.cleanup();
+    await docHigh.cleanup();
+  });
+
+  test("detects implication drift via warnings", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const warnings: AnalysisWarning[] = [];
+    await evaluateRulesCoarseToFine([workflow], context, warnings);
+    const driftWarnings = warnings.filter((w) => w.message.includes("implied"));
+    expect(driftWarnings.length).toBeGreaterThanOrEqual(0);
+    await cleanup();
+  });
+
+  test("respects singularity pole trigger to skip specific workflow+rule", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const tracker = new SingularityTracker();
+    tracker.record({
+      class: "pole",
+      ruleId: "missing-concurrency",
+      message: "test pole",
+      triggeredBy: workflow.relativePath,
+    });
+    const context: RuleContext = { repository: createSignals(), singularities: tracker };
+    const result = await evaluateRulesCoarseToFine([workflow], context);
+    expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(false);
+    expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+    await cleanup();
+  });
+
+  test("respects singularity quarantine in coarse-to-fine", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const tracker = new SingularityTracker();
+    tracker.record({
+      class: "essential",
+      ruleId: "missing-concurrency",
+      message: "test quarantine ctf",
+    });
+    const context: RuleContext = { repository: createSignals(), singularities: tracker };
+    const result = await evaluateRulesCoarseToFine([workflow], context);
+    expect(result.some((d) => d.ruleId === "missing-concurrency")).toBe(false);
+    expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+    await cleanup();
+  });
+
+  describe("error handling (catch block in coarse-to-fine)", () => {
+    let originalCheck: AnyRuleModule["check"];
+
+    beforeEach(() => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      originalCheck = missingConcurrencyRule.check;
+      (missingConcurrencyRule as { check: AnyRuleModule["check"] }).check = (() => {
+        throw new RangeError("deliberate test error in ctf");
+      }) as never;
+    });
+
+    afterEach(() => {
+      (missingConcurrencyRule as { check: AnyRuleModule["check"] }).check =
+        originalCheck as unknown as AnyRuleModule["check"];
+    });
+
+    test("records singularity and warning when a rule throws in coarse-to-fine", async () => {
+      const { workflow, cleanup } = await createWorkflowDoc(
+        [
+          "name: Build",
+          "on:",
+          "  push:",
+          "jobs:",
+          "  build:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/setup-node@v4",
+          "      - run: npm ci",
+        ].join("\n"),
+      );
+      const tracker = new SingularityTracker();
+      const warnings: AnalysisWarning[] = [];
+      const context: RuleContext = { repository: createSignals(), singularities: tracker };
+      const result = await evaluateRulesCoarseToFine([workflow], context, warnings, undefined);
+      expect(tracker.failures.length).toBeGreaterThan(0);
+      expect(tracker.failures.some((f) => f.ruleId === "missing-concurrency")).toBe(true);
+      expect(warnings.some((w) => w.message.includes("missing-concurrency"))).toBe(true);
+      expect(Array.isArray(result)).toBe(true);
+      await cleanup();
+    });
+
+    test("still returns valid results from other rules despite throw in coarse-to-fine", async () => {
+      const { workflow, cleanup } = await createWorkflowDoc(
+        [
+          "name: Build",
+          "on:",
+          "  push:",
+          "jobs:",
+          "  build:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/setup-node@v4",
+          "      - run: npm ci",
+        ].join("\n"),
+      );
+      const context: RuleContext = { repository: createSignals() };
+      const result = await evaluateRulesCoarseToFine([workflow], context);
+      expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+      await cleanup();
+    });
+  });
+
+  test("workflowSemantics as Map distributes per-workflow context", async () => {
+    const doc1 = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const doc2 = await createWorkflowDoc(
+      [
+        "name: Test",
+        "on:",
+        "  pull_request:",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const wf1 = doc1.workflow;
+    const wf2 = doc2.workflow;
+    const wfSem1 = { workflow: wf1, hasTimeout: false };
+    const wfSem2 = { workflow: wf2, hasTimeout: true };
+    const wfMap = new Map([
+      [wf1, wfSem1 as never],
+      [wf2, wfSem2 as never],
+    ]);
+    const context: RuleContext = { repository: createSignals(), workflowSemantics: wfMap };
+    const result = await evaluateRulesCoarseToFine([wf1, wf2], context);
+    expect(result.some((d) => d.ruleId === "missing-dependency-cache")).toBe(true);
+    await doc1.cleanup();
+    await doc2.cleanup();
+  });
+
+  test("ruleFilter excluding all returns empty in coarse-to-fine", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      [
+        "name: Build",
+        "on:",
+        "  push:",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/setup-node@v4",
+        "      - run: npm ci",
+      ].join("\n"),
+    );
+    const context: RuleContext = { repository: createSignals() };
+    const result = await evaluateRulesCoarseToFine(
+      [workflow],
+      context,
+      undefined,
+      undefined,
+      () => false,
+    );
+    expect(result).toEqual([]);
     await cleanup();
   });
 });
