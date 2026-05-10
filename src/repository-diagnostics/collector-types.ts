@@ -8,6 +8,8 @@ import type { RepositoryPredicateIndex } from "../rules/shared/repository-predic
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import type { RepositoryCorpusIndex } from "../rules/shared/repository-corpus-index.ts";
 
+export type GateKey = keyof RepositoryDiagnosticGateState;
+
 export interface RepositoryDiagnosticGateState {
   hasJavaScriptHeavyWorkflow: boolean;
   hasJavaScriptTooling: boolean;
@@ -29,6 +31,82 @@ export interface RepositoryDiagnosticGateState {
   hasGradle: boolean;
 }
 
+export interface GateProofs {
+  hasJavaScriptHeavyWorkflow?: HasJavaScriptHeavyWorkflowProof;
+  hasJavaScriptTooling?: HasJavaScriptToolingProof;
+  hasJavaScriptLinting?: HasJavaScriptLintingProof;
+  hasJavaScriptBuildConfig?: HasJavaScriptBuildConfigProof;
+  hasJavaScriptPackageScripts?: HasJavaScriptPackageScriptsProof;
+  hasDockerHeavyWorkflow?: HasDockerHeavyWorkflowProof;
+  hasTerraformHeavyWorkflow?: HasTerraformHeavyWorkflowProof;
+  hasLargeFiles?: HasLargeFilesProof;
+  hasDatadogHeavyWorkflow?: HasDatadogHeavyWorkflowProof;
+  hasPytest?: HasPytestProof;
+  hasPythonHeavyWorkflow?: HasPythonHeavyWorkflowProof;
+  hasRenovateConfig?: HasRenovateConfigProof;
+  hasHusky?: HasHuskyProof;
+  hasJavaScriptFrameworks?: HasJavaScriptFrameworksProof;
+  hasRust?: HasRustProof;
+  hasCdkManifest?: HasCdkManifestProof;
+  hasElixirHeavyWorkflow?: HasElixirHeavyWorkflowProof;
+  hasGradle?: HasGradleProof;
+}
+
+export interface HasJavaScriptHeavyWorkflowProof {
+  readonly _proof: unique symbol;
+}
+export interface HasJavaScriptToolingProof {
+  readonly _proof: unique symbol;
+}
+export interface HasJavaScriptLintingProof {
+  readonly _proof: unique symbol;
+}
+export interface HasJavaScriptBuildConfigProof {
+  readonly _proof: unique symbol;
+}
+export interface HasJavaScriptPackageScriptsProof {
+  readonly _proof: unique symbol;
+}
+export interface HasDockerHeavyWorkflowProof {
+  readonly _proof: unique symbol;
+}
+export interface HasTerraformHeavyWorkflowProof {
+  readonly _proof: unique symbol;
+}
+export interface HasLargeFilesProof {
+  readonly _proof: unique symbol;
+}
+export interface HasDatadogHeavyWorkflowProof {
+  readonly _proof: unique symbol;
+}
+export interface HasPytestProof {
+  readonly _proof: unique symbol;
+}
+export interface HasPythonHeavyWorkflowProof {
+  readonly _proof: unique symbol;
+}
+export interface HasRenovateConfigProof {
+  readonly _proof: unique symbol;
+}
+export interface HasHuskyProof {
+  readonly _proof: unique symbol;
+}
+export interface HasJavaScriptFrameworksProof {
+  readonly _proof: unique symbol;
+}
+export interface HasRustProof {
+  readonly _proof: unique symbol;
+}
+export interface HasCdkManifestProof {
+  readonly _proof: unique symbol;
+}
+export interface HasElixirHeavyWorkflowProof {
+  readonly _proof: unique symbol;
+}
+export interface HasGradleProof {
+  readonly _proof: unique symbol;
+}
+
 export interface RepositoryDiagnosticGateObservability {
   observed: string[];
   derivedFalse: { gate: string; dueTo: string[] }[];
@@ -37,6 +115,27 @@ export interface RepositoryDiagnosticGateObservability {
 export interface RepositoryDiagnosticGateResolution {
   state: RepositoryDiagnosticGateState;
   observability: RepositoryDiagnosticGateObservability;
+}
+
+export interface GateProofs {
+  hasJavaScriptHeavyWorkflow?: HasJavaScriptHeavyWorkflowProof;
+  hasJavaScriptTooling?: HasJavaScriptToolingProof;
+  hasJavaScriptLinting?: HasJavaScriptLintingProof;
+  hasJavaScriptBuildConfig?: HasJavaScriptBuildConfigProof;
+  hasJavaScriptPackageScripts?: HasJavaScriptPackageScriptsProof;
+  hasDockerHeavyWorkflow?: HasDockerHeavyWorkflowProof;
+  hasTerraformHeavyWorkflow?: HasTerraformHeavyWorkflowProof;
+  hasLargeFiles?: HasLargeFilesProof;
+  hasDatadogHeavyWorkflow?: HasDatadogHeavyWorkflowProof;
+  hasPytest?: HasPytestProof;
+  hasPythonHeavyWorkflow?: HasPythonHeavyWorkflowProof;
+  hasRenovateConfig?: HasRenovateConfigProof;
+  hasHusky?: HasHuskyProof;
+  hasJavaScriptFrameworks?: HasJavaScriptFrameworksProof;
+  hasRust?: HasRustProof;
+  hasCdkManifest?: HasCdkManifestProof;
+  hasElixirHeavyWorkflow?: HasElixirHeavyWorkflowProof;
+  hasGradle?: HasGradleProof;
 }
 
 export interface RepositoryDiagnosticContext {
@@ -53,10 +152,12 @@ export interface RepositoryDiagnosticContext {
   corpusIndex: RepositoryCorpusIndex;
 }
 
-export type GatePredicate = (state: RepositoryDiagnosticGateState) => boolean;
+export type GatedContext<_G extends GateKey> = RepositoryDiagnosticContext & {
+  proofs: GateProofs;
+};
 
-export interface RepositoryDiagnosticCollector {
+export interface RepositoryDiagnosticCollector<G extends GateKey = GateKey> {
   id: string;
-  gate: GatePredicate;
-  collect: (context: RepositoryDiagnosticContext) => Diagnostic[] | Promise<Diagnostic[]>;
+  gate: G;
+  collect: (context: GatedContext<G>) => Diagnostic[] | Promise<Diagnostic[]>;
 }

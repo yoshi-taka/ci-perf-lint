@@ -1,6 +1,11 @@
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import type { Diagnostic } from "../types.ts";
-import type { RepositoryDiagnosticContext } from "./collector-types.ts";
+import type {
+  GatedContext,
+  GateKey,
+  RepositoryDiagnosticContext,
+  RepositoryDiagnosticGateState,
+} from "./collector-types.ts";
 import {
   buildCollectorCooccurrenceDebug,
   orderCollectorsForDiagnostics,
@@ -15,7 +20,7 @@ import {
 import { javascriptDiagnosticCollectors } from "./collectors-javascript.ts";
 import { pytestDiagnosticCollectors, pythonDiagnosticCollectors } from "./collectors-python.ts";
 import { terraformDiagnosticCollectors } from "./collectors-terraform.ts";
-import { collectorGateMatches, collectRepositoryDiagnosticGateState, gates } from "./gates.ts";
+import { buildGateProofs, collectRepositoryDiagnosticGateState, gateKeys } from "./gates.ts";
 
 export const repositoryDiagnosticCollectors = [
   ...javascriptDiagnosticCollectors,
@@ -29,11 +34,35 @@ export const repositoryDiagnosticCollectors = [
   ...elixirDiagnosticCollectors,
   {
     id: "gradle-parallel-not-enabled",
-    gate: gates.gradle,
-    collect: (context: RepositoryDiagnosticContext) =>
+    gate: gateKeys.gradle,
+    collect: (context: GatedContext<"hasGradle">) =>
       collectGradleParallelNotEnabledDiagnostics(context),
   },
 ] as const;
+
+function gateKeyToPredicate(gate: GateKey): (state: RepositoryDiagnosticGateState) => boolean {
+  const predicateMap: Record<GateKey, (s: RepositoryDiagnosticGateState) => boolean> = {
+    hasJavaScriptHeavyWorkflow: (s) => s.hasJavaScriptHeavyWorkflow,
+    hasJavaScriptTooling: (s) => s.hasJavaScriptTooling,
+    hasJavaScriptLinting: (s) => s.hasJavaScriptLinting,
+    hasJavaScriptBuildConfig: (s) => s.hasJavaScriptBuildConfig,
+    hasJavaScriptPackageScripts: (s) => s.hasJavaScriptPackageScripts,
+    hasDockerHeavyWorkflow: (s) => s.hasDockerHeavyWorkflow,
+    hasTerraformHeavyWorkflow: (s) => s.hasTerraformHeavyWorkflow,
+    hasLargeFiles: (s) => s.hasLargeFiles,
+    hasDatadogHeavyWorkflow: (s) => s.hasDatadogHeavyWorkflow,
+    hasPytest: (s) => s.hasPytest,
+    hasPythonHeavyWorkflow: (s) => s.hasPythonHeavyWorkflow,
+    hasRenovateConfig: (s) => s.hasRenovateConfig,
+    hasHusky: (s) => s.hasHusky,
+    hasJavaScriptFrameworks: (s) => s.hasJavaScriptFrameworks,
+    hasRust: (s) => s.hasRust,
+    hasCdkManifest: (s) => s.hasCdkManifest,
+    hasElixirHeavyWorkflow: (s) => s.hasElixirHeavyWorkflow,
+    hasGradle: (s) => s.hasGradle,
+  };
+  return predicateMap[gate];
+}
 
 function timingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
@@ -62,8 +91,12 @@ export async function collectRepositoryDiagnostics(
   const gateResolution = await collectRepositoryDiagnosticGateState(context);
   const { state: gateState, observability: gateObservability } = gateResolution;
   const gateElapsed = performance.now() - gateStateStartedAt;
+  const proofs = buildGateProofs(gateState);
+  const provenContext = { ...context, proofs } as RepositoryDiagnosticContext & {
+    proofs: typeof proofs;
+  };
   const applicableCollectors = repositoryDiagnosticCollectors.filter((collector) =>
-    collectorGateMatches(collector.gate, gateState),
+    gateKeyToPredicate(collector.gate)(gateState),
   );
   const collectorSchedule =
     applicableCollectors.length > 1
@@ -103,7 +136,7 @@ export async function collectRepositoryDiagnostics(
   const results = await Promise.allSettled(
     scheduledCollectors.map((collector) => {
       const startedAt = performance.now();
-      const result = collector.collect(context);
+      const result = collector.collect(provenContext);
       if (result instanceof Promise) {
         if (timingsEnabled()) {
           return result.then((value) => {

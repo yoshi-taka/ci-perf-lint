@@ -107,7 +107,7 @@ export function meetsMinimum(
   return { value: passes, strength: evidence.strength, signals: evidence.signals };
 }
 
-function combineStrength(strengths: readonly EvidenceStrength[]): EvidenceStrength {
+export function combineStrength(strengths: readonly EvidenceStrength[]): EvidenceStrength {
   let best: EvidenceStrength = "weak";
   for (const s of strengths) {
     if (strengthPriority(s) > strengthPriority(best)) {

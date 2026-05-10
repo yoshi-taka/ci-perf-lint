@@ -1,5 +1,5 @@
 import type { RepositoryDiagnosticCollector } from "./collector-types.ts";
-import { gates } from "./gates.ts";
+import { gateKeys } from "./gates.ts";
 import { collectDatadogLambdaExtensionDiagnostics } from "./datadog-lambda-extension.ts";
 import { collectDockerBuildDiagnostics } from "./docker.ts";
 import { collectElixirOtpVersionDiagnostics } from "./elixir-otp-versions.ts";
@@ -8,7 +8,7 @@ import { collectLargeFileDiagnostics } from "./large-files.ts";
 export const dockerDiagnosticCollectors = [
   {
     id: "docker-build-diagnostics",
-    gate: gates.dockerHeavy,
+    gate: gateKeys.dockerHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectDockerBuildDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
   },
@@ -17,7 +17,7 @@ export const dockerDiagnosticCollectors = [
 export const largeFileDiagnosticCollectors = [
   {
     id: "detected-large-files",
-    gate: gates.largeFiles,
+    gate: gateKeys.largeFiles,
     collect: ({ repoRoot, repository, warnings, scanContext, featureIndex }) =>
       collectLargeFileDiagnostics(repoRoot, repository, warnings, scanContext, featureIndex),
   },
@@ -26,7 +26,7 @@ export const largeFileDiagnosticCollectors = [
 export const datadogDiagnosticCollectors = [
   {
     id: "datadog-lambda-extension-diagnostics",
-    gate: gates.datadogHeavy,
+    gate: gateKeys.datadogHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectDatadogLambdaExtensionDiagnostics(
         repoRoot,
@@ -41,7 +41,7 @@ export const datadogDiagnosticCollectors = [
 export const elixirDiagnosticCollectors = [
   {
     id: "elixir-otp-version-performance",
-    gate: gates.elixirHeavy,
+    gate: gateKeys.elixirHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectElixirOtpVersionDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
   },

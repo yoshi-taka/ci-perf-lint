@@ -1,6 +1,25 @@
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type {
-  GatePredicate,
+  GateKey,
+  GateProofs,
+  HasCdkManifestProof,
+  HasDatadogHeavyWorkflowProof,
+  HasDockerHeavyWorkflowProof,
+  HasElixirHeavyWorkflowProof,
+  HasJavaScriptBuildConfigProof,
+  HasJavaScriptFrameworksProof,
+  HasJavaScriptHeavyWorkflowProof,
+  HasJavaScriptLintingProof,
+  HasJavaScriptPackageScriptsProof,
+  HasJavaScriptToolingProof,
+  HasLargeFilesProof,
+  HasPythonHeavyWorkflowProof,
+  HasPytestProof,
+  HasRenovateConfigProof,
+  HasRustProof,
+  HasHuskyProof,
+  HasGradleProof,
+  HasTerraformHeavyWorkflowProof,
   RepositoryDiagnosticContext,
   RepositoryDiagnosticGateState,
   RepositoryDiagnosticGateResolution,
@@ -16,8 +35,6 @@ import { meetsMinimum } from "../rules/shared/evidence.ts";
 import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
-
-type GateKey = keyof RepositoryDiagnosticGateState;
 
 const gatePrerequisites: Partial<Record<GateKey, GateKey[]>> = {
   hasJavaScriptLinting: ["hasJavaScriptTooling"],
@@ -62,7 +79,7 @@ async function timedGate<T>(label: string, collect: () => Promise<T>): Promise<T
   return value;
 }
 
-export const gates = {
+const gates = {
   javascriptHeavy: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptHeavyWorkflow,
   javascriptTooling: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptTooling,
   javascriptLinting: (s: RepositoryDiagnosticGateState) => s.hasJavaScriptLinting,
@@ -83,11 +100,84 @@ export const gates = {
   gradle: (s: RepositoryDiagnosticGateState) => s.hasGradle,
 } as const;
 
-export function collectorGateMatches(
-  gate: GatePredicate,
-  gateState: RepositoryDiagnosticGateState,
-): boolean {
-  return gate(gateState);
+export const gateKeys = {
+  javascriptHeavy: "hasJavaScriptHeavyWorkflow",
+  javascriptTooling: "hasJavaScriptTooling",
+  javascriptLinting: "hasJavaScriptLinting",
+  javascriptBuildConfig: "hasJavaScriptBuildConfig",
+  javascriptPackageScripts: "hasJavaScriptPackageScripts",
+  dockerHeavy: "hasDockerHeavyWorkflow",
+  terraformHeavy: "hasTerraformHeavyWorkflow",
+  largeFiles: "hasLargeFiles",
+  datadogHeavy: "hasDatadogHeavyWorkflow",
+  pytest: "hasPytest",
+  pythonHeavy: "hasPythonHeavyWorkflow",
+  renovate: "hasRenovateConfig",
+  husky: "hasHusky",
+  javascriptFrameworks: "hasJavaScriptFrameworks",
+  rust: "hasRust",
+  cdkManifest: "hasCdkManifest",
+  elixirHeavy: "hasElixirHeavyWorkflow",
+  gradle: "hasGradle",
+} as const satisfies Record<keyof typeof gates, GateKey>;
+
+export function buildGateProofs(state: RepositoryDiagnosticGateState): GateProofs {
+  const proofs: GateProofs = {};
+  if (state.hasJavaScriptHeavyWorkflow) {
+    proofs.hasJavaScriptHeavyWorkflow = {} as HasJavaScriptHeavyWorkflowProof;
+  }
+  if (state.hasJavaScriptTooling) {
+    proofs.hasJavaScriptTooling = {} as HasJavaScriptToolingProof;
+  }
+  if (state.hasJavaScriptLinting) {
+    proofs.hasJavaScriptLinting = {} as HasJavaScriptLintingProof;
+  }
+  if (state.hasJavaScriptBuildConfig) {
+    proofs.hasJavaScriptBuildConfig = {} as HasJavaScriptBuildConfigProof;
+  }
+  if (state.hasJavaScriptPackageScripts) {
+    proofs.hasJavaScriptPackageScripts = {} as HasJavaScriptPackageScriptsProof;
+  }
+  if (state.hasDockerHeavyWorkflow) {
+    proofs.hasDockerHeavyWorkflow = {} as HasDockerHeavyWorkflowProof;
+  }
+  if (state.hasTerraformHeavyWorkflow) {
+    proofs.hasTerraformHeavyWorkflow = {} as HasTerraformHeavyWorkflowProof;
+  }
+  if (state.hasLargeFiles) {
+    proofs.hasLargeFiles = {} as HasLargeFilesProof;
+  }
+  if (state.hasDatadogHeavyWorkflow) {
+    proofs.hasDatadogHeavyWorkflow = {} as HasDatadogHeavyWorkflowProof;
+  }
+  if (state.hasPytest) {
+    proofs.hasPytest = {} as HasPytestProof;
+  }
+  if (state.hasPythonHeavyWorkflow) {
+    proofs.hasPythonHeavyWorkflow = {} as HasPythonHeavyWorkflowProof;
+  }
+  if (state.hasRenovateConfig) {
+    proofs.hasRenovateConfig = {} as HasRenovateConfigProof;
+  }
+  if (state.hasHusky) {
+    proofs.hasHusky = {} as HasHuskyProof;
+  }
+  if (state.hasJavaScriptFrameworks) {
+    proofs.hasJavaScriptFrameworks = {} as HasJavaScriptFrameworksProof;
+  }
+  if (state.hasRust) {
+    proofs.hasRust = {} as HasRustProof;
+  }
+  if (state.hasCdkManifest) {
+    proofs.hasCdkManifest = {} as HasCdkManifestProof;
+  }
+  if (state.hasElixirHeavyWorkflow) {
+    proofs.hasElixirHeavyWorkflow = {} as HasElixirHeavyWorkflowProof;
+  }
+  if (state.hasGradle) {
+    proofs.hasGradle = {} as HasGradleProof;
+  }
+  return proofs;
 }
 
 function collectSignalGateState(
