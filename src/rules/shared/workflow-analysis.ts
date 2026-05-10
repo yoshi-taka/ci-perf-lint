@@ -51,7 +51,7 @@ const TOOL_PRESENCE_PATTERNS: Record<string, RegExp> = {
   hasEslintSignal: /\b(?:eslint|oxlint)\b/i,
   hasPrettierSignal: /\b(?:prettier|oxfmt)\b/i,
   hasFrameworkSignal:
-    /\b(?:next|storybook|vite|astro|svelte|turbo|nx|lerna|gradle|gradlew|angular)\b/i,
+    /\b(?:next|storybook|vite|astro|svelte|turbo|nx|lerna|gradle|gradlew|angular|rails|rspec|ruby\/setup-ruby)\b/i,
   hasTypeScriptSignal: /\b(?:tsc|typescript|tsx|ts-jest)\b/i,
   hasJestSignal: /\b(?:jest|jsdom)\b/i,
   hasTailwindSignal: /\b(?:tailwind|postcss)\b/i,

@@ -177,6 +177,14 @@ export interface RepositorySignals {
     gradleBuildCacheConfigured: boolean;
     usesAngularCli: boolean;
     angularCliCacheEnabledForCi: boolean;
+    usesRails: boolean;
+    railsVersionSpec?: string;
+    railsMajor?: number;
+    railsMinor?: number;
+    railsPatch?: number;
+    rubyVersionSpec?: string;
+    rubyMajor?: number;
+    rubyMinor?: number;
   };
   typescript: {
     versionSpec?: string;

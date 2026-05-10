@@ -99,6 +99,14 @@ describe("migrations: framework milestones and bundler migration", () => {
       suggestion: "at least 7.6.x",
       why: ["Docs and MDX pipeline", "Webpack builder"],
     },
+    {
+      name: "Rails 7.2 from 7.0/7.1 builds",
+      fixture: fixtures.preferRailsPerformanceMilestoneLike,
+      ruleId: "prefer-rails-performance-milestone",
+      message: "below the 7.2 performance milestone",
+      suggestion: "at least 7.2.x",
+      why: ["YJIT"],
+    },
   ] as const;
 
   test.each(frameworkMilestonePositiveCases.map((testCase) => [testCase.name, testCase] as const))(
@@ -161,6 +169,11 @@ describe("migrations: framework milestones and bundler migration", () => {
       name: "Storybook 10 once already on 10.3",
       fixture: fixtures.storybook10MinorOk,
       ruleId: "prefer-storybook-10-minor-performance-milestone",
+    },
+    {
+      name: "Rails once already on 7.2",
+      fixture: fixtures.preferRailsPerformanceMilestoneOk72,
+      ruleId: "prefer-rails-performance-milestone",
     },
   ] as const;
 

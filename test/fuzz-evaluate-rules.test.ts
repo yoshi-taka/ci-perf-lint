@@ -109,6 +109,7 @@ function emptySignals(): RepositorySignals {
       gradleBuildCacheConfigured: false,
       usesAngularCli: false,
       angularCliCacheEnabledForCi: false,
+      usesRails: false,
     },
     typescript: { isPublishingTypeDefinitions: false },
     jest: {},

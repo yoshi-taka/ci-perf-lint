@@ -220,6 +220,10 @@ async function hasFrameworkSignalEvidence(
     return true;
   }
 
+  if (await context.pathExists(context.resolve("Gemfile"))) {
+    return true;
+  }
+
   return context.pathExists(context.resolve("package.json"));
 }
 
@@ -509,6 +513,14 @@ export async function collectRepositorySignals(
           gradleBuildCacheConfigured: false,
           usesAngularCli: false,
           angularCliCacheEnabledForCi: false,
+          usesRails: false,
+          railsVersionSpec: undefined,
+          railsMajor: undefined,
+          railsMinor: undefined,
+          railsPatch: undefined,
+          rubyVersionSpec: undefined,
+          rubyMajor: undefined,
+          rubyMinor: undefined,
         })
       : Promise.resolve({
           usesNextjs: false,
@@ -524,6 +536,14 @@ export async function collectRepositorySignals(
           gradleBuildCacheConfigured: false,
           usesAngularCli: false,
           angularCliCacheEnabledForCi: false,
+          usesRails: false,
+          railsVersionSpec: undefined,
+          railsMajor: undefined,
+          railsMinor: undefined,
+          railsPatch: undefined,
+          rubyVersionSpec: undefined,
+          rubyMajor: undefined,
+          rubyMinor: undefined,
         }),
     hasTypeScriptEvidence
       ? safeSignal("typescript", () => collectTypeScriptSignals(context), {

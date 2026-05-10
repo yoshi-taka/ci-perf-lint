@@ -345,6 +345,9 @@ const fixtureNames = {
   rubySetupRubyMissingBundlerCacheOkContainer: "ruby-setup-ruby-missing-bundler-cache-ok-container",
   rubySetupRubyMissingBundlerCacheOkCustomCache:
     "ruby-setup-ruby-missing-bundler-cache-ok-custom-cache",
+  preferRailsPerformanceMilestoneLike: "prefer-rails-performance-milestone-like",
+  preferRailsPerformanceMilestoneOk: "prefer-rails-performance-milestone-ok",
+  preferRailsPerformanceMilestoneOk72: "prefer-rails-performance-milestone-ok-72",
 } as const;
 
 const cache = new Map<string, string>();

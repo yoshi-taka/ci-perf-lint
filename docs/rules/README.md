@@ -111,6 +111,7 @@ Current rule registry:
 - `prefer-oxfmt-over-prettier`
 - `prefer-oxlint-over-eslint`
 - `prefer-pydantic-v2`
+- `prefer-rails-performance-milestone`
 - `prefer-ruff-format-over-black`
 - `prefer-ruff-import-sorting-over-isort`
 - `prefer-setup-bun-for-lightweight-node-tooling`

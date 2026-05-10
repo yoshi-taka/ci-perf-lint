@@ -101,6 +101,18 @@ function storybookDependencyVersionSpec(packageJson: Record<string, unknown>): s
   return undefined;
 }
 
+function extractGemVersion(text: string, gemName: string): string | undefined {
+  const escaped = gemName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`gem\\s+["']${escaped}["']\\s*,\\s*["']([^"']+)["']`);
+  const m = text.match(pattern);
+  return m?.[1];
+}
+
+function extractRubyVersionFromGemfile(text: string): string | undefined {
+  const m = text.match(/ruby\s+["']([^"']+)["']/);
+  return m?.[1];
+}
+
 export async function collectFrameworkSignals(
   context: RepositoryScanContext,
 ): Promise<RepositorySignals["frameworks"]> {
@@ -119,6 +131,9 @@ export async function collectFrameworkSignals(
   let gradleBuildCacheConfigured = false;
   let usesAngularCli = false;
   let angularCliCacheEnabledForCi = false;
+  let usesRails = false;
+  let railsVersionSpec: string | undefined;
+  let rubyVersionSpec: string | undefined;
 
   const packageJsonEntry = await context.loadPackageJson();
   const rootEntries = new Set(
@@ -216,12 +231,38 @@ export async function collectFrameworkSignals(
     }
   }
 
+  const gemfilePath = context.resolve("Gemfile");
+  if (await context.pathExists(gemfilePath)) {
+    const gemfileText = await context.readTextFileOrWarn(gemfilePath);
+    if (gemfileText) {
+      const railsSpec = extractGemVersion(gemfileText, "rails");
+      if (railsSpec) {
+        usesRails = true;
+        railsVersionSpec = railsSpec;
+      }
+      rubyVersionSpec = extractRubyVersionFromGemfile(gemfileText);
+    }
+  }
+
+  if (!rubyVersionSpec) {
+    const rubyVersionPath = context.resolve(".ruby-version");
+    const rubyVersionText = await context.readTextFileOrWarn(rubyVersionPath);
+    if (rubyVersionText) {
+      const m = rubyVersionText.match(/(\d+\.\d+(?:\.\d+)?)/);
+      if (m) {
+        rubyVersionSpec = m[1];
+      }
+    }
+  }
+
   const parsedNextjsVersion = nextjsVersionSpec
     ? parseSemverLikeVersionSpec(nextjsVersionSpec)
     : {};
   const parsedStorybookVersion = storybookVersionSpec
     ? parseSemverLikeVersionSpec(storybookVersionSpec)
     : {};
+  const parsedRailsVersion = railsVersionSpec ? parseSemverLikeVersionSpec(railsVersionSpec) : {};
+  const parsedRubyVersion = rubyVersionSpec ? parseSemverLikeVersionSpec(rubyVersionSpec) : {};
 
   return {
     usesNextjs,
@@ -245,5 +286,13 @@ export async function collectFrameworkSignals(
     gradleBuildCacheConfigured,
     usesAngularCli,
     angularCliCacheEnabledForCi,
+    usesRails,
+    railsVersionSpec,
+    railsMajor: parsedRailsVersion.major,
+    railsMinor: parsedRailsVersion.minor,
+    railsPatch: parsedRailsVersion.patch,
+    rubyVersionSpec,
+    rubyMajor: parsedRubyVersion.major,
+    rubyMinor: parsedRubyVersion.minor,
   };
 }
