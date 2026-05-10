@@ -1,4 +1,5 @@
 import type { AggregatedFinding, Diagnostic } from "./types.ts";
+import type { RepairOp } from "./reification.ts";
 import { mergeSingleJobCrossWorkflowEntries } from "./finding-grouping.ts";
 import { extractQuotedJobName } from "./shared/message-parsing.ts";
 
@@ -9,6 +10,7 @@ type MutableAggregatedFinding = AggregatedFinding & {
   workflowSet: Set<string>;
   jobSet: Set<string>;
   memberFindings: Diagnostic[];
+  repair?: RepairOp;
 };
 
 function mergeCrossWorkflowAggregatedFindings<
@@ -59,11 +61,12 @@ function createMutableAggregatedFinding(
     workflowSet: new Set(finding.scope === "repository" ? [finding.workflow] : []),
     jobSet: new Set(jobName ? [jobName] : []),
     memberFindings: [finding],
+    repair: finding.repair,
   };
 }
 
 function toAggregatedFinding(
-  finding: AggregatedFinding & { memberFindings: Diagnostic[] },
+  finding: AggregatedFinding & { memberFindings: Diagnostic[]; repair?: RepairOp },
 ): AggregatedFinding {
   return {
     ruleId: finding.ruleId,
@@ -79,6 +82,7 @@ function toAggregatedFinding(
     suggestion: finding.suggestion,
     measurementHint: finding.measurementHint,
     firstIndex: finding.firstIndex,
+    repair: finding.repair,
   };
 }
 

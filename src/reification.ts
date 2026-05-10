@@ -91,7 +91,7 @@ function renderSuggestion(op: RepairOp): string {
   return `${prefix} ${op.target} in ${scopeText}.`;
 }
 
-function renderAiHandoff(op: RepairOp, ruleId: string, source?: SourceRef): string {
+export function renderAiHandoff(op: RepairOp, ruleId: string, source?: SourceRef): string {
   const sourceStr = source ? formatSourceRef(source) : "";
   const prefix = sourceStr ? `Review ${sourceStr} for ${ruleId}.` : `Review for ${ruleId}.`;
 
@@ -189,6 +189,7 @@ export function reifyDiagnostic(
     measurementHint: blueprint.measurementHint,
     aiHandoff: renderAiHandoff(blueprint.repair, meta.id, sourceRef),
     score: blueprint.score,
+    repair: blueprint.repair,
   };
 }
 
@@ -222,5 +223,6 @@ export function reifyRepositoryDiagnostic(
     measurementHint: blueprint.measurementHint,
     aiHandoff: renderAiHandoff(blueprint.repair, meta.id, sourceRef),
     score: blueprint.score,
+    repair: blueprint.repair,
   };
 }

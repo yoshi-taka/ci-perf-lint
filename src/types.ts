@@ -1,3 +1,5 @@
+import type { RepairOp } from "./reification.ts";
+
 export type Severity = "error" | "warning" | "suggestion";
 export type Confidence = "high" | "medium";
 export type OutputFormat = "handoff" | "text" | "json" | "markdown";
@@ -33,6 +35,7 @@ export interface Diagnostic {
   measurementHint: string;
   aiHandoff: string;
   score: number;
+  repair?: RepairOp;
 }
 
 export interface AggregatedFinding {
@@ -49,6 +52,7 @@ export interface AggregatedFinding {
   suggestion: string;
   measurementHint: string;
   firstIndex: number;
+  repair?: RepairOp;
 }
 
 export interface WorkflowSummary {

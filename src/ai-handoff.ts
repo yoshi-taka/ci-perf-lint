@@ -1,4 +1,5 @@
 import type { AggregatedFinding } from "./types.ts";
+import { renderAiHandoff } from "./reification.ts";
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
@@ -23,15 +24,16 @@ function renderRepositoryHandoffSummary(entry: {
 
   const renderedLocations = renderRepresentativeLocations(entry.locations);
 
-  if (entry.ruleId === "detected-large-barrel-file") {
-    return `Review repeated detected-large-barrel-file findings across ${entry.locations.length} source/tooling locations, starting with ${renderedLocations}. Narrow broad \`export *\` barrels where they are not intentional public API or generated output, keep API boundaries explicit, prefer direct imports where possible, and evaluate adding \`no-barrel-file\` as a guardrail.`;
+  return `Review repeated ${entry.ruleId} findings across ${entry.locations.length} source/tooling locations, starting with ${renderedLocations}. Apply one consistent fix pattern where appropriate.`;
+}
+
+function renderStructuredWorkflowHandoff(finding: AggregatedFinding): string | undefined {
+  if (!finding.repair) {
+    return undefined;
   }
 
-  if (entry.ruleId === "prefer-explicit-import-extensions") {
-    return `Review repeated prefer-explicit-import-extensions findings across ${entry.locations.length} source/tooling locations, starting with ${renderedLocations}. Add explicit runtime extensions to relative JavaScript and TypeScript imports so resolvers do not repeatedly probe candidate extensions and index files; leave package imports unchanged.`;
-  }
-
-  return `Review repeated ${entry.ruleId} repository-wide findings across ${entry.locations.length} source/tooling locations, starting with ${renderedLocations}. Apply one consistent fix pattern where appropriate.`;
+  const source = { workflowPath: finding.workflow };
+  return renderAiHandoff(finding.repair, finding.ruleId, source);
 }
 
 const sharedAiHandoffInstruction =
@@ -40,7 +42,14 @@ const sharedAiHandoffInstruction =
 export function buildAiHandoff(topAggregatedFindings: AggregatedFinding[]): string[] {
   const lines: string[] = [sharedAiHandoffInstruction];
 
-  topAggregatedFindings.forEach((finding) => {
+  for (const finding of topAggregatedFindings) {
+    const structuredHandoff = renderStructuredWorkflowHandoff(finding);
+
+    if (structuredHandoff) {
+      lines.push(structuredHandoff);
+      continue;
+    }
+
     const fallback = finding.aiHandoffs?.[0];
 
     if (finding.scope === "repository") {
@@ -51,36 +60,36 @@ export function buildAiHandoff(topAggregatedFindings: AggregatedFinding[]): stri
           fallback,
         }),
       );
-      return;
+      continue;
     }
 
     if (finding.workflows.length >= 2 && finding.jobs.length >= 1) {
-      const renderedWorkflows = finding.workflows.map((workflow) => `\`${workflow}\``).join(", ");
-      const renderedJobs = finding.jobs.map((job) => `"${job}"`).join(", ");
+      const renderedWorkflows = finding.workflows.map((w) => `\`${w}\``).join(", ");
+      const renderedJobs = finding.jobs.map((j) => `"${j}"`).join(", ");
       lines.push(
         `Review repeated ${finding.ruleId} findings for jobs ${renderedJobs} across workflows ${renderedWorkflows}. Apply one consistent fix pattern where appropriate instead of treating each workflow separately.`,
       );
-      return;
+      continue;
     }
 
     if (finding.workflows.length >= 2 && finding.locations.length === 1) {
-      const renderedWorkflows = finding.workflows.map((workflow) => `\`${workflow}\``).join(", ");
+      const renderedWorkflows = finding.workflows.map((w) => `\`${w}\``).join(", ");
       lines.push(
         `Review ${finding.locations[0]} for repeated ${finding.ruleId} findings surfaced across workflows ${renderedWorkflows}. Apply one consistent fix pattern where appropriate instead of treating each workflow separately.`,
       );
-      return;
+      continue;
     }
 
     if (finding.jobs.length >= 2) {
-      const renderedJobs = finding.jobs.map((job) => `"${job}"`).join(", ");
+      const renderedJobs = finding.jobs.map((j) => `"${j}"`).join(", ");
       lines.push(
         `Review ${finding.workflow} for repeated ${finding.ruleId} findings affecting jobs ${renderedJobs}. Apply one consistent fix pattern where appropriate instead of treating each job in isolation.`,
       );
-      return;
+      continue;
     }
 
     lines.push(fallback ?? `Review ${finding.ruleId} and apply the suggested action.`);
-  });
+  }
 
   return uniqueStrings(lines);
 }
