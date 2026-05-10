@@ -1,10 +1,32 @@
-const minimumSharedFeatureCount = 3;
-const minimumSimilarity = 0.55;
+const MINIMUM_SHARED_FEATURE_COUNT = 3;
+const MINIMUM_SHARED_BAND_COUNT = 2;
+const MINIMUM_SIMILARITY = 0.55;
 
 interface FeatureComparable {
   features: Set<string>;
   featureMask: bigint;
   featureCount: number;
+}
+
+const BAND_PREFIXES = [
+  "trigger",
+  "push",
+  "filter",
+  "shape",
+  "job",
+  "runner",
+  "runtime",
+  "tool",
+  "kind",
+];
+
+function featureBand(feature: string): string {
+  const colon = feature.indexOf(":");
+  return colon > 0 ? feature.slice(0, colon) : feature;
+}
+
+function isKnownBand(band: string): boolean {
+  return BAND_PREFIXES.includes(band);
 }
 
 export function encodeFeatureMasks<T extends FeatureComparable>(summaries: T[]): void {
@@ -63,39 +85,58 @@ export function collectPeerIndexes<T extends FeatureComparable>(
   summaries: T[],
   isSameSummary: (left: T, right: T) => boolean,
 ): number[][] {
-  const summaryIndexesByFeature = new Map<string, number[]>();
+  const bandIndexes = new Map<string, Map<string, number[]>>();
 
   for (const [summaryIndex, summary] of summaries.entries()) {
     for (const feature of summary.features) {
-      const existing = summaryIndexesByFeature.get(feature);
+      const band = featureBand(feature);
+      if (!isKnownBand(band)) {
+        continue;
+      }
+      let featureMap = bandIndexes.get(band);
+      if (!featureMap) {
+        featureMap = new Map();
+        bandIndexes.set(band, featureMap);
+      }
+      const existing = featureMap.get(feature);
       if (existing) {
         existing.push(summaryIndex);
       } else {
-        summaryIndexesByFeature.set(feature, [summaryIndex]);
+        featureMap.set(feature, [summaryIndex]);
       }
     }
   }
 
   return summaries.map((summary, summaryIndex) => {
-    const candidateSharedFeatureCounts = new Map<number, number>();
+    const candidateData = new Map<number, { sharedCount: number; bands: Set<string> }>();
 
     for (const feature of summary.features) {
-      for (const candidateIndex of summaryIndexesByFeature.get(feature) ?? []) {
+      const band = featureBand(feature);
+      const featureMap = bandIndexes.get(band);
+      if (!featureMap) {
+        continue;
+      }
+      for (const candidateIndex of featureMap.get(feature) ?? []) {
         if (candidateIndex === summaryIndex) {
           continue;
         }
-
-        candidateSharedFeatureCounts.set(
-          candidateIndex,
-          (candidateSharedFeatureCounts.get(candidateIndex) ?? 0) + 1,
-        );
+        let data = candidateData.get(candidateIndex);
+        if (!data) {
+          data = { sharedCount: 0, bands: new Set() };
+          candidateData.set(candidateIndex, data);
+        }
+        data.sharedCount++;
+        data.bands.add(band);
       }
     }
 
     const peerIndexes: number[] = [];
 
-    for (const [candidateIndex, sharedFeatureCount] of candidateSharedFeatureCounts) {
-      if (sharedFeatureCount < minimumSharedFeatureCount) {
+    for (const [candidateIndex, { sharedCount, bands }] of candidateData) {
+      if (sharedCount < MINIMUM_SHARED_FEATURE_COUNT) {
+        continue;
+      }
+      if (bands.size < MINIMUM_SHARED_BAND_COUNT) {
         continue;
       }
 
@@ -104,7 +145,7 @@ export function collectPeerIndexes<T extends FeatureComparable>(
         continue;
       }
 
-      if (jaccardSimilarity(summary, candidate, sharedFeatureCount) >= minimumSimilarity) {
+      if (jaccardSimilarity(summary, candidate, sharedCount) >= MINIMUM_SIMILARITY) {
         peerIndexes.push(candidateIndex);
       }
     }
