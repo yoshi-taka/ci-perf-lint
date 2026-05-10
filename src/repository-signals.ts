@@ -6,6 +6,7 @@ import {
   collectRepositoryPrecedentSignals,
   collectSimilarWorkflowSignals,
 } from "./repository-similar-workflows.ts";
+import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
 import { isHeavyWorkflow } from "./rules/shared/workflows.ts";
 import type { WorkflowDocument } from "./workflow.ts";
 import { collectFrameworkSignals } from "./repository-framework-signals.ts";
@@ -88,8 +89,8 @@ function workflowFingerprint(workflows: WorkflowDocument[]): string {
     .join("|");
 }
 
-function workflowsMatch(workflows: WorkflowDocument[], pattern: RegExp): boolean {
-  return workflows.some((workflow) => pattern.test(workflow.source ?? ""));
+function anyWorkflowHasToolFeature(workflows: WorkflowDocument[], feature: string): boolean {
+  return workflows.some((wf) => getWorkflowFacts(wf).toolPresence.get(feature) ?? false);
 }
 
 function packageJsonTextMentions(packageJsonText: string | undefined, pattern: RegExp): boolean {
@@ -110,7 +111,7 @@ async function hasPythonSignalEvidence(
   context: RepositoryScanContext,
   workflows: WorkflowDocument[],
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:python|pip|uv|ruff|black|isort|tox|nox|hatch|pdm)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasPythonSignal")) {
     return true;
   }
 
@@ -126,7 +127,7 @@ async function hasRustSignalEvidence(
   context: RepositoryScanContext,
   workflows: WorkflowDocument[],
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:cargo|rustc|nextest)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasRustSignal")) {
     return true;
   }
 
@@ -137,7 +138,7 @@ async function hasElixirSignalEvidence(
   context: RepositoryScanContext,
   workflows: WorkflowDocument[],
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:elixir|erlang|otp|mix|setup-beam)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasElixirSignal")) {
     return true;
   }
 
@@ -152,12 +153,7 @@ async function hasNativePackageSignalEvidence(
   context: RepositoryScanContext,
   workflows: WorkflowDocument[],
 ): Promise<boolean> {
-  if (
-    workflowsMatch(
-      workflows,
-      /\b(?:npm|pnpm|yarn|bun|node-gyp|prebuild|node-pre-gyp|pip|uv|maturin|setuptools)\b/i,
-    )
-  ) {
+  if (anyWorkflowHasToolFeature(workflows, "hasNativePackageSignal")) {
     return true;
   }
 
@@ -169,7 +165,7 @@ async function hasEslintSignalEvidence(
   workflows: WorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:eslint|oxlint)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasEslintSignal")) {
     return true;
   }
 
@@ -190,7 +186,7 @@ async function hasPrettierSignalEvidence(
   workflows: WorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:prettier|oxfmt)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasPrettierSignal")) {
     return true;
   }
 
@@ -211,12 +207,7 @@ async function hasFrameworkSignalEvidence(
   workflows: WorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
-  if (
-    workflowsMatch(
-      workflows,
-      /\b(?:next|storybook|vite|astro|svelte|turbo|nx|lerna|gradle|gradlew|angular)\b/i,
-    )
-  ) {
+  if (anyWorkflowHasToolFeature(workflows, "hasFrameworkSignal")) {
     return true;
   }
 
@@ -237,7 +228,7 @@ async function hasTypeScriptSignalEvidence(
   workflows: WorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:tsc|typescript|tsx|ts-jest)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasTypeScriptSignal")) {
     return true;
   }
 
@@ -253,7 +244,7 @@ async function hasJestSignalEvidence(
   workflows: WorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:jest|jsdom)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasJestSignal")) {
     return true;
   }
 
@@ -269,7 +260,7 @@ async function hasTailwindSignalEvidence(
   workflows: WorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:tailwind|postcss)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasTailwindSignal")) {
     return true;
   }
 
@@ -285,7 +276,7 @@ async function hasHuskySignalEvidence(
   workflows: WorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:husky|lint-staged)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasHuskySignal")) {
     return true;
   }
 
@@ -301,7 +292,7 @@ async function hasBabelSignalEvidence(
   workflows: WorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
-  if (workflowsMatch(workflows, /\b(?:babel|@babel\/|core-js)\b/i)) {
+  if (anyWorkflowHasToolFeature(workflows, "hasBabelSignal")) {
     return true;
   }
 

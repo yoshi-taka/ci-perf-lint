@@ -35,6 +35,45 @@ const metaCheckWorkflowNamePattern =
 const agenticWorkflowNamePattern =
   /\b(ai|agent|claude|codex|openai|anthropic|gemini|review bot|autofix)\b/;
 
+const TOOL_PRESENCE_PATTERNS: Record<string, RegExp> = {
+  hasNpmEcosystem:
+    /actions\/setup-node@|\boven-sh\/setup-bun@|\bpnpm\/action-setup@|\bvolta-cli\/action@|\b(?:npm|pnpm|yarn|bun)\b|\b(?:eslint|oxlint|tsc|vitest|jest|next build|vite build|webpack|rollup|esbuild|turbo|nx)\b/,
+  hasDockerBuild: /docker\/build-push-action@|\bdocker\s+(?:buildx\s+build|build)\b/,
+  hasTerraform: /\bterraform\s+init\b/,
+  hasPython: /actions\/setup-python@|\b(?:pip\s+install|python\s+-m|pytest|tox|poetry\s+install)\b/,
+  hasDatadog: /datadog\/datadog-lambda-extension@|public\.ecr\.aws\/datadog\/lambda-extension/,
+  hasElixir: /erlef\/setup-beam@|\belixir\b|\bmix\b|container:\s*elixir:/,
+  hasPythonSignal: /\b(?:python|pip|uv|ruff|black|isort|tox|nox|hatch|pdm|pytest)\b/i,
+  hasRustSignal: /\b(?:cargo|rustc|nextest)\b/i,
+  hasElixirSignal: /\b(?:elixir|erlang|otp|mix|setup-beam)\b/i,
+  hasNativePackageSignal:
+    /\b(?:npm|pnpm|yarn|bun|node-gyp|prebuild|node-pre-gyp|pip|uv|maturin|setuptools)\b/i,
+  hasEslintSignal: /\b(?:eslint|oxlint)\b/i,
+  hasPrettierSignal: /\b(?:prettier|oxfmt)\b/i,
+  hasFrameworkSignal:
+    /\b(?:next|storybook|vite|astro|svelte|turbo|nx|lerna|gradle|gradlew|angular)\b/i,
+  hasTypeScriptSignal: /\b(?:tsc|typescript|tsx|ts-jest)\b/i,
+  hasJestSignal: /\b(?:jest|jsdom)\b/i,
+  hasTailwindSignal: /\b(?:tailwind|postcss)\b/i,
+  hasHuskySignal: /\b(?:husky|lint-staged)\b/i,
+  hasBabelSignal: /\b(?:babel|@babel\/|core-js)\b/i,
+  hasSparseCheckout: /sparse-checkout/i,
+  hasNpmRun: /npm run/i,
+  hasDockerBuildPushAction: /docker\/build-push-action/,
+  hasDockerPush: /--push/,
+  hasWebpackOrRspackOrBabel:
+    /\b(?:webpack|rspack|babel|ts-loader|fork-ts-checker|next build|vite build|storybook)\b/i,
+  hasNpmOrPnpmOrYarnOrBun: /\b(?:npm|pnpm|yarn|bun)\b/i,
+};
+
+function computeToolPresence(blob: string): Map<string, boolean> {
+  const presence = new Map<string, boolean>();
+  for (const [key, pattern] of Object.entries(TOOL_PRESENCE_PATTERNS)) {
+    presence.set(key, pattern.test(blob));
+  }
+  return presence;
+}
+
 export interface JobFacts {
   checkoutStep?: WorkflowStep;
   hasSetupBunStep: boolean;
@@ -76,6 +115,7 @@ export interface WorkflowFacts {
   setupActionsByJob: ReadonlyMap<string, readonly SetupActionKind[]>;
   installFamiliesByJob: ReadonlyMap<string, readonly string[]>;
   triggerFacts: TriggerFacts;
+  toolPresence: ReadonlyMap<string, boolean>;
 }
 
 const jobFactsCache = new WeakMap<WorkflowJob, JobFacts>();
@@ -138,6 +178,7 @@ const emptyWorkflowFacts: WorkflowFacts = {
   setupActionsByJob: new Map(),
   installFamiliesByJob: new Map(),
   triggerFacts: emptyTriggerFacts,
+  toolPresence: new Map(),
 };
 
 function usesSetupAction(stepUses: string | undefined, prefix: string): boolean {
@@ -400,6 +441,8 @@ export function getWorkflowFacts(
     wfHeavyStrengths.push("weak");
   }
 
+  const blob = loweredStepTexts.join("\n");
+
   const facts: WorkflowFacts = {
     isHeavyWorkflow: wfNameHeavy || hasHeavyJob,
     heavyWorkflowEvidence: {
@@ -416,13 +459,14 @@ export function getWorkflowFacts(
     releaseLikeJobIds,
     lintTools,
     pythonTools,
-    loweredStepTextBlob: loweredStepTexts.join("\n"),
+    loweredStepTextBlob: blob,
     checkoutDepthsByJob,
     dockerUsageByJob,
     timeoutPresenceByJob,
     setupActionsByJob,
     installFamiliesByJob,
     triggerFacts,
+    toolPresence: computeToolPresence(blob),
   };
   workflowFactsCache.set(wf, facts);
   return facts;

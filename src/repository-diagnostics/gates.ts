@@ -12,6 +12,7 @@ import {
   repositoryLooksPytestHeavy,
 } from "./imports-shared.ts";
 import { meetsMinimum } from "../rules/shared/evidence.ts";
+import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 
@@ -156,7 +157,9 @@ function repositoryLikelyUsesJavaScriptLinting(context: RepositoryDiagnosticCont
     eslint.pluginNames.length > 0 ||
     husky.usesHusky ||
     husky.usesLintStaged ||
-    context.workflows.some((workflow) => /\b(?:eslint|oxlint)\b/i.test(workflow.source ?? ""))
+    context.workflows.some(
+      (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasEslintSignal") ?? false,
+    )
   );
 }
 
@@ -175,10 +178,9 @@ function repositoryLikelyUsesJavaScriptBuildConfig(context: RepositoryDiagnostic
     jest.versionSpec !== undefined ||
     context.repository.eslint.usesEslint ||
     context.repository.prettier.usesPrettier ||
-    context.workflows.some((workflow) =>
-      /\b(?:webpack|rspack|babel|ts-loader|fork-ts-checker|next build|vite build|storybook)\b/i.test(
-        workflow.source ?? "",
-      ),
+    context.workflows.some(
+      (workflow) =>
+        getWorkflowFacts(workflow).toolPresence.get("hasWebpackOrRspackOrBabel") ?? false,
     )
   );
 }
@@ -194,7 +196,9 @@ function repositoryLikelyUsesJavaScriptPackageScripts(
     npm.packageScriptEnvReferences.length > 0 ||
     npm.workflowEnvReferences.length > 0 ||
     nativePackages.node.length > 0 ||
-    context.workflows.some((workflow) => /\b(?:npm|pnpm|yarn|bun)\b/i.test(workflow.source ?? ""))
+    context.workflows.some(
+      (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasNpmOrPnpmOrYarnOrBun") ?? false,
+    )
   );
 }
 

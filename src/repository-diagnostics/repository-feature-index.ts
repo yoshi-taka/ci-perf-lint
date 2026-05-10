@@ -4,17 +4,22 @@ import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { DockerBuildTarget } from "./docker-build-targets.ts";
 
-const ECOSYSTEM_PATTERNS: Record<string, RegExp> = {
-  javascript:
-    /actions\/setup-node@|\boven-sh\/setup-bun@|\bpnpm\/action-setup@|\bvolta-cli\/action@|\b(?:npm|pnpm|yarn|bun)\b|\b(?:eslint|oxlint|tsc|vitest|jest|next build|vite build|webpack|rollup|esbuild|turbo|nx)\b/,
-  docker: /docker\/build-push-action@|\bdocker\s+(?:buildx\s+build|build)\b/,
-  terraform: /\bterraform\s+init\b/,
-  python: /actions\/setup-python@|\b(?:pip\s+install|python\s+-m|pytest|tox|poetry\s+install)\b/,
-  datadog: /datadog\/datadog-lambda-extension@|public\.ecr\.aws\/datadog\/lambda-extension/,
-  elixir: /erlef\/setup-beam@|\belixir\b|\bmix\b|container:\s*elixir:/,
-};
+export type EcosystemFeature =
+  | "javascript"
+  | "docker"
+  | "terraform"
+  | "python"
+  | "datadog"
+  | "elixir";
 
-export type EcosystemFeature = keyof typeof ECOSYSTEM_PATTERNS;
+const ECOSYSTEM_FEATURES: Record<EcosystemFeature, string> = {
+  javascript: "hasNpmEcosystem",
+  docker: "hasDockerBuild",
+  terraform: "hasTerraform",
+  python: "hasPython",
+  datadog: "hasDatadog",
+  elixir: "hasElixir",
+};
 
 export interface DockerBuildPresenceFeature {
   readonly hasActionBasedBuild: boolean;
@@ -76,8 +81,8 @@ export function buildRepositoryFeatureIndex(
   const workflowsByEcosystem = new Map<EcosystemFeature, WorkflowDocument[]>();
   const workflowFeatures = new Map<WorkflowDocument, WorkflowFeatureMap>();
 
-  for (const ecosystem of Object.keys(ECOSYSTEM_PATTERNS)) {
-    workflowsByEcosystem.set(ecosystem, []);
+  for (const ecosystem of Object.keys(ECOSYSTEM_FEATURES)) {
+    workflowsByEcosystem.set(ecosystem as EcosystemFeature, []);
   }
 
   for (const workflow of workflows) {
@@ -85,12 +90,13 @@ export function buildRepositoryFeatureIndex(
     const blob = wfFacts.loweredStepTextBlob;
     const source = workflow.source;
     const matched = new Set<EcosystemFeature>();
+    const tp = wfFacts.toolPresence;
 
-    for (const ecosystem of Object.keys(ECOSYSTEM_PATTERNS)) {
-      if (ECOSYSTEM_PATTERNS[ecosystem]!.test(blob)) {
-        matched.add(ecosystem);
-        ecosystems.add(ecosystem);
-        workflowsByEcosystem.get(ecosystem)!.push(workflow);
+    for (const [ecosystem, tpKey] of Object.entries(ECOSYSTEM_FEATURES)) {
+      if (tp.get(tpKey)) {
+        matched.add(ecosystem as EcosystemFeature);
+        ecosystems.add(ecosystem as EcosystemFeature);
+        workflowsByEcosystem.get(ecosystem as EcosystemFeature)!.push(workflow);
       }
     }
 
