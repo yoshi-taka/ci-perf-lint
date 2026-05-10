@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
-  identityDiagnosticTransform,
   pipe,
   taggedPipe,
+  identityDiagnosticTransform,
+  getDiagnosticTransformMetadata,
   type TaggedTransform,
 } from "../src/rules/shared/diagnostic-transform.ts";
 import type { Diagnostic } from "../src/types.ts";
 
-function diagnostic(): Diagnostic {
+function diagnostic(overrides: Partial<Diagnostic> = {}): Diagnostic {
   return {
     ruleId: "test-rule",
     severity: "warning",
@@ -20,7 +21,8 @@ function diagnostic(): Diagnostic {
     suggestion: "suggest",
     measurementHint: "measure",
     aiHandoff: "handoff",
-    score: 1,
+    score: 10,
+    ...overrides,
   };
 }
 
@@ -41,7 +43,7 @@ describe("DiagnosticTransform monoid", () => {
 
     expect(transform.isIdentity).toBe(false);
     expect(transform.transforms).toHaveLength(1);
-    expect(transform(input)).toEqual({ ...input, score: 3 });
+    expect(transform(input)).toEqual({ ...input, score: 12 });
   });
 
   test("composition is associative", () => {
