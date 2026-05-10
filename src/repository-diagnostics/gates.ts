@@ -36,12 +36,100 @@ import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 
+interface AdjacencyList {
+  successors: Map<GateKey, readonly GateKey[]>;
+  predecessors: Map<GateKey, readonly GateKey[]>;
+  roots: readonly GateKey[];
+  evaluationOrder: readonly GateKey[];
+}
+
+export function buildDag(prerequisites: Partial<Record<GateKey, GateKey[]>>): AdjacencyList {
+  const allKeys = new Set<GateKey>([
+    ...(Object.keys(prerequisites) as GateKey[]),
+    ...Object.values(prerequisites).flatMap((v) => v),
+  ]);
+
+  const successors = new Map<GateKey, readonly GateKey[]>();
+  const predecessors = new Map<GateKey, readonly GateKey[]>();
+
+  for (const key of allKeys) {
+    if (!successors.has(key)) {
+      successors.set(key, []);
+    }
+    if (!predecessors.has(key)) {
+      predecessors.set(key, []);
+    }
+  }
+
+  for (const [key, prereqs] of Object.entries(prerequisites) as [GateKey, GateKey[]][]) {
+    for (const prereq of prereqs) {
+      const predList = [...(successors.get(prereq) ?? [])];
+      if (!predList.includes(key)) {
+        predList.push(key);
+        successors.set(prereq, predList);
+      }
+
+      const succList = [...(predecessors.get(key) ?? [])];
+      if (!succList.includes(prereq)) {
+        succList.push(prereq);
+        predecessors.set(key, succList);
+      }
+    }
+  }
+
+  const roots = [...allKeys].filter((k) => (predecessors.get(k) ?? []).length === 0);
+  const topo = topologicalSort(allKeys, successors);
+
+  return { successors, predecessors, roots, evaluationOrder: topo };
+}
+
+function topologicalSort(
+  allNodes: Set<GateKey>,
+  successors: Map<GateKey, readonly GateKey[]>,
+): readonly GateKey[] {
+  const inDegree = new Map<GateKey, number>();
+  for (const node of allNodes) {
+    inDegree.set(node, 0);
+  }
+  for (const [, succs] of successors) {
+    for (const succ of succs) {
+      inDegree.set(succ, (inDegree.get(succ) ?? 0) + 1);
+    }
+  }
+
+  const queue: GateKey[] = [];
+  for (const [node, degree] of inDegree) {
+    if (degree === 0) {
+      queue.push(node);
+    }
+  }
+
+  const sorted: GateKey[] = [];
+
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    sorted.push(node);
+    const succs = successors.get(node) ?? [];
+    for (const succ of succs) {
+      const newDegree = (inDegree.get(succ) ?? 1) - 1;
+      inDegree.set(succ, newDegree);
+      if (newDegree === 0) {
+        queue.push(succ);
+      }
+    }
+  }
+
+  return sorted;
+}
+
 const gatePrerequisites: Partial<Record<GateKey, GateKey[]>> = {
   hasJavaScriptLinting: ["hasJavaScriptTooling"],
   hasJavaScriptBuildConfig: ["hasJavaScriptTooling"],
   hasJavaScriptPackageScripts: ["hasJavaScriptTooling"],
   hasJavaScriptFrameworks: ["hasJavaScriptTooling"],
 };
+
+const dag = buildDag(gatePrerequisites);
 
 const emptyGateState: RepositoryDiagnosticGateState = {
   hasJavaScriptHeavyWorkflow: false,
@@ -394,7 +482,6 @@ export async function collectRepositoryDiagnosticGateState(
     observed: [] as string[],
     derivedFalse: [] as { gate: string; dueTo: string[] }[],
   };
-  const jsObservations = buildJavaScriptGateObservations(context);
 
   const signalGates = collectSignalGateState(context.featureIndex);
   Object.assign(state, signalGates);
@@ -417,107 +504,174 @@ export async function collectRepositoryDiagnosticGateState(
   state.hasHusky = context.repository.husky.hookFileCount > 0;
   state.hasGradle = context.repository.frameworks.usesGradle;
 
-  const jsToolingGate = await evaluateGate(
-    "hasJavaScriptTooling",
-    [() => quickTestJavaScriptTooling(jsObservations)],
-    async () =>
-      (
-        await timedGate("javascript-tooling", () =>
-          looksLikeJavaScriptRepository(context.scanContext),
-        )
-      ).value,
-    state,
-  );
-  if (jsToolingGate !== undefined) {
-    state.hasJavaScriptTooling = jsToolingGate;
+  const jsObservations = buildJavaScriptGateObservations(context);
+
+  const jsToolingQuick = quickTestJavaScriptTooling(jsObservations);
+
+  if (jsToolingQuick === true) {
+    state.hasJavaScriptTooling = true;
     observability.observed.push("hasJavaScriptTooling");
-  }
 
-  const jsBuildConfigEvidence = state.hasJavaScriptTooling
-    ? await repositoryHasJavaScriptBuildConfigEvidence(context.scanContext)
-    : false;
-  const jsPackageScriptEvidence = state.hasJavaScriptTooling
-    ? await repositoryHasJavaScriptPackageScriptEvidence(context.scanContext)
-    : false;
-
-  state.hasJavaScriptLinting = state.hasJavaScriptTooling
-    ? repositoryLikelyUsesJavaScriptLinting(context, jsObservations)
-    : false;
-  state.hasJavaScriptBuildConfig = state.hasJavaScriptTooling
-    ? repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) || jsBuildConfigEvidence
-    : false;
-  state.hasJavaScriptPackageScripts = state.hasJavaScriptTooling
-    ? repositoryLikelyUsesJavaScriptPackageScripts(jsObservations) || jsPackageScriptEvidence
-    : false;
-
-  const jsFrameworksGate = await evaluateGate(
-    "hasJavaScriptFrameworks",
-    [() => quickTestJavaScriptFrameworks(context, jsObservations)],
-    async () =>
-      (
-        await timedGate("javascript-frameworks", () =>
-          looksLikeJavaScriptFrameworksRepository(context.scanContext),
-        )
-      ).value,
-    state,
-  );
-  if (jsFrameworksGate !== undefined && state.hasJavaScriptTooling) {
-    state.hasJavaScriptFrameworks = jsFrameworksGate;
-  } else if (!state.hasJavaScriptTooling) {
+    const [jsBuildConfigEvidence, jsPackageScriptEvidence] = await Promise.all([
+      repositoryHasJavaScriptBuildConfigEvidence(context.scanContext),
+      repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
+    ]);
+    state.hasJavaScriptLinting = repositoryLikelyUsesJavaScriptLinting(context, jsObservations);
+    state.hasJavaScriptBuildConfig =
+      repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) || jsBuildConfigEvidence;
+    state.hasJavaScriptPackageScripts =
+      repositoryLikelyUsesJavaScriptPackageScripts(jsObservations) || jsPackageScriptEvidence;
+  } else if (jsToolingQuick === false) {
+    state.hasJavaScriptTooling = false;
+    state.hasJavaScriptLinting = false;
+    state.hasJavaScriptBuildConfig = false;
+    state.hasJavaScriptPackageScripts = false;
     state.hasJavaScriptFrameworks = false;
-  }
-
-  const rustGate = await evaluateGate(
-    "hasRust",
-    [() => quickTestRust(context)],
-    async () => (await timedGate("rust", () => looksLikeRustRepository(context.scanContext))).value,
-    state,
-  );
-  if (rustGate !== undefined) {
-    state.hasRust = rustGate;
-  }
-
-  if (!state.hasJavaScriptTooling) {
-    observability.derivedFalse.push(
-      ...[
-        "hasJavaScriptLinting",
-        "hasJavaScriptBuildConfig",
-        "hasJavaScriptPackageScripts",
-        "hasJavaScriptFrameworks",
-      ].map((gate) => ({ gate, dueTo: ["hasJavaScriptTooling"] })),
+    pruneDescendants(
+      gateKeys.javascriptTooling,
+      dag,
+      state,
+      gateKeys.javascriptTooling,
+      observability,
     );
+    await evaluateDescendantsPruned(context, state, observability);
+    return { state, observability };
+  } else {
+    const jsToolingResult = await timedGate("javascript-tooling", () =>
+      looksLikeJavaScriptRepository(context.scanContext),
+    );
+    state.hasJavaScriptTooling = jsToolingResult.value;
+    observability.observed.push("hasJavaScriptTooling");
+
+    if (!state.hasJavaScriptTooling) {
+      state.hasJavaScriptLinting = false;
+      state.hasJavaScriptBuildConfig = false;
+      state.hasJavaScriptPackageScripts = false;
+      state.hasJavaScriptFrameworks = false;
+      pruneDescendants(
+        gateKeys.javascriptTooling,
+        dag,
+        state,
+        gateKeys.javascriptTooling,
+        observability,
+      );
+      await evaluateDescendantsPruned(context, state, observability);
+      return { state, observability };
+    }
+
+    const [jsBuildConfigEvidence, jsPackageScriptEvidence] = await Promise.all([
+      repositoryHasJavaScriptBuildConfigEvidence(context.scanContext),
+      repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
+    ]);
+    state.hasJavaScriptLinting = repositoryLikelyUsesJavaScriptLinting(context, jsObservations);
+    state.hasJavaScriptBuildConfig =
+      repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) || jsBuildConfigEvidence;
+    state.hasJavaScriptPackageScripts =
+      repositoryLikelyUsesJavaScriptPackageScripts(jsObservations) || jsPackageScriptEvidence;
   }
 
-  for (const gate of ["hasJavaScriptTooling", "hasJavaScriptFrameworks", "hasRust"] as const) {
-    if (state[gate]) {
-      observability.observed.push(gate);
+  const jsFrameworksQuick = quickTestJavaScriptFrameworks(context, jsObservations);
+  if (jsFrameworksQuick !== undefined) {
+    state.hasJavaScriptFrameworks = jsFrameworksQuick;
+    observability.observed.push("hasJavaScriptFrameworks");
+    if (!jsFrameworksQuick) {
+      pruneDescendants(
+        gateKeys.javascriptFrameworks,
+        dag,
+        state,
+        gateKeys.javascriptFrameworks,
+        observability,
+      );
     }
+  } else {
+    const jsFrameworksResult = await timedGate("javascript-frameworks", () =>
+      looksLikeJavaScriptFrameworksRepository(context.scanContext),
+    );
+    state.hasJavaScriptFrameworks = jsFrameworksResult.value;
+    observability.observed.push("hasJavaScriptFrameworks");
+    if (!jsFrameworksResult.value) {
+      pruneDescendants(
+        gateKeys.javascriptFrameworks,
+        dag,
+        state,
+        gateKeys.javascriptFrameworks,
+        observability,
+      );
+    }
+  }
+
+  const rustQuick = quickTestRust(context);
+  if (rustQuick !== undefined) {
+    state.hasRust = rustQuick;
+    observability.observed.push("hasRust");
+  } else {
+    const rustResult = await timedGate("rust", () => looksLikeRustRepository(context.scanContext));
+    state.hasRust = rustResult.value;
+    observability.observed.push("hasRust");
   }
 
   return { state, observability };
 }
 
-async function evaluateGate(
-  key: GateKey,
-  quickTests: (() => boolean | undefined)[],
-  expensiveEval: () => Promise<boolean>,
+async function evaluateDescendantsPruned(
+  context: RepositoryDiagnosticContext,
   state: RepositoryDiagnosticGateState,
-): Promise<boolean | undefined> {
-  const prereqs = gatePrerequisites[key];
-  if (prereqs) {
-    for (const prereq of prereqs) {
-      if (!state[prereq]) {
-        return false;
+  observability: { observed: string[]; derivedFalse: { gate: string; dueTo: string[] }[] },
+): Promise<void> {
+  if (state[gateKeys.rust]) {
+    return;
+  }
+
+  const rustQuick = quickTestRust(context);
+  if (rustQuick !== undefined) {
+    state.hasRust = rustQuick;
+    observability.observed.push("hasRust");
+  } else {
+    const rustResult = await timedGate("rust", () => looksLikeRustRepository(context.scanContext));
+    state.hasRust = rustResult.value;
+    observability.observed.push("hasRust");
+  }
+}
+
+function pruneDescendants(
+  key: GateKey,
+  graph: AdjacencyList,
+  state: RepositoryDiagnosticGateState,
+  reason: GateKey,
+  observability: {
+    derivedFalse: { gate: string; dueTo: string[] }[];
+  },
+): void {
+  const visited = new Set<GateKey>();
+  const stack = [...(graph.successors.get(key) ?? [])];
+
+  while (stack.length > 0) {
+    const curr = stack.pop()!;
+    if (visited.has(curr)) {
+      continue;
+    }
+    visited.add(curr);
+
+    if (!state[curr]) {
+      const existing = observability.derivedFalse.find((d) => d.gate === curr);
+      if (existing) {
+        if (!existing.dueTo.includes(key)) {
+          existing.dueTo.push(key);
+        }
+      } else {
+        observability.derivedFalse.push({ gate: curr, dueTo: [key] });
       }
+    } else {
+      state[curr] = false as never;
+      const existing = observability.derivedFalse.find((d) => d.gate === curr);
+      if (existing) {
+        if (!existing.dueTo.includes(reason)) {
+          existing.dueTo.push(reason);
+        }
+      } else {
+        observability.derivedFalse.push({ gate: curr, dueTo: [reason] });
+      }
+      stack.push(...(graph.successors.get(curr) ?? []));
     }
   }
-
-  for (const test of quickTests) {
-    const result = test();
-    if (result !== undefined) {
-      return result;
-    }
-  }
-
-  return expensiveEval();
 }

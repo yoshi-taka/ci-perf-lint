@@ -25,6 +25,7 @@
     { "file": "src/rules/shared/similar-workflow-consensus-consensus.ts", "exports": ["detectClusterInconsistency"] },
     { "file": "src/severity-promotion.ts", "exports": ["severityPromotionRules"] },
     { "file": "src/reification.ts", "exports": ["createLegacyDetails", "createBlueprintDetails", "foldDiagnosticDetails"] },
-    { "file": "src/diagnostic-source.ts", "exports": ["composeDiagnosticSources", "diagnosticSourceToRef"] }
+    { "file": "src/diagnostic-source.ts", "exports": ["composeDiagnosticSources", "diagnosticSourceToRef"] },
+    { "file": "src/repository-diagnostics/gates.ts", "exports": ["buildDag"] }
   ]
 }
