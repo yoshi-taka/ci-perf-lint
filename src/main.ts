@@ -48,6 +48,7 @@ const supportedOutputFormats = [
 
 const supportedOptionFlags = [
   "--help",
+  "--version",
   "--format",
   "--top",
   "--mode",
@@ -213,7 +214,8 @@ function renderWorkflowSelection(repoRoot: string, workflowFiles: string[]): str
 export async function runCli(args: string[], cwd: string, logger: LoggerLike): Promise<number> {
   const cliStartedAt = performance.now();
 
-  if (args.includes("--version")) {
+  const versionFlag = args.find((a) => a.startsWith("--") && "--version".startsWith(a));
+  if (versionFlag) {
     logger.log(pkg.version);
     return 0;
   }
