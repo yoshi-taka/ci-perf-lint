@@ -26,25 +26,3 @@ export function transitiveClosure(
   }
   return result;
 }
-
-function computeReachability(
-  start: string,
-  graph: ReadonlyMap<string, readonly string[]>,
-): Set<string> {
-  const visited = new Set<string>();
-  const stack = [start];
-  while (stack.length > 0) {
-    const current = stack.pop()!;
-    if (visited.has(current)) {
-      continue;
-    }
-    visited.add(current);
-    const next = graph.get(current) ?? [];
-    for (const n of next) {
-      if (!visited.has(n)) {
-        stack.push(n);
-      }
-    }
-  }
-  return visited;
-}

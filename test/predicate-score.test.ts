@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { predicateToPrecheck } from "../src/rules/shared/predicate-score.ts";
 import type { WeightedPredicate } from "../src/rules/shared/predicate-score.ts";
-import { sourceContains, TRUE } from "../src/rules/shared/predicate.ts";
+import { sourceContains } from "../src/rules/shared/predicate.ts";
 
 describe("predicateToPrecheck", () => {
   test("produces 1 for matching source", () => {
