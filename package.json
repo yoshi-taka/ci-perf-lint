@@ -5,9 +5,7 @@
   "bin": {
     "ci-perf-lint": "./dist/cli.js"
   },
-  "workspaces": [
-    "packages/ci-perf-lint"
-  ],
+  "workspaces": [],
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -52,8 +50,8 @@
     "fallow:dead-code": "fallow dead-code --production",
     "unused": "bun run knip && bun run fallow:dead-code",
     "audit:static": "bun run knip && bun run fallow",
-    "release:alpha": "npm version prerelease --preid=alpha --no-git-tag-version && npm publish --access public --tag alpha && npm publish -w packages/ci-perf-lint --tag alpha",
-    "release:stable": "npm version patch --no-git-tag-version && npm publish --access public && npm publish -w packages/ci-perf-lint",
+    "release:alpha": "npm version prerelease --preid=alpha --no-git-tag-version && npm publish --access public --tag alpha && npm publish --prefix packages/ci-perf-lint --tag alpha",
+    "release:stable": "npm version patch --no-git-tag-version && npm publish --access public && npm publish --prefix packages/ci-perf-lint",
     "perf:bench": "hyperfine --warmup 3 'bun run src/cli.ts'",
     "perf:flame": "bun --profile src/cli.ts",
     "perf:profile": "bun --cpu-prof --cpu-prof-dir .profile src/cli.ts",

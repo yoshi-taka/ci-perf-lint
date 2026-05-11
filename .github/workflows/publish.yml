@@ -72,8 +72,12 @@ jobs:
           else
             npm version patch --no-git-tag-version
           fi
+
+      - name: Sync wrapper dependency version
+        run: |
           VERSION="$(node -p "require('./package.json').version")"
-          npm pkg set version="$VERSION" dependencies.@yoshi-taka/ci-perf-lint="$VERSION" -w packages/ci-perf-lint
+          cd packages/ci-perf-lint
+          npm pkg set version="$VERSION" dependencies.@yoshi-taka/ci-perf-lint="$VERSION"
 
       - name: Resolve publish metadata
         id: meta
@@ -93,7 +97,7 @@ jobs:
         run: npm publish --access public --tag "${{ steps.meta.outputs.dist_tag }}"
 
       - name: Publish unscoped package
-        run: npm publish -w packages/ci-perf-lint --tag "${{ steps.meta.outputs.dist_tag }}"
+        run: cd packages/ci-perf-lint && npm publish --tag "${{ steps.meta.outputs.dist_tag }}"
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && !contains(github.ref_name, '-')
