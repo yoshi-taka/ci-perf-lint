@@ -56,7 +56,7 @@ describe("renderReport", () => {
 
     const markdown = renderReport(report, "markdown");
 
-    expect(markdown).toContain("# GitHub Actions Performance Lint");
+    expect(markdown).toContain("# ci-perf-lint");
     expect(markdown).toContain("## AI Handoff");
     expect(markdown).toContain("missing-paths-filter");
   });
@@ -393,7 +393,7 @@ describe("renderReport", () => {
     expect(text).toContain("rerun with --mode exploratory");
     expect(text).not.toContain("Top findings:");
 
-    expect(markdown).toContain("# GitHub Actions Performance Lint");
+    expect(markdown).toContain("# ci-perf-lint");
     expect(markdown).toContain("- No actionable findings in the current scan mode.");
     expect(markdown).toContain(
       "- If you want advisory suggestions too, rerun with --mode exploratory.",
@@ -708,7 +708,7 @@ describe("renderReport", () => {
         mode: "exploratory",
       });
       const text = renderReport(report, "text", ttyOpts);
-      expect(text).toContain("\x1b[1mGitHub Actions Performance Lint\x1b[0m");
+      expect(text).toContain("\x1b[1mci-perf-lint\x1b[0m");
       expect(text).toContain("\x1b[1mTop findings:\x1b[0m");
     });
 

@@ -92,7 +92,7 @@ describe("runCli", () => {
 
     expect(exitCode).toBe(1);
     expect(errors).toHaveLength(0);
-    expect(lines[0]).toContain("GitHub Actions Performance Lint");
+    expect(lines[0]).toContain("ci-perf-lint");
     expect(lines[0]).toContain("Workflows scanned: 1");
     expect(lines[0]).toContain("deep-checkout-without-need");
   });

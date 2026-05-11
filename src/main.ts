@@ -67,7 +67,7 @@ function isAuditMode(value: string): value is AuditMode {
 }
 
 function printHelp(logger: LoggerLike) {
-  logger.log(`GitHub Actions Performance Lint
+  logger.log(`ci-perf-lint
 
 Usage:
   bunx ci-perf-lint [path] [--format handoff|text|json|markdown] [--mode strict|exploratory] [--top N] [--workflow-only|--repository-only] [--findings-only] [--show-workflows] [--show-all-locations]

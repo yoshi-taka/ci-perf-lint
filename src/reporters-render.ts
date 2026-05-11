@@ -244,7 +244,7 @@ function renderText(report: ReportData, options: RenderOptions = {}): string {
 
   const lines: string[] = [];
 
-  const header = maybeColor(ansi.bold, "GitHub Actions Performance Lint", options);
+  const header = maybeColor(ansi.bold, "ci-perf-lint", options);
   lines.push(header);
   lines.push(`Repository: ${report.targetPath}`);
   lines.push(`Workflows scanned: ${report.workflowCount}`);
@@ -304,7 +304,7 @@ function renderFindingsOnlyText(report: ReportData, options?: RenderOptions): st
 
 function renderMarkdown(report: ReportData, options: RenderOptions = {}): string {
   if (report.topAggregatedFindings.length === 0) {
-    const lines = ["# GitHub Actions Performance Lint", ""];
+    const lines = ["# ci-perf-lint", ""];
     for (const line of renderNoFindingsSummary(report, options)) {
       lines.push(`- ${line}`);
     }
@@ -313,7 +313,7 @@ function renderMarkdown(report: ReportData, options: RenderOptions = {}): string
 
   const lines: string[] = [];
 
-  lines.push("# GitHub Actions Performance Lint");
+  lines.push("# ci-perf-lint");
   lines.push("");
   lines.push(`- Repository: \`${report.targetPath}\``);
   lines.push(`- Workflows scanned: ${report.workflowCount}`);
