@@ -4,6 +4,7 @@ import { collectWorkflowFiles, resolveWorkflowTarget } from "./fs.ts";
 import { analyzeRepository } from "./repo.ts";
 import { renderReport } from "./reporters.ts";
 import type { AuditMode, OutputFormat } from "./types.ts";
+import pkg from "../package.json" with { type: "json" };
 
 interface LoggerLike {
   log: (...args: unknown[]) => void;
@@ -211,6 +212,12 @@ function renderWorkflowSelection(repoRoot: string, workflowFiles: string[]): str
 
 export async function runCli(args: string[], cwd: string, logger: LoggerLike): Promise<number> {
   const cliStartedAt = performance.now();
+
+  if (args.includes("--version")) {
+    logger.log(pkg.version);
+    return 0;
+  }
+
   let options: CliOptions | null;
 
   try {
