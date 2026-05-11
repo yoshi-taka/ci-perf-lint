@@ -199,8 +199,23 @@ export interface RepositoryDiagnosticContext {
 
 export interface RepositoryDiagnosticCollector<G extends GateKey = GateKey> {
   id: string;
-  gate: G;
+  gate?: G;
+  gates?: readonly GateKey[];
   collect: (context: GatedContext<G>) => Diagnostic[] | Promise<Diagnostic[]>;
+}
+
+export function collectorRequiresAllGates(
+  collector: { gate?: GateKey; gates?: readonly GateKey[] },
+  gateState: RepositoryDiagnosticGateState,
+): boolean {
+  const checkGate = (g: GateKey): boolean => gateState[g];
+  if (collector.gates) {
+    return collector.gates.every(checkGate);
+  }
+  if (collector.gate) {
+    return checkGate(collector.gate);
+  }
+  return true;
 }
 
 function __unsafeWrapProof<G extends GateKey>(_gate: G, _proof: ProofForGate<G>): GateTrue<G> {
@@ -210,7 +225,7 @@ function __unsafeWrapProof<G extends GateKey>(_gate: G, _proof: ProofForGate<G>)
   } as GateTrue<G>;
 }
 
-export function buildTypedContext<G extends GateKey>(
+function buildTypedContext<G extends GateKey>(
   context: RepositoryDiagnosticContext,
   gate: G,
   proof: ProofForGate<G>,

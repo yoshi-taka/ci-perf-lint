@@ -3,6 +3,8 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import { collectEmbeddedOxlintDiagnosticsByCode } from "./embedded-oxlint.ts";
+import type { DiagnosticOp } from "../rules/shared/diagnostic-ops.ts";
+import { applyOps } from "../rules/shared/diagnostic-ops.ts";
 
 const barrelFileMeta = {
   id: "detected-large-barrel-file",
@@ -91,21 +93,28 @@ export async function collectLargeBarrelFileDiagnostics(
         "Embedded Oxlint `oxc/no-barrel-file` detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.";
       const suggestion = buildBarrelSuggestion(relativePath, generated);
 
-      return buildRepositoryDiagnostic(repository, barrelFileMeta, {
+      const builtDiagnostic = buildRepositoryDiagnostic(repository, barrelFileMeta, {
         location: {
           path: relativePath,
           line: diagnostic.line,
           column: diagnostic.column,
         },
-        severity: advisoryOnly ? "suggestion" : undefined,
+        severity: undefined,
         message: `Embedded Oxlint scan flagged ${relativePath} as a large barrel file. ${contextText}`,
         why,
         suggestion,
         measurementHint:
           "Compare lint, test, typecheck, or build wall-clock time before and after replacing the flagged barrel with direct imports or narrower re-exports.",
         aiHandoff: buildBarrelAiHandoff(relativePath, generated),
-        score: advisoryOnly ? 36 : 92,
+        score: 92,
       });
+      const ops: DiagnosticOp[] = advisoryOnly
+        ? [
+            { op: "setSeverity", severity: "suggestion" },
+            { op: "setScore", score: 36 },
+          ]
+        : [];
+      return applyOps(builtDiagnostic, ops);
     }),
   );
 

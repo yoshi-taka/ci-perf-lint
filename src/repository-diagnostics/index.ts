@@ -1,13 +1,7 @@
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import type { Diagnostic } from "../types.ts";
-import type {
-  GatedContext,
-  GateKey,
-  ProofForGate,
-  RepositoryDiagnosticContext,
-  RepositoryDiagnosticGateState,
-} from "./collector-types.ts";
-import { buildTypedContext, assertGateProof } from "./collector-types.ts";
+import type { GatedContext, GateKey, RepositoryDiagnosticContext } from "./collector-types.ts";
+import { assertGateProof, collectorRequiresAllGates } from "./collector-types.ts";
 import {
   buildCollectorCooccurrenceDebug,
   orderCollectorsForDiagnostics,
@@ -42,28 +36,26 @@ export const repositoryDiagnosticCollectors = [
   } as const,
 ] as const;
 
-function gateKeyToPredicate(gate: GateKey): (state: RepositoryDiagnosticGateState) => boolean {
-  const predicateMap: Record<GateKey, (s: RepositoryDiagnosticGateState) => boolean> = {
-    hasJavaScriptHeavyWorkflow: (s) => s.hasJavaScriptHeavyWorkflow,
-    hasJavaScriptTooling: (s) => s.hasJavaScriptTooling,
-    hasJavaScriptLinting: (s) => s.hasJavaScriptLinting,
-    hasJavaScriptBuildConfig: (s) => s.hasJavaScriptBuildConfig,
-    hasJavaScriptPackageScripts: (s) => s.hasJavaScriptPackageScripts,
-    hasDockerHeavyWorkflow: (s) => s.hasDockerHeavyWorkflow,
-    hasTerraformHeavyWorkflow: (s) => s.hasTerraformHeavyWorkflow,
-    hasLargeFiles: (s) => s.hasLargeFiles,
-    hasDatadogHeavyWorkflow: (s) => s.hasDatadogHeavyWorkflow,
-    hasPytest: (s) => s.hasPytest,
-    hasPythonHeavyWorkflow: (s) => s.hasPythonHeavyWorkflow,
-    hasRenovateConfig: (s) => s.hasRenovateConfig,
-    hasHusky: (s) => s.hasHusky,
-    hasJavaScriptFrameworks: (s) => s.hasJavaScriptFrameworks,
-    hasRust: (s) => s.hasRust,
-    hasCdkManifest: (s) => s.hasCdkManifest,
-    hasElixirHeavyWorkflow: (s) => s.hasElixirHeavyWorkflow,
-    hasGradle: (s) => s.hasGradle,
-  };
-  return predicateMap[gate];
+interface CollectorLike {
+  id: string;
+  gate?: GateKey;
+  gates?: readonly GateKey[];
+  collect: (ctx: unknown) => Diagnostic[] | Promise<Diagnostic[]>;
+}
+
+function runRepositoryDiagnosticCollector(
+  collector: CollectorLike,
+  context: RepositoryDiagnosticContext,
+  proofs: ReturnType<typeof buildGateProofs>,
+): Diagnostic[] | Promise<Diagnostic[]> {
+  if (collector.gates) {
+    for (const g of collector.gates) {
+      assertGateProof(g, proofs);
+    }
+  } else if (collector.gate) {
+    assertGateProof(collector.gate, proofs);
+  }
+  return collector.collect(context);
 }
 
 function timingsEnabled(): boolean {
@@ -95,7 +87,7 @@ export async function collectRepositoryDiagnostics(
   const gateElapsed = performance.now() - gateStateStartedAt;
   const proofs = buildGateProofs(gateState);
   const applicableCollectors = repositoryDiagnosticCollectors.filter((collector) =>
-    gateKeyToPredicate(collector.gate)(gateState),
+    collectorRequiresAllGates(collector, gateState),
   );
   const collectorSchedule =
     applicableCollectors.length > 1
@@ -135,17 +127,7 @@ export async function collectRepositoryDiagnostics(
   const results = await Promise.allSettled(
     scheduledCollectors.map((collector) => {
       const startedAt = performance.now();
-      const typedProof = assertGateProof(collector.gate, proofs);
-      const typedContext = buildTypedContext(
-        context,
-        collector.gate as GateKey,
-        typedProof.__proof as ProofForGate<typeof collector.gate>,
-      );
-      const result: Diagnostic[] | Promise<Diagnostic[]> = (
-        collector as {
-          collect: (ctx: typeof typedContext) => Diagnostic[] | Promise<Diagnostic[]>;
-        }
-      ).collect(typedContext);
+      const result = runRepositoryDiagnosticCollector(collector as CollectorLike, context, proofs);
       if (result instanceof Promise) {
         if (timingsEnabled()) {
           return result.then((value) => {
@@ -198,6 +180,7 @@ export async function collectRepositoryDiagnostics(
       return {
         id: c.id,
         gate: c.gate,
+        gates: (c as CollectorLike).gates,
         findings: r?.status === "fulfilled" ? r.value.length : -1,
         error: r?.status === "rejected" ? String(r.reason) : undefined,
       };
