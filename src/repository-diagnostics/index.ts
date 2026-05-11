@@ -43,11 +43,10 @@ interface CollectorLike {
   collect: (ctx: unknown) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
-function runRepositoryDiagnosticCollector(
+function buildCollectorContext(
   collector: CollectorLike,
-  context: RepositoryDiagnosticContext,
   proofs: ReturnType<typeof buildGateProofs>,
-): Diagnostic[] | Promise<Diagnostic[]> {
+): void {
   if (collector.gates) {
     for (const g of collector.gates) {
       assertGateProof(g, proofs);
@@ -55,6 +54,14 @@ function runRepositoryDiagnosticCollector(
   } else if (collector.gate) {
     assertGateProof(collector.gate, proofs);
   }
+}
+
+function runRepositoryDiagnosticCollector(
+  collector: CollectorLike,
+  context: RepositoryDiagnosticContext,
+  proofs: ReturnType<typeof buildGateProofs>,
+): Diagnostic[] | Promise<Diagnostic[]> {
+  buildCollectorContext(collector, proofs);
   return collector.collect(context);
 }
 

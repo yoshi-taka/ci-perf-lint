@@ -173,6 +173,11 @@ export type GatedContext<G extends GateKey> = RepositoryDiagnosticContext & {
   readonly __typedGate: GateTrue<G>;
 };
 
+export type MultiGatedContext<Gs extends readonly GateKey[]> = RepositoryDiagnosticContext & {
+  readonly __gatesProven: true;
+  readonly __gateKeys: Gs;
+};
+
 export interface RepositoryDiagnosticGateObservability {
   observed: string[];
   derivedFalse: { gate: string; dueTo: string[] }[];
@@ -197,11 +202,18 @@ export interface RepositoryDiagnosticContext {
   corpusIndex: RepositoryCorpusIndex;
 }
 
-export interface RepositoryDiagnosticCollector<G extends GateKey = GateKey> {
+export type CollectorContext<G extends GateKey, Gs extends readonly GateKey[]> = Gs extends never[]
+  ? GatedContext<G>
+  : MultiGatedContext<Gs>;
+
+export interface RepositoryDiagnosticCollector<
+  G extends GateKey = GateKey,
+  Gs extends readonly GateKey[] = never[],
+> {
   id: string;
   gate?: G;
-  gates?: readonly GateKey[];
-  collect: (context: GatedContext<G>) => Diagnostic[] | Promise<Diagnostic[]>;
+  gates?: Gs;
+  collect: (context: CollectorContext<G, Gs>) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 export function collectorRequiresAllGates(
