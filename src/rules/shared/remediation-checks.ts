@@ -1,5 +1,5 @@
 import type { AnalysisWarning, Diagnostic, ImpliedCheck, RuleMeta } from "../../types.ts";
-import { transitiveClosure } from "./predicate-lattice.ts";
+import { buildReverseGraph, transitiveClosure } from "./predicate-lattice.ts";
 
 const ruleMetaRegistry = new Map<string, RuleMeta>();
 
@@ -7,6 +7,17 @@ export function registerAllRuleMetaForRemediation(rules: readonly { meta: RuleMe
   for (const rule of rules) {
     ruleMetaRegistry.set(rule.meta.id, rule.meta);
   }
+}
+
+function buildForwardGraph(rules: readonly { meta: RuleMeta }[]): Map<string, string[]> {
+  const forwards = new Map<string, string[]>();
+  for (const rule of rules) {
+    const implied = rule.meta.impliedChecks;
+    if (implied && implied.length > 0) {
+      forwards.set(rule.meta.id, [...implied]);
+    }
+  }
+  return forwards;
 }
 
 // ──────────────────────────────────────────────
@@ -20,26 +31,9 @@ export interface InferenceGraph {
 }
 
 export function buildInferenceGraph(rules: readonly { meta: RuleMeta }[]): InferenceGraph {
-  const forwards = new Map<string, string[]>();
-  const reverse = new Map<string, string[]>();
-
-  for (const rule of rules) {
-    const implied = rule.meta.impliedChecks;
-    if (implied && implied.length > 0) {
-      forwards.set(rule.meta.id, [...implied]);
-    }
-  }
-
-  for (const rule of rules) {
-    for (const implied of rule.meta.impliedChecks ?? []) {
-      const sources = reverse.get(implied) ?? [];
-      sources.push(rule.meta.id);
-      reverse.set(implied, sources);
-    }
-  }
-
+  const forwards = buildForwardGraph(rules);
+  const reverse = buildReverseGraph(forwards);
   const closure = transitiveClosure(forwards);
-
   return { forwards, reverse, transitiveForwards: closure };
 }
 
@@ -94,8 +88,8 @@ export function detectImplicationDrift(
       continue;
     }
     const direct = new Set(graph.forwards.get(sourceId) ?? []);
-    const indirect = new Set([...transitiveIds].filter((id) => !direct.has(id)));
-    if (indirect.size > 0) {
+    const indirect = [...transitiveIds].filter((id) => !direct.has(id)).sort();
+    if (indirect.length > 0) {
       detectDriftForEdges(sourceId, indirect, firedRuleIds, evaluatedRuleIds, warnings);
     }
   }
@@ -104,49 +98,47 @@ export function detectImplicationDrift(
 }
 
 // ──────────────────────────────────────────────
-// EXISTING: computeImpliedChecks (remediation layer)
+// REMEDIATION CHECKS — multi-hop aware
 // ──────────────────────────────────────────────
 
-function collectImpliedIds(ruleId: string): Set<string> {
-  const collected = new Set<string>();
-  const meta = ruleMetaRegistry.get(ruleId);
-  if (meta?.impliedChecks) {
-    for (const id of meta.impliedChecks) {
-      collected.add(id);
+function buildFullClosure(): Map<string, Set<string>> {
+  const forwards = new Map<string, string[]>();
+  for (const [ruleId, meta] of ruleMetaRegistry) {
+    if (meta.impliedChecks && meta.impliedChecks.length > 0) {
+      forwards.set(ruleId, [...meta.impliedChecks]);
     }
   }
-  return collected;
+  return transitiveClosure(forwards);
 }
 
-function transitiveImpliedIds(ruleId: string): Set<string> {
-  const visited = new Set<string>();
-  const stack = [ruleId];
-  while (stack.length > 0) {
-    const current = stack.pop()!;
-    const meta = ruleMetaRegistry.get(current);
-    if (meta?.impliedChecks) {
-      for (const id of meta.impliedChecks) {
-        if (!visited.has(id)) {
-          visited.add(id);
-          stack.push(id);
-        }
-      }
+function buildDirectMap(): Map<string, Set<string>> {
+  const direct = new Map<string, Set<string>>();
+  for (const [ruleId, meta] of ruleMetaRegistry) {
+    if (meta.impliedChecks) {
+      direct.set(ruleId, new Set(meta.impliedChecks));
     }
   }
-  return visited;
+  return direct;
 }
 
 export function computeImpliedChecks(findings: Diagnostic[]): ImpliedCheck[] {
+  const closure = buildFullClosure();
+  const directMap = buildDirectMap();
   const seenRuleIds = new Set(findings.map((f) => f.ruleId));
   const result: ImpliedCheck[] = [];
   const dedup = new Set<string>();
 
-  for (const finding of findings) {
-    const directIds = collectImpliedIds(finding.ruleId);
-    const allIds = transitiveImpliedIds(finding.ruleId);
+  const reverseClosure = buildReverseGraph(closure);
 
-    for (const implied of allIds) {
-      const isDirect = directIds.has(implied);
+  for (const finding of findings) {
+    const allIds = closure.get(finding.ruleId);
+    if (!allIds || allIds.size === 0) {
+      continue;
+    }
+    const directIds = directMap.get(finding.ruleId) ?? new Set();
+
+    const sorted = [...allIds].sort();
+    for (const implied of sorted) {
       const key = `${finding.ruleId}->${implied}`;
       if (dedup.has(key)) {
         continue;
@@ -155,18 +147,23 @@ export function computeImpliedChecks(findings: Diagnostic[]): ImpliedCheck[] {
 
       const impliedMeta = ruleMetaRegistry.get(implied);
       const alreadyPresent = seenRuleIds.has(implied);
+
       let reason: string;
-      if (isDirect) {
+      if (directIds.has(implied)) {
         if (alreadyPresent) {
           reason = `${finding.ruleId} fix may also be needed by existing ${implied} finding`;
         } else {
           reason = `After fixing ${finding.ruleId}, validate ${implied} to ensure remediation stability`;
         }
       } else {
+        const paths = (reverseClosure.get(implied) ?? []).filter(
+          (p) => p !== finding.ruleId && directIds.has(p),
+        );
+        const via = [...new Set(paths)].sort().join(", ") || "intermediate rule";
         if (alreadyPresent) {
-          reason = `${finding.ruleId} fix may transitively affect ${implied} (directly implied by ${[...directIds].filter((d) => transitiveImpliedIds(d).has(implied)).join(", ") || "intermediate"})`;
+          reason = `${finding.ruleId} fix may transitively affect ${implied} (via ${via})`;
         } else {
-          reason = `After fixing ${finding.ruleId}, consider checking ${implied} via transitive implication chain`;
+          reason = `After fixing ${finding.ruleId}, consider checking ${implied} via ${via}`;
         }
       }
       if (impliedMeta?.docsPath) {

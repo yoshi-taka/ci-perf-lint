@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { transitiveClosure } from "../src/rules/shared/predicate-lattice.ts";
+import { transitiveClosure, buildReverseGraph } from "../src/rules/shared/predicate-lattice.ts";
 
 describe("transitiveClosure", () => {
   test("empty graph returns empty map", () => {
@@ -69,5 +69,36 @@ describe("transitiveClosure", () => {
     ]);
     const result = transitiveClosure(graph);
     expect(result.has("b")).toBe(false);
+  });
+
+  test("deterministic ordering across same graph", () => {
+    const graph = new Map([
+      ["z", ["a"]],
+      ["y", ["b"]],
+      ["x", ["c"]],
+    ]);
+    const a = transitiveClosure(graph);
+    const b = transitiveClosure(graph);
+    expect([...a.keys()]).toEqual([...b.keys()]);
+  });
+});
+
+describe("buildReverseGraph", () => {
+  test("builds reverse mapping", () => {
+    const forward = new Map([
+      ["a", ["b", "c"]],
+      ["b", ["c"]],
+    ]);
+    const reverse = buildReverseGraph(forward);
+    expect(reverse.get("b")).toEqual(["a"]);
+    const cSources = reverse.get("c");
+    expect(cSources).toBeDefined();
+    expect(cSources!.sort()).toEqual(["a", "b"]);
+  });
+
+  test("empty for orphan nodes", () => {
+    const forward = new Map([["a", []]]);
+    const reverse = buildReverseGraph(forward);
+    expect(reverse.size).toBe(0);
   });
 });

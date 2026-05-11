@@ -509,6 +509,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
       (acc, ids) => acc + ids.size,
       0,
     );
+    const indirectEdgeCount = transitiveEdgeCount - directEdgeCount;
     const closureDebug = [...inferenceGraph.transitiveForwards]
       .filter(([, ids]) => ids.size > 0)
       .map(([source, ids]) => ({
@@ -516,6 +517,12 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
         directRules: inferenceGraph.forwards.get(source) ?? [],
         transitiveRules: [...ids],
       }));
+    const cycles: { involved: string[] }[] = [];
+    for (const [source, ids] of inferenceGraph.transitiveForwards) {
+      if (ids.has(source)) {
+        cycles.push({ involved: [source, ...ids].sort() });
+      }
+    }
 
     process.stderr.write(
       JSON.stringify({
@@ -531,6 +538,9 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
         remediationGraph: {
           directEdgeCount,
           transitiveEdgeCount,
+          indirectEdgeCount,
+          cycleCount: cycles.length,
+          cycles: cycles.length > 0 ? cycles : undefined,
           closure: closureDebug,
         },
       }),
