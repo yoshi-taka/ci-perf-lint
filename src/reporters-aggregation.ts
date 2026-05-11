@@ -180,34 +180,55 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
     workflowGrouped.set(workflowFindingKey(finding.workflow, finding.ruleId), existing);
   });
 
-  const workflowByRuleDocs = new Map<string, MutableAggregatedFinding>();
+  const workflowByRuleDocs = new Map<string, MutableAggregatedFinding[]>();
   for (const wfEntry of workflowGrouped.values()) {
     const key = `${wfEntry.ruleId}\n${wfEntry.docsPath}`;
-    if (!workflowByRuleDocs.has(key)) {
-      workflowByRuleDocs.set(key, wfEntry);
-    }
+    const entries = workflowByRuleDocs.get(key) ?? [];
+    entries.push(wfEntry);
+    workflowByRuleDocs.set(key, entries);
   }
 
   for (const [repoKey, repoEntry] of repositoryGrouped) {
-    const wfEntry = workflowByRuleDocs.get(`${repoEntry.ruleId}\n${repoEntry.docsPath}`);
-    if (!wfEntry) {
+    const wfEntries = workflowByRuleDocs.get(`${repoEntry.ruleId}\n${repoEntry.docsPath}`);
+    if (!wfEntries || wfEntries.length === 0) {
       continue;
     }
 
-    mergeUniqueValues(wfEntry.workflows, repoEntry.workflows);
-    mergeUniqueValues(wfEntry.locations, repoEntry.locations);
-    mergeUniqueValues(wfEntry.messages, repoEntry.messages);
-    wfEntry.scope = "repository";
-    wfEntry.aiHandoffs ??= [];
+    const primaryEntry = wfEntries[0]!;
+
+    mergeUniqueValues(primaryEntry.workflows, repoEntry.workflows);
+    mergeUniqueValues(primaryEntry.locations, repoEntry.locations);
+    mergeUniqueValues(primaryEntry.messages, repoEntry.messages);
+    primaryEntry.scope = "repository";
+    primaryEntry.aiHandoffs ??= [];
     repoEntry.aiHandoffs ??= [];
-    mergeUniqueValues(wfEntry.aiHandoffs, repoEntry.aiHandoffs);
-    mergeUniqueValues(wfEntry.jobs, repoEntry.jobs);
+    mergeUniqueValues(primaryEntry.aiHandoffs, repoEntry.aiHandoffs);
+    mergeUniqueValues(primaryEntry.jobs, repoEntry.jobs);
     for (const kind of repoEntry.sourceKindSet) {
-      wfEntry.sourceKindSet.add(kind);
+      primaryEntry.sourceKindSet.add(kind);
     }
-    mergeUniqueValues((wfEntry.sourceKinds ??= []), repoEntry.sourceKinds ?? []);
-    wfEntry.memberFindings.push(...repoEntry.memberFindings);
-    wfEntry.firstIndex = Math.min(wfEntry.firstIndex, repoEntry.firstIndex);
+    mergeUniqueValues((primaryEntry.sourceKinds ??= []), repoEntry.sourceKinds ?? []);
+    primaryEntry.memberFindings.push(...repoEntry.memberFindings);
+    primaryEntry.firstIndex = Math.min(primaryEntry.firstIndex, repoEntry.firstIndex);
+
+    for (let i = 1; i < wfEntries.length; i++) {
+      const otherEntry = wfEntries[i]!;
+      mergeUniqueValues(primaryEntry.workflows, otherEntry.workflows);
+      mergeUniqueValues(primaryEntry.locations, otherEntry.locations);
+      mergeUniqueValues(primaryEntry.messages, otherEntry.messages);
+      primaryEntry.aiHandoffs ??= [];
+      otherEntry.aiHandoffs ??= [];
+      mergeUniqueValues(primaryEntry.aiHandoffs, otherEntry.aiHandoffs);
+      mergeUniqueValues(primaryEntry.jobs, otherEntry.jobs);
+      for (const kind of otherEntry.sourceKindSet) {
+        primaryEntry.sourceKindSet.add(kind);
+      }
+      mergeUniqueValues((primaryEntry.sourceKinds ??= []), otherEntry.sourceKinds ?? []);
+      primaryEntry.memberFindings.push(...otherEntry.memberFindings);
+      primaryEntry.firstIndex = Math.min(primaryEntry.firstIndex, otherEntry.firstIndex);
+      workflowGrouped.delete(workflowFindingKey(otherEntry.workflow, otherEntry.ruleId));
+    }
+
     repositoryGrouped.delete(repoKey);
   }
 

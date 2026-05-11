@@ -509,6 +509,63 @@ describe("aggregateFindings and grouped reporter output", () => {
     );
   });
 
+  test("merges all workflow entries into one when repository finding spans multiple workflow files", () => {
+    const findings: Diagnostic[] = [
+      {
+        ruleId: "prefer-node-run-over-npm-run",
+        severity: "warning",
+        confidence: "medium",
+        scope: "repository",
+        docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
+        workflow: "package.json",
+        location: { path: "package.json", line: 60, column: 5 },
+        message: "Repository-wide finding.",
+        why: "Reason.",
+        suggestion: "Use `node --run`.",
+        measurementHint: "Measure it.",
+        aiHandoff: "Handoff.",
+        score: 80,
+      },
+      {
+        ruleId: "prefer-node-run-over-npm-run",
+        severity: "warning",
+        confidence: "medium",
+        docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
+        workflow: ".buildkite/prod-pipeline.yml",
+        location: { path: ".buildkite/prod-pipeline.yml", line: 38, column: 5 },
+        message: 'Job "build" uses npm run.',
+        why: "Reason.",
+        suggestion: "Use `node --run`.",
+        measurementHint: "Measure it.",
+        aiHandoff: "Handoff.",
+        score: 70,
+      },
+      {
+        ruleId: "prefer-node-run-over-npm-run",
+        severity: "warning",
+        confidence: "medium",
+        docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
+        workflow: ".buildkite/deploy-pipeline.yml",
+        location: { path: ".buildkite/deploy-pipeline.yml", line: 78, column: 5 },
+        message: 'Job "deploy" uses npm run.',
+        why: "Reason.",
+        suggestion: "Use `node --run`.",
+        measurementHint: "Measure it.",
+        aiHandoff: "Handoff.",
+        score: 70,
+      },
+    ];
+
+    const aggregated = aggregateFindingsWithMembers(findings).aggregatedFindings;
+
+    expect(aggregated).toHaveLength(1);
+    expect(aggregated[0]?.ruleId).toBe("prefer-node-run-over-npm-run");
+    expect(aggregated[0]?.scope).toBe("repository");
+    expect(aggregated[0]?.workflows).toContain("package.json");
+    expect(aggregated[0]?.workflows).toContain(".buildkite/prod-pipeline.yml");
+    expect(aggregated[0]?.workflows).toContain(".buildkite/deploy-pipeline.yml");
+  });
+
   test("preserves earliest firstIndex when repository and workflow findings merge", () => {
     const findings: Diagnostic[] = [
       {
