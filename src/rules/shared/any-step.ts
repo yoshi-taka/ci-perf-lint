@@ -6,6 +6,10 @@ import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 
 export type AnyStep = WorkflowStep | PipelineStep;
 
+type CIDocumentNormalizer<D> = (doc: D) => CommandEntry[];
+
+export type CIDocument = WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument;
+
 const MAX_RUN_PREVIEW = 40;
 const ansiRe = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[a-zA-Z]`, "g");
 
@@ -13,7 +17,7 @@ function stripAnsi(text: string): string {
   return text.replace(ansiRe, "");
 }
 
-export function stepDisplayName(step: WorkflowStep): string {
+export function stepDisplayName(step: { name?: string; run?: string; uses?: string }): string {
   if (step.name) {
     return stripAnsi(step.name);
   }
@@ -49,7 +53,7 @@ export function getStepCommandText(step: AnyStep): string {
   return "";
 }
 
-interface CommandEntry {
+export interface CommandEntry {
   text: string;
   node: Node | undefined;
   jobName: string;
@@ -152,9 +156,16 @@ function buildGitHubActionsEntries(doc: WorkflowDocument): CommandEntry[] {
   return entries;
 }
 
-function normalizeCiDocument(
-  doc: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
-): CommandEntry[] {
+/**
+ * Normalize a CI document from any supported provider into a flat CommandEntry[].
+ *
+ * Invariants:
+ * - Traversal order is deterministic (provider order: CircleCI → GitLab → Buildkite → GH Actions)
+ * - Same command sequence across providers produces the same CommandEntry[] text values
+ * - Noop/empty steps are excluded
+ * - Multiple commands within one step are expanded in declaration order
+ */
+const normalizeCiDocument: CIDocumentNormalizer<CIDocument> = (doc) => {
   if (isCircleCiDoc(doc)) {
     return buildCircleCiEntries(doc);
   }
@@ -165,16 +176,11 @@ function normalizeCiDocument(
     return buildBuildkiteEntries(doc);
   }
   return buildGitHubActionsEntries(doc);
-}
+};
 
-const commandEntriesCache = new WeakMap<
-  WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
-  CommandEntry[]
->();
+const commandEntriesCache = new WeakMap<CIDocument, CommandEntry[]>();
 
-export function collectCommandEntries(
-  doc: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
-): CommandEntry[] {
+export function collectCommandEntries(doc: CIDocument): CommandEntry[] {
   const cached = commandEntriesCache.get(doc);
   if (cached) {
     return cached;

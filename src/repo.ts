@@ -501,6 +501,12 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   };
   if (process.env.CI_PERF_LINT_DUMP_STATE === "1") {
     const inferenceGraph = buildInferenceGraph(allRules);
+    const workflowDocKinds: Record<string, number> = {};
+    for (const wf of wfList) {
+      const kind = "kind" in wf ? (wf as { kind: unknown }).kind : "github-actions";
+      const key = typeof kind === "string" ? kind : "github-actions";
+      workflowDocKinds[key] = (workflowDocKinds[key] ?? 0) + 1;
+    }
     const directEdgeCount = [...inferenceGraph.forwards.values()].reduce(
       (acc, ids) => acc + ids.length,
       0,
@@ -542,6 +548,10 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           cycleCount: cycles.length,
           cycles: cycles.length > 0 ? cycles : undefined,
           closure: closureDebug,
+        },
+        normalizationMetadata: {
+          totalWorkflows: wfList.length,
+          workflowDocKinds,
         },
       }),
     );

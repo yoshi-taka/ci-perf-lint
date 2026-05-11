@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { collectCommandEntries } from "../src/rules/shared/any-step.ts";
 import type { WorkflowDocument } from "../src/workflow.ts";
 import type { PipelineDocument } from "../src/buildkite-workflow.ts";
+import type { CircleCiDocument } from "../src/circleci-workflow.ts";
+import type { GitlabCiDocument } from "../src/gitlab-ci-workflow.ts";
 
 function makeGithubActionsWorkflow(steps: { run: string; name?: string }[]): WorkflowDocument {
   return {
@@ -59,43 +61,91 @@ function makeBuildkitePipeline(
   } as unknown as PipelineDocument;
 }
 
+function makeCircleCiWorkflow(steps: { command: string; name?: string }[]): CircleCiDocument {
+  return {
+    kind: "circleci",
+    path: ".circleci/config.yml",
+    relativePath: ".circleci/config.yml",
+    jobs: [
+      {
+        name: "build",
+        node: undefined as never,
+        steps: steps.map((s, i) => ({
+          type: "run",
+          ...s,
+          name: s.name ?? `Step ${i}`,
+          node: undefined as never,
+        })),
+      },
+    ],
+    source: "",
+  } as CircleCiDocument;
+}
+
+function makeGitlabCiWorkflow(commands: string[]): GitlabCiDocument {
+  return {
+    kind: "gitlab-ci",
+    path: ".gitlab-ci.yml",
+    relativePath: ".gitlab-ci.yml",
+    jobs: [
+      {
+        name: "build",
+        node: undefined as never,
+        script: commands,
+      },
+    ],
+    source: "",
+  } as GitlabCiDocument;
+}
+
 describe("normalize CI documents invariants", () => {
-  test("single command across GH Actions and Buildkite produces same text", () => {
+  test("single command across all 4 providers produces same text", () => {
     const gh = makeGithubActionsWorkflow([{ run: "npm run build" }]);
     const bk = makeBuildkitePipeline([{ command: "npm run build" }]);
+    const cc = makeCircleCiWorkflow([{ command: "npm run build" }]);
+    const gl = makeGitlabCiWorkflow(["npm run build"]);
 
     const ghEntries = collectCommandEntries(gh);
     const bkEntries = collectCommandEntries(bk);
+    const ccEntries = collectCommandEntries(cc);
+    const glEntries = collectCommandEntries(gl);
 
     expect(ghEntries).toHaveLength(1);
     expect(bkEntries).toHaveLength(1);
+    expect(ccEntries).toHaveLength(1);
+    expect(glEntries).toHaveLength(1);
     expect(ghEntries[0]!.text).toBe(bkEntries[0]!.text);
+    expect(ccEntries[0]!.text).toBe(bkEntries[0]!.text);
+    expect(glEntries[0]!.text).toBe(bkEntries[0]!.text);
   });
 
   test("multiple commands across CI types", () => {
-    const gh = makeGithubActionsWorkflow([
-      { run: "npm install" },
-      { run: "npm run build" },
-      { run: "npm test" },
-    ]);
-    const bk = makeBuildkitePipeline([{ commands: ["npm install", "npm run build", "npm test"] }]);
+    const cmds = ["npm install", "npm run build", "npm test"];
+    const gh = makeGithubActionsWorkflow(cmds.map((run) => ({ run })));
+    const bk = makeBuildkitePipeline([{ commands: cmds }]);
+    const cc = makeCircleCiWorkflow(cmds.map((command) => ({ command })));
+    const gl = makeGitlabCiWorkflow(cmds);
 
     const ghEntries = collectCommandEntries(gh);
     const bkEntries = collectCommandEntries(bk);
+    const ccEntries = collectCommandEntries(cc);
+    const glEntries = collectCommandEntries(gl);
 
-    expect(ghEntries).toHaveLength(3);
-    expect(bkEntries).toHaveLength(3);
+    for (const entries of [ghEntries, bkEntries, ccEntries, glEntries]) {
+      expect(entries).toHaveLength(3);
+    }
     for (let i = 0; i < 3; i++) {
       expect(ghEntries[i]!.text).toBe(bkEntries[i]!.text);
+      expect(ccEntries[i]!.text).toBe(bkEntries[i]!.text);
+      expect(glEntries[i]!.text).toBe(bkEntries[i]!.text);
     }
   });
 
-  test("empty commands produce empty entries", () => {
-    const gh = makeGithubActionsWorkflow([]);
-    const bk = makeBuildkitePipeline([]);
-
-    expect(collectCommandEntries(gh)).toHaveLength(0);
-    expect(collectCommandEntries(bk)).toHaveLength(0);
+  test("empty commands produce empty entries across all providers", () => {
+    expect(collectCommandEntries(makeGithubActionsWorkflow([]))).toHaveLength(0);
+    expect(collectCommandEntries(makeBuildkitePipeline([]))).toHaveLength(0);
+    expect(collectCommandEntries(makeCircleCiWorkflow([]))).toHaveLength(0);
+    expect(collectCommandEntries(makeGitlabCiWorkflow([]))).toHaveLength(0);
   });
 
   test("Buildkite wait/block/trigger steps are excluded", () => {
@@ -143,18 +193,8 @@ describe("normalize CI documents invariants", () => {
 
   test("deterministic output ordering across repeated calls", () => {
     const gh = makeGithubActionsWorkflow([{ run: "c" }, { run: "a" }, { run: "b" }]);
-    const bk = makeBuildkitePipeline([
-      { command: "c", label: "z" },
-      { command: "a", label: "x" },
-      { command: "b", label: "y" },
-    ]);
-
-    const ghFirst = collectCommandEntries(gh);
-    const ghSecond = collectCommandEntries(gh);
-    const bkFirst = collectCommandEntries(bk);
-    const bkSecond = collectCommandEntries(bk);
-
-    expect(ghFirst.map((e) => e.text)).toEqual(ghSecond.map((e) => e.text));
-    expect(bkFirst.map((e) => e.text)).toEqual(bkSecond.map((e) => e.text));
+    const first = collectCommandEntries(gh);
+    const second = collectCommandEntries(gh);
+    expect(first.map((e) => e.text)).toEqual(second.map((e) => e.text));
   });
 });
