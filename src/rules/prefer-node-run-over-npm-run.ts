@@ -10,6 +10,10 @@ import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
 import { detectSimpleNpmRunFromText } from "./shared/command-patterns.ts";
 import { setIntersection } from "../set-algebra.ts";
+import { sourceContains } from "./shared/predicate.ts";
+import { predicateToPrecheck } from "./shared/predicate-score.ts";
+
+const precheckPredicates = [{ pred: sourceContains("npm run"), weight: 1, label: "has-npm-run" }];
 
 const meta = {
   id: "prefer-node-run-over-npm-run",
@@ -17,7 +21,7 @@ const meta = {
   confidence: "medium",
   docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
   scope: "all",
-  precheck: (workflow) => (workflow.source?.includes("npm run") ? 1 : 0),
+  precheck: predicateToPrecheck(precheckPredicates),
   impliedChecks: ["npm-ci-over-npm-install"],
 } satisfies RuleMeta;
 

@@ -41,6 +41,7 @@ import {
 import { buildPropagationClusters } from "./repository-diagnostics/repository-propagation.ts";
 import { buildRepositoryFeatureIndex } from "./repository-diagnostics/repository-feature-index.ts";
 import {
+  buildInferenceGraph,
   computeImpliedChecks,
   registerAllRuleMetaForRemediation,
 } from "./rules/shared/remediation-checks.ts";
@@ -499,6 +500,23 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
       measureCompleteness.abstentions.length > 0 ? measureCompleteness.abstentions : undefined,
   };
   if (process.env.CI_PERF_LINT_DUMP_STATE === "1") {
+    const inferenceGraph = buildInferenceGraph(allRules);
+    const directEdgeCount = [...inferenceGraph.forwards.values()].reduce(
+      (acc, ids) => acc + ids.length,
+      0,
+    );
+    const transitiveEdgeCount = [...inferenceGraph.transitiveForwards.values()].reduce(
+      (acc, ids) => acc + ids.size,
+      0,
+    );
+    const closureDebug = [...inferenceGraph.transitiveForwards]
+      .filter(([, ids]) => ids.size > 0)
+      .map(([source, ids]) => ({
+        source,
+        directRules: inferenceGraph.forwards.get(source) ?? [],
+        transitiveRules: [...ids],
+      }));
+
     process.stderr.write(
       JSON.stringify({
         type: "repo-analysis-state",
@@ -510,6 +528,11 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
         aggregatedFindingCount: aggregatedFindings.aggregatedFindings.length,
         findings: debugFindings,
         measureCompleteness: measureCompletenessReport,
+        remediationGraph: {
+          directEdgeCount,
+          transitiveEdgeCount,
+          closure: closureDebug,
+        },
       }),
     );
     process.stderr.write("\n");

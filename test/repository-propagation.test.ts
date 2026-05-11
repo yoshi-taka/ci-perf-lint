@@ -249,12 +249,12 @@ describe("computeImpliedChecks", () => {
     ]);
   });
 
-  test("returns implied checks from finding ruleIds", () => {
+  test("returns implied checks from finding ruleIds including transitive", () => {
     const findings = [makeDiagnostic("rule-a", "wf.yml", 50)];
     const checks = computeImpliedChecks(findings);
-    expect(checks).toHaveLength(1);
-    expect(checks[0]!.sourceRuleId).toBe("rule-a");
-    expect(checks[0]!.impliedRuleId).toBe("rule-b");
+    expect(checks).toHaveLength(2);
+    const pairKeys = checks.map((c) => `${c.sourceRuleId}->${c.impliedRuleId}`).sort();
+    expect(pairKeys).toEqual(["rule-a->rule-b", "rule-a->rule-c"]);
   });
 
   test("returns empty for findings without impliedChecks", () => {

@@ -406,6 +406,11 @@ export async function evaluateRules(
         impliedIds.add(id);
       }
     }
+    for (const [, transitiveIds] of inferenceGraph.transitiveForwards) {
+      for (const id of transitiveIds) {
+        impliedIds.add(id);
+      }
+    }
 
     const caps = new Map<string, number>();
     const cappedCounts = new Map<string, number>();
