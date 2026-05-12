@@ -7,6 +7,8 @@ import type { RepositoryFileIndex } from "../rules/shared/repository-file-index.
 import type { RepositoryPredicateIndex } from "../rules/shared/repository-predicate-index.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import type { RepositoryCorpusIndex } from "../rules/shared/repository-corpus-index.ts";
+import type { GateExpr } from "./gate-expr.ts";
+import { evaluateGateExpr } from "./gate-expr.ts";
 
 export type GateKey = keyof RepositoryDiagnosticGateState;
 
@@ -213,10 +215,11 @@ export interface RepositoryDiagnosticCollector<
   id: string;
   gate?: G;
   gates?: Gs;
+  gateExpr?: GateExpr<GateKey>;
   collect: (context: CollectorContext<G, Gs>) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
-export function collectorRequiresAllGates(
+function checkLegacyGate(
   collector: { gate?: GateKey; gates?: readonly GateKey[] },
   gateState: RepositoryDiagnosticGateState,
 ): boolean {
@@ -228,6 +231,16 @@ export function collectorRequiresAllGates(
     return checkGate(collector.gate);
   }
   return true;
+}
+
+export function collectorRequiresAllGates(
+  collector: { gate?: GateKey; gates?: readonly GateKey[]; gateExpr?: GateExpr<GateKey> },
+  gateState: RepositoryDiagnosticGateState,
+): boolean {
+  if (collector.gateExpr) {
+    return evaluateGateExpr(collector.gateExpr, gateState);
+  }
+  return checkLegacyGate(collector, gateState);
 }
 
 function __unsafeWrapProof<G extends GateKey>(_gate: G, _proof: ProofForGate<G>): GateTrue<G> {

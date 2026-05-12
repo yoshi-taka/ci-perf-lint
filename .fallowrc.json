@@ -27,6 +27,7 @@
     { "file": "src/severity-promotion.ts", "exports": ["severityPromotionRules"] },
     { "file": "src/reification.ts", "exports": ["createLegacyDetails", "createBlueprintDetails", "foldDiagnosticDetails"] },
     { "file": "src/diagnostic-source.ts", "exports": ["composeDiagnosticSources", "diagnosticSourceToRef"] },
-    { "file": "src/repository-diagnostics/gates.ts", "exports": ["buildDag"] }
+    { "file": "src/repository-diagnostics/gates.ts", "exports": ["buildDag"] },
+    { "file": "src/repository-diagnostics/gate-expr.ts", "exports": ["atom", "andExpr", "orExpr", "evaluateGateExpr", "collectGates", "flattenAnd", "flattenOr", "simplifyGateExpr", "gateExprFromLegacy"] }
   ]
 }
