@@ -50,13 +50,13 @@ import { allRules } from "./rules/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
 import { stderrWarn } from "./stderr-warn.ts";
 import {
-  composeRefiners,
-  severityPromotionRefiner,
-  repositoryScopeFixRefiner,
-  modeFilterRefiner,
-  actionsPriorityRefiner,
-  sortRefiner,
+  composePipeline,
+  repositoryScopeFixMap,
+  modeFilter,
+  actionsPriorityListOp,
+  findingSorter,
 } from "./refiner-pipeline.ts";
+import { applySeverityPromotion } from "./severity-promotion.ts";
 import { findingIncludedInScope } from "./repo-finding-utils.ts";
 
 const buildkitePattern = /(?:^|\/)\.buildkite\//i;
@@ -438,14 +438,14 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
 
   scanContext.clearCaches();
 
-  const globalRefiners = composeRefiners([
-    severityPromotionRefiner(mode),
-    repositoryScopeFixRefiner(),
-    modeFilterRefiner(mode),
-    actionsPriorityRefiner(),
-    sortRefiner(),
-  ]);
-  let findings = globalRefiners.refine(allFindings, { mode });
+  const findingsPromoted = applySeverityPromotion(allFindings, mode);
+  const pipeline = composePipeline({
+    maps: [repositoryScopeFixMap()],
+    filters: [modeFilter(mode)],
+    listOps: [actionsPriorityListOp()],
+    sorter: findingSorter(),
+  });
+  let findings = pipeline.refine(findingsPromoted, { mode });
 
   const findingsByWorkflow = new Map<string, Diagnostic[]>();
 

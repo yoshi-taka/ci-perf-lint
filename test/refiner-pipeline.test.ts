@@ -3,13 +3,15 @@ import type { AnalysisWarning, Diagnostic } from "../src/types.ts";
 import type { InferenceGraph } from "../src/rules/shared/remediation-checks.ts";
 import {
   composeRefiners,
+  composePipeline,
   deduplicateRefiner,
   driftDetectionRefiner,
   maxFindingsRefiner,
-  severityPromotionRefiner,
-  modeFilterRefiner,
-  sortRefiner,
-  repositoryScopeFixRefiner,
+  modeFilter,
+  repositoryScopeFixMap,
+  findingSorter,
+  type DiagnosticMap,
+  type DiagnosticFilter,
 } from "../src/refiner-pipeline.ts";
 
 function makeDiagnostic(overrides: Partial<Diagnostic> & { ruleId: string }): Diagnostic {
@@ -108,98 +110,252 @@ describe("maxFindingsRefiner", () => {
   });
 });
 
-describe("severityPromotionRefiner", () => {
-  test("promotes suggestions to warnings in strict mode when no warnings exist", () => {
-    const diagnostics = [
-      makeDiagnostic({
-        ruleId: "missing-concurrency",
-        severity: "suggestion",
-      }),
-    ];
-    const result = severityPromotionRefiner("strict").refine(diagnostics, {});
-    expect(result[0]?.severity).toBe("warning");
+// ============================================================
+// New phase-typed interface tests
+// ============================================================
+
+describe("DiagnosticMap", () => {
+  test("repositoryScopeFixMap sets scope on repository findings", () => {
+    const m = repositoryScopeFixMap();
+    const d = makeDiagnostic({
+      ruleId: "rule-a",
+      scope: undefined,
+      source: {
+        kind: "repository",
+        workflowPath: "pkg.json",
+        location: { path: "pkg.json", line: 1, column: 1 },
+      },
+    });
+    const result = m.map(d, {});
+    expect(result.scope).toBe("repository");
   });
 
-  test("does not promote in exploratory mode", () => {
-    const diagnostics = [
-      makeDiagnostic({
-        ruleId: "missing-concurrency",
-        severity: "suggestion",
-      }),
-    ];
-    const result = severityPromotionRefiner("exploratory").refine(diagnostics, {});
-    expect(result[0]?.severity).toBe("suggestion");
-  });
-});
-
-describe("modeFilterRefiner", () => {
-  test("filters out suggestions in strict mode", () => {
-    const diagnostics = [
-      makeDiagnostic({ ruleId: "rule-a", severity: "warning" }),
-      makeDiagnostic({ ruleId: "rule-b", severity: "suggestion" }),
-    ];
-    const result = modeFilterRefiner("strict").refine(diagnostics, {});
-    expect(result).toHaveLength(1);
-    expect(result[0]?.ruleId).toBe("rule-a");
+  test("repositoryScopeFixMap does not change workflow-scoped findings", () => {
+    const m = repositoryScopeFixMap();
+    const d = makeDiagnostic({ ruleId: "rule-a", scope: undefined });
+    const result = m.map(d, {});
+    expect(result.scope).toBeUndefined();
   });
 
-  test("keeps all findings in exploratory mode", () => {
-    const diagnostics = [
-      makeDiagnostic({ ruleId: "rule-a", severity: "warning" }),
-      makeDiagnostic({ ruleId: "rule-b", severity: "suggestion" }),
+  test("map preserves element count and order", () => {
+    const m: DiagnosticMap = {
+      name: "test-map",
+      map: (d) => ({ ...d, score: d.score + 1 }),
+    };
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: 10 }),
+      makeDiagnostic({ ruleId: "b", score: 20 }),
     ];
-    const result = modeFilterRefiner("exploratory").refine(diagnostics, {});
+    const result = input.map((d) => m.map(d, {}));
     expect(result).toHaveLength(2);
+    expect(result[0]!.score).toBe(11);
+    expect(result[1]!.score).toBe(21);
   });
 });
 
-describe("repositoryScopeFixRefiner", () => {
-  test("sets scope to repository when source.kind is repository and scope is undefined", () => {
-    const diagnostics = [
+describe("DiagnosticFilter", () => {
+  test("modeFilter keeps warnings in strict mode", () => {
+    const f = modeFilter("strict");
+    const d = makeDiagnostic({ ruleId: "rule-a", severity: "warning" });
+    expect(f.keep(d, {})).toBe(true);
+  });
+
+  test("modeFilter drops suggestions in strict mode", () => {
+    const f = modeFilter("strict");
+    const d = makeDiagnostic({ ruleId: "rule-a", severity: "suggestion" });
+    expect(f.keep(d, {})).toBe(false);
+  });
+
+  test("modeFilter keeps suggestions in exploratory mode", () => {
+    const f = modeFilter("exploratory");
+    const d = makeDiagnostic({ ruleId: "rule-a", severity: "suggestion" });
+    expect(f.keep(d, {})).toBe(true);
+  });
+
+  test("filter preserves element order", () => {
+    const f: DiagnosticFilter = {
+      name: "test-filter",
+      keep: (d) => d.score > 15,
+    };
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: 10 }),
+      makeDiagnostic({ ruleId: "b", score: 20 }),
+      makeDiagnostic({ ruleId: "c", score: 15 }),
+    ];
+    const result = input.filter((d) => f.keep(d, {}));
+    expect(result).toHaveLength(1);
+    expect(result[0]!.ruleId).toBe("b");
+  });
+});
+
+describe("DiagnosticSorter", () => {
+  test("findingSorter sorts by score descending then by stable fields", () => {
+    const s = findingSorter();
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: 50 }),
+      makeDiagnostic({ ruleId: "b", score: 100 }),
+      makeDiagnostic({ ruleId: "c", score: 75 }),
+    ];
+    const result = [...input].sort((a, b) => s.compare(a, b));
+    expect(result.map((d) => d.score)).toEqual([100, 75, 50]);
+  });
+
+  test("findingSorter tie-breaking by workflow name", () => {
+    const s = findingSorter();
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: 50, workflow: "z.yml" }),
+      makeDiagnostic({ ruleId: "a", score: 50, workflow: "a.yml" }),
+    ];
+    const result = [...input].sort((a, b) => s.compare(a, b));
+    expect(result[0]!.workflow).toBe("a.yml");
+  });
+});
+
+// ============================================================
+// composePipeline tests
+// ============================================================
+
+describe("composePipeline", () => {
+  test("applies maps → filters → sorter in order", () => {
+    const pipeline = composePipeline({
+      maps: [
+        {
+          name: "add-10",
+          map: (d) => ({ ...d, score: d.score + 10 }),
+        },
+      ],
+      filters: [
+        {
+          name: "score-gt-20",
+          keep: (d) => d.score > 20,
+        },
+      ],
+      sorter: {
+        name: "score-desc",
+        compare: (a, b) => b.score - a.score,
+      },
+    });
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: 5 }),
+      makeDiagnostic({ ruleId: "b", score: 15 }),
+      makeDiagnostic({ ruleId: "c", score: 25 }),
+    ];
+    const result = pipeline.refine(input, {});
+    // After map: [15, 25, 35]; after filter: [25, 35]; after sort desc: [35, 25]
+    expect(result).toHaveLength(2);
+    expect(result[0]!.score).toBe(35);
+    expect(result[1]!.score).toBe(25);
+  });
+
+  test("applies listOps after filters", () => {
+    const pipeline = composePipeline({
+      filters: [
+        {
+          name: "odd-only",
+          keep: (d) => d.score % 2 === 1,
+        },
+      ],
+      listOps: [
+        {
+          name: "double-scores",
+          apply: (diags) => diags.map((d) => ({ ...d, score: d.score * 2 })),
+        },
+      ],
+    });
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: 1 }),
+      makeDiagnostic({ ruleId: "b", score: 2 }),
+      makeDiagnostic({ ruleId: "c", score: 3 }),
+    ];
+    const result = pipeline.refine(input, {});
+    // filter keeps [1, 3]; listOp doubles to [2, 6]
+    expect(result).toHaveLength(2);
+    expect(result[0]!.score).toBe(2);
+    expect(result[1]!.score).toBe(6);
+  });
+
+  test("empty config acts as identity", () => {
+    const pipeline = composePipeline({});
+    const input = [makeDiagnostic({ ruleId: "a" })];
+    expect(pipeline.refine(input, {})).toEqual(input);
+  });
+
+  test("maps only", () => {
+    const pipeline = composePipeline({
+      maps: [
+        {
+          name: "increment",
+          map: (d) => ({ ...d, score: d.score + 1 }),
+        },
+      ],
+    });
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: 1 }),
+      makeDiagnostic({ ruleId: "b", score: 2 }),
+    ];
+    const result = pipeline.refine(input, {});
+    expect(result.map((d) => d.score)).toEqual([2, 3]);
+  });
+
+  test("filters only", () => {
+    const pipeline = composePipeline({
+      filters: [
+        {
+          name: "positive",
+          keep: (d) => d.score > 0,
+        },
+      ],
+    });
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: -1 }),
+      makeDiagnostic({ ruleId: "b", score: 5 }),
+    ];
+    const result = pipeline.refine(input, {});
+    expect(result).toHaveLength(1);
+    expect(result[0]!.ruleId).toBe("b");
+  });
+
+  test("sorter only", () => {
+    const pipeline = composePipeline({
+      sorter: { name: "asc", compare: (a, b) => a.score - b.score },
+    });
+    const input = [
+      makeDiagnostic({ ruleId: "a", score: 30 }),
+      makeDiagnostic({ ruleId: "b", score: 10 }),
+    ];
+    const result = pipeline.refine(input, {});
+    expect(result.map((d) => d.score)).toEqual([10, 30]);
+  });
+
+  test("composePipeline with real factory functions", () => {
+    const pipeline = composePipeline({
+      maps: [repositoryScopeFixMap()],
+      filters: [modeFilter("strict")],
+    });
+    const input = [
       makeDiagnostic({
-        ruleId: "rule-a",
+        ruleId: "repo-rule",
         scope: undefined,
         source: {
           kind: "repository",
-          workflowPath: "package.json",
-          location: { path: "package.json", line: 1, column: 1 },
+          workflowPath: "pkg.json",
+          location: { path: "pkg.json", line: 1, column: 1 },
         },
+        severity: "warning",
       }),
-    ];
-    const result = repositoryScopeFixRefiner().refine(diagnostics, {});
-    expect(result[0]?.scope).toBe("repository");
-  });
-
-  test("does not change scope when already set", () => {
-    const diagnostics = [
       makeDiagnostic({
-        ruleId: "rule-a",
-        scope: "workflow",
-        source: {
-          kind: "repository",
-          workflowPath: "package.json",
-          location: { path: "package.json", line: 1, column: 1 },
-        },
+        ruleId: "suggestion-rule",
+        severity: "suggestion",
       }),
     ];
-    const result = repositoryScopeFixRefiner().refine(diagnostics, {});
-    expect(result[0]?.scope).toBe("workflow");
+    const result = pipeline.refine(input, {});
+    expect(result).toHaveLength(1);
+    expect(result[0]!.ruleId).toBe("repo-rule");
+    expect(result[0]!.scope).toBe("repository");
   });
 });
 
-describe("sortRefiner", () => {
-  test("sorts by score descending", () => {
-    const diagnostics = [
-      makeDiagnostic({ ruleId: "rule-a", score: 50 }),
-      makeDiagnostic({ ruleId: "rule-b", score: 100 }),
-      makeDiagnostic({ ruleId: "rule-c", score: 75 }),
-    ];
-    const result = sortRefiner().refine(diagnostics, {});
-    expect(result.map((d) => d.score)).toEqual([100, 75, 50]);
-  });
-});
-
-describe("composeRefiners", () => {
+describe("composeRefiners (legacy)", () => {
   test("applies refiners in order", () => {
     const diagnostics = [
       makeDiagnostic({
