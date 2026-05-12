@@ -60,6 +60,7 @@ export interface RuleContext {
   singularities?: SingularityTracker;
   measureCompleteness?: MeasureCompletenessTracker;
   abstain?: (abstention: Omit<RuleAbstention, "epistemicStatus">, status?: EpistemicStatus) => void;
+  allWorkflows?: readonly WorkflowDocument[];
 }
 
 interface RuleModule {
@@ -189,12 +190,17 @@ function ruleMatchesScope(
   return !isBuildkite && !isGitlab && !isCircle;
 }
 
-function shouldSkipForWorkflow(pred: Predicate, workflow: WorkflowDocument): boolean {
+function shouldSkipForWorkflow(
+  pred: Predicate,
+  workflow: WorkflowDocument,
+  allWorkflows?: readonly WorkflowDocument[],
+): boolean {
   const wfFacts = getWorkflowFacts(workflow);
   const ctx = {
     workflow,
     workflowFacts: wfFacts,
     source: workflow.source ?? "",
+    workflows: allWorkflows,
   };
   return evaluatePredicate(pred, ctx);
 }
@@ -338,7 +344,10 @@ export async function evaluateRules(
 
     const rmeta: RuleMeta = rule.meta;
     const skipPred = rmeta.skipIf;
-    if (skipPred && shouldSkipForWorkflow(skipPred, workflow as WorkflowDocument)) {
+    if (
+      skipPred &&
+      shouldSkipForWorkflow(skipPred, workflow as WorkflowDocument, context.allWorkflows)
+    ) {
       context.measureCompleteness?.skippedGates.add(rule.meta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
@@ -553,7 +562,10 @@ export async function evaluateRulesCoarseToFine(
 
       const rmetaB: RuleMeta = rule.meta;
       const skipPred = rmetaB.skipIf;
-      if (skipPred && shouldSkipForWorkflow(skipPred, workflow as WorkflowDocument)) {
+      if (
+        skipPred &&
+        shouldSkipForWorkflow(skipPred, workflow as WorkflowDocument, context.allWorkflows)
+      ) {
         context.measureCompleteness?.skippedGates.add(ruleId);
         pushAnalysisWarning(warnings, {
           kind: "gate-skipped",

@@ -328,6 +328,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     precedentIndex,
     fileIndex,
     measureCompleteness,
+    allWorkflows: wfList as WorkflowDocument[],
     abstain(
       abstention: Omit<RuleAbstention, "epistemicStatus">,
       status: EpistemicStatus = "unknown",

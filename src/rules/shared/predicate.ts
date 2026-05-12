@@ -23,7 +23,9 @@ export type Predicate =
   | { kind: "tool-absent"; key: ToolPresenceKey }
   | { kind: "has-node-type"; nodeType: NodeKind }
   | { kind: "scope-is"; scope: ScopeKind }
-  | { kind: "source-contains"; pattern: string };
+  | { kind: "source-contains"; pattern: string }
+  | { kind: "all-workflows"; operand: Predicate }
+  | { kind: "any-workflows"; operand: Predicate };
 
 // ── Literal helpers ──────────────────────────
 
@@ -115,6 +117,14 @@ export function sourceContains(pattern: string): Predicate {
   return { kind: "source-contains", pattern };
 }
 
+export function allWorkflows(operand: Predicate): Predicate {
+  return { kind: "all-workflows", operand };
+}
+
+export function anyWorkflows(operand: Predicate): Predicate {
+  return { kind: "any-workflows", operand };
+}
+
 // ── Skip condition (the top-level predicate for a rule) ──
 
 // ── Evaluator ─────────────────────────────────
@@ -123,6 +133,7 @@ export interface EvalContext {
   workflow: WorkflowDocument;
   workflowFacts: ReturnType<typeof getWorkflowFacts>;
   source: string;
+  workflows?: readonly WorkflowDocument[];
 }
 
 export function evaluate(pred: Predicate, ctx: EvalContext): boolean {
@@ -151,6 +162,24 @@ export function evaluate(pred: Predicate, ctx: EvalContext): boolean {
       return true;
     case "source-contains":
       return ctx.source.includes(pred.pattern);
+    case "all-workflows": {
+      if (!ctx.workflows || ctx.workflows.length === 0) {
+        return false;
+      }
+      return ctx.workflows.every((w) => {
+        const wfFacts = ctx.workflowFacts;
+        return evaluate(pred.operand, { ...ctx, workflow: w, workflowFacts: wfFacts });
+      });
+    }
+    case "any-workflows": {
+      if (!ctx.workflows || ctx.workflows.length === 0) {
+        return false;
+      }
+      return ctx.workflows.some((w) => {
+        const wfFacts = ctx.workflowFacts;
+        return evaluate(pred.operand, { ...ctx, workflow: w, workflowFacts: wfFacts });
+      });
+    }
   }
 }
 
@@ -196,6 +225,9 @@ function collectLiterals(pred: Predicate): string[] | null {
       return [lit(`scope:${pred.scope}`, true)];
     case "source-contains":
       return [lit(`source:${pred.pattern}`, true)];
+    case "all-workflows":
+    case "any-workflows":
+      return null;
     case "and": {
       const all: string[] = [];
       for (const o of pred.operands) {
@@ -246,6 +278,9 @@ function collectDNFClauses(pred: Predicate): DNFClause[] {
       return [new Set([lit(`scope:${pred.scope}`, true)])];
     case "source-contains":
       return [new Set([lit(`source:${pred.pattern}`, true)])];
+    case "all-workflows":
+    case "any-workflows":
+      return [new Set([`quantifier:${pred.kind}`])];
   }
 }
 
@@ -451,6 +486,11 @@ function collectConditionNames(pred: Predicate): string[] {
       case "source-contains":
         names.add(`src:${p.pattern}`);
         break;
+      case "all-workflows":
+      case "any-workflows":
+        names.add(`quantifier:${p.kind}`);
+        walk(p.operand);
+        break;
     }
   }
   walk(pred);
@@ -481,6 +521,9 @@ function evaluateWithAssignments(pred: Predicate, assignments: Map<string, boole
       return assignments.get(`scope:${pred.scope}`) ?? false;
     case "source-contains":
       return assignments.get(`src:${pred.pattern}`) ?? false;
+    case "all-workflows":
+    case "any-workflows":
+      return assignments.get(`quantifier:${pred.kind}`) === true;
   }
 }
 
@@ -513,5 +556,9 @@ export function simplify(pred: Predicate): Predicate {
       return and(...pred.operands.map(simplify));
     case "or":
       return or(...pred.operands.map(simplify));
+    case "all-workflows":
+      return allWorkflows(simplify(pred.operand));
+    case "any-workflows":
+      return anyWorkflows(simplify(pred.operand));
   }
 }
