@@ -42,6 +42,9 @@ export interface JobFacts {
   hasSetupPnpmStep: boolean;
   hasSetupUvStep: boolean;
   hasBuildxBake: boolean;
+  hasCache: boolean;
+  hasInstall: boolean;
+  installManager?: string;
   isHeavyJob: boolean;
   heavyEvidence: HeavyEvidence;
   hasDirectHeavySignals: boolean;
@@ -56,6 +59,8 @@ export interface JobFacts {
   checkoutDepth?: number;
   hasTimeout: boolean;
   dockerUsage: boolean;
+  hasTest: boolean;
+  hasBuild: boolean;
   setupActions: readonly SetupActionKind[];
   runsOnSpec: RunsOnSpec;
 }
@@ -187,6 +192,11 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
   let looksAgenticLike = false;
   let checkoutFetchDepth: number | undefined;
   let jobHasTimeout = false;
+  let jobHasTest = false;
+  let jobHasBuild = false;
+  let jobHasCache = false;
+  let jobInstallManager: string | undefined;
+  let jobHasInstall = false;
   const setupActions: SetupActionKind[] = [];
   const lintTools = new Set<string>();
   const pythonTools = new Set<string>();
@@ -195,21 +205,9 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
   for (const step of job.steps) {
     const facts = getStepFacts(step);
 
-    if (!checkoutStep && usesSetupAction(step.uses, "actions/checkout@")) {
+    if (facts.isCheckout && !checkoutStep) {
       checkoutStep = step;
-      const fetchDepth = step.with?.["fetch-depth"];
-      if (fetchDepth === 0 || fetchDepth === "0") {
-        checkoutFetchDepth = 0;
-      } else if (typeof fetchDepth === "number" && fetchDepth > 1) {
-        checkoutFetchDepth = fetchDepth;
-      } else if (typeof fetchDepth === "string" && /^\d+$/.test(fetchDepth)) {
-        const n = Number(fetchDepth);
-        if (n > 1) {
-          checkoutFetchDepth = n;
-        }
-      } else if (fetchDepth !== undefined) {
-        checkoutFetchDepth = undefined;
-      }
+      checkoutFetchDepth = facts.checkoutDepth;
     }
 
     foundSetupBunStep ||= usesSetupAction(step.uses, "oven-sh/setup-bun@");
@@ -236,6 +234,14 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
       setupActions.push(facts.setupActionKind);
     }
 
+    jobHasCache ||=
+      usesSetupAction(step.uses, "actions/cache@") ||
+      usesSetupAction(step.uses, "ashleytaylor/cache-action@");
+    jobHasCache ||= facts.isManualCacheStep;
+
+    jobInstallManager ??= facts.installCommand;
+    jobHasInstall ||= Boolean(facts.installCommand);
+
     hasBuildxBake ||= dockerBuildxBakePattern.test(run);
     hasDockerBuild ||= dockerBuildPattern.test(run);
     hasHeavyStepSignal ||= heavyStepSignalPattern.test(loweredStepText);
@@ -244,6 +250,14 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     hasOpaqueRepoScriptExecution ||= opaqueRepoScriptExecutionPattern.test(run);
     looksMetaCheckLike ||= metaCheckLikePattern.test(loweredStepText);
     looksAgenticLike ||= agenticLikePattern.test(loweredStepText);
+    jobHasTest ||=
+      /\b(test|tests|spec|jest|vitest|pytest|mocha|rspec|cargo test|go test|npm test|pnpm test|bun test)\b/i.test(
+        loweredRunNameText,
+      );
+    jobHasBuild ||=
+      /\b(npm run build|pnpm build|yarn build|bun run build|vite build|next build|turbo run build|nx build|gradle build|mvn build|cargo build|go build|dotnet build|webpack|rollup|esbuild)\b/i.test(
+        loweredRunNameText,
+      );
   }
 
   const timeoutMinutes = job.raw["timeout-minutes"];
@@ -279,6 +293,9 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     hasSetupPnpmStep: foundSetupPnpmStep,
     hasSetupUvStep: foundSetupUvStep,
     hasBuildxBake,
+    hasCache: jobHasCache,
+    hasInstall: jobHasInstall,
+    installManager: jobInstallManager,
     isHeavyJob: isHeavy,
     heavyEvidence,
     hasDirectHeavySignals,
@@ -293,6 +310,8 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     checkoutDepth: checkoutFetchDepth,
     hasTimeout: jobHasTimeout,
     dockerUsage: hasBuildxBake || hasDockerBuild,
+    hasTest: jobHasTest,
+    hasBuild: jobHasBuild,
     setupActions,
     runsOnSpec: getRunsOnSpec(job),
   };

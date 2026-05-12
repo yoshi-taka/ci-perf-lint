@@ -20,6 +20,21 @@ export interface StepFacts {
   readonly setupActionKind?: SetupActionKind;
   readonly isManualCacheStep: boolean;
   readonly hasDependencyCacheConfig: boolean;
+
+  readonly isCheckout: boolean;
+  readonly checkoutDepth?: number;
+  readonly checkoutSparseCheckout?: string;
+  readonly checkoutFilter?: string;
+
+  readonly isDockerBuild: boolean;
+  readonly dockerNoCache?: boolean;
+  readonly dockerLoad?: boolean;
+  readonly dockerCacheFrom?: string;
+  readonly dockerCacheTo?: string;
+  readonly dockerPlatforms?: string;
+
+  readonly setupCacheParam?: string;
+  readonly setupCacheDependencyPath?: string;
 }
 
 const stepFactsCache = new WeakMap<WorkflowStep, StepFacts>();
@@ -71,12 +86,65 @@ function computeStepFacts(step: WorkflowStep): StepFacts {
     uses.startsWith("actions/cache/save@");
 
   let hasDependencyCacheConfig = false;
+  let setupCacheParam: string | undefined;
+  let setupCacheDependencyPath: string | undefined;
   if (step.uses && step.with) {
     const cacheValue = step.with.cache;
-    const cacheDependencyPath = step.with["cache-dependency-path"];
+    const cacheDepPath = step.with["cache-dependency-path"];
     hasDependencyCacheConfig =
       (typeof cacheValue === "string" && cacheValue.trim().length > 0) ||
-      (typeof cacheDependencyPath === "string" && cacheDependencyPath.trim().length > 0);
+      (typeof cacheDepPath === "string" && cacheDepPath.trim().length > 0);
+    if (setupActionKind) {
+      setupCacheParam = typeof cacheValue === "string" ? cacheValue : undefined;
+      setupCacheDependencyPath = typeof cacheDepPath === "string" ? cacheDepPath : undefined;
+    }
+  }
+
+  let isCheckout = false;
+  let checkoutDepth: number | undefined;
+  let checkoutSparseCheckout: string | undefined;
+  let checkoutFilter: string | undefined;
+  if (uses.startsWith("actions/checkout@")) {
+    isCheckout = true;
+    const fetchDepth = step.with?.["fetch-depth"];
+    if (fetchDepth === 0 || fetchDepth === "0") {
+      checkoutDepth = 0;
+    } else if (typeof fetchDepth === "number" && fetchDepth > 1) {
+      checkoutDepth = fetchDepth;
+    } else if (typeof fetchDepth === "string" && /^\d+$/.test(fetchDepth)) {
+      const n = Number(fetchDepth);
+      if (n > 1) {
+        checkoutDepth = n;
+      }
+    } else if (fetchDepth !== undefined) {
+      checkoutDepth = undefined;
+    }
+    checkoutSparseCheckout =
+      typeof step.with?.["sparse-checkout"] === "string" ? step.with["sparse-checkout"] : undefined;
+    checkoutFilter = typeof step.with?.filter === "string" ? step.with.filter : undefined;
+  }
+
+  const run = step.run ?? "";
+  let isDockerBuild = false;
+  let dockerNoCache: boolean | undefined;
+  let dockerLoad: boolean | undefined;
+  let dockerCacheFrom: string | undefined;
+  let dockerCacheTo: string | undefined;
+  let dockerPlatforms: string | undefined;
+  if (uses.startsWith("docker/build-push-action@") || uses.startsWith("depot/build-push-action@")) {
+    isDockerBuild = true;
+    const noCacheVal = step.with?.["no-cache"];
+    dockerNoCache = noCacheVal === true || noCacheVal === "true";
+    const loadVal = step.with?.load;
+    dockerLoad = loadVal === true || loadVal === "true";
+    dockerCacheFrom =
+      typeof step.with?.["cache-from"] === "string" ? step.with["cache-from"] : undefined;
+    dockerCacheTo = typeof step.with?.["cache-to"] === "string" ? step.with["cache-to"] : undefined;
+    dockerPlatforms = typeof step.with?.platforms === "string" ? step.with.platforms : undefined;
+  } else if (/\bdocker\s+(?:buildx\s+build|build)\b/i.test(run)) {
+    isDockerBuild = true;
+    dockerNoCache = /\b--no-cache\b/i.test(run);
+    dockerLoad = /\b--load\b/i.test(run);
   }
 
   return {
@@ -90,5 +158,17 @@ function computeStepFacts(step: WorkflowStep): StepFacts {
     setupActionKind,
     isManualCacheStep,
     hasDependencyCacheConfig,
+    isCheckout,
+    checkoutDepth,
+    checkoutSparseCheckout,
+    checkoutFilter,
+    isDockerBuild,
+    dockerNoCache,
+    dockerLoad,
+    dockerCacheFrom,
+    dockerCacheTo,
+    dockerPlatforms,
+    setupCacheParam,
+    setupCacheDependencyPath,
   };
 }

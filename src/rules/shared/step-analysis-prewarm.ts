@@ -4,6 +4,7 @@ import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "../../circleci-workflow.ts";
 import { getStepFacts } from "./step-facts.ts";
 import { getJobFacts, getWorkflowFacts } from "./workflow-analysis.ts";
+import { buildWorkflowSemantics } from "./workflow-semantics.ts";
 
 export function prewarmStepAnalysisCaches(
   workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
@@ -24,4 +25,6 @@ export function prewarmStepAnalysisCaches(
       getStepFacts(step);
     }
   }
+
+  buildWorkflowSemantics(wf);
 }

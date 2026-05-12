@@ -1,9 +1,8 @@
 import type { WorkflowDocument } from "../../workflow.ts";
 
-import { getWorkflowFacts } from "./workflow-analysis.ts";
+import { getWorkflowFacts, getJobFacts } from "./workflow-analysis.ts";
 import { workflowHasConcurrency, isHeavyWorkflow } from "./workflows.ts";
 import { jobHasMatrix } from "./workflow-jobs.ts";
-import { detectInstallCommand, detectLintTool } from "./tools.ts";
 
 export interface JobMetadata {
   id: string;
@@ -57,59 +56,14 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
   const jobs: JobMetadata[] = [];
 
   for (const job of workflow.jobs) {
+    const jf = getJobFacts(job);
     stepCount += job.steps.length;
     hasMatrixJob ||= jobHasMatrix(job);
 
-    let hasCheckout = false;
-    let hasInstall = false;
-    let installManager: string | undefined;
-    let hasLint = false;
-    let lintTool: string | undefined;
-    let hasTest = false;
-    let hasBuild = false;
-    let hasCache = false;
+    const lintTool = jf.lintTools.size > 0 ? [...jf.lintTools][0] : undefined;
 
-    for (const step of job.steps) {
-      const run = step.run ?? "";
-      const name = step.name ?? "";
-      const text = `${name} ${run}`.toLowerCase();
-      const uses = step.uses?.toLowerCase() ?? "";
-
-      hasCheckout ||= uses.startsWith("actions/checkout@");
-      hasCache ||=
-        uses.startsWith("actions/cache@") || uses.startsWith("ashleytaylor/cache-action@");
-
-      hasLint ||=
-        /\b(eslint|oxlint|prettier|actionlint|shellcheck|ruff|markdownlint|biome|yamllint|stylelint)\b/.test(
-          text,
-        );
-      hasTest ||=
-        /\b(test|tests|spec|jest|vitest|pytest|mocha|rspec|cargo test|go test|npm test|pnpm test|bun test)\b/.test(
-          text,
-        );
-      hasBuild ||=
-        /\b(npm run build|pnpm build|yarn build|bun run build|vite build|next build|turbo run build|nx build|gradle build|mvn build|cargo build|go build|dotnet build|webpack|rollup|esbuild)\b/.test(
-          text,
-        );
-
-      if (!installManager) {
-        const mgr = detectInstallCommand(step);
-        if (mgr) {
-          installManager = mgr;
-        }
-      }
-      if (!lintTool) {
-        const lt = detectLintTool(step);
-        if (lt) {
-          lintTool = lt;
-        }
-      }
-    }
-
-    hasInstall = Boolean(installManager);
-
-    if (installManager) {
-      installManagers.add(installManager);
+    if (jf.installManager) {
+      installManagers.add(jf.installManager);
     }
     if (lintTool) {
       lintTools.add(lintTool);
@@ -118,15 +72,15 @@ export function buildWorkflowSemantics(workflow: WorkflowDocument): WorkflowSema
     jobs.push({
       id: job.id,
       hasMatrix: jobHasMatrix(job),
-      hasCheckout,
-      hasInstall,
-      installManager,
-      hasLint,
+      hasCheckout: jf.checkoutStep !== undefined,
+      hasInstall: jf.hasInstall,
+      installManager: jf.installManager,
+      hasLint: lintTool !== undefined,
       lintTool,
-      hasTest,
-      hasBuild,
-      hasCache,
-      hasTimeout: Boolean(job.raw["timeout-minutes"]),
+      hasTest: jf.hasTest,
+      hasBuild: jf.hasBuild,
+      hasCache: jf.hasCache,
+      hasTimeout: jf.hasTimeout,
     });
   }
 
