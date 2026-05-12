@@ -91,13 +91,13 @@ export const repeatedBootstrapSetupRule = {
         stepTypes.length > 0 ? ` — they run ${stepTypes.join(", ")} respectively` : "";
 
       return buildDiagnostic(workflow, meta, workflow.jobsNode, {
-        message: `${totalJobs} jobs share the same bootstrap fingerprint "${group.bootstrapFp}": ${sortedJobIds.join(", ")}${stepDesc}.`,
+        message: `${totalJobs} jobs share the same bootstrap setup: ${sortedJobIds.join(", ")}${stepDesc}.`,
         why: "Each job repeats checkout, dependency installation, and cache restore independently. When jobs share the same bootstrap pattern, the setup cost is multiplied without adding proportional value.",
         suggestion:
           "Consider running all work types in one job with parallel steps, or consolidating the bootstrap setup by passing a dependency artifact between jobs.",
         measurementHint:
           "Compare total workflow duration and runner minutes after consolidating the repeated bootstrap setup across one pair of jobs.",
-        aiHandoff: `Review ${workflow.relativePath} jobs ${sortedJobIds.join(", ")} for shared bootstrap setup (fingerprint "${group.bootstrapFp}") and consolidate if the jobs can share an artifact.`,
+        aiHandoff: `Review ${workflow.relativePath} jobs ${sortedJobIds.join(", ")} for shared bootstrap setup and consolidate if the jobs can share an artifact.`,
         score: 56,
       });
     });
