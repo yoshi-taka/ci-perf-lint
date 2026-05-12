@@ -37,11 +37,19 @@ export interface WorkflowFeatureMap {
   readonly workflow: WorkflowDocument;
 }
 
+export interface ResourceAccessRecord {
+  readonly resourceId: string;
+  readonly status: "resolved" | "error";
+  readonly durationMs: number;
+  readonly error?: string;
+}
+
 export interface RepositoryFeatureIndex {
   readonly ecosystems: ReadonlySet<EcosystemFeature>;
   readonly workflowEcosystems: ReadonlyMap<WorkflowDocument, ReadonlySet<EcosystemFeature>>;
   readonly workflowsByEcosystem: ReadonlyMap<EcosystemFeature, readonly WorkflowDocument[]>;
   readonly workflowFeatures: ReadonlyMap<WorkflowDocument, WorkflowFeatureMap>;
+  readonly resourceAccessLog: readonly ResourceAccessRecord[];
 
   workflowFeature(workflow: WorkflowDocument): WorkflowFeatureMap | undefined;
   workflowsWithEcosystem(ecosystem: EcosystemFeature): readonly WorkflowDocument[];
@@ -150,6 +158,30 @@ export function buildRepositoryFeatureIndex(
     return result;
   }
 
+  const resourceAccessLog: ResourceAccessRecord[] = [];
+
+  function recordAccess<T>(resourceId: string, fn: () => Promise<T>): Promise<T> {
+    const start = performance.now();
+    return fn()
+      .then((result) => {
+        resourceAccessLog.push({
+          resourceId,
+          status: "resolved",
+          durationMs: performance.now() - start,
+        });
+        return result;
+      })
+      .catch((error: unknown) => {
+        resourceAccessLog.push({
+          resourceId,
+          status: "error",
+          durationMs: performance.now() - start,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      });
+  }
+
   let dockerBuildTargetsPromise: Promise<DockerBuildTarget[]> | undefined;
   const dockerfileDataCache = new Map<string, Promise<CollectedDockerfileData | undefined>>();
 
@@ -158,6 +190,7 @@ export function buildRepositoryFeatureIndex(
     workflowEcosystems,
     workflowsByEcosystem,
     workflowFeatures,
+    resourceAccessLog,
 
     workflowFeature(workflow: WorkflowDocument): WorkflowFeatureMap | undefined {
       return workflowFeatures.get(workflow);
@@ -175,10 +208,10 @@ export function buildRepositoryFeatureIndex(
       scanContext: RepositoryScanContext,
       warnings?: AnalysisWarning[],
     ): Promise<DockerBuildTarget[]> {
-      dockerBuildTargetsPromise ??= (async () => {
+      dockerBuildTargetsPromise ??= recordAccess("docker-build-targets", async () => {
         const { collectDockerBuildTargets } = await import("./docker-build-targets.ts");
         return collectDockerBuildTargets(repoRoot, [...workflows], warnings, scanContext);
-      })();
+      });
       return dockerBuildTargetsPromise;
     },
 
@@ -191,11 +224,11 @@ export function buildRepositoryFeatureIndex(
         return cached;
       }
 
-      const dataLoad = (async () => {
+      const dataLoad = recordAccess(`dockerfile:${dockerfilePath}`, async () => {
         const { collectDockerfileData: fetchDockerfileData } =
           await import("./docker-build-targets.ts");
         return fetchDockerfileData(scanContext, dockerfilePath);
-      })();
+      });
       dockerfileDataCache.set(dockerfilePath, dataLoad);
       return dataLoad;
     },

@@ -219,6 +219,7 @@ export async function collectRepositoryDiagnostics(
         type: "repo-diagnostics-state",
         activeGates,
         gateResults,
+        resourceAccessLog: context.featureIndex.resourceAccessLog,
         collectorCount: applicableCollectors.length,
         totalCollectors: repositoryDiagnosticCollectors.length,
         collectors: collectorResultsDump,
