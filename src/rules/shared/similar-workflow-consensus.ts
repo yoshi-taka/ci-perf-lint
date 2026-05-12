@@ -1,5 +1,4 @@
 export {
-  withSimilarWorkflowConcurrencyConsensus,
   withSimilarWorkflowDeepCheckoutConsensus,
   withSimilarWorkflowDependencyCacheConsensus,
   withSimilarWorkflowNonCodeIgnoreConsensus,
@@ -8,7 +7,6 @@ export {
 } from "./similar-workflow-consensus-consensus.ts";
 export {
   withRepositoryBlobNoneReleasePrecedent,
-  withRepositoryConcurrencyPrecedent,
   withRepositoryDependencyCachePrecedent,
   withRepositoryNonCodeIgnorePrecedent,
   withRepositoryPathsFilterPrecedent,

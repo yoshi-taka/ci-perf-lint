@@ -7,7 +7,7 @@ import {
   withWorkflowConsensus,
 } from "./similar-workflow-consensus-shared.ts";
 
-export function withSimilarWorkflowConcurrencyConsensus(
+function withSimilarWorkflowConcurrencyConsensus(
   context: RuleContext,
   workflowPath: string,
   adjustment: SimilarWorkflowConsensusAdjustment,

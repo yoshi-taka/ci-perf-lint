@@ -25,7 +25,7 @@ function rjp(
   return repositoryJobPrecedents(entries, workflowPath, jobId, lookup);
 }
 
-export function withRepositoryConcurrencyPrecedent(
+function withRepositoryConcurrencyPrecedent(
   context: RuleContext,
   workflowPath: string,
 ): DiagnosticTransform {

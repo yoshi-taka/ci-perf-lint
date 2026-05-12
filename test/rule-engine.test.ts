@@ -403,7 +403,7 @@ describe("evaluateRules", () => {
 
     expect(getDiagnosticTransformMetadata(finding!)).toEqual({
       axes: ["why", "score", "why", "aiHandoff"],
-      labels: ["repo-precedent", "consensus", "stacked-diff"],
+      labels: ["repo-precedent > consensus > stacked-diff"],
     });
     await cleanup();
   });

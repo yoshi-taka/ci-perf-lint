@@ -5,12 +5,13 @@ import { workflowLooksAgenticLike } from "./shared/workflow-jobs.ts";
 import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { taggedPipe } from "./shared/diagnostic-transform.ts";
+import { contramap, composeEnrichers, toTaggedEnrich } from "./shared/diagnostic-enricher.ts";
 import {
-  withRepositoryConcurrencyPrecedent,
-  withSimilarWorkflowConcurrencyConsensus,
-} from "./shared/similar-workflow-consensus.ts";
-import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
-import { and, workflowFact, or } from "./shared/predicate.ts";
+  precedentEnricher,
+  consensusEnricher,
+  stackedDiffEnricher,
+} from "./shared/repository-enrichers.ts";
+import { workflowFact, or } from "./shared/predicate.ts";
 
 const meta = {
   id: "missing-concurrency",
@@ -77,34 +78,55 @@ export const missingConcurrencyRule = {
       score: agentic ? 62 : 58,
     });
 
-    const transform = taggedPipe(
-      {
-        transform: withRepositoryConcurrencyPrecedent(context, workflow.relativePath),
-        axes: ["why"],
-        label: "repo-precedent",
-      },
-      {
-        transform: withSimilarWorkflowConcurrencyConsensus(context, workflow.relativePath, {
+    const enrich = composeEnrichers(
+      contramap(precedentEnricher, (ctx: RuleContext) => ({
+        entries: ctx.repository.repoPrecedents.concurrency,
+        lookups: ctx.repository.repoPrecedents.lookups.concurrency,
+        workflowPath: workflow.relativePath,
+        label: "concurrency",
+        aiHandoff:
+          "Reuse one of the repository's existing concurrency patterns where it fits this workflow.",
+      })),
+      contramap(consensusEnricher, (ctx: RuleContext) => ({
+        signal: ctx.repository.similarWorkflows.index.concurrency.get(workflow.relativePath),
+        adjustment: {
           scoreBonus: 8,
           why: "That makes this look more like a repository-local normalization gap than a one-off design choice.",
           aiHandoff:
             "Prefer the repository's existing concurrency pattern over inventing a new grouping strategy unless this workflow has clearly different cancellation requirements.",
-        }),
-        axes: ["score"],
-        label: "consensus",
-      },
-      {
-        transform: withStackedDiffContext(context, {
-          scoreBonus: 10,
-          why: "Concurrency is more valuable because superseded runs from restacks can otherwise keep consuming runner time.",
-          aiHandoff:
-            "Use a concurrency group scoped to the workflow and PR/head ref so newer restack runs cancel older runs from the same branch without canceling unrelated PRs.",
-        }),
-        axes: ["why", "aiHandoff"],
-        label: "stacked-diff",
-      },
+        },
+        why: (evidence, peerText) =>
+          `In this repository, ${evidence.peerCount} similar workflows already use concurrency.${peerText}`,
+        peerText: "Similar workflows already using concurrency include",
+        aiHandoff:
+          "Match the established concurrency pattern already used in similar workflows where it fits this workflow's trigger semantics.",
+      })),
+      contramap(stackedDiffEnricher, (ctx: RuleContext) => {
+        const provider =
+          ctx.repository.stackedDiffs.provider === "graphite"
+            ? "Graphite/stacked diff"
+            : ctx.repository.stackedDiffs.provider === "github"
+              ? "GitHub gh-stack"
+              : ctx.repository.stackedDiffs.provider === "ghstack"
+                ? "ghstack"
+                : "stacked diff";
+        const evidence = ctx.repository.stackedDiffs.evidence[0];
+        const evidenceText = evidence
+          ? `${provider} evidence: ${evidence}.`
+          : `${provider} evidence was found.`;
+        return {
+          likelyUsed: ctx.repository.stackedDiffs.likelyUsed,
+          evidenceText,
+          adjustment: {
+            scoreBonus: 10,
+            why: "Concurrency is more valuable because superseded runs from restacks can otherwise keep consuming runner time.",
+            aiHandoff:
+              "Use a concurrency group scoped to the workflow and PR/head ref so newer restack runs cancel older runs from the same branch without canceling unrelated PRs.",
+          },
+        };
+      }),
     );
 
-    return [transform(base)];
+    return [taggedPipe(toTaggedEnrich(enrich, context))(base)];
   },
 };
