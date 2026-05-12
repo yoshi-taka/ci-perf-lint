@@ -55,7 +55,7 @@ describe("repeated-bootstrap-setup", () => {
     );
 
     expect(pnpmFindings.length).toBe(1);
-    expect(pnpmFindings[0]!.message).toContain("pnpm");
+    expect(pnpmFindings[0]!.message).toContain("lint, test");
   });
 
   test("does not fire when workflows use different install managers", async () => {

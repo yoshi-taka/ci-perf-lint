@@ -7,6 +7,9 @@ import type { GitlabCiDocument } from "../gitlab-ci-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { textRunsDockerBuild } from "./shared/docker.ts";
 import { collectCommandEntries } from "./shared/any-step.ts";
+import { selectSignal } from "./shared/signal-selector.ts";
+
+const hasBakeFile = selectSignal((s) => s.docker.hasBakeFile);
 
 const meta = {
   id: "docker-bake-file-unused-in-ci",
@@ -28,7 +31,7 @@ export const dockerBakeFileUnusedInCiRule = {
     workflow: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
     context: RuleContext,
   ) {
-    if (!context.repository.docker.hasBakeFile) {
+    if (!hasBakeFile.select(context.repository)) {
       return [];
     }
 

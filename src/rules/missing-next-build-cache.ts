@@ -4,6 +4,9 @@ import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { workflowHasCachePath } from "./shared/workflow-caches.ts";
 import { getWorkflowStepText } from "./shared/workflow-step-text.ts";
+import { selectSignal } from "./shared/signal-selector.ts";
+
+const usesNextjs = selectSignal((s) => s.frameworks.usesNextjs);
 
 const meta = {
   id: "missing-next-build-cache",
@@ -21,10 +24,7 @@ const nextCachePathRe = /\.next\/cache\b/i;
 export const missingNextBuildCacheRule = {
   meta,
   check(workflow: WorkflowDocument, context: RuleContext) {
-    if (
-      !context.repository.frameworks.usesNextjs ||
-      workflowHasCachePath(workflow, nextCachePathRe)
-    ) {
+    if (!usesNextjs.select(context.repository) || workflowHasCachePath(workflow, nextCachePathRe)) {
       return [];
     }
 

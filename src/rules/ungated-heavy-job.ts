@@ -15,6 +15,9 @@ import {
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
+import { selectSignal } from "./shared/signal-selector.ts";
+
+const looksLargeOrComplex = selectSignal((s) => s.looksLargeOrComplex);
 
 const meta = {
   id: "ungated-heavy-job",
@@ -26,7 +29,7 @@ const meta = {
 export const ungatedHeavyJobRule = {
   meta,
   check(workflow: WorkflowDocument, context: RuleContext) {
-    if (!context.repository.looksLargeOrComplex) {
+    if (!looksLargeOrComplex.select(context.repository)) {
       return [];
     }
 
