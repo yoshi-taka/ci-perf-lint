@@ -64,31 +64,31 @@ export interface RuleContext {
 }
 
 interface RuleModule {
-  meta: RuleMeta;
+  meta: RuleMeta & { scope?: "github-actions" };
   nodeTypes?: WorkflowNodeKind[];
   check: (workflow: WorkflowDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface BuildkiteRuleModule {
-  meta: RuleMeta;
+  meta: RuleMeta & { scope: "buildkite" };
   nodeTypes?: WorkflowNodeKind[];
   check: (pipeline: PipelineDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface GitlabCiRuleModule {
-  meta: RuleMeta;
+  meta: RuleMeta & { scope: "gitlab-ci" };
   nodeTypes?: WorkflowNodeKind[];
   check: (doc: GitlabCiDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface CircleCiRuleModule {
-  meta: RuleMeta;
+  meta: RuleMeta & { scope: "circleci" };
   nodeTypes?: WorkflowNodeKind[];
   check: (doc: CircleCiDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 interface BothRuleModule {
-  meta: RuleMeta;
+  meta: RuleMeta & { scope: "all" };
   nodeTypes?: WorkflowNodeKind[];
   check: (
     workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
@@ -125,32 +125,34 @@ function isCircleCiDocument(doc: unknown): doc is CircleCiDocument {
   );
 }
 
+type AnyCheckFn = (
+  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
+  context: RuleContext,
+) => Diagnostic[] | Promise<Diagnostic[]>;
+
+function isBothScope(rule: AnyRuleModule): rule is BothRuleModule {
+  return rule.meta.scope === "all";
+}
+
 function getRuleCheckFn(
   rule: AnyRuleModule,
   isBuildkite: boolean,
   isGitlab: boolean,
   isCircle: boolean,
-): (
-  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
-  context: RuleContext,
-) => Promise<Diagnostic[]> {
+): AnyCheckFn {
+  if (isBothScope(rule)) {
+    return rule.check;
+  }
+
   const scope = rule.meta.scope ?? "github-actions";
 
-  if (scope === "all") {
-    return (rule as BothRuleModule).check as never;
-  }
-  if (scope === "buildkite") {
-    return isBuildkite ? ((rule as BuildkiteRuleModule).check as never) : () => Promise.resolve([]);
-  }
-  if (scope === "gitlab-ci") {
-    return isGitlab ? ((rule as GitlabCiRuleModule).check as never) : () => Promise.resolve([]);
-  }
-  if (scope === "circleci") {
-    return isCircle ? ((rule as CircleCiRuleModule).check as never) : () => Promise.resolve([]);
-  }
-  return !isBuildkite && !isGitlab && !isCircle
-    ? ((rule as RuleModule).check as never)
-    : () => Promise.resolve([]);
+  const active =
+    (scope === "buildkite" && isBuildkite) ||
+    (scope === "gitlab-ci" && isGitlab) ||
+    (scope === "circleci" && isCircle) ||
+    (scope === "github-actions" && !isBuildkite && !isGitlab && !isCircle);
+
+  return (active ? rule.check : () => Promise.resolve([])) as AnyCheckFn;
 }
 
 function workflowContainsKind(
