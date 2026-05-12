@@ -12,6 +12,13 @@ import { evaluateGateExpr } from "./gate-expr.ts";
 
 export type GateKey = keyof RepositoryDiagnosticGateState;
 
+export type GateResult =
+  | { readonly status: "resolved"; readonly value: boolean }
+  | { readonly status: "skipped"; readonly reason: string }
+  | { readonly status: "error"; readonly reason: string };
+
+export type GateResultRecord = Record<GateKey, GateResult>;
+
 export interface RepositoryDiagnosticGateState {
   hasJavaScriptHeavyWorkflow: boolean;
   hasJavaScriptTooling: boolean;
@@ -188,6 +195,7 @@ export interface RepositoryDiagnosticGateObservability {
 export interface RepositoryDiagnosticGateResolution {
   state: RepositoryDiagnosticGateState;
   observability: RepositoryDiagnosticGateObservability;
+  results: GateResultRecord;
 }
 
 export interface RepositoryDiagnosticContext {
@@ -233,7 +241,7 @@ function checkLegacyGate(
   return true;
 }
 
-export function collectorRequiresAllGates(
+function collectorRequiresAllGates(
   collector: { gate?: GateKey; gates?: readonly GateKey[]; gateExpr?: GateExpr<GateKey> },
   gateState: RepositoryDiagnosticGateState,
 ): boolean {
@@ -241,6 +249,75 @@ export function collectorRequiresAllGates(
     return evaluateGateExpr(collector.gateExpr, gateState);
   }
   return checkLegacyGate(collector, gateState);
+}
+
+function gateResultFromRecord(key: GateKey, results: GateResultRecord): GateResult {
+  return results[key];
+}
+
+export function collectorRequiresAllGatesFromResults(
+  collector: { gate?: GateKey; gates?: readonly GateKey[]; gateExpr?: GateExpr<GateKey> },
+  results: GateResultRecord,
+): GateResult {
+  if (collector.gateExpr) {
+    return evaluateGateExprWithResult(collector.gateExpr, results);
+  }
+
+  const keys: GateKey[] = [];
+  if (collector.gates && collector.gates.length > 0) {
+    keys.push(...collector.gates);
+  } else if (collector.gate) {
+    keys.push(collector.gate);
+  }
+
+  if (keys.length === 0) {
+    return { status: "resolved", value: true };
+  }
+
+  for (const key of keys) {
+    const r = gateResultFromRecord(key, results);
+    if (r.status === "error") {
+      return r;
+    }
+    if (r.status === "skipped") {
+      return r;
+    }
+    if (!r.value) {
+      return { status: "resolved", value: false };
+    }
+  }
+  return { status: "resolved", value: true };
+}
+
+function evaluateGateExprWithResult(
+  expr: GateExpr<GateKey>,
+  results: GateResultRecord,
+): GateResult {
+  switch (expr.kind) {
+    case "atom": {
+      return gateResultFromRecord(expr.gate, results);
+    }
+    case "and": {
+      const left = evaluateGateExprWithResult(expr.left, results);
+      if (left.status !== "resolved") {
+        return left;
+      }
+      if (!left.value) {
+        return { status: "resolved", value: false };
+      }
+      return evaluateGateExprWithResult(expr.right, results);
+    }
+    case "or": {
+      const left = evaluateGateExprWithResult(expr.left, results);
+      if (left.status !== "resolved") {
+        return left;
+      }
+      if (left.value) {
+        return { status: "resolved", value: true };
+      }
+      return evaluateGateExprWithResult(expr.right, results);
+    }
+  }
 }
 
 function __unsafeWrapProof<G extends GateKey>(_gate: G, _proof: ProofForGate<G>): GateTrue<G> {

@@ -2,6 +2,7 @@ import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type {
   GateKey,
   GateProofs,
+  GateResultRecord,
   HasCdkManifestProof,
   HasDatadogHeavyWorkflowProof,
   HasDockerHeavyWorkflowProof,
@@ -150,6 +151,31 @@ const emptyGateState: RepositoryDiagnosticGateState = {
   hasCdkManifest: false,
   hasElixirHeavyWorkflow: false,
   hasGradle: false,
+};
+
+function skippedGateResult(reason: string) {
+  return { status: "skipped" as const, reason };
+}
+
+const emptyGateResultRecord: GateResultRecord = {
+  hasJavaScriptHeavyWorkflow: skippedGateResult("not evaluated"),
+  hasJavaScriptTooling: skippedGateResult("not evaluated"),
+  hasJavaScriptLinting: skippedGateResult("not evaluated"),
+  hasJavaScriptBuildConfig: skippedGateResult("not evaluated"),
+  hasJavaScriptPackageScripts: skippedGateResult("not evaluated"),
+  hasDockerHeavyWorkflow: skippedGateResult("not evaluated"),
+  hasTerraformHeavyWorkflow: skippedGateResult("not evaluated"),
+  hasLargeFiles: skippedGateResult("not evaluated"),
+  hasDatadogHeavyWorkflow: skippedGateResult("not evaluated"),
+  hasPytest: skippedGateResult("not evaluated"),
+  hasPythonHeavyWorkflow: skippedGateResult("not evaluated"),
+  hasRenovateConfig: skippedGateResult("not evaluated"),
+  hasHusky: skippedGateResult("not evaluated"),
+  hasJavaScriptFrameworks: skippedGateResult("not evaluated"),
+  hasRust: skippedGateResult("not evaluated"),
+  hasCdkManifest: skippedGateResult("not evaluated"),
+  hasElixirHeavyWorkflow: skippedGateResult("not evaluated"),
+  hasGradle: skippedGateResult("not evaluated"),
 };
 
 function timingsEnabled(): boolean {
@@ -474,10 +500,15 @@ function quickTestRust(context: RepositoryDiagnosticContext): boolean | undefine
   return undefined;
 }
 
+function markResolved<K extends GateKey>(results: GateResultRecord, key: K, value: boolean): void {
+  results[key] = { status: "resolved", value };
+}
+
 export async function collectRepositoryDiagnosticGateState(
   context: RepositoryDiagnosticContext,
 ): Promise<RepositoryDiagnosticGateResolution> {
   const state: RepositoryDiagnosticGateState = { ...emptyGateState };
+  const results: GateResultRecord = { ...emptyGateResultRecord };
   const observability = {
     observed: [] as string[],
     derivedFalse: [] as { gate: string; dueTo: string[] }[],
@@ -485,6 +516,9 @@ export async function collectRepositoryDiagnosticGateState(
 
   const signalGates = collectSignalGateState(context.featureIndex);
   Object.assign(state, signalGates);
+  for (const [key, value] of Object.entries(signalGates) as [GateKey, boolean][]) {
+    markResolved(results, key, value);
+  }
 
   const [largeFilesEvidence, pytestEvidence, hasRenovateConfig, hasCdkManifest] = await Promise.all(
     [
@@ -495,14 +529,20 @@ export async function collectRepositoryDiagnosticGateState(
     ],
   );
   state.hasLargeFiles = largeFilesEvidence.value;
+  markResolved(results, "hasLargeFiles", largeFilesEvidence.value);
   const pytestGate = meetsMinimum(pytestEvidence, "medium");
   state.hasPytest = pytestGate.value;
+  markResolved(results, "hasPytest", pytestGate.value);
   state.hasRenovateConfig = hasRenovateConfig;
+  markResolved(results, "hasRenovateConfig", hasRenovateConfig);
   state.hasCdkManifest = hasCdkManifest;
+  markResolved(results, "hasCdkManifest", hasCdkManifest);
   observability.observed.push("hasLargeFiles", "hasPytest", "hasRenovateConfig", "hasCdkManifest");
 
   state.hasHusky = context.repository.husky.hookFileCount > 0;
+  markResolved(results, "hasHusky", state.hasHusky);
   state.hasGradle = context.repository.frameworks.usesGradle;
+  markResolved(results, "hasGradle", state.hasGradle);
 
   const jsObservations = buildJavaScriptGateObservations(context);
 
@@ -510,6 +550,7 @@ export async function collectRepositoryDiagnosticGateState(
 
   if (jsToolingQuick === true) {
     state.hasJavaScriptTooling = true;
+    markResolved(results, "hasJavaScriptTooling", true);
     observability.observed.push("hasJavaScriptTooling");
 
     const [jsBuildConfigEvidence, jsPackageScriptEvidence] = await Promise.all([
@@ -517,30 +558,36 @@ export async function collectRepositoryDiagnosticGateState(
       repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
     ]);
     state.hasJavaScriptLinting = repositoryLikelyUsesJavaScriptLinting(context, jsObservations);
+    markResolved(results, "hasJavaScriptLinting", state.hasJavaScriptLinting);
     state.hasJavaScriptBuildConfig =
       repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) || jsBuildConfigEvidence;
+    markResolved(results, "hasJavaScriptBuildConfig", state.hasJavaScriptBuildConfig);
     state.hasJavaScriptPackageScripts =
       repositoryLikelyUsesJavaScriptPackageScripts(jsObservations) || jsPackageScriptEvidence;
+    markResolved(results, "hasJavaScriptPackageScripts", state.hasJavaScriptPackageScripts);
   } else if (jsToolingQuick === false) {
     state.hasJavaScriptTooling = false;
+    markResolved(results, "hasJavaScriptTooling", false);
     state.hasJavaScriptLinting = false;
     state.hasJavaScriptBuildConfig = false;
     state.hasJavaScriptPackageScripts = false;
     state.hasJavaScriptFrameworks = false;
     pruneDescendants(
       gateKeys.javascriptTooling,
-      dag,
+
       state,
+      results,
       gateKeys.javascriptTooling,
       observability,
     );
-    await evaluateDescendantsPruned(context, state, observability);
-    return { state, observability };
+    await evaluateDescendantsPruned(context, state, results, observability);
+    return { state, observability, results };
   } else {
     const jsToolingResult = await timedGate("javascript-tooling", () =>
       looksLikeJavaScriptRepository(context.scanContext),
     );
     state.hasJavaScriptTooling = jsToolingResult.value;
+    markResolved(results, "hasJavaScriptTooling", jsToolingResult.value);
     observability.observed.push("hasJavaScriptTooling");
 
     if (!state.hasJavaScriptTooling) {
@@ -550,13 +597,13 @@ export async function collectRepositoryDiagnosticGateState(
       state.hasJavaScriptFrameworks = false;
       pruneDescendants(
         gateKeys.javascriptTooling,
-        dag,
         state,
+        results,
         gateKeys.javascriptTooling,
         observability,
       );
-      await evaluateDescendantsPruned(context, state, observability);
-      return { state, observability };
+      await evaluateDescendantsPruned(context, state, results, observability);
+      return { state, observability, results };
     }
 
     const [jsBuildConfigEvidence, jsPackageScriptEvidence] = await Promise.all([
@@ -564,21 +611,26 @@ export async function collectRepositoryDiagnosticGateState(
       repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
     ]);
     state.hasJavaScriptLinting = repositoryLikelyUsesJavaScriptLinting(context, jsObservations);
+    markResolved(results, "hasJavaScriptLinting", state.hasJavaScriptLinting);
     state.hasJavaScriptBuildConfig =
       repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) || jsBuildConfigEvidence;
+    markResolved(results, "hasJavaScriptBuildConfig", state.hasJavaScriptBuildConfig);
     state.hasJavaScriptPackageScripts =
       repositoryLikelyUsesJavaScriptPackageScripts(jsObservations) || jsPackageScriptEvidence;
+    markResolved(results, "hasJavaScriptPackageScripts", state.hasJavaScriptPackageScripts);
   }
 
   const jsFrameworksQuick = quickTestJavaScriptFrameworks(context, jsObservations);
   if (jsFrameworksQuick !== undefined) {
     state.hasJavaScriptFrameworks = jsFrameworksQuick;
+    markResolved(results, "hasJavaScriptFrameworks", jsFrameworksQuick);
     observability.observed.push("hasJavaScriptFrameworks");
     if (!jsFrameworksQuick) {
       pruneDescendants(
         gateKeys.javascriptFrameworks,
-        dag,
+
         state,
+        results,
         gateKeys.javascriptFrameworks,
         observability,
       );
@@ -588,12 +640,14 @@ export async function collectRepositoryDiagnosticGateState(
       looksLikeJavaScriptFrameworksRepository(context.scanContext),
     );
     state.hasJavaScriptFrameworks = jsFrameworksResult.value;
+    markResolved(results, "hasJavaScriptFrameworks", jsFrameworksResult.value);
     observability.observed.push("hasJavaScriptFrameworks");
     if (!jsFrameworksResult.value) {
       pruneDescendants(
         gateKeys.javascriptFrameworks,
-        dag,
+
         state,
+        results,
         gateKeys.javascriptFrameworks,
         observability,
       );
@@ -603,19 +657,22 @@ export async function collectRepositoryDiagnosticGateState(
   const rustQuick = quickTestRust(context);
   if (rustQuick !== undefined) {
     state.hasRust = rustQuick;
+    markResolved(results, "hasRust", rustQuick);
     observability.observed.push("hasRust");
   } else {
     const rustResult = await timedGate("rust", () => looksLikeRustRepository(context.scanContext));
     state.hasRust = rustResult.value;
+    markResolved(results, "hasRust", rustResult.value);
     observability.observed.push("hasRust");
   }
 
-  return { state, observability };
+  return { state, observability, results };
 }
 
 async function evaluateDescendantsPruned(
   context: RepositoryDiagnosticContext,
   state: RepositoryDiagnosticGateState,
+  results: GateResultRecord,
   observability: { observed: string[]; derivedFalse: { gate: string; dueTo: string[] }[] },
 ): Promise<void> {
   if (state[gateKeys.rust]) {
@@ -625,25 +682,27 @@ async function evaluateDescendantsPruned(
   const rustQuick = quickTestRust(context);
   if (rustQuick !== undefined) {
     state.hasRust = rustQuick;
+    markResolved(results, "hasRust", rustQuick);
     observability.observed.push("hasRust");
   } else {
     const rustResult = await timedGate("rust", () => looksLikeRustRepository(context.scanContext));
     state.hasRust = rustResult.value;
+    markResolved(results, "hasRust", rustResult.value);
     observability.observed.push("hasRust");
   }
 }
 
 function pruneDescendants(
   key: GateKey,
-  graph: AdjacencyList,
   state: RepositoryDiagnosticGateState,
+  results: GateResultRecord,
   reason: GateKey,
   observability: {
     derivedFalse: { gate: string; dueTo: string[] }[];
   },
 ): void {
   const visited = new Set<GateKey>();
-  const stack = [...(graph.successors.get(key) ?? [])];
+  const stack = [...(dag.successors.get(key) ?? [])];
 
   while (stack.length > 0) {
     const curr = stack.pop()!;
@@ -651,6 +710,8 @@ function pruneDescendants(
       continue;
     }
     visited.add(curr);
+
+    results[curr] = { status: "skipped", reason: `parent gate ${reason} is not resolved true` };
 
     if (!state[curr]) {
       const existing = observability.derivedFalse.find((d) => d.gate === curr);
@@ -671,7 +732,7 @@ function pruneDescendants(
       } else {
         observability.derivedFalse.push({ gate: curr, dueTo: [reason] });
       }
-      stack.push(...(graph.successors.get(curr) ?? []));
+      stack.push(...(dag.successors.get(curr) ?? []));
     }
   }
 }

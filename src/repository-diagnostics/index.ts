@@ -1,7 +1,7 @@
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import type { Diagnostic } from "../types.ts";
 import type { GatedContext, GateKey, RepositoryDiagnosticContext } from "./collector-types.ts";
-import { assertGateProof, collectorRequiresAllGates } from "./collector-types.ts";
+import { assertGateProof, collectorRequiresAllGatesFromResults } from "./collector-types.ts";
 import {
   buildCollectorCooccurrenceDebug,
   orderCollectorsForDiagnostics,
@@ -90,12 +90,25 @@ export async function collectRepositoryDiagnostics(
 ): Promise<Diagnostic[]> {
   const gateStateStartedAt = performance.now();
   const gateResolution = await collectRepositoryDiagnosticGateState(context);
-  const { state: gateState, observability: gateObservability } = gateResolution;
+  const {
+    state: gateState,
+    observability: gateObservability,
+    results: gateResults,
+  } = gateResolution;
   const gateElapsed = performance.now() - gateStateStartedAt;
   const proofs = buildGateProofs(gateState);
-  const applicableCollectors = repositoryDiagnosticCollectors.filter((collector) =>
-    collectorRequiresAllGates(collector, gateState),
+
+  const collectorGateResults = new Map(
+    repositoryDiagnosticCollectors.map(
+      (c) => [c.id, collectorRequiresAllGatesFromResults(c, gateResults)] as const,
+    ),
   );
+
+  const applicableCollectors = repositoryDiagnosticCollectors.filter((collector) => {
+    const r = collectorGateResults.get(collector.id)!;
+    return r.status === "resolved" && r.value;
+  });
+
   const collectorSchedule =
     applicableCollectors.length > 1
       ? orderCollectorsForDiagnostics(applicableCollectors.map((collector) => collector.id))
@@ -119,11 +132,20 @@ export async function collectRepositoryDiagnostics(
       continue;
     }
     context.measureCompleteness?.skippedGates.add(collector.id);
-    context.warnings.push({
-      kind: "gate-skipped",
-      source: collector.id,
-      message: `Collector ${collector.id} was not run because its gate did not match.`,
-    });
+    const r = collectorGateResults.get(collector.id)!;
+    if (r.status === "resolved") {
+      context.warnings.push({
+        kind: "gate-skipped",
+        source: collector.id,
+        message: `Collector ${collector.id} was not run because its gate resolved false.`,
+      });
+    } else {
+      context.warnings.push({
+        kind: "gate-skipped",
+        source: collector.id,
+        message: `Collector ${collector.id} was not run: ${r.reason}`,
+      });
+    }
   }
   if (timingsEnabled()) {
     process.stderr.write(
@@ -131,7 +153,7 @@ export async function collectRepositoryDiagnostics(
     );
   }
 
-  const results = await Promise.allSettled(
+  const collectorResults = await Promise.allSettled(
     scheduledCollectors.map((collector) => {
       const startedAt = performance.now();
       const result = runRepositoryDiagnosticCollector(collector as CollectorLike, context, proofs);
@@ -152,7 +174,7 @@ export async function collectRepositoryDiagnostics(
   const diagnostics: Diagnostic[] = [];
   const firedCollectors = new Set<string>();
 
-  for (const [index, result] of results.entries()) {
+  for (const [index, result] of collectorResults.entries()) {
     if (result.status === "fulfilled") {
       if (result.value.length === 0) {
         const collector = scheduledCollectors[index];
@@ -182,8 +204,8 @@ export async function collectRepositoryDiagnostics(
     const activeGates = Object.entries(gateState)
       .filter(([_, v]) => v)
       .map(([k]) => k.replace(/^has/, ""));
-    const collectorResults = scheduledCollectors.map((c, i) => {
-      const r = results[i];
+    const collectorResultsDump = scheduledCollectors.map((c, i) => {
+      const r = collectorResults[i];
       return {
         id: c.id,
         gate: c.gate,
@@ -196,9 +218,10 @@ export async function collectRepositoryDiagnostics(
       JSON.stringify({
         type: "repo-diagnostics-state",
         activeGates,
+        gateResults,
         collectorCount: applicableCollectors.length,
         totalCollectors: repositoryDiagnosticCollectors.length,
-        collectors: collectorResults,
+        collectors: collectorResultsDump,
         collectorCooccurrence: buildCollectorCooccurrenceDebug([...firedCollectors]),
         collectorSchedule,
         gateObservability,
