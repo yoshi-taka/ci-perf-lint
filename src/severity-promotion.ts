@@ -1,4 +1,5 @@
 import type { AuditMode, Diagnostic, Severity } from "./types.ts";
+import { severityRank, joinSeverity } from "./severity.ts";
 
 export interface SeverityPromotionRule {
   trigger: (findings: Diagnostic[]) => boolean;
@@ -8,7 +9,7 @@ export interface SeverityPromotionRule {
 
 export const severityPromotionRules: SeverityPromotionRule[] = [
   {
-    trigger: (findings) => !findings.some((f) => f.severity === "warning"),
+    trigger: (findings) => !findings.some((f) => severityRank[f.severity] >= severityRank.warning),
     predicate: (d) => d.severity === "suggestion" && strictFallbackWarningRuleIds.has(d.ruleId),
     targetSeverity: "warning",
   },
@@ -35,7 +36,9 @@ export function applySeverityPromotion(findings: Diagnostic[], mode: AuditMode):
       continue;
     }
 
-    return findings.map((f) => (rule.predicate(f) ? { ...f, severity: rule.targetSeverity } : f));
+    return findings.map((f) =>
+      rule.predicate(f) ? { ...f, severity: joinSeverity(f.severity, rule.targetSeverity) } : f,
+    );
   }
 
   return findings;

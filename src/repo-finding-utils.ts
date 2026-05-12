@@ -1,5 +1,6 @@
 import type { AuditMode, Diagnostic } from "./types.ts";
 import { applySeverityPromotion } from "./severity-promotion.ts";
+import { severityCompare } from "./severity.ts";
 
 const actionsPriorityScoreBonus = 30;
 const prioritizedActionsFindingLimit = 3;
@@ -35,6 +36,11 @@ export function findingIncludedInScope(
 export function compareFindings(left: Diagnostic, right: Diagnostic): number {
   if (right.score !== left.score) {
     return right.score - left.score;
+  }
+
+  const severityDiff = severityCompare(right.severity, left.severity);
+  if (severityDiff !== 0) {
+    return severityDiff;
   }
 
   if (left.workflow < right.workflow) {
