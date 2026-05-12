@@ -3,15 +3,19 @@
   "ignorePatterns": ["dist/**", "site/**", "test/fixtures/**", "fuzz/**", "profile-*.ts", "scripts/**", "src/rules/shared/evidence-propagation.ts", "src/rules/shared/finding-sheet.ts", "src/rules/shared/singularity.ts", "src/rules/shared/workflow-interaction.ts", "src/transform-stability.ts"],
   "ignoreDependencies": ["bun"],
   "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts", "src/rules/shared/predicate.ts"],
+  "rules": {
+    "circular-dependencies": "error",
+    "duplicate-exports": "error"
+  },
   "health": {
-    "maxCyclomatic": 25,
-    "maxCognitive": 35,
-    "maxCrap": 300
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+    "maxCrap": 30
   },
   "duplicates": {
-    "mode": "weak",
-    "minLines": 8,
-    "minTokens": 80
+    "mode": "mild",
+    "minLines": 5,
+    "minTokens": 50
   },
   "usedClassMembers": ["clear"],
   "ignoreExports": [

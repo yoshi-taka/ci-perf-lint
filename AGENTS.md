@@ -24,7 +24,7 @@ Before every commit, ensure `oxlint --type-aware --fix` passes; `nano-staged` ru
 
 Workflow YAML rules:
 
-- Rule interface and execution: `src/rule-engine.ts`
+- Rule interface and execution: `src/rule-engine/`
 - Rule registry: `src/rules/index.ts`
 - Individual workflow rules: `src/rules/*.ts`
 - Workflow diagnostic builder: `src/rules/shared/diagnostics.ts`

@@ -117,35 +117,25 @@ Learnings from step 2:
 
 ## 3. Move `RepositorySignals` Out of `rule-engine.ts`
 
-Status: done for now.
+Status: done.
 
-`src/rule-engine.ts` should mainly define rule execution. It currently owns the large `RepositorySignals` type, which makes the file carry repository analysis concerns too.
-
-Move `RepositorySignals` to a dedicated type module, such as:
-
-- `src/repository-signals-types.ts`
-
-or, if the project prefers fewer type files:
-
-- `src/types.ts`
-
-This is low risk and clarifies ownership.
+`src/rule-engine.ts` was split into `src/rule-engine/` (types, utils, filters, rule-dispatch, execute). The barrel at `src/rule-engine.ts` re-exports the public API (`RuleContext`, `AnyRuleModule`, `evaluateRules`, `evaluateRulesCoarseToFine`).
 
 Completed extraction:
 
 - `src/repository-signals-types.ts`
-  - now owns the full `RepositorySignals` shape
-- `src/rule-engine.ts`
-  - now owns rule execution types and `evaluateRules`
+  - owns the full `RepositorySignals` shape
+- `src/rule-engine/`
+  - owns rule execution types and `evaluateRules`
   - imports `RepositorySignals` only for `RuleContext`
-  - re-exports `RepositorySignals` as a compatibility path
+  - barrel at `src/rule-engine.ts` provides compatibility re-exports
 - repository signal collectors and repository diagnostics now import `RepositorySignals` directly from `src/repository-signals-types.ts`
 
 Learnings from step 3:
 
 - The extraction was purely type-level; there was no runtime behavior to preserve beyond import compatibility.
-- Keeping a compatibility re-export from `rule-engine.ts` avoids forcing every rule module to move immediately.
-- Repository-oriented modules should import `RepositorySignals` from `repository-signals-types.ts`; rule modules can keep using `RuleContext` from `rule-engine.ts`.
+- Keeping a compatibility re-export from `src/rule-engine.ts` avoids forcing every rule module to move immediately.
+- Repository-oriented modules should import `RepositorySignals` from `repository-signals-types.ts`; rule modules can keep using `RuleContext` from `src/rule-engine.ts`.
 
 ## 4. Add a Repository Diagnostic Builder
 

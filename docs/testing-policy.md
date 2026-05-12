@@ -165,7 +165,7 @@ paramsDef → ParamSpec[] → generatePairwise() → combinations[]
 - Run: `bun run test:slow:mutation` (not in default `bun test` path; intentionally slow).
 - Covered modules:
   - `src/finding-grouping.ts`, `src/repository-package-helpers.ts`, `src/cli-option-resolver.ts`
-  - `src/reporters.ts`, `src/reporters-render.ts`, `src/rule-engine.ts`
+  - `src/reporters.ts`, `src/reporters-render.ts`, `src/rule-engine/`
   - `src/repo.ts`, `src/repository-signals.ts`, `src/rules/*.ts`
 - Add a new Stryker config when adding a new module whose mutation coverage should be tracked.
 - Use `command` test runner with a focused test command to keep per-config runs fast.
@@ -210,7 +210,7 @@ paramsDef → ParamSpec[] → generatePairwise() → combinations[]
 | Source area | File | Example warning shape | Notes |
 | --- | --- | --- | --- |
 | Workflow parse | `src/repo.ts` | `Failed to parse workflow: ...` | Emitted when one workflow file cannot be parsed. |
-| Rule execution | `src/rule-engine.ts` | `Rule <id> failed: ...` | Per-rule failure guardrail. |
+| Rule execution | `src/rule-engine/execute.ts` | `Rule <id> failed: ...` | Per-rule failure guardrail. |
 | Repository signal orchestration | `src/repository-signals.ts` | `<label> failed: ...` | Collector-family failure wrapper. |
 | Repository file read / JSON parse | `src/repository-scan-context.ts` | `Failed to read file while collecting repository signals: ...` / `Failed to parse JSON while collecting repository signals: ...` | Common source for malformed `package.json` cases. |
 | Repository diagnostics collector wrapper | `src/repository-diagnostics/index.ts` | `Collector <id> failed: ...` | Per-collector failure guardrail. |

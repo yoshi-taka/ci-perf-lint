@@ -4,7 +4,7 @@ export default {
   commandRunner: {
     command: "bun test test/rule-engine.test.ts",
   },
-  mutate: ["src/rule-engine.ts"],
+  mutate: ["src/rule-engine/utils.ts", "src/rule-engine/filters.ts", "src/rule-engine/rule-dispatch.ts", "src/rule-engine/execute.ts"],
   reporters: ["clear-text", "progress"],
   coverageAnalysis: "off",
   concurrency: 1,

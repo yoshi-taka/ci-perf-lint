@@ -20,7 +20,7 @@ Suggested contents:
 - Repository orchestration:
   - `src/repo.ts`
 - Workflow rule execution:
-  - `src/rule-engine.ts`
+  - `src/rule-engine/`
   - `src/rules/index.ts`
 - Repository-wide diagnostics:
   - `src/repository-diagnostics/index.ts`
