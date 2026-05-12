@@ -17,6 +17,7 @@ import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import type { RepositoryPrecedentIndex } from "./rules/shared/repository-precedent-index.ts";
 import type { RepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
+import { composeRefiners, deduplicateRefiner, maxFindingsRefiner } from "./refiner-pipeline.ts";
 import { classifySingularity, type SingularityTracker } from "./rules/shared/singularity.ts";
 import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
 import { buildInferenceGraph, detectImplicationDrift } from "./rules/shared/remediation-checks.ts";
@@ -399,56 +400,36 @@ export async function evaluateRules(
     warnings.push(...drift);
   }
 
-  if (findingCounts || idMaxFindings.size > 0) {
-    const impliedIds = new Set<string>();
-    for (const [, impliedList] of inferenceGraph.forwards) {
-      for (const id of impliedList) {
-        impliedIds.add(id);
-      }
-    }
-    for (const [, transitiveIds] of inferenceGraph.transitiveForwards) {
-      for (const id of transitiveIds) {
-        impliedIds.add(id);
-      }
-    }
-
-    const caps = new Map<string, number>();
-    const cappedCounts = new Map<string, number>();
-    const filtered = ruleResults.filter((d) => {
-      const max = idMaxFindings.get(d.ruleId);
-      if (max === undefined || impliedIds.has(d.ruleId)) {
-        return true;
-      }
-      const count = caps.get(d.ruleId) ?? 0;
-      if (count >= max) {
-        cappedCounts.set(d.ruleId, (cappedCounts.get(d.ruleId) ?? 0) + 1);
-        return false;
-      }
-      caps.set(d.ruleId, count + 1);
-      return true;
-    });
-
-    for (const [ruleId, suppressed] of cappedCounts) {
-      const max = idMaxFindings.get(ruleId);
-      if (warnings && max !== undefined) {
-        pushAnalysisWarning(warnings, {
-          kind: "max-findings-hit",
-          source: workflowPath,
-          message: `Rule ${ruleId} produced more than ${max} findings and ${suppressed} were suppressed by maxFindings.`,
-        });
-      }
-    }
-
-    if (findingCounts) {
-      for (const [id, count] of caps) {
-        findingCounts.set(id, (findingCounts.get(id) ?? 0) + count);
-      }
-    }
-
-    return filtered;
+  if (!findingCounts && idMaxFindings.size === 0) {
+    return deduplicateRefiner().refine(ruleResults, {});
   }
 
-  return deduplicateByPathLine(ruleResults);
+  const impliedIds = new Set<string>();
+  for (const [, impliedList] of inferenceGraph.forwards) {
+    for (const id of impliedList) {
+      impliedIds.add(id);
+    }
+  }
+  for (const [, transitiveIds] of inferenceGraph.transitiveForwards) {
+    for (const id of transitiveIds) {
+      impliedIds.add(id);
+    }
+  }
+
+  const refiners = composeRefiners([maxFindingsRefiner(idMaxFindings, impliedIds)]);
+  const filtered = refiners.refine(ruleResults, {
+    warnings,
+    measureCompleteness: context.measureCompleteness,
+    workflowPath,
+  });
+
+  if (findingCounts) {
+    for (const d of filtered) {
+      findingCounts.set(d.ruleId, (findingCounts.get(d.ruleId) ?? 0) + 1);
+    }
+  }
+
+  return filtered;
 }
 
 function deduplicateByPathLine(diagnostics: Diagnostic[]): Diagnostic[] {

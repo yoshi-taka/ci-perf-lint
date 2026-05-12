@@ -49,13 +49,15 @@ import { getDiagnosticTransformMetadata } from "./rules/shared/diagnostic-transf
 import { allRules } from "./rules/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
 import { stderrWarn } from "./stderr-warn.ts";
-import { applySeverityPromotion } from "./severity-promotion.ts";
 import {
-  findingIncludedInMode,
-  findingIncludedInScope,
-  compareFindings,
-  applyLimitedActionsPriority,
-} from "./repo-finding-utils.ts";
+  composeRefiners,
+  severityPromotionRefiner,
+  repositoryScopeFixRefiner,
+  modeFilterRefiner,
+  actionsPriorityRefiner,
+  sortRefiner,
+} from "./refiner-pipeline.ts";
+import { findingIncludedInScope } from "./repo-finding-utils.ts";
 
 const buildkitePattern = /(?:^|\/)\.buildkite\//i;
 const buildkiteAltPattern = /(?:^|\/)buildkite\//i;
@@ -435,17 +437,14 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
 
   scanContext.clearCaches();
 
-  const promotedFindings = applySeverityPromotion(allFindings, mode);
-  const findings = promotedFindings
-    .map((finding) =>
-      finding.scope === undefined && finding.source?.kind === "repository"
-        ? { ...finding, scope: "repository" as const }
-        : finding,
-    )
-    .filter((finding) => findingIncludedInMode(finding, mode));
-
-  findings.splice(0, findings.length, ...applyLimitedActionsPriority(findings));
-  findings.sort(compareFindings);
+  const globalRefiners = composeRefiners([
+    severityPromotionRefiner(mode),
+    repositoryScopeFixRefiner(),
+    modeFilterRefiner(mode),
+    actionsPriorityRefiner(),
+    sortRefiner(),
+  ]);
+  let findings = globalRefiners.refine(allFindings, { mode });
 
   const findingsByWorkflow = new Map<string, Diagnostic[]>();
 
