@@ -307,6 +307,41 @@ async function hasBabelSignalEvidence(
   return anyPathExists(context, babelEvidenceFiles);
 }
 
+async function collectSignalIf<T>(
+  hasEvidence: boolean,
+  id: string,
+  context: RepositoryScanContext,
+  collect: (ctx: RepositoryScanContext) => Promise<T>,
+  fallback: T,
+): Promise<T> {
+  if (!hasEvidence) {
+    return fallback;
+  }
+  const signalStartedAt = performance.now();
+  try {
+    const value = await collect(context);
+    if (timingsEnabled()) {
+      process.stderr.write(
+        `[timing] collectRepositorySignals ${id}=${(performance.now() - signalStartedAt).toFixed(1)}ms\n`,
+      );
+    }
+    return value;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    context.warnings.push({
+      kind: "scan-warning",
+      source: "collectRepositorySignals",
+      message: `${id} failed: ${detail}`,
+    });
+    if (timingsEnabled()) {
+      process.stderr.write(
+        `[timing] collectRepositorySignals ${id}=${(performance.now() - signalStartedAt).toFixed(1)}ms(fallback)\n`,
+      );
+    }
+    return fallback;
+  }
+}
+
 export async function collectRepositorySignals(
   repoRoot: string,
   workflows: WorkflowDocument[],
@@ -423,266 +458,135 @@ export async function collectRepositorySignals(
     babelSignals,
     elixirSignals,
   ] = await Promise.all([
-    hasEslintEvidence
-      ? safeSignal("eslint", () => collectEslintSignals(context), {
-          usesEslint: false,
-          usesOxlint: false,
-          hasConfig: false,
-          pluginNames: [],
-          unsupportedPluginNames: [],
-          usesCustomExtensions: false,
-          usesPrettierPlugin: false,
-          usesPrettierRecommendedConfig: false,
-          usesPrettierRule: false,
-          usesImportPlugin: false,
-          usesImportXPlugin: false,
-          usesNoBarrelFilesPlugin: false,
-          usesBarrelFilesPlugin: false,
-        })
-      : Promise.resolve({
-          usesEslint: false,
-          usesOxlint: false,
-          hasConfig: false,
-          pluginNames: [],
-          unsupportedPluginNames: [],
-          usesCustomExtensions: false,
-          usesPrettierPlugin: false,
-          usesPrettierRecommendedConfig: false,
-          usesPrettierRule: false,
-          usesImportPlugin: false,
-          usesImportXPlugin: false,
-          usesNoBarrelFilesPlugin: false,
-          usesBarrelFilesPlugin: false,
-        }),
-    hasPrettierEvidence
-      ? safeSignal("prettier", () => collectPrettierSignals(context), {
-          usesPrettier: false,
-          usesOxfmt: false,
-          hasConfig: false,
-          pluginNames: [],
-          usesPrettierEslint: false,
-        })
-      : Promise.resolve({
-          usesPrettier: false,
-          usesOxfmt: false,
-          hasConfig: false,
-          pluginNames: [],
-          usesPrettierEslint: false,
-        }),
-    hasPythonEvidence
-      ? safeSignal("python", () => collectPythonSignals(context), {
-          usesBlack: false,
-          usesIsort: false,
-          usesRuff: false,
-          usesTox: false,
-          usesNox: false,
-        })
-      : Promise.resolve({
-          usesBlack: false,
-          usesIsort: false,
-          usesRuff: false,
-          usesTox: false,
-          usesNox: false,
-        }),
-    hasNativePackageEvidence
-      ? safeSignal("nativePackages", () => collectNativePackageSignals(context), {
-          node: [],
-          python: [],
-        })
-      : Promise.resolve({
-          node: [],
-          python: [],
-        }),
-    hasPythonEvidence
-      ? safeSignal("pdm", () => collectPdmSignals(context), {
-          usesPdm: false,
-          usesUv: false,
-        })
-      : Promise.resolve({
-          usesPdm: false,
-          usesUv: false,
-        }),
-    hasFrameworkEvidence
-      ? safeSignal("frameworks", () => collectFrameworkSignals(context), {
-          usesNextjs: false,
-          usesStorybook: false,
-          usesVite: false,
-          usesAstro: false,
-          usesSvelteKit: false,
-          usesSolidStart: false,
-          usesTurbo: false,
-          usesNx: false,
-          usesLerna: false,
-          usesGradle: false,
-          gradleBuildCacheConfigured: false,
-          usesAngularCli: false,
-          angularCliCacheEnabledForCi: false,
-          usesRails: false,
-          railsVersionSpec: undefined,
-          railsMajor: undefined,
-          railsMinor: undefined,
-          railsPatch: undefined,
-          rubyVersionSpec: undefined,
-          rubyMajor: undefined,
-          rubyMinor: undefined,
-        })
-      : Promise.resolve({
-          usesNextjs: false,
-          usesStorybook: false,
-          usesVite: false,
-          usesAstro: false,
-          usesSvelteKit: false,
-          usesSolidStart: false,
-          usesTurbo: false,
-          usesNx: false,
-          usesLerna: false,
-          usesGradle: false,
-          gradleBuildCacheConfigured: false,
-          usesAngularCli: false,
-          angularCliCacheEnabledForCi: false,
-          usesRails: false,
-          railsVersionSpec: undefined,
-          railsMajor: undefined,
-          railsMinor: undefined,
-          railsPatch: undefined,
-          rubyVersionSpec: undefined,
-          rubyMajor: undefined,
-          rubyMinor: undefined,
-        }),
-    hasTypeScriptEvidence
-      ? safeSignal("typescript", () => collectTypeScriptSignals(context), {
-          versionSpec: undefined,
-          major: undefined,
-          minor: undefined,
-          isPublishingTypeDefinitions: false,
-        })
-      : Promise.resolve({
-          versionSpec: undefined,
-          major: undefined,
-          minor: undefined,
-          isPublishingTypeDefinitions: false,
-        }),
-    hasHuskyEvidence
-      ? safeSignal("husky", () => collectHuskySignals(context), {
-          usesHusky: false,
-          usesLintStaged: false,
-          hookFileCount: 0,
-          nonPreCommitHookCount: 0,
-          totalHookCommandCount: 0,
-          multiCommandHookCount: 0,
-          lintStagedPatternCount: 0,
-          lintStagedCommandCount: 0,
-          hookFiles: [],
-        })
-      : Promise.resolve({
-          usesHusky: false,
-          usesLintStaged: false,
-          hookFileCount: 0,
-          nonPreCommitHookCount: 0,
-          totalHookCommandCount: 0,
-          multiCommandHookCount: 0,
-          lintStagedPatternCount: 0,
-          lintStagedCommandCount: 0,
-          hookFiles: [],
-        }),
-    hasPythonEvidence
-      ? safeSignal("hatch", () => collectHatchSignals(context), {
-          usesHatch: false,
-          usesUvInstaller: false,
-        })
-      : Promise.resolve({
-          usesHatch: false,
-          usesUvInstaller: false,
-        }),
-    hasJestEvidence
-      ? safeSignal("jest", () => collectJestSignals(context), {
-          versionSpec: undefined,
-          major: undefined,
-          minor: undefined,
-          jsdomVersionSpec: undefined,
-          jsdomMajor: undefined,
-          jsdomEnvironmentVersionSpec: undefined,
-          jsdomEnvironmentMajor: undefined,
-        })
-      : Promise.resolve({
-          versionSpec: undefined,
-          major: undefined,
-          minor: undefined,
-          jsdomVersionSpec: undefined,
-          jsdomMajor: undefined,
-          jsdomEnvironmentVersionSpec: undefined,
-          jsdomEnvironmentMajor: undefined,
-        }),
-    hasTailwindEvidence
-      ? safeSignal("tailwind", () => collectTailwindSignals(context), {
-          usesTailwind: false,
-          hasConfig: false,
-          usesConfigPlugins: false,
-          usesPostcssPlugin: false,
-          usesVitePlugin: false,
-          usesCliPackage: false,
-          hasLegacyBrowserTargets: false,
-        })
-      : Promise.resolve({
-          usesTailwind: false,
-          hasConfig: false,
-          usesConfigPlugins: false,
-          usesPostcssPlugin: false,
-          usesVitePlugin: false,
-          usesCliPackage: false,
-          hasLegacyBrowserTargets: false,
-        }),
-    hasRustEvidence
-      ? safeSignal("rust", () => collectRustSignals(context), {
-          hasCargoToml: false,
-          hasWorkspace: false,
-          usesNextest: false,
-        })
-      : Promise.resolve({
-          hasCargoToml: false,
-          hasWorkspace: false,
-          usesNextest: false,
-        }),
-    hasBabelEvidence
-      ? safeSignal("babel", () => collectBabelSignals(context), {
-          usesBabel: false,
-          hasConfig: false,
-          presetNames: [],
-          pluginNames: [],
-          hasCustomPlugins: false,
-          hasMacros: false,
-          hasDecorators: false,
-          hasEmotionPlugin: false,
-          hasStyledComponentsPlugin: false,
-          hasRelayPlugin: false,
-          hasI18nPlugin: false,
-          hasCoreJs: false,
-          hasLegacyBrowserTargets: false,
-        })
-      : Promise.resolve({
-          usesBabel: false,
-          hasConfig: false,
-          presetNames: [],
-          pluginNames: [],
-          hasCustomPlugins: false,
-          hasMacros: false,
-          hasDecorators: false,
-          hasEmotionPlugin: false,
-          hasStyledComponentsPlugin: false,
-          hasRelayPlugin: false,
-          hasI18nPlugin: false,
-          hasCoreJs: false,
-          hasLegacyBrowserTargets: false,
-        }),
-    hasElixirEvidence
-      ? safeSignal("elixir", () => collectElixirSignals(context), {
-          hasMixExs: false,
-          hasToolVersions: false,
-        })
-      : Promise.resolve({
-          hasMixExs: false,
-          hasToolVersions: false,
-        }),
+    collectSignalIf(hasEslintEvidence, "eslint", context, collectEslintSignals, {
+      usesEslint: false,
+      usesOxlint: false,
+      hasConfig: false,
+      pluginNames: [],
+      unsupportedPluginNames: [],
+      usesCustomExtensions: false,
+      usesPrettierPlugin: false,
+      usesPrettierRecommendedConfig: false,
+      usesPrettierRule: false,
+      usesImportPlugin: false,
+      usesImportXPlugin: false,
+      usesNoBarrelFilesPlugin: false,
+      usesBarrelFilesPlugin: false,
+    }),
+    collectSignalIf(hasPrettierEvidence, "prettier", context, collectPrettierSignals, {
+      usesPrettier: false,
+      usesOxfmt: false,
+      hasConfig: false,
+      pluginNames: [],
+      usesPrettierEslint: false,
+    }),
+    collectSignalIf(hasPythonEvidence, "python", context, collectPythonSignals, {
+      usesBlack: false,
+      usesIsort: false,
+      usesRuff: false,
+      usesTox: false,
+      usesNox: false,
+    }),
+    collectSignalIf(
+      hasNativePackageEvidence,
+      "nativePackages",
+      context,
+      collectNativePackageSignals,
+      {
+        node: [],
+        python: [],
+      },
+    ),
+    collectSignalIf(hasPythonEvidence, "pdm", context, collectPdmSignals, {
+      usesPdm: false,
+      usesUv: false,
+    }),
+    collectSignalIf(hasFrameworkEvidence, "frameworks", context, collectFrameworkSignals, {
+      usesNextjs: false,
+      usesStorybook: false,
+      usesVite: false,
+      usesAstro: false,
+      usesSvelteKit: false,
+      usesSolidStart: false,
+      usesTurbo: false,
+      usesNx: false,
+      usesLerna: false,
+      usesGradle: false,
+      gradleBuildCacheConfigured: false,
+      usesAngularCli: false,
+      angularCliCacheEnabledForCi: false,
+      usesRails: false,
+      railsVersionSpec: undefined,
+      railsMajor: undefined,
+      railsMinor: undefined,
+      railsPatch: undefined,
+      rubyVersionSpec: undefined,
+      rubyMajor: undefined,
+      rubyMinor: undefined,
+    }),
+    collectSignalIf(hasTypeScriptEvidence, "typescript", context, collectTypeScriptSignals, {
+      versionSpec: undefined,
+      major: undefined,
+      minor: undefined,
+      isPublishingTypeDefinitions: false,
+    }),
+    collectSignalIf(hasHuskyEvidence, "husky", context, collectHuskySignals, {
+      usesHusky: false,
+      usesLintStaged: false,
+      hookFileCount: 0,
+      nonPreCommitHookCount: 0,
+      totalHookCommandCount: 0,
+      multiCommandHookCount: 0,
+      lintStagedPatternCount: 0,
+      lintStagedCommandCount: 0,
+      hookFiles: [],
+    }),
+    collectSignalIf(hasPythonEvidence, "hatch", context, collectHatchSignals, {
+      usesHatch: false,
+      usesUvInstaller: false,
+    }),
+    collectSignalIf(hasJestEvidence, "jest", context, collectJestSignals, {
+      versionSpec: undefined,
+      major: undefined,
+      minor: undefined,
+      jsdomVersionSpec: undefined,
+      jsdomMajor: undefined,
+      jsdomEnvironmentVersionSpec: undefined,
+      jsdomEnvironmentMajor: undefined,
+    }),
+    collectSignalIf(hasTailwindEvidence, "tailwind", context, collectTailwindSignals, {
+      usesTailwind: false,
+      hasConfig: false,
+      usesConfigPlugins: false,
+      usesPostcssPlugin: false,
+      usesVitePlugin: false,
+      usesCliPackage: false,
+      hasLegacyBrowserTargets: false,
+    }),
+    collectSignalIf(hasRustEvidence, "rust", context, collectRustSignals, {
+      hasCargoToml: false,
+      hasWorkspace: false,
+      usesNextest: false,
+    }),
+    collectSignalIf(hasBabelEvidence, "babel", context, collectBabelSignals, {
+      usesBabel: false,
+      hasConfig: false,
+      presetNames: [],
+      pluginNames: [],
+      hasCustomPlugins: false,
+      hasMacros: false,
+      hasDecorators: false,
+      hasEmotionPlugin: false,
+      hasStyledComponentsPlugin: false,
+      hasRelayPlugin: false,
+      hasI18nPlugin: false,
+      hasCoreJs: false,
+      hasLegacyBrowserTargets: false,
+    }),
+    collectSignalIf(hasElixirEvidence, "elixir", context, collectElixirSignals, {
+      hasMixExs: false,
+      hasToolVersions: false,
+    }),
   ]);
 
   const result = {
