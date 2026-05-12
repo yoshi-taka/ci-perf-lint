@@ -256,6 +256,83 @@ function matchesFeatureMask(
   return true;
 }
 
+function shouldEvaluateRule(
+  rule: AnyRuleModule,
+  context: RuleContext,
+  source: string,
+  warnings: AnalysisWarning[] | undefined,
+  ruleFilter?: (rule: AnyRuleModule) => boolean,
+): boolean {
+  if (ruleFilter && !ruleFilter(rule)) {
+    context.measureCompleteness?.skippedGates.add(rule.meta.id);
+    pushAnalysisWarning(warnings, {
+      kind: "gate-skipped",
+      source,
+      message: `Rule ${rule.meta.id} was not evaluated because the rule filter excluded it.`,
+    });
+    return false;
+  }
+
+  if (context.singularities?.isQuarantined(rule.meta.id)) {
+    context.measureCompleteness?.skippedGates.add(rule.meta.id);
+    pushAnalysisWarning(warnings, {
+      kind: "gate-skipped",
+      source,
+      message: `Rule ${rule.meta.id} was not evaluated because it is quarantined by singularity handling.`,
+    });
+    return false;
+  }
+
+  return true;
+}
+
+async function runRuleSafely(
+  ruleId: string,
+  workflowPath: string,
+  context: RuleContext,
+  warnings: AnalysisWarning[] | undefined,
+  run: () => Diagnostic[] | Promise<Diagnostic[]>,
+): Promise<{ diagnostics: Diagnostic[]; errored: boolean }> {
+  try {
+    const diagnostics = await run();
+    return { diagnostics, errored: false };
+  } catch (error) {
+    const failure = classifySingularity(error, ruleId, workflowPath);
+    context.singularities?.record(failure);
+    if (warnings) {
+      const detail = error instanceof Error ? error.message : String(error);
+      warnings.push({
+        kind: "rule-error",
+        source: workflowPath,
+        message: `[${failure.class}] Rule ${ruleId} failed: ${detail}`,
+      });
+    }
+    return { diagnostics: [], errored: true };
+  }
+}
+
+function applyMaxFindings(
+  diagnostics: Diagnostic[],
+  maxFindings: number | undefined,
+  ruleId: string,
+  opts: {
+    source: string;
+    warnings: AnalysisWarning[] | undefined;
+    measureCompleteness?: MeasureCompletenessTracker;
+  },
+): Diagnostic[] {
+  if (maxFindings !== undefined && diagnostics.length > maxFindings) {
+    opts.measureCompleteness?.maxFindingsHitRules.add(ruleId);
+    pushAnalysisWarning(opts.warnings, {
+      kind: "max-findings-hit",
+      source: opts.source,
+      message: `Rule ${ruleId} produced ${diagnostics.length} findings and was capped at ${maxFindings}.`,
+    });
+    return diagnostics.slice(0, maxFindings);
+  }
+  return diagnostics;
+}
+
 export async function evaluateRules(
   workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
   context: RuleContext,
@@ -294,23 +371,7 @@ export async function evaluateRules(
   const workflowPath = workflow.relativePath;
 
   for (const rule of allRules) {
-    if (ruleFilter && !ruleFilter(rule)) {
-      context.measureCompleteness?.skippedGates.add(rule.meta.id);
-      pushAnalysisWarning(warnings, {
-        kind: "gate-skipped",
-        source: workflowPath,
-        message: `Rule ${rule.meta.id} was not evaluated because the rule filter excluded it.`,
-      });
-      continue;
-    }
-
-    if (context.singularities?.isQuarantined(rule.meta.id)) {
-      context.measureCompleteness?.skippedGates.add(rule.meta.id);
-      pushAnalysisWarning(warnings, {
-        kind: "gate-skipped",
-        source: workflowPath,
-        message: `Rule ${rule.meta.id} was not evaluated because it is quarantined by singularity handling.`,
-      });
+    if (!shouldEvaluateRule(rule, context, workflowPath, warnings, ruleFilter)) {
       continue;
     }
 
@@ -371,21 +432,14 @@ export async function evaluateRules(
   const settled = await runConcurrent(
     tasks,
     async (task) => {
-      try {
-        return { diagnostics: await task.run(), rule: task.rule, errored: false };
-      } catch (error) {
-        const failure = classifySingularity(error, task.rule.meta.id, workflowPath);
-        context.singularities?.record(failure);
-        if (warnings) {
-          const detail = error instanceof Error ? error.message : String(error);
-          warnings.push({
-            kind: "rule-error",
-            source: workflowPath,
-            message: `[${failure.class}] Rule ${task.rule.meta.id} failed: ${detail}`,
-          });
-        }
-        return { diagnostics: [], rule: task.rule, errored: true };
-      }
+      const { diagnostics, errored } = await runRuleSafely(
+        task.rule.meta.id,
+        workflowPath,
+        context,
+        warnings,
+        () => task.run(),
+      );
+      return { diagnostics, rule: task.rule, errored };
     },
     4,
   );
@@ -489,26 +543,11 @@ export async function evaluateRulesCoarseToFine(
   }
 
   for (const rule of allRules) {
-    if (ruleFilter && !ruleFilter(rule)) {
-      context.measureCompleteness?.skippedGates.add(rule.meta.id);
-      pushAnalysisWarning(warnings, {
-        kind: "gate-skipped",
-        source: rule.meta.id,
-        message: `Rule ${rule.meta.id} was not evaluated because the rule filter excluded it.`,
-      });
+    if (!shouldEvaluateRule(rule, context, rule.meta.id, warnings, ruleFilter)) {
       continue;
     }
 
     const ruleId = rule.meta.id;
-    if (context.singularities?.isQuarantined(ruleId)) {
-      context.measureCompleteness?.skippedGates.add(ruleId);
-      pushAnalysisWarning(warnings, {
-        kind: "gate-skipped",
-        source: ruleId,
-        message: `Rule ${ruleId} was not evaluated because it is quarantined by singularity handling.`,
-      });
-      continue;
-    }
 
     evaluatedRuleIds.add(ruleId);
 
@@ -593,42 +632,31 @@ export async function evaluateRulesCoarseToFine(
           : context.workflowSemantics;
       const perWorkflowContext: RuleContext =
         workflowSemantics !== undefined ? { ...context, workflowSemantics } : context;
-      let errored = false;
-      let diagnostics: Diagnostic[] = [];
-      try {
-        diagnostics = await checkFn(workflow, perWorkflowContext);
-        if (diagnostics.length > 0) {
-          firedRuleIds.add(ruleId);
-        }
-        if (maxFindings !== undefined && diagnostics.length > maxFindings) {
-          context.measureCompleteness?.maxFindingsHitRules.add(ruleId);
-          pushAnalysisWarning(warnings, {
-            kind: "max-findings-hit",
-            source: workflowPath,
-            message: `Rule ${ruleId} produced ${diagnostics.length} findings and was capped at ${maxFindings}.`,
-          });
-          diagnostics.length = maxFindings;
-        }
-        const workflowIndex = workflowIndexByRef.get(workflow);
-        if (workflowIndex !== undefined) {
-          workflowResults[workflowIndex]!.push(...diagnostics);
-        }
-        if (findingCounts) {
-          findingCounts.set(ruleId, (findingCounts.get(ruleId) ?? 0) + diagnostics.length);
-        }
-      } catch (error) {
-        errored = true;
-        const failure = classifySingularity(error, ruleId, workflowPath);
-        context.singularities?.record(failure);
-        if (warnings) {
-          const detail = error instanceof Error ? error.message : String(error);
-          warnings.push({
-            kind: "rule-error",
-            source: workflowPath,
-            message: `[${failure.class}] Rule ${ruleId} failed: ${detail}`,
-          });
-        }
+      const { diagnostics: rawDiagnostics, errored } = await runRuleSafely(
+        ruleId,
+        workflowPath,
+        context,
+        warnings,
+        () => checkFn(workflow, perWorkflowContext),
+      );
+      const diagnostics = applyMaxFindings(rawDiagnostics, maxFindings, ruleId, {
+        source: workflowPath,
+        warnings,
+        measureCompleteness: context.measureCompleteness,
+      });
+
+      if (!errored && diagnostics.length > 0) {
+        firedRuleIds.add(ruleId);
       }
+
+      const workflowIndex = workflowIndexByRef.get(workflow);
+      if (workflowIndex !== undefined) {
+        workflowResults[workflowIndex]!.push(...diagnostics);
+      }
+      if (findingCounts) {
+        findingCounts.set(ruleId, (findingCounts.get(ruleId) ?? 0) + diagnostics.length);
+      }
+
       if (!errored && diagnostics.length === 0) {
         pushAnalysisWarning(warnings, {
           kind: "empty-result",
