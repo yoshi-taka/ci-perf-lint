@@ -60,6 +60,7 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
     await mkdir(libDir, { recursive: true });
 
     await writeFile(path.join(fixtureRoot, "package.json"), '{"name": "test-cdk-usage-only"}');
+    await writeFile(path.join(fixtureRoot, "cdk.json"), '{"app": "lib/deployment-stack.ts"}');
     await writeFile(
       path.join(workflowDir, "ci.yml"),
       "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-node@v4\n",
@@ -112,6 +113,7 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
     await mkdir(libDir, { recursive: true });
 
     await writeFile(path.join(fixtureRoot, "package.json"), '{"name": "test-cdk-rg-fallback"}');
+    await writeFile(path.join(fixtureRoot, "cdk.json"), '{"app": "lib/deployment-stack.ts"}');
     await writeFile(
       path.join(workflowDir, "ci.yml"),
       "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/setup-node@v4\n",

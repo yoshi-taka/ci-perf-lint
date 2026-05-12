@@ -13,6 +13,7 @@ describe("cdk-bucket-deployment fallback (no rg)", () => {
     try {
       await mkdir(path.join(tmpDir, ".github", "workflows"), { recursive: true });
       await mkdir(path.join(tmpDir, "lib"), { recursive: true });
+      await writeFile(path.join(tmpDir, "cdk.json"), '{"app": "lib/stack.ts"}');
       await writeFile(
         path.join(tmpDir, ".github", "workflows", "ci.yml"),
         "name: CI\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
@@ -51,6 +52,7 @@ describe("cdk-bucket-deployment fallback (no rg)", () => {
     try {
       await mkdir(path.join(tmpDir, ".github", "workflows"), { recursive: true });
       await mkdir(path.join(tmpDir, "lib"), { recursive: true });
+      await writeFile(path.join(tmpDir, "cdk.json"), '{"app": "lib/stack.ts"}');
       await writeFile(
         path.join(tmpDir, ".github", "workflows", "ci.yml"),
         "name: CI\njobs:\n  test:\n    runs-on: ubuntu-latest\n",

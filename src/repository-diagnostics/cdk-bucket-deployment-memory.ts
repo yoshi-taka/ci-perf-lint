@@ -58,7 +58,9 @@ function positionAt(content: string, index: number): { line: number; column: num
   return { line, column: index - lineStart + 1 };
 }
 
-async function findBucketDeploymentFiles(repoRoot: string): Promise<string[]> {
+type RgResult = { kind: "files"; files: string[] } | { kind: "error" };
+
+async function findBucketDeploymentFiles(repoRoot: string): Promise<RgResult> {
   const args = [
     "-l",
     "--hidden",
@@ -86,9 +88,9 @@ async function findBucketDeploymentFiles(repoRoot: string): Promise<string[]> {
       const proc = Bun.spawn(["rg", ...args], { stdio: ["ignore", "pipe", "pipe"] });
       const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
       if (exitCode === 0) {
-        return stdout.trim().split("\n").filter(Boolean);
+        return { kind: "files", files: stdout.trim().split("\n").filter(Boolean) };
       }
-      return [];
+      return { kind: "error" };
     }
 
     let resolveExit: (code: number) => void;
@@ -102,12 +104,15 @@ async function findBucketDeploymentFiles(repoRoot: string): Promise<string[]> {
     proc.stdout.on("data", (c: Buffer) => chunks.push(c));
     const exitCode = await exitPromise;
     if (exitCode === 0) {
-      return Buffer.concat(chunks).toString().trim().split("\n").filter(Boolean);
+      return {
+        kind: "files",
+        files: Buffer.concat(chunks).toString().trim().split("\n").filter(Boolean),
+      };
     }
   } catch {
     // rg not available
   }
-  return [];
+  return { kind: "error" };
 }
 
 export async function collectCdkBucketDeploymentMemoryDiagnostics(
@@ -118,14 +123,27 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  let sourceFiles = await findBucketDeploymentFiles(repoRoot);
-  if (sourceFiles.length === 0) {
-    const allFiles = await context.walkFiles(".", {
-      ignoredDirectories: new Set([".git", "node_modules", "cdk.out", "fixtures"]),
-      include: (candidatePath: string) => /\.(?:ts|js|tsx|jsx)$/.test(candidatePath),
-    });
-    sourceFiles = allFiles.map((f) => context.resolve(f));
+  const [packageJsonEntry, hasCdkJson] = await Promise.all([
+    context.loadPackageJson(),
+    context.pathExists(context.resolve("cdk.json")),
+  ]);
+  const hasCdkDep = packageJsonEntry.text
+    ? /\baws-cdk-lib\b/.test(packageJsonEntry.text) || /@aws-cdk\//.test(packageJsonEntry.text)
+    : false;
+  if (!hasCdkDep && !hasCdkJson) {
+    return [];
   }
+
+  const rgResult = await findBucketDeploymentFiles(repoRoot);
+  const sourceFiles =
+    rgResult.kind === "error"
+      ? (
+          await context.walkFiles(".", {
+            ignoredDirectories: new Set([".git", "node_modules", "cdk.out", "fixtures"]),
+            include: (candidatePath: string) => /\.(?:ts|js|tsx|jsx)$/.test(candidatePath),
+          })
+        ).map((f) => context.resolve(f))
+      : rgResult.files;
 
   const diagnostics: Diagnostic[] = [];
 
