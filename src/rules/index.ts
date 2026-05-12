@@ -1,6 +1,7 @@
 import type { AnyRuleModule } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import { validateImpliedChecks } from "./validate-implied-checks.ts";
+import { repositoryDiagnosticCollectors } from "../repository-diagnostics/index.ts";
 import { avoidBroadUploadArtifactRule } from "./avoid-broad-upload-artifact.ts";
 import { avoidBrewUpdateOnHostedMacosRule } from "./avoid-brew-update-on-hosted-macos.ts";
 import { avoidCDriveOnWindowsRunnerRule } from "./avoid-c-drive-on-windows-runner.ts";
@@ -199,7 +200,8 @@ export const allRules = [
   goTestRepeatsVetAfterGoVetRule,
 ] satisfies readonly AnyRuleModule[];
 
-const _validation = validateImpliedChecks(allRules);
+const _repoIds = repositoryDiagnosticCollectors.map((c) => c.id);
+const _validation = validateImpliedChecks(allRules, _repoIds);
 for (const { sourceId, targetId } of _validation.missingTargets) {
   console.warn(
     `[validate-implied-checks] Rule "${sourceId}" references non-existent implied check "${targetId}".`,

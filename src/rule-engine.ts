@@ -17,10 +17,15 @@ import type { WorkflowSemantics } from "./rules/shared/workflow-semantics.ts";
 import type { RepositoryPrecedentIndex } from "./rules/shared/repository-precedent-index.ts";
 import type { RepositoryFileIndex } from "./rules/shared/repository-file-index.ts";
 import { prewarmStepAnalysisCaches } from "./rules/shared/step-analysis-prewarm.ts";
-import { composeRefiners, deduplicateRefiner, maxFindingsRefiner } from "./refiner-pipeline.ts";
+import {
+  composeRefiners,
+  deduplicateRefiner,
+  driftDetectionRefiner,
+  maxFindingsRefiner,
+} from "./refiner-pipeline.ts";
 import { classifySingularity, type SingularityTracker } from "./rules/shared/singularity.ts";
 import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
-import { buildInferenceGraph, detectImplicationDrift } from "./rules/shared/remediation-checks.ts";
+import { buildInferenceGraph } from "./rules/shared/remediation-checks.ts";
 import { evaluate as evaluatePredicate, type Predicate } from "./rules/shared/predicate.ts";
 
 type WorkflowNodeKind = "trigger" | "concurrency";
@@ -395,10 +400,9 @@ export async function evaluateRules(
     ruleResults.push(...diagnostics);
   }
 
-  if (warnings) {
-    const drift = detectImplicationDrift(firedRuleIds, evaluatedRuleIds, inferenceGraph);
-    warnings.push(...drift);
-  }
+  driftDetectionRefiner(firedRuleIds, evaluatedRuleIds, inferenceGraph).refine(ruleResults, {
+    warnings,
+  });
 
   if (!findingCounts && idMaxFindings.size === 0) {
     return deduplicateRefiner().refine(ruleResults, {});
@@ -430,19 +434,6 @@ export async function evaluateRules(
   }
 
   return filtered;
-}
-
-function deduplicateByPathLine(diagnostics: Diagnostic[]): Diagnostic[] {
-  const seen = new Map<string, Diagnostic>();
-
-  for (const d of diagnostics) {
-    const key = `${d.location.path}:${d.location.line}`;
-    if (!seen.has(key)) {
-      seen.set(key, d);
-    }
-  }
-
-  return [...seen.values()];
 }
 
 interface ScoredWorkflow {
@@ -634,10 +625,10 @@ export async function evaluateRulesCoarseToFine(
     }
   }
 
-  if (warnings) {
-    const drift = detectImplicationDrift(firedRuleIds, evaluatedRuleIds, inferenceGraph);
-    warnings.push(...drift);
-  }
+  driftDetectionRefiner(firedRuleIds, evaluatedRuleIds, inferenceGraph).refine(
+    workflowResults.flat(),
+    { warnings },
+  );
 
-  return deduplicateByPathLine(workflowResults.flat());
+  return deduplicateRefiner().refine(workflowResults.flat(), {});
 }

@@ -4,18 +4,21 @@ import type {
   Diagnostic,
   MeasureCompletenessTracker,
 } from "./types.ts";
+import type { InferenceGraph } from "./rules/shared/remediation-checks.ts";
 import {
   applyLimitedActionsPriority,
   compareFindings,
   findingIncludedInMode,
 } from "./repo-finding-utils.ts";
 import { applySeverityPromotion } from "./severity-promotion.ts";
+import { detectImplicationDrift } from "./rules/shared/remediation-checks.ts";
 
 export interface RefinerContext {
   mode?: AuditMode;
   warnings?: AnalysisWarning[];
   measureCompleteness?: MeasureCompletenessTracker;
   workflowPath?: string;
+  inferenceGraph?: InferenceGraph;
 }
 
 export interface Refiner {
@@ -133,5 +136,23 @@ export function sortRefiner(): Refiner {
   return {
     name: "sort",
     refine: (diagnostics) => [...diagnostics].sort(compareFindings),
+  };
+}
+
+export function driftDetectionRefiner(
+  firedRuleIds: Set<string>,
+  evaluatedRuleIds: Set<string>,
+  inferenceGraph: InferenceGraph,
+): Refiner {
+  return {
+    name: "drift-detection",
+    refine: (diagnostics, ctx) => {
+      if (!ctx.warnings) {
+        return diagnostics;
+      }
+      const drift = detectImplicationDrift(firedRuleIds, evaluatedRuleIds, inferenceGraph);
+      ctx.warnings.push(...drift);
+      return diagnostics;
+    },
   };
 }

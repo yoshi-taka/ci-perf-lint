@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { AnalysisWarning, Diagnostic } from "../src/types.ts";
+import type { InferenceGraph } from "../src/rules/shared/remediation-checks.ts";
 import {
   composeRefiners,
   deduplicateRefiner,
+  driftDetectionRefiner,
   maxFindingsRefiner,
   severityPromotionRefiner,
   modeFilterRefiner,
@@ -223,6 +225,39 @@ describe("composeRefiners", () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.location.line).toBe(1);
     expect(result[0]?.score).toBe(50);
+  });
+
+  test("drift detection pushes warnings when implied rule has no findings", () => {
+    const graph: InferenceGraph = {
+      forwards: new Map([["rule-a", ["rule-b"]]]),
+      reverse: new Map([["rule-b", ["rule-a"]]]),
+      transitiveForwards: new Map([["rule-a", new Set(["rule-b"])]]),
+    };
+    const fired = new Set(["rule-a"]);
+    const evaluated = new Set(["rule-a", "rule-b"]);
+    const warnings: AnalysisWarning[] = [];
+
+    driftDetectionRefiner(fired, evaluated, graph).refine([], { warnings });
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.kind).toBe("remediation-drift");
+    expect(warnings[0]?.message).toContain("rule-b");
+    expect(warnings[0]?.message).toContain("no findings");
+  });
+
+  test("drift detection does not warn when implied rule also fired", () => {
+    const graph: InferenceGraph = {
+      forwards: new Map([["rule-a", ["rule-b"]]]),
+      reverse: new Map([["rule-b", ["rule-a"]]]),
+      transitiveForwards: new Map([["rule-a", new Set(["rule-b"])]]),
+    };
+    const fired = new Set(["rule-a", "rule-b"]);
+    const evaluated = new Set(["rule-a", "rule-b"]);
+    const warnings: AnalysisWarning[] = [];
+
+    driftDetectionRefiner(fired, evaluated, graph).refine([], { warnings });
+
+    expect(warnings).toEqual([]);
   });
 
   test("identity for empty refiner list", () => {
