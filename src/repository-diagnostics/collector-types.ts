@@ -9,6 +9,7 @@ import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import type { RepositoryCorpusIndex } from "../rules/shared/repository-corpus-index.ts";
 import type { GateExpr } from "./gate-expr.ts";
 import { evaluateGateExpr } from "./gate-expr.ts";
+import type { ResourceGetter } from "./semantic-resource.ts";
 
 export type GateKey = keyof RepositoryDiagnosticGateState;
 
@@ -210,6 +211,7 @@ export interface RepositoryDiagnosticContext {
   predicateIndex: RepositoryPredicateIndex;
   featureIndex: RepositoryFeatureIndex;
   corpusIndex: RepositoryCorpusIndex;
+  getResource?: ResourceGetter;
 }
 
 export type CollectorContext<G extends GateKey, Gs extends readonly GateKey[]> = Gs extends never[]

@@ -25,6 +25,7 @@ import type {
   RepositoryDiagnosticGateState,
   RepositoryDiagnosticGateResolution,
 } from "./collector-types.ts";
+import { topologicalSort } from "../rules/shared/topo-sort.ts";
 import {
   looksLikeJavaScriptFrameworksRepository,
   looksLikeJavaScriptRepository,
@@ -82,45 +83,6 @@ export function buildDag(prerequisites: Partial<Record<GateKey, GateKey[]>>): Ad
   const topo = topologicalSort(allKeys, successors);
 
   return { successors, predecessors, roots, evaluationOrder: topo };
-}
-
-function topologicalSort(
-  allNodes: Set<GateKey>,
-  successors: Map<GateKey, readonly GateKey[]>,
-): readonly GateKey[] {
-  const inDegree = new Map<GateKey, number>();
-  for (const node of allNodes) {
-    inDegree.set(node, 0);
-  }
-  for (const [, succs] of successors) {
-    for (const succ of succs) {
-      inDegree.set(succ, (inDegree.get(succ) ?? 0) + 1);
-    }
-  }
-
-  const queue: GateKey[] = [];
-  for (const [node, degree] of inDegree) {
-    if (degree === 0) {
-      queue.push(node);
-    }
-  }
-
-  const sorted: GateKey[] = [];
-
-  while (queue.length > 0) {
-    const node = queue.shift()!;
-    sorted.push(node);
-    const succs = successors.get(node) ?? [];
-    for (const succ of succs) {
-      const newDegree = (inDegree.get(succ) ?? 1) - 1;
-      inDegree.set(succ, newDegree);
-      if (newDegree === 0) {
-        queue.push(succ);
-      }
-    }
-  }
-
-  return sorted;
 }
 
 const gatePrerequisites: Partial<Record<GateKey, GateKey[]>> = {

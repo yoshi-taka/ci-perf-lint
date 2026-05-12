@@ -17,6 +17,14 @@ import { javascriptDiagnosticCollectors } from "./collectors-javascript.ts";
 import { pytestDiagnosticCollectors, pythonDiagnosticCollectors } from "./collectors-python.ts";
 import { terraformDiagnosticCollectors } from "./collectors-terraform.ts";
 import { buildGateProofs, collectRepositoryDiagnosticGateState, gateKeys } from "./gates.ts";
+import { ResourceRegistry } from "./resource-registry.ts";
+import { ResourceCache } from "./resource-cache.ts";
+import { ResourceEvaluator } from "./resource-evaluator.ts";
+import type { ResourceEvaluationObservability } from "./semantic-resource.ts";
+import { registerDefaultResources } from "./resources/index.ts";
+
+const resourceRegistry: ResourceRegistry = new ResourceRegistry();
+registerDefaultResources(resourceRegistry);
 
 export const repositoryDiagnosticCollectors = [
   ...javascriptDiagnosticCollectors,
@@ -153,10 +161,32 @@ export async function collectRepositoryDiagnostics(
     );
   }
 
+  const resourceCache = new ResourceCache();
+  const resourceEvaluator = new ResourceEvaluator(resourceRegistry, resourceCache);
+  const resourceObservability: ResourceEvaluationObservability = {
+    resources: [],
+    evaluationOrder: [],
+    cacheHits: 0,
+    cacheMisses: 0,
+  };
+  const getResource = await resourceEvaluator.evaluate(context, [], {
+    observability: resourceObservability,
+  });
+  const resourceContext: RepositoryDiagnosticContext = {
+    ...context,
+    getResource,
+  };
+
+  const resourceTimingStartedAt = performance.now();
+
   const collectorResults = await Promise.allSettled(
     scheduledCollectors.map((collector) => {
       const startedAt = performance.now();
-      const result = runRepositoryDiagnosticCollector(collector as CollectorLike, context, proofs);
+      const result = runRepositoryDiagnosticCollector(
+        collector as CollectorLike,
+        resourceContext,
+        proofs,
+      );
       if (result instanceof Promise) {
         if (timingsEnabled()) {
           return result.then((value) => {
@@ -171,6 +201,12 @@ export async function collectRepositoryDiagnostics(
       return Promise.resolve(result);
     }),
   );
+
+  if (timingsEnabled() && resourceObservability.cacheMisses > 0) {
+    process.stderr.write(
+      `[timing] resources evaluated=${resourceObservability.cacheMisses} cached=${resourceObservability.cacheHits} total=${(performance.now() - resourceTimingStartedAt).toFixed(1)}ms\n`,
+    );
+  }
   const diagnostics: Diagnostic[] = [];
   const firedCollectors = new Set<string>();
 
@@ -226,6 +262,8 @@ export async function collectRepositoryDiagnostics(
         collectorCooccurrence: buildCollectorCooccurrenceDebug([...firedCollectors]),
         collectorSchedule,
         gateObservability,
+        semanticResources:
+          resourceObservability.resources.length > 0 ? resourceObservability : undefined,
         signals: extractSignals(context.repository),
         warnings: context.warnings,
         measureCompleteness: context.measureCompleteness
