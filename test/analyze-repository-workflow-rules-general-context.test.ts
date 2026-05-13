@@ -200,29 +200,41 @@ describe("analyzeRepository workflow and execution rules: general context", () =
   });
 
   test("warns when npm install is used instead of npm ci", async () => {
-     const report = await getFixtureReport(fixtures.npmCiOverNpmInstallLike, {
-       targetPath: ".",
-       topCount: 10,
-       mode: "strict",
-     });
+    const report = await getFixtureReport(fixtures.npmCiOverNpmInstallLike, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "strict",
+    });
 
-     const finding = report.findings.find((f) => f.ruleId === "prefer-npm-ci");
-     expect(finding).toBeDefined();
-     expect(finding?.message).toContain("npm install");
-     expect(finding?.suggestion).toContain("npm ci");
-   });
+    const finding = report.findings.find((f) => f.ruleId === "prefer-npm-ci");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("npm install");
+    expect(finding?.suggestion).toContain("npm ci");
+  });
 
-   test("does not warn when npm ci is used instead of npm install", async () => {
-     const report = await getFixtureReport(fixtures.npmCiOk, {
-       targetPath: ".",
-       topCount: 10,
-       mode: "strict",
-     });
+  test("does not warn when npm ci is used instead of npm install", async () => {
+    const report = await getFixtureReport(fixtures.npmCiOk, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "strict",
+    });
 
-     expect(report.findings.some((f) => f.ruleId === "prefer-npm-ci")).toBe(false);
-   });
+    expect(report.findings.some((f) => f.ruleId === "prefer-npm-ci")).toBe(false);
+  });
 
-   test("supports exploratory mode for advisory findings", async () => {
+  test("warns when pnpm/yarn/bun install without frozen lockfile flag", async () => {
+    const report = await getFixtureReport(fixtures.frozenLockfileLike, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find((f) => f.ruleId === "prefer-frozen-lockfile");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toMatch(/pnpm|yarn|bun/);
+  });
+
+  test("supports exploratory mode for advisory findings", async () => {
     const report = await getFixtureReport(fixtures.sampleRepo, {
       targetPath: ".",
       topCount: 10,
