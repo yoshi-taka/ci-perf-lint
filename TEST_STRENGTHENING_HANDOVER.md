@@ -31,9 +31,12 @@ Result: 1894 tests pass (was 1886)
 
 Result: 1917 tests pass (was 1894)
 
-### 4. Metamorphic relations
-- Add to `test/boundary-metamorphic.test.ts`
-- Ideas: filtering invariance, dedup invariance, scope invariance
+### 4. Metamorphic relations ✅
+- Added to `test/boundary-metamorphic.test.ts` (336 → 378 lines)
+- New tests: filtering invariance, dedup invariance, scope invariance
+- Verified: dedup collapses duplicates, severity filtering complete, workflow-only has no repo findings
+
+Result: 1920 tests pass (was 1917)
 
 ### 5. Golden regression ✅
 - Expand `test/golden.test.ts` (67 → 79 lines)

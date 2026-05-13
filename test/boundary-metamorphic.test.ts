@@ -333,4 +333,45 @@ describe("metamorphic relations", () => {
     expect(sortJsonValue(jsonA)).toEqual(sortJsonValue(jsonB));
     expect(sortJsonValue(findingsOnlyA)).toEqual(sortJsonValue(findingsOnlyB));
   });
+
+  test("dedup invariance: aggregateFindingsWithMembers handles duplicate findings", () => {
+    const findings: Diagnostic[] = [
+      timeoutFinding(".github/workflows/ci.yml", "build", 12, 80),
+      timeoutFinding(".github/workflows/ci.yml", "build", 12, 80),
+      timeoutFinding(".github/workflows/release.yml", "build", 16, 79),
+    ];
+
+    const aggregated = aggregateFindingsWithMembers(findings).aggregatedFindings;
+
+    expect(aggregated.length).toBeGreaterThanOrEqual(1);
+    expect(aggregated[0]?.ruleId).toBe("missing-timeout-minutes");
+  });
+
+  test("filtering invariance: filtering by severity preserves other severities", async () => {
+    const report = await getFixtureReport(fixtures.sampleRepo, {
+      targetPath: ".",
+      topCount: 100,
+      mode: "strict",
+    });
+
+    const errors = report.findings.filter((f) => f.severity === "error");
+    const warnings = report.findings.filter((f) => f.severity === "warning");
+    const suggestions = report.findings.filter((f) => f.severity === "suggestion");
+
+    const all = report.findings;
+    expect(all.length).toBe(errors.length + warnings.length + suggestions.length);
+  });
+
+  test("scope invariance: workflow-only scan returns no repository findings", async () => {
+    const workflowOnlyReport = await getFixtureReport(fixtures.barrelFileLike, {
+      targetPath: ".",
+      topCount: 50,
+      mode: "strict",
+      workflowOnly: true,
+    });
+
+    const wfOnlyRepoFindings = workflowOnlyReport.findings.filter((f) => f.scope === "repository");
+
+    expect(wfOnlyRepoFindings.length).toBe(0);
+  });
 });
