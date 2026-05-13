@@ -1,14 +1,15 @@
 import type { RuleMeta } from "../types.ts";
+import { isRegisteredRuleId } from "./rule-id.ts";
+import type { InferenceGraph } from "../rules/shared/remediation-checks.ts";
 
 export type RuleId = string;
-import type { InferenceGraph } from "../rules/shared/remediation-checks.ts";
 
 export type ImplicationType = "semantic-implies" | "remediation-hints" | "ordering";
 
 export interface RuleImplication {
   readonly type: ImplicationType;
-  readonly source: RuleId;
-  readonly target: RuleId;
+  readonly source: string;
+  readonly target: string;
 }
 
 export interface RuleScheduling {
@@ -60,10 +61,15 @@ function detectImplicationCycles(implications: Map<RuleId, RuleId[]>): string[][
   return cycles;
 }
 
+export interface ImplicationValidationEx extends ImplicationValidation {
+  unregisteredRules: string[];
+  unregisteredImplications: { sourceId: string; targetId: string }[];
+}
+
 export function validateImplications(
   rules: readonly { meta: RuleMeta }[],
   extraKnownIds?: Iterable<string>,
-): ImplicationValidation {
+): ImplicationValidationEx {
   const allIds = new Set(rules.map((r) => r.meta.id));
   if (extraKnownIds) {
     for (const id of extraKnownIds) {
@@ -73,15 +79,25 @@ export function validateImplications(
 
   const missingTargets: { sourceId: string; targetId: string }[] = [];
   const graph = new Map<RuleId, RuleId[]>();
+  const unregisteredRules: string[] = [];
+  const unregisteredImplications: { sourceId: string; targetId: string }[] = [];
 
   for (const rule of rules) {
     const sourceId = rule.meta.id;
+
+    if (!isRegisteredRuleId(sourceId) && !unregisteredRules.includes(sourceId)) {
+      unregisteredRules.push(sourceId);
+    }
+
     const edges: RuleId[] = [];
 
     const legacy = rule.meta.impliedChecks ?? [];
     for (const target of legacy) {
       if (!allIds.has(target)) {
         missingTargets.push({ sourceId, targetId: target });
+      }
+      if (!isRegisteredRuleId(target)) {
+        unregisteredImplications.push({ sourceId, targetId: target });
       }
       edges.push(target);
     }
@@ -91,6 +107,9 @@ export function validateImplications(
       if (impl.type !== "ordering") {
         if (!allIds.has(impl.target)) {
           missingTargets.push({ sourceId, targetId: impl.target });
+        }
+        if (!isRegisteredRuleId(impl.target)) {
+          unregisteredImplications.push({ sourceId, targetId: impl.target });
         }
         edges.push(impl.target);
       }
@@ -107,6 +126,8 @@ export function validateImplications(
     missingTargets,
     cycles,
     valid: missingTargets.length === 0 && cycles.length === 0,
+    unregisteredRules,
+    unregisteredImplications,
   };
 }
 

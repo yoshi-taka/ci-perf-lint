@@ -46,7 +46,12 @@ import {
   computeImpliedChecks,
   registerAllRuleMetaForRemediation,
 } from "./rules/shared/remediation-checks.ts";
-import { computeScheduling, buildImplicationObservability } from "./rule-engine/implication.ts";
+import {
+  computeScheduling,
+  buildImplicationObservability,
+  validateImplications,
+} from "./rule-engine/implication.ts";
+import { RULE_REGISTRY } from "./rule-engine/rule-id.ts";
 import { getDiagnosticTransformMetadata } from "./rules/shared/diagnostic-transform.ts";
 import { allRules } from "./rules/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
@@ -602,6 +607,15 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
             commandTypes: ["install", "lint", "test", "build", "setup", "other"],
             adapterVersion: "v1",
           },
+        },
+        ruleRegistry: {
+          registeredIds: Object.keys(RULE_REGISTRY),
+          registeredCount: Object.keys(RULE_REGISTRY).length,
+          allRulesCount: allRules.length,
+          validation: (() => {
+            const repoIds = repositoryDiagnosticCollectors.map((c) => c.id);
+            return validateImplications(allRules, repoIds);
+          })(),
         },
       }),
     );

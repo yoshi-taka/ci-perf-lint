@@ -219,7 +219,7 @@ export interface RuleMeta {
   skipIf?: Predicate;
   precheck?: (workflow: { source?: string }) => number;
   precheckBudget?: number;
-  impliedChecks?: string[];
+  impliedChecks?: readonly string[];
   implications?: readonly RuleImplication[];
   scheduling?: RuleScheduling;
 }

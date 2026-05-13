@@ -211,6 +211,14 @@ for (const { sourceId, targetId } of _validation.missingTargets) {
     `[validate-implied-checks] Rule "${sourceId}" references non-existent implied check "${targetId}".`,
   );
 }
+for (const ruleId of _validation.unregisteredRules) {
+  console.warn(`[validate-implied-checks] Rule "${ruleId}" is not registered in RULE_REGISTRY.`);
+}
+for (const { sourceId, targetId } of _validation.unregisteredImplications) {
+  console.warn(
+    `[validate-implied-checks] Implication from "${sourceId}" to unregistered rule "${targetId}".`,
+  );
+}
 
 export const rulesByScope = {
   "github-actions": allRules.filter(

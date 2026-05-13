@@ -1,11 +1,11 @@
 import type { RuleMeta } from "../types.ts";
-import { validateImplications, type ImplicationValidation } from "../rule-engine/implication.ts";
+import { validateImplications, type ImplicationValidationEx } from "../rule-engine/implication.ts";
 
-export type ImpliedChecksValidation = ImplicationValidation;
+export type ImpliedChecksValidationEx = ImplicationValidationEx;
 
 export function validateImpliedChecks(
   rules: readonly { meta: RuleMeta }[],
   extraKnownIds?: Iterable<string>,
-): ImpliedChecksValidation {
+): ImpliedChecksValidationEx {
   return validateImplications(rules, extraKnownIds);
 }
