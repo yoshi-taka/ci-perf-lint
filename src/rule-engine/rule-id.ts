@@ -2,10 +2,6 @@ declare const __BrandedRuleId: unique symbol;
 
 export type BrandedRuleId = string & { readonly [__BrandedRuleId]: never };
 
-function toRuleId(id: string): BrandedRuleId {
-  return id as BrandedRuleId;
-}
-
 export type RuleIdKind = "workflow" | "repository";
 
 export interface RegisteredRuleEntry {
