@@ -145,6 +145,23 @@ export interface PropagationCluster {
   metrics: DiffusionMetrics;
 }
 
+export interface SharedDiagnostic {
+  readonly kind: "shared";
+  readonly ruleId: string;
+  readonly sourceRuleId: string;
+  readonly memberWorkflows: string[];
+  readonly confidence: "low" | "medium" | "high";
+  readonly representativeWorkflow: string;
+  readonly representativeLocation: SourceLocation;
+  readonly representativeMessage: string;
+  readonly severity: Severity;
+  readonly score: number;
+  readonly why: string;
+  readonly suggestion: string;
+  readonly measurementHint: string;
+  readonly docsPath: string;
+}
+
 export interface ReportData {
   targetPath: string;
   workflowCount: number;
@@ -158,6 +175,7 @@ export interface ReportData {
   analysisWarnings: AnalysisWarning[];
   measureCompleteness?: MeasureCompleteness;
   propagationClusters: PropagationCluster[];
+  sharedDiagnostics?: SharedDiagnostic[];
   remediationChecks: ImpliedCheck[];
 }
 

@@ -40,6 +40,7 @@ import {
 } from "./repository-diagnostics/index.ts";
 import { buildPropagationClusters } from "./repository-diagnostics/repository-propagation.ts";
 import { buildRepositoryFeatureIndex } from "./repository-diagnostics/repository-feature-index.ts";
+import { aggregateSharedDiagnostics } from "./repository-diagnostics/shared-diagnostics.ts";
 import {
   buildInferenceGraph,
   computeImpliedChecks,
@@ -437,6 +438,33 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   );
   timer.mark("build-propagation-clusters");
 
+  const enableSharedDiagnostics = process.env.CI_PERF_LINT_SHARED_DIAGNOSTICS === "1";
+  let sharedResult: {
+    shared: {
+      kind: "shared";
+      ruleId: string;
+      sourceRuleId: string;
+      memberWorkflows: string[];
+      confidence: "low" | "medium" | "high";
+      representativeWorkflow: string;
+      representativeLocation: { path: string; line: number; column: number };
+      representativeMessage: string;
+      severity: "error" | "warning" | "suggestion";
+      score: number;
+      why: string;
+      suggestion: string;
+      measurementHint: string;
+      docsPath: string;
+    }[];
+    unique: typeof allFindings;
+  };
+  if (enableSharedDiagnostics) {
+    sharedResult = aggregateSharedDiagnostics(allFindings, propagationClusters);
+  } else {
+    sharedResult = { shared: [], unique: allFindings };
+  }
+  timer.mark("aggregate-shared-diagnostics");
+
   scanContext.clearCaches();
 
   const findingsPromoted = applySeverityPromotion(allFindings, mode);
@@ -593,6 +621,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     analysisWarnings: uniqueAnalysisWarnings,
     measureCompleteness: measureCompletenessReport,
     propagationClusters,
+    sharedDiagnostics: enableSharedDiagnostics ? sharedResult.shared : undefined,
     remediationChecks,
   };
 }
