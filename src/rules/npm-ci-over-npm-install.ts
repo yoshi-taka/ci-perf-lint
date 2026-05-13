@@ -64,8 +64,7 @@ export const npmCiOverNpmInstallRule = {
         findings.push(
           buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
             message: `Job "${job.id}" uses "npm install" instead of "npm ci".`,
-            why:
-              "npm ci is faster and deterministic for CI. It installs exactly what is in package-lock.json without modifying it, while npm install may update the lock file and re-resolve dependencies.",
+            why: "npm ci is faster and deterministic for CI. It installs exactly what is in package-lock.json without modifying it, while npm install may update the lock file and re-resolve dependencies.",
             suggestion:
               'Replace "npm install" with "npm ci" when a package-lock.json exists in the repository.',
             measurementHint:
