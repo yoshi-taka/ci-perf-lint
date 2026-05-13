@@ -17,14 +17,13 @@ const title = ruleId
 const ruleFile = path.join("src/rules", `${ruleId}.ts`);
 const docsFile = path.join("docs/rules", `${ruleId}.md`);
 
-const ruleTemplate = `import type { RuleMeta } from "../types.ts";
+const ruleTemplate = `import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 
 const meta = {
   id: "${ruleId}",
-  title: "${title}",
   severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/${ruleId}.md",
@@ -32,21 +31,31 @@ const meta = {
 
 export const ${camelCaseId}Rule = {
   meta,
-  check(workflow: WorkflowDocument, _context: RuleContext) {
-    if (!someCondition(workflow)) {
-      return [];
+  check(workflow: WorkflowDocument, _context: RuleContext): Diagnostic[] {
+    const findings: Diagnostic[] = [];
+
+    for (const job of workflow.jobs) {
+      for (const step of job.steps) {
+        const run = step.run ?? "";
+        // TODO: implement detection logic
+        if (!run) {
+          continue;
+        }
+
+        findings.push(
+          buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
+            message: \`Job "\${job.id}" has a performance issue.\`,
+            why: "Why it matters for CI performance or waste.",
+            suggestion: "What to change.",
+            measurementHint: "How to verify the change.",
+            aiHandoff: \`Review \${workflow.relativePath} job "\${job.id}" and take suggested action.\`,
+            score: 50,
+          }),
+        );
+      }
     }
 
-    return [
-      buildDiagnostic(workflow, meta, workflow.nameNode, {
-        message: "What was found.",
-        why: "Why it matters for CI performance or waste.",
-        suggestion: "What to change.",
-        measurementHint: "How to verify the change.",
-        aiHandoff: \`Update \${workflow.relativePath} while preserving unrelated behavior.\`,
-        score: 50,
-      }),
-    ];
+    return findings;
   },
 };
 `;
