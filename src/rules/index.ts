@@ -36,6 +36,7 @@ import { missingConcurrencyRule } from "./missing-concurrency.ts";
 import { missingDependencyCacheRule } from "./missing-dependency-cache.ts";
 import { missingAngularCliCacheRule } from "./missing-angular-cli-cache.ts";
 import { noxWithoutUvBackendRule } from "./nox-without-uv-backend.ts";
+import { npmCiOverNpmInstallRule } from "./npm-ci-over-npm-install.ts";
 import { pdmWithoutUseUvRule } from "./pdm-without-use-uv.ts";
 import { missingGradleBuildCacheRule } from "./missing-gradle-build-cache.ts";
 import { missingMakeJFlagRule } from "./missing-make-j-flag.ts";
@@ -74,6 +75,7 @@ import {
 } from "./prefer-storybook-minor-performance-milestone.ts";
 import { preferTailwindV4UpgradeToolRule } from "./prefer-tailwind-v4-upgrade-tool.ts";
 import { preferNativeArmRunnerOverQemuRule } from "./prefer-native-arm-runner-over-qemu.ts";
+import { preferFrozenLockfileRule } from "./prefer-frozen-lockfile.ts";
 import { preferNodeRunOverNpmRunRule } from "./prefer-node-run-over-npm-run.ts";
 import { preferNextestForHeavyRustTestsRule } from "./prefer-nextest-for-heavy-rust-tests.ts";
 import { preferBuildxBakeForMultipleImagesRule } from "./prefer-buildx-bake-for-multiple-images.ts";
@@ -139,6 +141,7 @@ export const allRules = [
   outdatedDatadogLambdaExtensionRule,
   outdatedSetupActionWithoutCacheRule,
   noxWithoutUvBackendRule,
+  npmCiOverNpmInstallRule,
   pdmWithoutUseUvRule,
   ungatedHeavyJobRule,
   unnecessaryAppInstallForLintJobRule,
@@ -169,6 +172,7 @@ export const allRules = [
   preferStorybook7MinorPerformanceMilestoneRule,
   preferTailwindV4UpgradeToolRule,
   preferNativeArmRunnerOverQemuRule,
+  preferFrozenLockfileRule,
   preferNodeRunOverNpmRunRule,
   preferNextestForHeavyRustTestsRule,
   preferBuildxBakeForMultipleImagesRule,

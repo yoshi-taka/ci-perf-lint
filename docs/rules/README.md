@@ -98,6 +98,7 @@ Current rule registry:
 - `prefer-dorny-paths-filter-for-scoped-jobs`
 - `prefer-eslint-plugin-import-x`
 - `prefer-explicit-import-extensions`
+- `prefer-frozen-lockfile`
 - `prefer-jest-30-for-jest-29`
 - `prefer-lefthook-for-complex-git-hooks`
 - `prefer-mypy-performance-milestone`
@@ -108,6 +109,7 @@ Current rule registry:
 - `prefer-nextjs-13-minor-performance-milestone`
 - `prefer-nextjs-14-minor-performance-milestone`
 - `prefer-node-run-over-npm-run`
+- `prefer-npm-ci`
 - `prefer-oxfmt-over-prettier`
 - `prefer-oxlint-over-eslint`
 - `prefer-pydantic-v2`
