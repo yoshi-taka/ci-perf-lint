@@ -184,6 +184,7 @@ export interface RequiredFeatures {
 }
 
 import type { Predicate } from "./rules/shared/predicate.ts";
+import type { RuleImplication, RuleScheduling } from "./rule-engine/implication.ts";
 
 export interface RuleMeta {
   id: string;
@@ -200,4 +201,6 @@ export interface RuleMeta {
   precheck?: (workflow: { source?: string }) => number;
   precheckBudget?: number;
   impliedChecks?: string[];
+  implications?: readonly RuleImplication[];
+  scheduling?: RuleScheduling;
 }

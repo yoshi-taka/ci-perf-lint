@@ -45,6 +45,7 @@ import {
   computeImpliedChecks,
   registerAllRuleMetaForRemediation,
 } from "./rules/shared/remediation-checks.ts";
+import { computeScheduling, buildImplicationObservability } from "./rule-engine/implication.ts";
 import { getDiagnosticTransformMetadata } from "./rules/shared/diagnostic-transform.ts";
 import { allRules } from "./rules/index.ts";
 import { PhaseTimer } from "./repo-timer.ts";
@@ -549,6 +550,22 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           cycles: cycles.length > 0 ? cycles : undefined,
           closure: closureDebug,
         },
+        ruleScheduling: (() => {
+          const fired = new Set<string>();
+          for (const wf of wfList) {
+            for (const d of findings) {
+              if ("relativePath" in wf && d.location.path.includes(wf.relativePath)) {
+                fired.add(d.ruleId);
+              }
+            }
+          }
+          const sched = computeScheduling(allRules, fired);
+          return {
+            orderedRanks: sched.orderedRanks,
+            skipped: sched.skipped,
+            observability: buildImplicationObservability(inferenceGraph, sched),
+          };
+        })(),
         normalizationMetadata: {
           totalWorkflows: wfList.length,
           workflowDocKinds,

@@ -12,9 +12,20 @@ export function registerAllRuleMetaForRemediation(rules: readonly { meta: RuleMe
 function buildForwardGraph(rules: readonly { meta: RuleMeta }[]): Map<string, string[]> {
   const forwards = new Map<string, string[]>();
   for (const rule of rules) {
-    const implied = rule.meta.impliedChecks;
-    if (implied && implied.length > 0) {
-      forwards.set(rule.meta.id, [...implied]);
+    const edges: string[] = [];
+
+    const legacy = rule.meta.impliedChecks ?? [];
+    edges.push(...legacy);
+
+    const typed = rule.meta.implications ?? [];
+    for (const impl of typed) {
+      if (impl.type !== "ordering") {
+        edges.push(impl.target);
+      }
+    }
+
+    if (edges.length > 0) {
+      forwards.set(rule.meta.id, edges);
     }
   }
   return forwards;
