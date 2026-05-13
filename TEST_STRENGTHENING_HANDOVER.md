@@ -23,9 +23,13 @@ Result: 1838 tests pass (was 1832)
 
 Result: 1894 tests pass (was 1886)
 
-### 3. Pairwise testing
-- Add clusters to `test/pairwise-cluster-*.test.ts`
-- Targets: cache rules, Docker rules, timeout rules
+### 3. Pairwise testing ✅
+- Add `test/pairwise-cluster-g.test.ts` (159 lines)
+- Added 23 pairwise combinations for Docker build rules
+- Tests: docker-build-cache-disabled-in-ci, docker-build-without-layer-cache, docker-build-load-true-unnecessary
+- No crash for all parameter combinations
+
+Result: 1917 tests pass (was 1894)
 
 ### 4. Metamorphic relations
 - Add to `test/boundary-metamorphic.test.ts`
