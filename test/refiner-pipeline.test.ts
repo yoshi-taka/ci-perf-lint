@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { AnalysisWarning, Diagnostic } from "../src/types.ts";
 import type { InferenceGraph } from "../src/rules/shared/remediation-checks.ts";
+import type { BrandedRuleId } from "../src/rule-engine/rule-id.ts";
+
+function _R(id: string): BrandedRuleId {
+  return id as unknown as BrandedRuleId;
+}
 import {
   composeRefiners,
   composePipeline,
@@ -395,9 +400,9 @@ describe("composeRefiners (legacy)", () => {
 
   test("drift detection pushes warnings when implied rule has no findings", () => {
     const graph: InferenceGraph = {
-      forwards: new Map([["rule-a", ["rule-b"]]]),
-      reverse: new Map([["rule-b", ["rule-a"]]]),
-      transitiveForwards: new Map([["rule-a", new Set(["rule-b"])]]),
+      forwards: new Map([[_R("rule-a"), [_R("rule-b")]]]),
+      reverse: new Map([[_R("rule-b"), [_R("rule-a")]]]),
+      transitiveForwards: new Map([[_R("rule-a"), new Set([_R("rule-b")])]]),
     };
     const fired = new Set(["rule-a"]);
     const evaluated = new Set(["rule-a", "rule-b"]);
@@ -413,9 +418,9 @@ describe("composeRefiners (legacy)", () => {
 
   test("drift detection does not warn when implied rule also fired", () => {
     const graph: InferenceGraph = {
-      forwards: new Map([["rule-a", ["rule-b"]]]),
-      reverse: new Map([["rule-b", ["rule-a"]]]),
-      transitiveForwards: new Map([["rule-a", new Set(["rule-b"])]]),
+      forwards: new Map([[_R("rule-a"), [_R("rule-b")]]]),
+      reverse: new Map([[_R("rule-b"), [_R("rule-a")]]]),
+      transitiveForwards: new Map([[_R("rule-a"), new Set([_R("rule-b")])]]),
     };
     const fired = new Set(["rule-a", "rule-b"]);
     const evaluated = new Set(["rule-a", "rule-b"]);

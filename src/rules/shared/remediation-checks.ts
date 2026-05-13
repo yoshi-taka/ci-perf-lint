@@ -1,21 +1,26 @@
 import type { AnalysisWarning, Diagnostic, ImpliedCheck, RuleMeta } from "../../types.ts";
+import type { BrandedRuleId } from "../../rule-engine/rule-id.ts";
 import { buildReverseGraph, transitiveClosure } from "./predicate-lattice.ts";
 
-const ruleMetaRegistry = new Map<string, RuleMeta>();
+const ruleMetaRegistry = new Map<BrandedRuleId, RuleMeta>();
 
 export function registerAllRuleMetaForRemediation(rules: readonly { meta: RuleMeta }[]): void {
   for (const rule of rules) {
-    ruleMetaRegistry.set(rule.meta.id, rule.meta);
+    ruleMetaRegistry.set(rule.meta.id as BrandedRuleId, rule.meta);
   }
 }
 
-function buildForwardGraph(rules: readonly { meta: RuleMeta }[]): Map<string, string[]> {
-  const forwards = new Map<string, string[]>();
+function buildForwardGraph(
+  rules: readonly { meta: RuleMeta }[],
+): Map<BrandedRuleId, BrandedRuleId[]> {
+  const forwards = new Map<BrandedRuleId, BrandedRuleId[]>();
   for (const rule of rules) {
-    const edges: string[] = [];
+    const edges: BrandedRuleId[] = [];
 
     const legacy = rule.meta.impliedChecks ?? [];
-    edges.push(...legacy);
+    for (const target of legacy) {
+      edges.push(target as BrandedRuleId);
+    }
 
     const typed = rule.meta.implications ?? [];
     for (const impl of typed) {
@@ -25,7 +30,7 @@ function buildForwardGraph(rules: readonly { meta: RuleMeta }[]): Map<string, st
     }
 
     if (edges.length > 0) {
-      forwards.set(rule.meta.id, edges);
+      forwards.set(rule.meta.id as BrandedRuleId, edges);
     }
   }
   return forwards;
@@ -36,9 +41,9 @@ function buildForwardGraph(rules: readonly { meta: RuleMeta }[]): Map<string, st
 // ──────────────────────────────────────────────
 
 export interface InferenceGraph {
-  forwards: ReadonlyMap<string, readonly string[]>;
-  reverse: ReadonlyMap<string, readonly string[]>;
-  transitiveForwards: ReadonlyMap<string, ReadonlySet<string>>;
+  forwards: ReadonlyMap<BrandedRuleId, readonly BrandedRuleId[]>;
+  reverse: ReadonlyMap<BrandedRuleId, readonly BrandedRuleId[]>;
+  transitiveForwards: ReadonlyMap<BrandedRuleId, ReadonlySet<BrandedRuleId>>;
 }
 
 export function buildInferenceGraph(rules: readonly { meta: RuleMeta }[]): InferenceGraph {
@@ -53,8 +58,8 @@ export function buildInferenceGraph(rules: readonly { meta: RuleMeta }[]): Infer
 // ──────────────────────────────────────────────
 
 function detectDriftForEdges(
-  sourceId: string,
-  impliedIds: Iterable<string>,
+  sourceId: BrandedRuleId,
+  impliedIds: Iterable<BrandedRuleId>,
   firedRuleIds: Set<string>,
   evaluatedRuleIds: Set<string>,
   warnings: AnalysisWarning[],
@@ -98,7 +103,7 @@ export function detectImplicationDrift(
     if (!firedRuleIds.has(sourceId)) {
       continue;
     }
-    const direct = new Set(graph.forwards.get(sourceId) ?? []);
+    const direct = new Set<string>(graph.forwards.get(sourceId) ?? []);
     const indirect = [...transitiveIds].filter((id) => !direct.has(id)).sort();
     if (indirect.length > 0) {
       detectDriftForEdges(sourceId, indirect, firedRuleIds, evaluatedRuleIds, warnings);
@@ -112,21 +117,21 @@ export function detectImplicationDrift(
 // REMEDIATION CHECKS — multi-hop aware
 // ──────────────────────────────────────────────
 
-function buildFullClosure(): Map<string, Set<string>> {
-  const forwards = new Map<string, string[]>();
+function buildFullClosure(): Map<BrandedRuleId, Set<BrandedRuleId>> {
+  const forwards = new Map<BrandedRuleId, BrandedRuleId[]>();
   for (const [ruleId, meta] of ruleMetaRegistry) {
     if (meta.impliedChecks && meta.impliedChecks.length > 0) {
-      forwards.set(ruleId, [...meta.impliedChecks]);
+      forwards.set(ruleId, [...meta.impliedChecks] as BrandedRuleId[]);
     }
   }
   return transitiveClosure(forwards);
 }
 
-function buildDirectMap(): Map<string, Set<string>> {
-  const direct = new Map<string, Set<string>>();
+function buildDirectMap(): Map<BrandedRuleId, Set<BrandedRuleId>> {
+  const direct = new Map<BrandedRuleId, Set<BrandedRuleId>>();
   for (const [ruleId, meta] of ruleMetaRegistry) {
     if (meta.impliedChecks) {
-      direct.set(ruleId, new Set(meta.impliedChecks));
+      direct.set(ruleId, new Set(meta.impliedChecks as BrandedRuleId[]));
     }
   }
   return direct;
@@ -142,11 +147,11 @@ export function computeImpliedChecks(findings: Diagnostic[]): ImpliedCheck[] {
   const reverseClosure = buildReverseGraph(closure);
 
   for (const finding of findings) {
-    const allIds = closure.get(finding.ruleId);
+    const allIds = closure.get(finding.ruleId as BrandedRuleId);
     if (!allIds || allIds.size === 0) {
       continue;
     }
-    const directIds = directMap.get(finding.ruleId) ?? new Set();
+    const directIds = directMap.get(finding.ruleId as BrandedRuleId) ?? new Set();
 
     const sorted = [...allIds].sort();
     for (const implied of sorted) {

@@ -5,6 +5,11 @@ import {
   detectImplicationDrift,
 } from "../src/rules/shared/remediation-checks.ts";
 import type { RuleMeta } from "../src/types.ts";
+import type { BrandedRuleId } from "../src/rule-engine/rule-id.ts";
+
+function _R(id: string): BrandedRuleId {
+  return id as unknown as BrandedRuleId;
+}
 
 const ruleIdArbitrary = fc.stringMatching(/^[a-z][a-z0-9-]{1,20}$/);
 
@@ -33,25 +38,25 @@ describe("buildInferenceGraph", () => {
   test("builds forward and reverse maps for implied relationships", () => {
     const rules = [fakeRule("rule-a", ["rule-b", "rule-c"]), fakeRule("rule-b", ["rule-c"])];
     const graph = buildInferenceGraph(rules);
-    expect(graph.forwards.get("rule-a")).toEqual(["rule-b", "rule-c"]);
-    expect(graph.forwards.get("rule-b")).toEqual(["rule-c"]);
-    expect(graph.reverse.get("rule-c")).toEqual(["rule-a", "rule-b"]);
-    expect(graph.reverse.get("rule-b")).toEqual(["rule-a"]);
+    expect(graph.forwards.get(_R("rule-a")) as unknown as string[]).toEqual(["rule-b", "rule-c"]);
+    expect(graph.forwards.get(_R("rule-b")) as unknown as string[]).toEqual(["rule-c"]);
+    expect(graph.reverse.get(_R("rule-c")) as unknown as string[]).toEqual(["rule-a", "rule-b"]);
+    expect(graph.reverse.get(_R("rule-b")) as unknown as string[]).toEqual(["rule-a"]);
   });
 
   test("handles circular implied checks", () => {
     const rules = [fakeRule("rule-a", ["rule-b"]), fakeRule("rule-b", ["rule-a"])];
     const graph = buildInferenceGraph(rules);
-    expect(graph.forwards.get("rule-a")).toEqual(["rule-b"]);
-    expect(graph.forwards.get("rule-b")).toEqual(["rule-a"]);
-    expect(graph.reverse.get("rule-a")).toEqual(["rule-b"]);
-    expect(graph.reverse.get("rule-b")).toEqual(["rule-a"]);
+    expect(graph.forwards.get(_R("rule-a")) as unknown as string[]).toEqual(["rule-b"]);
+    expect(graph.forwards.get(_R("rule-b")) as unknown as string[]).toEqual(["rule-a"]);
+    expect(graph.reverse.get(_R("rule-a")) as unknown as string[]).toEqual(["rule-b"]);
+    expect(graph.reverse.get(_R("rule-b")) as unknown as string[]).toEqual(["rule-a"]);
   });
 
   test("handles rule with impliedChecks referencing nonexistent rule", () => {
     const rules = [fakeRule("rule-a", ["nonexistent"])];
     const graph = buildInferenceGraph(rules);
-    expect(graph.forwards.get("rule-a")).toEqual(["nonexistent"]);
+    expect(graph.forwards.get(_R("rule-a")) as unknown as string[]).toEqual(["nonexistent"]);
   });
 });
 

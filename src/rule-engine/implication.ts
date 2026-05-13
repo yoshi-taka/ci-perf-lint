@@ -219,8 +219,8 @@ export function buildImplicationObservability(
   for (const [source, targets] of graph.forwards) {
     for (const target of targets) {
       activeImplications.push({
-        source: source as BrandedRuleId,
-        target: target as BrandedRuleId,
+        source,
+        target,
         type: "semantic-implies",
       });
     }

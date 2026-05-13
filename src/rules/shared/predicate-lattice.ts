@@ -1,7 +1,7 @@
-export function buildReverseGraph(
-  graph: ReadonlyMap<string, readonly string[] | ReadonlySet<string>>,
-): Map<string, string[]> {
-  const reverse = new Map<string, string[]>();
+export function buildReverseGraph<T extends string>(
+  graph: ReadonlyMap<T, readonly T[] | ReadonlySet<T>>,
+): Map<T, T[]> {
+  const reverse = new Map<T, T[]>();
   for (const [source, targets] of graph) {
     for (const target of targets) {
       const sources = reverse.get(target) ?? [];
@@ -12,25 +12,13 @@ export function buildReverseGraph(
   return reverse;
 }
 
-function normalizeGraph(graph: ReadonlyMap<string, ReadonlySet<string>>): Map<string, string[]> {
-  const result = new Map<string, string[]>();
-  const keys = [...graph.keys()].sort();
-  for (const key of keys) {
-    const values = [...(graph.get(key) ?? [])].sort();
-    if (values.length > 0) {
-      result.set(key, values);
-    }
-  }
-  return result;
-}
-
-export function transitiveClosure(
-  graph: ReadonlyMap<string, readonly string[]>,
-): Map<string, Set<string>> {
-  const result = new Map<string, Set<string>>();
+export function transitiveClosure<T extends string>(
+  graph: ReadonlyMap<T, readonly T[]>,
+): Map<T, Set<T>> {
+  const result = new Map<T, Set<T>>();
   const allKeys = [...graph.keys()].sort();
   for (const node of allKeys) {
-    const visited = new Set<string>([node]);
+    const visited = new Set<T>([node]);
     const stack = [...(graph.get(node) ?? [])];
     while (stack.length > 0) {
       const current = stack.pop()!;

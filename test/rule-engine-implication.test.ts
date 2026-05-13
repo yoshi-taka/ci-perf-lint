@@ -10,6 +10,10 @@ import type { BrandedRuleId } from "../src/rule-engine/rule-id.ts";
 import type { RuleMeta } from "../src/types.ts";
 import { buildInferenceGraph } from "../src/rules/shared/remediation-checks.ts";
 
+function _R(id: string): BrandedRuleId {
+  return id as unknown as BrandedRuleId;
+}
+
 function mkImpl(
   source: string,
   target: string,
@@ -97,7 +101,7 @@ describe("RuleImplication", () => {
         },
       ];
       const graph = buildInferenceGraph(rules);
-      const edges = graph.forwards.get("a") ?? [];
+      const edges = (graph.forwards.get(_R("a")) ?? []) as unknown as string[];
       expect(edges).toContain("b");
       expect(edges).toContain("c");
     });
@@ -117,7 +121,7 @@ describe("RuleImplication", () => {
         { meta: { id: "c", severity: "warning", confidence: "high", docsPath: "docs/c.md" } },
       ];
       const graph = buildInferenceGraph(rules);
-      const edges = graph.forwards.get("a") ?? [];
+      const edges = (graph.forwards.get(_R("a")) ?? []) as unknown as string[];
       expect(edges).toContain("c");
       expect(edges).not.toContain("b");
     });
