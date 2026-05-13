@@ -132,7 +132,7 @@ describe("RuleImplication", () => {
             severity: "error",
             confidence: "high",
             docsPath: "docs/a.md",
-            scheduling: { ordering: [["a", "b"]] },
+            scheduling: { ordering: [["a", "b"]] as unknown as BrandedRuleId[][] },
           },
         },
         {
@@ -146,7 +146,9 @@ describe("RuleImplication", () => {
       ];
       const result = computeScheduling(rules, new Set());
       const flatOrder = result.orderedRanks.flat();
-      expect(flatOrder.indexOf("a")).toBeLessThan(flatOrder.indexOf("b"));
+      expect(flatOrder.indexOf("a" as unknown as BrandedRuleId)).toBeLessThan(
+        flatOrder.indexOf("b" as unknown as BrandedRuleId),
+      );
     });
 
     it("prunes on mutual exclusion when source fired", () => {
@@ -157,7 +159,9 @@ describe("RuleImplication", () => {
             severity: "error",
             confidence: "high",
             docsPath: "docs/a.md",
-            scheduling: { mutualExclusion: [["a", "b"] as [string, string]] },
+            scheduling: {
+              mutualExclusion: [["a", "b"]] as unknown as [BrandedRuleId, BrandedRuleId][],
+            },
           },
         },
         {
@@ -170,7 +174,9 @@ describe("RuleImplication", () => {
         },
       ];
       const result = computeScheduling(rules, new Set(["a"]));
-      expect(result.skipped).toEqual([{ ruleId: "b", reason: "mutual-exclusion: a fired" }]);
+      expect(result.skipped).toEqual([
+        { ruleId: "b" as unknown as BrandedRuleId, reason: "mutual-exclusion: a fired" },
+      ]);
     });
   });
 
@@ -200,7 +206,11 @@ describe("RuleImplication", () => {
       const obs = buildImplicationObservability(graph, scheduling);
 
       expect(obs.activeImplications).toEqual([
-        { source: "a", target: "b", type: "semantic-implies" },
+        {
+          source: "a" as unknown as BrandedRuleId,
+          target: "b" as unknown as BrandedRuleId,
+          type: "semantic-implies" as const,
+        },
       ]);
       expect(obs.evaluationOrder).toEqual([]);
     });

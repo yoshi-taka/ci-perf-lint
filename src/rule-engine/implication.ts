@@ -13,8 +13,8 @@ export interface RuleImplication {
 }
 
 export interface RuleScheduling {
-  readonly ordering?: readonly RuleId[][];
-  readonly mutualExclusion?: readonly [RuleId, RuleId][];
+  readonly ordering?: readonly BrandedRuleId[][];
+  readonly mutualExclusion?: readonly [BrandedRuleId, BrandedRuleId][];
 }
 
 export interface ImplicationValidation {
@@ -132,15 +132,15 @@ export function validateImplications(
 }
 
 export interface SchedulingResult {
-  orderedRanks: RuleId[][];
-  skipped: { ruleId: RuleId; reason: string }[];
+  orderedRanks: BrandedRuleId[][];
+  skipped: { ruleId: BrandedRuleId; reason: string }[];
 }
 
 export function computeScheduling(
   rules: readonly { meta: RuleMeta }[],
-  firedRules: Set<RuleId>,
+  firedRules: Set<string>,
 ): SchedulingResult {
-  const orderingConstraints: [RuleId, RuleId][] = [];
+  const orderingConstraints: [string, string][] = [];
 
   for (const rule of rules) {
     const sched = rule.meta.scheduling;
@@ -174,8 +174,8 @@ export function computeScheduling(
     }
   }
 
-  const rankMap = new Map<RuleId, number>();
-  const rulesByRank = new Map<number, RuleId[]>();
+  const rankMap = new Map<string, number>();
+  const rulesByRank = new Map<number, string[]>();
 
   for (const [before, after] of orderingConstraints) {
     const currentRank = rankMap.get(before) ?? 0;
@@ -192,31 +192,35 @@ export function computeScheduling(
   }
 
   const maxRank = Math.max(...rankMap.values(), 0);
-  const orderedRanks: RuleId[][] = [];
+  const orderedRanks: BrandedRuleId[][] = [];
   for (let i = 0; i <= maxRank; i++) {
-    orderedRanks.push(rulesByRank.get(i) ?? []);
+    orderedRanks.push((rulesByRank.get(i) ?? []) as BrandedRuleId[]);
   }
 
   return { orderedRanks, skipped: [] };
 }
 
 export interface ImplicationObservability {
-  activeImplications: { source: RuleId; target: RuleId; type: ImplicationType }[];
-  skippedRules: { ruleId: RuleId; reason: string }[];
-  evaluationOrder: RuleId[];
+  activeImplications: { source: BrandedRuleId; target: BrandedRuleId; type: ImplicationType }[];
+  skippedRules: { ruleId: BrandedRuleId; reason: string }[];
+  evaluationOrder: BrandedRuleId[];
 }
 
 export function buildImplicationObservability(
   graph: InferenceGraph,
   scheduling: SchedulingResult,
 ): ImplicationObservability {
-  const activeImplications: { source: RuleId; target: RuleId; type: ImplicationType }[] = [];
+  const activeImplications: {
+    source: BrandedRuleId;
+    target: BrandedRuleId;
+    type: ImplicationType;
+  }[] = [];
 
   for (const [source, targets] of graph.forwards) {
     for (const target of targets) {
       activeImplications.push({
-        source,
-        target,
+        source: source as BrandedRuleId,
+        target: target as BrandedRuleId,
         type: "semantic-implies",
       });
     }
