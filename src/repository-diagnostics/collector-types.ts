@@ -11,7 +11,28 @@ import type { GateExpr } from "./gate-expr.ts";
 import { evaluateGateExpr } from "./gate-expr.ts";
 import type { ResourceGetter } from "./semantic-resource.ts";
 
-export type GateKey = keyof RepositoryDiagnosticGateState;
+const GATE_DEFINITIONS = {
+  hasJavaScriptHeavyWorkflow: {},
+  hasJavaScriptTooling: {},
+  hasJavaScriptLinting: {},
+  hasJavaScriptBuildConfig: {},
+  hasJavaScriptPackageScripts: {},
+  hasDockerHeavyWorkflow: {},
+  hasTerraformHeavyWorkflow: {},
+  hasLargeFiles: {},
+  hasDatadogHeavyWorkflow: {},
+  hasPytest: {},
+  hasPythonHeavyWorkflow: {},
+  hasRenovateConfig: {},
+  hasHusky: {},
+  hasJavaScriptFrameworks: {},
+  hasRust: {},
+  hasCdkManifest: {},
+  hasElixirHeavyWorkflow: {},
+  hasGradle: {},
+} as const satisfies Record<string, object>;
+
+export type GateKey = keyof typeof GATE_DEFINITIONS;
 
 export type GateResult =
   | { readonly status: "resolved"; readonly value: boolean }
@@ -41,143 +62,20 @@ export interface RepositoryDiagnosticGateState {
   hasGradle: boolean;
 }
 
-declare const __hasJavaScriptHeavyWorkflowProof: unique symbol;
-declare const __hasJavaScriptToolingProof: unique symbol;
-declare const __hasJavaScriptLintingProof: unique symbol;
-declare const __hasJavaScriptBuildConfigProof: unique symbol;
-declare const __hasJavaScriptPackageScriptsProof: unique symbol;
-declare const __hasDockerHeavyWorkflowProof: unique symbol;
-declare const __hasTerraformHeavyWorkflowProof: unique symbol;
-declare const __hasLargeFilesProof: unique symbol;
-declare const __hasDatadogHeavyWorkflowProof: unique symbol;
-declare const __hasPytestProof: unique symbol;
-declare const __hasPythonHeavyWorkflowProof: unique symbol;
-declare const __hasRenovateConfigProof: unique symbol;
-declare const __hasHuskyProof: unique symbol;
-declare const __hasJavaScriptFrameworksProof: unique symbol;
-declare const __hasRustProof: unique symbol;
-declare const __hasCdkManifestProof: unique symbol;
-declare const __hasElixirHeavyWorkflowProof: unique symbol;
-declare const __hasGradleProof: unique symbol;
+type _GateStateExhaustiveCheck = keyof RepositoryDiagnosticGateState extends GateKey
+  ? GateKey extends keyof RepositoryDiagnosticGateState
+    ? true
+    : never
+  : never;
 
-export interface HasJavaScriptHeavyWorkflowProof {
-  readonly __proof: typeof __hasJavaScriptHeavyWorkflowProof;
-}
-export interface HasJavaScriptToolingProof {
-  readonly __proof: typeof __hasJavaScriptToolingProof;
-}
-export interface HasJavaScriptLintingProof {
-  readonly __proof: typeof __hasJavaScriptLintingProof;
-}
-export interface HasJavaScriptBuildConfigProof {
-  readonly __proof: typeof __hasJavaScriptBuildConfigProof;
-}
-export interface HasJavaScriptPackageScriptsProof {
-  readonly __proof: typeof __hasJavaScriptPackageScriptsProof;
-}
-export interface HasDockerHeavyWorkflowProof {
-  readonly __proof: typeof __hasDockerHeavyWorkflowProof;
-}
-export interface HasTerraformHeavyWorkflowProof {
-  readonly __proof: typeof __hasTerraformHeavyWorkflowProof;
-}
-export interface HasLargeFilesProof {
-  readonly __proof: typeof __hasLargeFilesProof;
-}
-export interface HasDatadogHeavyWorkflowProof {
-  readonly __proof: typeof __hasDatadogHeavyWorkflowProof;
-}
-export interface HasPytestProof {
-  readonly __proof: typeof __hasPytestProof;
-}
-export interface HasPythonHeavyWorkflowProof {
-  readonly __proof: typeof __hasPythonHeavyWorkflowProof;
-}
-export interface HasRenovateConfigProof {
-  readonly __proof: typeof __hasRenovateConfigProof;
-}
-export interface HasHuskyProof {
-  readonly __proof: typeof __hasHuskyProof;
-}
-export interface HasJavaScriptFrameworksProof {
-  readonly __proof: typeof __hasJavaScriptFrameworksProof;
-}
-export interface HasRustProof {
-  readonly __proof: typeof __hasRustProof;
-}
-export interface HasCdkManifestProof {
-  readonly __proof: typeof __hasCdkManifestProof;
-}
-export interface HasElixirHeavyWorkflowProof {
-  readonly __proof: typeof __hasElixirHeavyWorkflowProof;
-}
-export interface HasGradleProof {
-  readonly __proof: typeof __hasGradleProof;
-}
-
-export type ProofForGate<G extends GateKey> = G extends "hasJavaScriptHeavyWorkflow"
-  ? HasJavaScriptHeavyWorkflowProof
-  : G extends "hasJavaScriptTooling"
-    ? HasJavaScriptToolingProof
-    : G extends "hasJavaScriptLinting"
-      ? HasJavaScriptLintingProof
-      : G extends "hasJavaScriptBuildConfig"
-        ? HasJavaScriptBuildConfigProof
-        : G extends "hasJavaScriptPackageScripts"
-          ? HasJavaScriptPackageScriptsProof
-          : G extends "hasDockerHeavyWorkflow"
-            ? HasDockerHeavyWorkflowProof
-            : G extends "hasTerraformHeavyWorkflow"
-              ? HasTerraformHeavyWorkflowProof
-              : G extends "hasLargeFiles"
-                ? HasLargeFilesProof
-                : G extends "hasDatadogHeavyWorkflow"
-                  ? HasDatadogHeavyWorkflowProof
-                  : G extends "hasPytest"
-                    ? HasPytestProof
-                    : G extends "hasPythonHeavyWorkflow"
-                      ? HasPythonHeavyWorkflowProof
-                      : G extends "hasRenovateConfig"
-                        ? HasRenovateConfigProof
-                        : G extends "hasHusky"
-                          ? HasHuskyProof
-                          : G extends "hasJavaScriptFrameworks"
-                            ? HasJavaScriptFrameworksProof
-                            : G extends "hasRust"
-                              ? HasRustProof
-                              : G extends "hasCdkManifest"
-                                ? HasCdkManifestProof
-                                : G extends "hasElixirHeavyWorkflow"
-                                  ? HasElixirHeavyWorkflowProof
-                                  : G extends "hasGradle"
-                                    ? HasGradleProof
-                                    : never;
+export type ProofForGate<G extends GateKey> = { readonly __gate: G };
 
 export type GateTrue<G extends GateKey> = {
   readonly __gate: G;
   readonly __proof: ProofForGate<G>;
 };
 
-export interface GateProofs {
-  hasJavaScriptHeavyWorkflow?: HasJavaScriptHeavyWorkflowProof;
-  hasJavaScriptTooling?: HasJavaScriptToolingProof;
-  hasJavaScriptLinting?: HasJavaScriptLintingProof;
-  hasJavaScriptBuildConfig?: HasJavaScriptBuildConfigProof;
-  hasJavaScriptPackageScripts?: HasJavaScriptPackageScriptsProof;
-  hasDockerHeavyWorkflow?: HasDockerHeavyWorkflowProof;
-  hasTerraformHeavyWorkflow?: HasTerraformHeavyWorkflowProof;
-  hasLargeFiles?: HasLargeFilesProof;
-  hasDatadogHeavyWorkflow?: HasDatadogHeavyWorkflowProof;
-  hasPytest?: HasPytestProof;
-  hasPythonHeavyWorkflow?: HasPythonHeavyWorkflowProof;
-  hasRenovateConfig?: HasRenovateConfigProof;
-  hasHusky?: HasHuskyProof;
-  hasJavaScriptFrameworks?: HasJavaScriptFrameworksProof;
-  hasRust?: HasRustProof;
-  hasCdkManifest?: HasCdkManifestProof;
-  hasElixirHeavyWorkflow?: HasElixirHeavyWorkflowProof;
-  hasGradle?: HasGradleProof;
-}
+export type GateProofs = { [K in GateKey]?: ProofForGate<K> };
 
 export type GatedContext<G extends GateKey> = RepositoryDiagnosticContext & {
   readonly __typedGate: GateTrue<G>;
@@ -329,13 +227,6 @@ function evaluateGateExprWithResult(
   }
 }
 
-function __unsafeWrapProof<G extends GateKey>(_gate: G, _proof: ProofForGate<G>): GateTrue<G> {
-  return {
-    __gate: _gate,
-    __proof: _proof,
-  } as GateTrue<G>;
-}
-
 export function buildTypedContext<G extends GateKey>(
   context: RepositoryDiagnosticContext,
   gate: G,
@@ -343,15 +234,14 @@ export function buildTypedContext<G extends GateKey>(
 ): GatedContext<G> {
   return {
     ...context,
-    __typedGate: __unsafeWrapProof(gate, proof),
+    __typedGate: { __gate: gate, __proof: proof },
   } as GatedContext<G>;
 }
 
 export function assertGateProof<G extends GateKey>(gate: G, proofs: GateProofs): GateTrue<G> {
-  const key = gate as keyof GateProofs;
-  const proof = proofs[key];
+  const proof = proofs[gate];
   if (!proof) {
     throw new Error(`Gate "${gate}" is false. Cannot create proof for unproven gate.`);
   }
-  return __unsafeWrapProof(gate, proof as ProofForGate<G>);
+  return { __gate: gate, __proof: proof };
 }

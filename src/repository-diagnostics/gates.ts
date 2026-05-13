@@ -3,24 +3,6 @@ import type {
   GateKey,
   GateProofs,
   GateResultRecord,
-  HasCdkManifestProof,
-  HasDatadogHeavyWorkflowProof,
-  HasDockerHeavyWorkflowProof,
-  HasElixirHeavyWorkflowProof,
-  HasJavaScriptBuildConfigProof,
-  HasJavaScriptFrameworksProof,
-  HasJavaScriptHeavyWorkflowProof,
-  HasJavaScriptLintingProof,
-  HasJavaScriptPackageScriptsProof,
-  HasJavaScriptToolingProof,
-  HasLargeFilesProof,
-  HasPythonHeavyWorkflowProof,
-  HasPytestProof,
-  HasRenovateConfigProof,
-  HasRustProof,
-  HasHuskyProof,
-  HasGradleProof,
-  HasTerraformHeavyWorkflowProof,
   RepositoryDiagnosticContext,
   RepositoryDiagnosticGateState,
   RepositoryDiagnosticGateResolution,
@@ -199,59 +181,10 @@ export const gateKeys = {
 
 export function buildGateProofs(state: RepositoryDiagnosticGateState): GateProofs {
   const proofs: GateProofs = {};
-  if (state.hasJavaScriptHeavyWorkflow) {
-    proofs.hasJavaScriptHeavyWorkflow = {} as HasJavaScriptHeavyWorkflowProof;
-  }
-  if (state.hasJavaScriptTooling) {
-    proofs.hasJavaScriptTooling = {} as HasJavaScriptToolingProof;
-  }
-  if (state.hasJavaScriptLinting) {
-    proofs.hasJavaScriptLinting = {} as HasJavaScriptLintingProof;
-  }
-  if (state.hasJavaScriptBuildConfig) {
-    proofs.hasJavaScriptBuildConfig = {} as HasJavaScriptBuildConfigProof;
-  }
-  if (state.hasJavaScriptPackageScripts) {
-    proofs.hasJavaScriptPackageScripts = {} as HasJavaScriptPackageScriptsProof;
-  }
-  if (state.hasDockerHeavyWorkflow) {
-    proofs.hasDockerHeavyWorkflow = {} as HasDockerHeavyWorkflowProof;
-  }
-  if (state.hasTerraformHeavyWorkflow) {
-    proofs.hasTerraformHeavyWorkflow = {} as HasTerraformHeavyWorkflowProof;
-  }
-  if (state.hasLargeFiles) {
-    proofs.hasLargeFiles = {} as HasLargeFilesProof;
-  }
-  if (state.hasDatadogHeavyWorkflow) {
-    proofs.hasDatadogHeavyWorkflow = {} as HasDatadogHeavyWorkflowProof;
-  }
-  if (state.hasPytest) {
-    proofs.hasPytest = {} as HasPytestProof;
-  }
-  if (state.hasPythonHeavyWorkflow) {
-    proofs.hasPythonHeavyWorkflow = {} as HasPythonHeavyWorkflowProof;
-  }
-  if (state.hasRenovateConfig) {
-    proofs.hasRenovateConfig = {} as HasRenovateConfigProof;
-  }
-  if (state.hasHusky) {
-    proofs.hasHusky = {} as HasHuskyProof;
-  }
-  if (state.hasJavaScriptFrameworks) {
-    proofs.hasJavaScriptFrameworks = {} as HasJavaScriptFrameworksProof;
-  }
-  if (state.hasRust) {
-    proofs.hasRust = {} as HasRustProof;
-  }
-  if (state.hasCdkManifest) {
-    proofs.hasCdkManifest = {} as HasCdkManifestProof;
-  }
-  if (state.hasElixirHeavyWorkflow) {
-    proofs.hasElixirHeavyWorkflow = {} as HasElixirHeavyWorkflowProof;
-  }
-  if (state.hasGradle) {
-    proofs.hasGradle = {} as HasGradleProof;
+  for (const key of Object.keys(state) as GateKey[]) {
+    if (state[key]) {
+      (proofs as Record<string, object>)[key] = { __gate: key };
+    }
   }
   return proofs;
 }
