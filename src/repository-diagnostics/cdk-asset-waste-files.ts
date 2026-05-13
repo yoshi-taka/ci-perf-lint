@@ -24,6 +24,7 @@ const wasteNamePatterns = [
   /\/docs?\//,
   /\/examples?\//,
   /\/fixtures?\//,
+  /\/__fixtures__\//,
   /\/mocks?\//,
   /\/test\/?$/,
   ...experimentalArtifactPatterns,

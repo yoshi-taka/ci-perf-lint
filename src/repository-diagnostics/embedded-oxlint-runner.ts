@@ -24,10 +24,8 @@ const embeddedOxlintIgnoredDirectories = new Set([
   ".turbo",
   "coverage",
 ]);
-const embeddedOxlintDefaultIgnorePatterns = [...embeddedOxlintIgnoredDirectories].map(
-  (dir) => `**/${dir}/**`,
-);
-const embeddedOxlintFixtureIgnorePatterns = [
+const embeddedOxlintDefaultIgnorePatterns = [
+  ...[...embeddedOxlintIgnoredDirectories].map((dir) => `**/${dir}/**`),
   "**/fixtures/**",
   "**/__fixtures__/**",
   "**/*.fixture.*",
@@ -149,11 +147,7 @@ export async function runEmbeddedOxlint(
       result.diagnostics.length === 0 &&
       !result.timedOut
     ) {
-      const fixtureRetryResult = await runOxlintWithFallbacks(
-        context,
-        configPath,
-        embeddedOxlintFixtureIgnorePatterns,
-      );
+      const fixtureRetryResult = await runOxlintWithFallbacks(context, configPath);
       if (fixtureRetryResult) {
         result = fixtureRetryResult;
       }

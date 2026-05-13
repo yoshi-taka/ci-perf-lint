@@ -71,7 +71,9 @@ async function findBucketDeploymentFiles(repoRoot: string): Promise<RgResult> {
     "--glob",
     "!**/cdk.out/**",
     "--glob",
-    "!fixtures",
+    "!**/fixtures/**",
+    "--glob",
+    "!**/__fixtures__/**",
     "--glob",
     "*.ts",
     "--glob",
@@ -139,8 +141,16 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
     rgResult.kind === "error"
       ? (
           await context.walkFiles(".", {
-            ignoredDirectories: new Set([".git", "node_modules", "cdk.out", "fixtures"]),
-            include: (candidatePath: string) => /\.(?:ts|js|tsx|jsx)$/.test(candidatePath),
+            ignoredDirectories: new Set([
+              ".git",
+              "node_modules",
+              "cdk.out",
+              "fixtures",
+              "__fixtures__",
+            ]),
+            include: (candidatePath: string) =>
+              /\.(?:ts|js|tsx|jsx)$/.test(candidatePath) &&
+              !/\b(?:fixtures?|__fixtures__)\b/.test(candidatePath),
           })
         ).map((f) => context.resolve(f))
       : rgResult.files;

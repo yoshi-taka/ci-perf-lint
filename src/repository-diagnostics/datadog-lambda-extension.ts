@@ -64,8 +64,11 @@ async function scanConfigFilesForExtensionVersion(
       "dist",
       "build",
       "fixtures",
+      "__fixtures__",
     ]),
-    include: (candidatePath) => allPatterns.some((pattern) => pattern.test(candidatePath)),
+    include: (candidatePath) =>
+      !/\b(?:fixtures?|__fixtures__)\b/.test(candidatePath) &&
+      allPatterns.some((pattern) => pattern.test(candidatePath)),
   })) {
     configFiles.push(relativePath);
   }

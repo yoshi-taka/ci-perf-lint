@@ -31,6 +31,7 @@ const likelyUnwantedDirNames = new Set([
   "docs",
   "examples",
   "fixtures",
+  "__fixtures__",
 ]);
 
 function lineColumnForIndex(text: string, index: number): { line: number; column: number } {
