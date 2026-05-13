@@ -1,7 +1,11 @@
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import type { Diagnostic } from "../types.ts";
 import type { GatedContext, GateKey, RepositoryDiagnosticContext } from "./collector-types.ts";
-import { assertGateProof, collectorRequiresAllGatesFromResults } from "./collector-types.ts";
+import {
+  assertGateProof,
+  buildTypedContext,
+  collectorRequiresAllGatesFromResults,
+} from "./collector-types.ts";
 import type { GateExpr } from "./gate-expr.ts";
 import { gateExprToString } from "./gate-expr.ts";
 import {
@@ -51,20 +55,7 @@ interface CollectorLike {
   gate?: GateKey;
   gates?: readonly GateKey[];
   gateExpr?: GateExpr<GateKey>;
-  collect: (ctx: unknown) => Diagnostic[] | Promise<Diagnostic[]>;
-}
-
-function buildCollectorContext(
-  collector: CollectorLike,
-  proofs: ReturnType<typeof buildGateProofs>,
-): void {
-  if (collector.gates) {
-    for (const g of collector.gates) {
-      assertGateProof(g, proofs);
-    }
-  } else if (collector.gate) {
-    assertGateProof(collector.gate, proofs);
-  }
+  collect: (ctx: RepositoryDiagnosticContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
 function runRepositoryDiagnosticCollector(
@@ -72,7 +63,15 @@ function runRepositoryDiagnosticCollector(
   context: RepositoryDiagnosticContext,
   proofs: ReturnType<typeof buildGateProofs>,
 ): Diagnostic[] | Promise<Diagnostic[]> {
-  buildCollectorContext(collector, proofs);
+  if (collector.gate) {
+    const gateTrue = assertGateProof(collector.gate, proofs);
+    return collector.collect(buildTypedContext(context, collector.gate, gateTrue.__proof));
+  }
+  if (collector.gates) {
+    for (const g of collector.gates) {
+      assertGateProof(g, proofs);
+    }
+  }
   return collector.collect(context);
 }
 

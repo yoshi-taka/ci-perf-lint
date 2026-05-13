@@ -336,7 +336,7 @@ function __unsafeWrapProof<G extends GateKey>(_gate: G, _proof: ProofForGate<G>)
   } as GateTrue<G>;
 }
 
-function buildTypedContext<G extends GateKey>(
+export function buildTypedContext<G extends GateKey>(
   context: RepositoryDiagnosticContext,
   gate: G,
   proof: ProofForGate<G>,
