@@ -58,6 +58,7 @@ export interface CommandEntry {
   node: Node | undefined;
   jobName: string;
   stepName: string;
+  workingDirectory?: string;
 }
 
 function isCircleCiDoc(doc: unknown): doc is CircleCiDocument {
@@ -149,6 +150,7 @@ function buildGitHubActionsEntries(doc: WorkflowDocument): CommandEntry[] {
           node: step.runNode ?? step.node,
           jobName: job.id,
           stepName: stepDisplayName(step),
+          workingDirectory: step.workingDirectory,
         });
       }
     }

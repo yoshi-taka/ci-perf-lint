@@ -1,12 +1,9 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowDocument } from "../workflow.ts";
-import type { PipelineDocument } from "../buildkite-workflow.ts";
-import type { CircleCiDocument } from "../circleci-workflow.ts";
-import type { GitlabCiDocument } from "../gitlab-ci-workflow.ts";
+import type { CIDocument } from "./shared/any-step.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { detectRedundantBootstrapToolFromText, usesLanguageInstall } from "./shared/tools.ts";
-import { collectCommandEntries } from "./shared/any-step.ts";
+import { extractSemanticSteps, groupStepsByJob } from "./shared/semantic-adapter.ts";
 
 const NPX_RE =
   /\bnpx\b|\bnpm\s+bootstrap\b|\bpnpx\b|\bbunx\b|\byarn\s+dlx\b|\budu\s+dlx\b|\budu\s+tool\s+run\b|\buvx\b|\buv\s+tool\s+run\b/;
@@ -22,41 +19,34 @@ const meta = {
 
 export const redundantNpxOrBootstrapRule = {
   meta,
-  check(
-    workflow: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
-    _context: RuleContext,
-  ): Diagnostic[] {
+  check(doc: CIDocument, _context: RuleContext): Diagnostic[] {
     const findings: Diagnostic[] = [];
-    const entries = collectCommandEntries(workflow);
+    const steps = extractSemanticSteps(doc);
+    const jobGroups = groupStepsByJob(steps);
 
-    const jobEntries = new Map<string, typeof entries>();
-    for (const entry of entries) {
-      const list = jobEntries.get(entry.jobName) ?? [];
-      list.push(entry);
-      jobEntries.set(entry.jobName, list);
-    }
-
-    for (const [, jobEntryList] of jobEntries) {
-      const hasInstall = jobEntryList.some((e) => usesLanguageInstall(e.text));
+    for (const [jobName, jobSteps] of jobGroups) {
+      const hasInstall = jobSteps.some(
+        (s) => s.commandType === "install" || usesLanguageInstall(s.text),
+      );
       if (!hasInstall) {
         continue;
       }
 
-      for (const entry of jobEntryList) {
-        const tool = detectRedundantBootstrapToolFromText(entry.text);
+      for (const step of jobSteps) {
+        const tool = detectRedundantBootstrapToolFromText(step.text);
         if (!tool) {
           continue;
         }
 
         findings.push(
-          buildDiagnostic(workflow, meta, entry.node, {
-            message: `Job "${entry.jobName}" installs dependencies and still invokes ${tool} through an x-runner such as npx, pnpx, pnpm dlx, bunx, yarn dlx, uvx, or uv tool run.`,
+          buildDiagnostic(doc, meta, step.node, {
+            message: `Job "${jobName}" installs dependencies and still invokes ${tool} through an x-runner such as npx, pnpx, pnpm dlx, bunx, yarn dlx, uvx, or uv tool run.`,
             why: "After the job installs dependencies, local project CLIs are usually already available from node_modules, the package-manager exec path, or the Python environment. Running them through an x-runner can trigger another resolution path, temporary package lookup or install, and wrapper startup before the actual tool starts.",
             suggestion:
               "If the tool is already available from the installed dependencies, run the local binary directly, use the package-manager exec command that reuses the install, or call an existing package script instead of bootstrapping it again.",
             measurementHint:
               "Compare the lint or check step startup time and total duration before and after removing the extra CLI bootstrap path.",
-            aiHandoff: `Review ${workflow.relativePath} job "${entry.jobName}" and replace x-runner based local CLI invocation with a direct command or package script where safe.`,
+            aiHandoff: `Review ${doc.relativePath} job "${jobName}" and replace x-runner based local CLI invocation with a direct command or package script where safe.`,
             score: 72,
           }),
         );

@@ -78,6 +78,8 @@ function applyMaxFindings(
   return diagnostics;
 }
 
+const scopeGateDebugEnabled = process.env.CI_PERF_LINT_DUMP_STATE === "1";
+
 export async function evaluateRules(
   workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
   context: RuleContext,
@@ -89,6 +91,22 @@ export async function evaluateRules(
   const isBuildkite = isPipelineDocument(workflow);
   const isGitlab = isGitlabCiDocument(workflow);
   const isCircle = isCircleCiDocument(workflow);
+
+  const { createScopeGateState } = await import("./scope-gate.ts");
+  const scopeGateState = createScopeGateState(isBuildkite, isGitlab, isCircle);
+
+  if (scopeGateDebugEnabled) {
+    process.stderr.write(
+      `${JSON.stringify({
+        type: "scope-gate-state",
+        workflowPath: workflow.relativePath,
+        isBuildkite,
+        isGitlab,
+        isCircle,
+        gateState: scopeGateState,
+      })}\n`,
+    );
+  }
 
   const rulesByScope = await getRulesByScope();
   const allRules = [

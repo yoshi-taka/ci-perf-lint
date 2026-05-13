@@ -5,6 +5,8 @@ export type { DependencyFamily, SetupActionKind } from "./tools-text.ts";
 export {
   usesLanguageInstall,
   detectInstallCommandFromText,
+  detectLintToolFromText,
+  detectBuildToolFromText,
   detectRedundantBootstrapToolFromText,
 } from "./tools-text.ts";
 

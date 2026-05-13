@@ -569,6 +569,11 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
         normalizationMetadata: {
           totalWorkflows: wfList.length,
           workflowDocKinds,
+          semanticExtraction: {
+            enabled: true,
+            commandTypes: ["install", "lint", "test", "build", "setup", "other"],
+            adapterVersion: "v1",
+          },
         },
       }),
     );
