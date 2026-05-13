@@ -15,9 +15,13 @@ Result: 1838 tests pass (was 1832)
 
 ## Remaining Options (from original plan)
 
-### 2. Property-based tests
-- Add to `test/fuzz-*.test.ts`
-- Targets: `workflow-triggers.ts`, signal collectors
+### 2. Property-based tests ✅
+- Add `test/fuzz-workflow-triggers.test.ts` (195 lines)
+- Added 8 fuzz tests for workflow-trigger functions
+- getTriggerSemantics, workflowHas*Trigger* functions
+- Tests invariants and consistency between direct and via-semantics
+
+Result: 1894 tests pass (was 1886)
 
 ### 3. Pairwise testing
 - Add clusters to `test/pairwise-cluster-*.test.ts`
