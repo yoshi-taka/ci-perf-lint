@@ -1,5 +1,6 @@
 import type { AnyRuleModule } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
+import type { RegisteredRuleId } from "../rule-engine/rule-id.ts";
 import { validateImpliedChecks } from "./validate-implied-checks.ts";
 import { repositoryDiagnosticCollectors } from "../repository-diagnostics/index.ts";
 import { avoidBroadUploadArtifactRule } from "./avoid-broad-upload-artifact.ts";
@@ -202,7 +203,7 @@ export const allRules = [
   wastefulPackageInstallInContainerRule,
   goTestBroadPackageSerialPOneRule,
   goTestRepeatsVetAfterGoVetRule,
-] satisfies readonly AnyRuleModule[];
+] satisfies readonly (AnyRuleModule & { meta: { id: RegisteredRuleId } })[];
 
 const _repoIds = repositoryDiagnosticCollectors.map((c) => c.id);
 const _validation = validateImpliedChecks(allRules, _repoIds);
