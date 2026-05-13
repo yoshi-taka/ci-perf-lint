@@ -1,6 +1,7 @@
 import type { AnyRuleModule } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { RegisteredRuleId } from "../rule-engine/rule-id.ts";
+import { RULE_REGISTRY } from "../rule-engine/rule-id.ts";
 import { validateImpliedChecks } from "./validate-implied-checks.ts";
 import { repositoryDiagnosticCollectors } from "../repository-diagnostics/index.ts";
 import { avoidBroadUploadArtifactRule } from "./avoid-broad-upload-artifact.ts";
@@ -221,6 +222,15 @@ for (const { sourceId, targetId } of _validation.unregisteredImplications) {
   console.warn(
     `[validate-implied-checks] Implication from "${sourceId}" to unregistered rule "${targetId}".`,
   );
+}
+
+const ruleIds = new Set(allRules.map((r) => r.meta.id));
+for (const [id, entry] of Object.entries(RULE_REGISTRY)) {
+  if (entry.kind === "workflow" && !ruleIds.has(id)) {
+    console.warn(
+      `[validate-implied-checks] Registered rule "${id}" is not present in allRules — possible orphan.`,
+    );
+  }
 }
 
 export const rulesByScope = {
