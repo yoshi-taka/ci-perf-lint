@@ -2,13 +2,13 @@ declare const __BrandedRuleId: unique symbol;
 
 export type BrandedRuleId = string & { readonly [__BrandedRuleId]: never };
 
-export type RuleIdKind = "workflow" | "repository";
+type RuleIdKind = "workflow" | "repository";
 
-export interface RegisteredRuleEntry {
+interface RegisteredRuleEntry {
   readonly kind: RuleIdKind;
 }
 
-export const RULE_REGISTRY: Record<string, RegisteredRuleEntry> = {
+export const RULE_REGISTRY = {
   "avoid-broad-upload-artifact": { kind: "workflow" },
   "avoid-brew-update-on-hosted-macos": { kind: "workflow" },
   "avoid-c-drive-on-windows-runner": { kind: "workflow" },
@@ -107,7 +107,7 @@ export const RULE_REGISTRY: Record<string, RegisteredRuleEntry> = {
   "prefer-node-run-over-npm-run": { kind: "repository" },
   "setup-node-cache-dependency-path-unset": { kind: "repository" },
   "gradle-parallel-not-enabled": { kind: "repository" },
-} as const;
+} as const satisfies Record<string, RegisteredRuleEntry>;
 
 export type RegisteredRuleId = keyof typeof RULE_REGISTRY;
 

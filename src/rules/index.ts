@@ -203,7 +203,9 @@ export const allRules = [
   wastefulPackageInstallInContainerRule,
   goTestBroadPackageSerialPOneRule,
   goTestRepeatsVetAfterGoVetRule,
-] satisfies readonly (AnyRuleModule & { meta: { id: RegisteredRuleId } })[];
+] satisfies readonly (AnyRuleModule & {
+  meta: { impliedChecks?: readonly RegisteredRuleId[] };
+})[];
 
 const _repoIds = repositoryDiagnosticCollectors.map((c) => c.id);
 const _validation = validateImpliedChecks(allRules, _repoIds);

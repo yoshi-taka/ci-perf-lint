@@ -15,7 +15,7 @@ const meta = {
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-oxlint-over-eslint.md",
-  impliedChecks: ["prefer-oxfmt-over-prettier"],
+  impliedChecks: ["prefer-oxfmt-over-prettier"] as const,
 } satisfies RuleMeta;
 
 export const preferOxlintOverEslintRule = {

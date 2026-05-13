@@ -20,7 +20,7 @@ const meta = {
   docsPath: "docs/rules/missing-concurrency.md",
   maxFindings: 3,
   skipIf: or(workflowFact("isHeavyWorkflow", false), workflowFact("hasConcurrency", true)),
-  impliedChecks: ["missing-timeout-minutes"],
+  impliedChecks: ["missing-timeout-minutes"] as const,
 } satisfies RuleMeta;
 
 export const missingConcurrencyRule = {

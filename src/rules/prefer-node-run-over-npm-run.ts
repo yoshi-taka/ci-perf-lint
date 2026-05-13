@@ -22,7 +22,7 @@ const meta = {
   docsPath: "docs/rules/prefer-node-run-over-npm-run.md",
   scope: "all",
   precheck: predicateToPrecheck(precheckPredicates),
-  impliedChecks: ["prefer-npm-ci"],
+  impliedChecks: ["prefer-npm-ci"] as const,
 } satisfies RuleMeta;
 
 function parseVisibleNodeMajor(version: unknown): number | undefined {
