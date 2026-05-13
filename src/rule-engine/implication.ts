@@ -1,18 +1,15 @@
 import type { RuleMeta } from "../types.ts";
-import { isRegisteredRuleId } from "./rule-id.ts";
+import { isRegisteredRuleId, type BrandedRuleId } from "./rule-id.ts";
 import type { InferenceGraph } from "../rules/shared/remediation-checks.ts";
 
 export type RuleId = string;
-
-declare const __Idx: unique symbol;
-type _RId = string & { readonly [__Idx]: never };
 
 export type ImplicationType = "semantic-implies" | "remediation-hints" | "ordering";
 
 export interface RuleImplication {
   readonly type: ImplicationType;
-  readonly source: string;
-  readonly target: string;
+  readonly source: BrandedRuleId;
+  readonly target: BrandedRuleId;
 }
 
 export interface RuleScheduling {
@@ -26,13 +23,13 @@ export interface ImplicationValidation {
   valid: boolean;
 }
 
-function detectImplicationCycles(implications: Map<_RId, _RId[]>): string[][] {
+function detectImplicationCycles(implications: Map<BrandedRuleId, BrandedRuleId[]>): string[][] {
   const cycles: string[][] = [];
-  const visited = new Set<_RId>();
-  const recStack = new Set<_RId>();
-  const path: _RId[] = [];
+  const visited = new Set<BrandedRuleId>();
+  const recStack = new Set<BrandedRuleId>();
+  const path: BrandedRuleId[] = [];
 
-  function dfs(node: _RId): void {
+  function dfs(node: BrandedRuleId): void {
     visited.add(node);
     recStack.add(node);
     path.push(node);
@@ -123,7 +120,7 @@ export function validateImplications(
     }
   }
 
-  const cycles = detectImplicationCycles(graph as Map<_RId, _RId[]>);
+  const cycles = detectImplicationCycles(graph as Map<BrandedRuleId, BrandedRuleId[]>);
 
   return {
     missingTargets,

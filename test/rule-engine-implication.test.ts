@@ -3,9 +3,24 @@ import {
   validateImplications,
   computeScheduling,
   buildImplicationObservability,
+  type RuleImplication,
+  type ImplicationType,
 } from "../src/rule-engine/implication.ts";
+import type { BrandedRuleId } from "../src/rule-engine/rule-id.ts";
 import type { RuleMeta } from "../src/types.ts";
 import { buildInferenceGraph } from "../src/rules/shared/remediation-checks.ts";
+
+function mkImpl(
+  source: string,
+  target: string,
+  type: ImplicationType = "semantic-implies",
+): RuleImplication {
+  return {
+    type,
+    source: source as unknown as BrandedRuleId,
+    target: target as unknown as BrandedRuleId,
+  };
+}
 
 describe("RuleImplication", () => {
   describe("validateImplications", () => {
@@ -17,7 +32,7 @@ describe("RuleImplication", () => {
             severity: "error",
             confidence: "high",
             docsPath: "docs/a.md",
-            implications: [{ type: "semantic-implies", source: "a", target: "b" }],
+            implications: [mkImpl("a", "b")],
           },
         },
         {
@@ -26,7 +41,7 @@ describe("RuleImplication", () => {
             severity: "error",
             confidence: "high",
             docsPath: "docs/b.md",
-            implications: [{ type: "semantic-implies", source: "b", target: "a" }],
+            implications: [mkImpl("b", "a")],
           },
         },
       ];
@@ -43,7 +58,7 @@ describe("RuleImplication", () => {
             severity: "error",
             confidence: "high",
             docsPath: "docs/a.md",
-            implications: [{ type: "semantic-implies", source: "a", target: "nonexistent" }],
+            implications: [mkImpl("a", "nonexistent")],
           },
         },
       ];
@@ -61,7 +76,7 @@ describe("RuleImplication", () => {
             confidence: "high",
             docsPath: "docs/a.md",
             impliedChecks: ["b"],
-            implications: [{ type: "semantic-implies", source: "a", target: "c" }],
+            implications: [mkImpl("a", "c")],
           },
         },
         {
@@ -95,10 +110,7 @@ describe("RuleImplication", () => {
             severity: "error",
             confidence: "high",
             docsPath: "docs/a.md",
-            implications: [
-              { type: "ordering", source: "a", target: "b" },
-              { type: "semantic-implies", source: "a", target: "c" },
-            ],
+            implications: [mkImpl("a", "b", "ordering"), mkImpl("a", "c")],
           },
         },
         { meta: { id: "b", severity: "warning", confidence: "high", docsPath: "docs/b.md" } },
