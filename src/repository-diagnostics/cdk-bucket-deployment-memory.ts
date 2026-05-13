@@ -130,7 +130,7 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
     context.pathExists(context.resolve("cdk.json")),
   ]);
   const hasCdkDep = packageJsonEntry.text
-    ? /\baws-cdk-lib\b/.test(packageJsonEntry.text) || /@aws-cdk\//.test(packageJsonEntry.text)
+    ? /\baws-cdk-lib\b/.test(packageJsonEntry.text) || packageJsonEntry.text.includes("@aws-cdk/")
     : false;
   if (!hasCdkDep && !hasCdkJson) {
     return [];
