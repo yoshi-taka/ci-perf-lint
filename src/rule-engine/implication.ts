@@ -4,6 +4,9 @@ import type { InferenceGraph } from "../rules/shared/remediation-checks.ts";
 
 export type RuleId = string;
 
+declare const __Idx: unique symbol;
+type _RId = string & { readonly [__Idx]: never };
+
 export type ImplicationType = "semantic-implies" | "remediation-hints" | "ordering";
 
 export interface RuleImplication {
@@ -23,13 +26,13 @@ export interface ImplicationValidation {
   valid: boolean;
 }
 
-function detectImplicationCycles(implications: Map<RuleId, RuleId[]>): string[][] {
+function detectImplicationCycles(implications: Map<_RId, _RId[]>): string[][] {
   const cycles: string[][] = [];
-  const visited = new Set<RuleId>();
-  const recStack = new Set<RuleId>();
-  const path: RuleId[] = [];
+  const visited = new Set<_RId>();
+  const recStack = new Set<_RId>();
+  const path: _RId[] = [];
 
-  function dfs(node: RuleId): void {
+  function dfs(node: _RId): void {
     visited.add(node);
     recStack.add(node);
     path.push(node);
@@ -78,7 +81,7 @@ export function validateImplications(
   }
 
   const missingTargets: { sourceId: string; targetId: string }[] = [];
-  const graph = new Map<RuleId, RuleId[]>();
+  const graph = new Map<string, string[]>();
   const unregisteredRules: string[] = [];
   const unregisteredImplications: { sourceId: string; targetId: string }[] = [];
 
@@ -89,7 +92,7 @@ export function validateImplications(
       unregisteredRules.push(sourceId);
     }
 
-    const edges: RuleId[] = [];
+    const edges: string[] = [];
 
     const legacy = rule.meta.impliedChecks ?? [];
     for (const target of legacy) {
@@ -120,7 +123,7 @@ export function validateImplications(
     }
   }
 
-  const cycles = detectImplicationCycles(graph);
+  const cycles = detectImplicationCycles(graph as Map<_RId, _RId[]>);
 
   return {
     missingTargets,
