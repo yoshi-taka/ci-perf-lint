@@ -1,7 +1,8 @@
 export type GateExpr<G extends string = string> =
   | { readonly kind: "atom"; readonly gate: G }
   | { readonly kind: "and"; readonly left: GateExpr<G>; readonly right: GateExpr<G> }
-  | { readonly kind: "or"; readonly left: GateExpr<G>; readonly right: GateExpr<G> };
+  | { readonly kind: "or"; readonly left: GateExpr<G>; readonly right: GateExpr<G> }
+  | { readonly kind: "not"; readonly inner: GateExpr<G> };
 
 export function atom<G extends string>(gate: G): GateExpr<G> {
   return { kind: "atom", gate };
@@ -13,6 +14,10 @@ export function andExpr<G extends string>(left: GateExpr<G>, right: GateExpr<G>)
 
 export function orExpr<G extends string>(left: GateExpr<G>, right: GateExpr<G>): GateExpr<G> {
   return { kind: "or", left, right };
+}
+
+export function notExpr<G extends string>(inner: GateExpr<G>): GateExpr<G> {
+  return { kind: "not", inner };
 }
 
 export type GateState<G extends string> = Partial<Record<G, boolean>>;
@@ -28,6 +33,8 @@ export function evaluateGateExpr<G extends string>(
       return evaluateGateExpr(expr.left, state) && evaluateGateExpr(expr.right, state);
     case "or":
       return evaluateGateExpr(expr.left, state) || evaluateGateExpr(expr.right, state);
+    case "not":
+      return !evaluateGateExpr(expr.inner, state);
   }
 }
 
@@ -43,6 +50,9 @@ export function collectGates<G extends string>(expr: GateExpr<G>): Set<G> {
       case "or":
         walk(e.left);
         walk(e.right);
+        break;
+      case "not":
+        walk(e.inner);
         break;
     }
   }
@@ -70,6 +80,8 @@ export function flattenAnd<G extends string>(expr: GateExpr<G>): GateExpr<G> {
     }
     case "or":
       return orExpr(flattenAnd(expr.left), flattenAnd(expr.right));
+    case "not":
+      return notExpr(flattenAnd(expr.inner));
   }
 }
 
@@ -92,6 +104,8 @@ export function flattenOr<G extends string>(expr: GateExpr<G>): GateExpr<G> {
     }
     case "and":
       return andExpr(flattenOr(expr.left), flattenOr(expr.right));
+    case "not":
+      return notExpr(flattenOr(expr.inner));
   }
 }
 
@@ -131,6 +145,13 @@ export function simplifyGateExpr<G extends string>(expr: GateExpr<G>): GateExpr<
       }
       return orExpr(left, right);
     }
+    case "not": {
+      const innerSimplified = simplifyGateExpr(expr.inner);
+      if (innerSimplified.kind === "not") {
+        return innerSimplified.inner;
+      }
+      return notExpr(innerSimplified);
+    }
   }
 }
 
@@ -146,4 +167,74 @@ export function gateExprFromLegacy<G extends string>(
     return atom(gate);
   }
   return undefined;
+}
+
+export interface GateEvaluationStep {
+  path: string[];
+  gate: string;
+  result: boolean;
+}
+
+export interface GateEvaluationTrace {
+  steps: GateEvaluationStep[];
+  finalResult: boolean;
+}
+
+export function evaluateGateExprWithTrace<G extends string>(
+  expr: GateExpr<G>,
+  state: Partial<Record<G, boolean>>,
+): GateEvaluationTrace {
+  const steps: GateEvaluationStep[] = [];
+
+  function walk(e: GateExpr<G>, path: string[]): boolean {
+    switch (e.kind) {
+      case "atom": {
+        const result = state[e.gate] ?? false;
+        steps.push({ path: [...path, `atom:${e.gate}`], gate: e.gate, result });
+        return result;
+      }
+      case "and": {
+        const leftResult = walk(e.left, [...path, "and:left"]);
+        if (!leftResult) {
+          steps.push({ path: [...path, "and"], gate: "AND", result: false });
+          return false;
+        }
+        const rightResult = walk(e.right, [...path, "and:right"]);
+        steps.push({ path: [...path, "and"], gate: "AND", result: rightResult });
+        return rightResult;
+      }
+      case "or": {
+        const leftResult = walk(e.left, [...path, "or:left"]);
+        if (leftResult) {
+          steps.push({ path: [...path, "or"], gate: "OR", result: true });
+          return true;
+        }
+        const rightResult = walk(e.right, [...path, "or:right"]);
+        steps.push({ path: [...path, "or"], gate: "OR", result: rightResult });
+        return rightResult;
+      }
+      case "not": {
+        const innerResult = walk(e.inner, [...path, "not:inner"]);
+        const result = !innerResult;
+        steps.push({ path: [...path, "not"], gate: "NOT", result });
+        return result;
+      }
+    }
+  }
+
+  const finalResult = walk(expr, []);
+  return { steps, finalResult };
+}
+
+export function gateExprToString<G extends string>(expr: GateExpr<G>): string {
+  switch (expr.kind) {
+    case "atom":
+      return expr.gate;
+    case "and":
+      return `(${gateExprToString(expr.left)} AND ${gateExprToString(expr.right)})`;
+    case "or":
+      return `(${gateExprToString(expr.left)} OR ${gateExprToString(expr.right)})`;
+    case "not":
+      return `(NOT ${gateExprToString(expr.inner)})`;
+  }
 }

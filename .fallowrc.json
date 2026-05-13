@@ -32,7 +32,7 @@
     { "file": "src/reification.ts", "exports": ["createLegacyDetails", "createBlueprintDetails", "foldDiagnosticDetails"] },
     { "file": "src/diagnostic-source.ts", "exports": ["composeDiagnosticSources", "diagnosticSourceToRef"] },
     { "file": "src/repository-diagnostics/gates.ts", "exports": ["buildDag"] },
-    { "file": "src/repository-diagnostics/gate-expr.ts", "exports": ["atom", "andExpr", "orExpr", "evaluateGateExpr", "collectGates", "flattenAnd", "flattenOr", "simplifyGateExpr", "gateExprFromLegacy"] },
+    { "file": "src/repository-diagnostics/gate-expr.ts", "exports": ["atom", "andExpr", "orExpr", "notExpr", "evaluateGateExpr", "evaluateGateExprWithTrace", "collectGates", "flattenAnd", "flattenOr", "simplifyGateExpr", "gateExprFromLegacy"] },
     { "file": "src/repository-diagnostics/semantic-resource.ts", "exports": ["ResourceId", "SemanticResource", "ResourceGetter", "ResourceResultEntry", "ResourceEvaluationObservability"] },
     { "file": "src/repository-diagnostics/resource-cache.ts", "exports": ["ResourceCache"] },
     { "file": "src/repository-diagnostics/resource-registry.ts", "exports": ["ResourceRegistry"] },

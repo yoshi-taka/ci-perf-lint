@@ -2,6 +2,8 @@ import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-no
 import type { Diagnostic } from "../types.ts";
 import type { GatedContext, GateKey, RepositoryDiagnosticContext } from "./collector-types.ts";
 import { assertGateProof, collectorRequiresAllGatesFromResults } from "./collector-types.ts";
+import type { GateExpr } from "./gate-expr.ts";
+import { gateExprToString } from "./gate-expr.ts";
 import {
   buildCollectorCooccurrenceDebug,
   orderCollectorsForDiagnostics,
@@ -48,6 +50,7 @@ interface CollectorLike {
   id: string;
   gate?: GateKey;
   gates?: readonly GateKey[];
+  gateExpr?: GateExpr<GateKey>;
   collect: (ctx: unknown) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
@@ -242,10 +245,12 @@ export async function collectRepositoryDiagnostics(
       .map(([k]) => k.replace(/^has/, ""));
     const collectorResultsDump = scheduledCollectors.map((c, i) => {
       const r = collectorResults[i];
+      const collectorLike = c as CollectorLike;
       return {
         id: c.id,
         gate: c.gate,
-        gates: (c as CollectorLike).gates,
+        gates: collectorLike.gates,
+        gateExpr: collectorLike.gateExpr ? gateExprToString(collectorLike.gateExpr) : undefined,
         findings: r?.status === "fulfilled" ? r.value.length : -1,
         error: r?.status === "rejected" ? String(r.reason) : undefined,
       };

@@ -319,6 +319,13 @@ function evaluateGateExprWithResult(
       }
       return evaluateGateExprWithResult(expr.right, results);
     }
+    case "not": {
+      const inner = evaluateGateExprWithResult(expr.inner, results);
+      if (inner.status !== "resolved") {
+        return inner;
+      }
+      return { status: "resolved", value: !inner.value };
+    }
   }
 }
 

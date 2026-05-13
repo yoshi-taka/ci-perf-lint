@@ -3,7 +3,9 @@ import {
   atom,
   andExpr,
   orExpr,
+  notExpr,
   evaluateGateExpr,
+  evaluateGateExprWithTrace,
   collectGates,
   flattenAnd,
   flattenOr,
@@ -171,5 +173,65 @@ describe("gateExprFromLegacy", () => {
     const expr = gateExprFromLegacy("a", ["b", "c"]);
     // gates is used when provided, gate is fallback
     expect(expr).toEqual(andExpr(atom("b"), atom("c")));
+  });
+});
+
+describe("notExpr", () => {
+  test("not true becomes false", () => {
+    expect(evaluateGateExpr(notExpr(atom("a")), { a: true })).toBe(false);
+  });
+
+  test("not false becomes true", () => {
+    expect(evaluateGateExpr(notExpr(atom("a")), { a: false })).toBe(true);
+  });
+
+  test("not missing gate becomes true", () => {
+    expect(evaluateGateExpr(notExpr(atom("x")), {})).toBe(true);
+  });
+
+  test("not with and", () => {
+    const expr = notExpr(andExpr(atom("a"), atom("b")));
+    expect(evaluateGateExpr(expr, { a: true, b: true })).toBe(false);
+    expect(evaluateGateExpr(expr, { a: true, b: false })).toBe(true);
+  });
+
+  test("not with or", () => {
+    const expr = notExpr(orExpr(atom("a"), atom("b")));
+    expect(evaluateGateExpr(expr, { a: true, b: false })).toBe(false);
+    expect(evaluateGateExpr(expr, { a: false, b: false })).toBe(true);
+  });
+
+  test("simplify removes double not", () => {
+    const expr = simplifyGateExpr(notExpr(notExpr(atom("a"))));
+    expect(expr).toEqual(atom("a"));
+  });
+});
+
+describe("evaluateGateExprWithTrace", () => {
+  test("atom returns trace", () => {
+    const result = evaluateGateExprWithTrace(atom("a"), { a: true });
+    expect(result.finalResult).toBe(true);
+    expect(result.steps).toEqual([{ path: ["atom:a"], gate: "a", result: true }]);
+  });
+
+  test("and short-circuits on false", () => {
+    const expr = andExpr(atom("a"), atom("b"));
+    const result = evaluateGateExprWithTrace(expr, { a: false, b: true });
+    expect(result.finalResult).toBe(false);
+    expect(result.steps.some((s) => s.gate === "b")).toBe(false);
+  });
+
+  test("or short-circuits on true", () => {
+    const expr = orExpr(atom("a"), atom("b"));
+    const result = evaluateGateExprWithTrace(expr, { a: true, b: false });
+    expect(result.finalResult).toBe(true);
+    expect(result.steps.some((s) => s.gate === "b")).toBe(false);
+  });
+
+  test("not records in trace", () => {
+    const expr = notExpr(atom("a"));
+    const result = evaluateGateExprWithTrace(expr, { a: false });
+    expect(result.finalResult).toBe(true);
+    expect(result.steps.map((s) => s.gate)).toEqual(["a", "NOT"]);
   });
 });
