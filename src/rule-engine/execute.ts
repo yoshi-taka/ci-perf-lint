@@ -15,6 +15,8 @@ import {
   deduplicateRefiner,
   driftDetectionRefiner,
   maxFindingsRefiner,
+  runRefinersWithTracking,
+  isRefinerDumpStateEnabled,
 } from "../refiner-pipeline.ts";
 import { classifySingularity } from "../rules/shared/singularity.ts";
 import { buildInferenceGraph } from "../rules/shared/remediation-checks.ts";
@@ -248,12 +250,35 @@ export async function evaluateRules(
     }
   }
 
-  const refiners = composeRefiners([maxFindingsRefiner(idMaxFindings, impliedIds)]);
-  const filtered = refiners.refine(ruleResults, {
-    warnings,
-    measureCompleteness: context.measureCompleteness,
-    workflowPath,
-  });
+  const refiners = [maxFindingsRefiner(idMaxFindings, impliedIds)];
+  let filtered: Diagnostic[];
+
+  if (isRefinerDumpStateEnabled()) {
+    const ctx = {
+      warnings,
+      measureCompleteness: context.measureCompleteness,
+      workflowPath,
+    };
+    const { result, state } = runRefinersWithTracking(refiners, ruleResults, ctx);
+    filtered = result;
+    if (warnings) {
+      for (const effect of state.refiners) {
+        if (effect.removedByRuleId && effect.removedByRuleId.size > 0) {
+          warnings.push({
+            kind: "refiner-effect",
+            source: workflowPath,
+            message: `[${effect.refinerName}] removed ${effect.beforeCount - effect.afterCount} diagnostics (${effect.refinerKind})`,
+          });
+        }
+      }
+    }
+  } else {
+    filtered = composeRefiners(refiners).refine(ruleResults, {
+      warnings,
+      measureCompleteness: context.measureCompleteness,
+      workflowPath,
+    });
+  }
 
   if (findingCounts) {
     for (const d of filtered) {

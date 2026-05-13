@@ -115,7 +115,8 @@ export interface AnalysisWarning {
     | "empty-result"
     | "parser-error"
     | "remediation-drift"
-    | "scan-warning";
+    | "scan-warning"
+    | "refiner-effect";
   source: string;
   message: string;
 }
