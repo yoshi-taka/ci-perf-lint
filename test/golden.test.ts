@@ -28,40 +28,52 @@ const goldenFixtures = [
   "blobNoneLike",
 ] as const;
 
+type OutputFormat = "json" | "text" | "markdown" | "handoff";
+
+const outputFormats: OutputFormat[] = ["json", "text", "markdown", "handoff"];
+
 describe("golden regression", () => {
-  for (const name of goldenFixtures) {
-    test(name, async () => {
-      const fixturePath = fixtures[name as keyof typeof fixtures];
-      if (!fixturePath) {
-        throw new Error(`Fixture not found: ${name}`);
+  for (const format of outputFormats) {
+    describe(`format: ${format}`, () => {
+      for (const name of goldenFixtures) {
+        test(name, async () => {
+          const fixturePath = fixtures[name as keyof typeof fixtures];
+          if (!fixturePath) {
+            throw new Error(`Fixture not found: ${name}`);
+          }
+
+          const report = await memoizedAnalyzeRepository({
+            cwd: fixturePath,
+            targetPath: ".",
+            topCount: 100,
+            mode: "exploratory",
+          });
+
+          const output = renderReport(report, format, { findingsOnly: true });
+          const goldenPath = path.join(GOLDEN_DIR, `${name}.${format}`);
+
+          if (UPDATE) {
+            await mkdir(GOLDEN_DIR, { recursive: true });
+            await writeFile(goldenPath, output);
+            return;
+          }
+
+          if (!existsSync(goldenPath)) {
+            process.stderr.write(
+              `[golden] No golden file for "${name}.${format}". Run with UPDATE_GOLDEN=1 to create.\n`,
+            );
+            expect(existsSync(goldenPath)).toBe(true);
+            return;
+          }
+
+          const golden = await readFile(goldenPath, "utf8");
+          if (format === "json") {
+            expect(JSON.parse(output)).toEqual(JSON.parse(golden));
+          } else {
+            expect(output).toBe(golden);
+          }
+        });
       }
-
-      const report = await memoizedAnalyzeRepository({
-        cwd: fixturePath,
-        targetPath: ".",
-        topCount: 100,
-        mode: "exploratory",
-      });
-
-      const findingsJson = renderReport(report, "json", { findingsOnly: true });
-      const goldenPath = path.join(GOLDEN_DIR, `${name}.json`);
-
-      if (UPDATE) {
-        await mkdir(GOLDEN_DIR, { recursive: true });
-        await writeFile(goldenPath, findingsJson);
-        return;
-      }
-
-      if (!existsSync(goldenPath)) {
-        process.stderr.write(
-          `[golden] No golden file for "${name}". Run with UPDATE_GOLDEN=1 to create.\n`,
-        );
-        expect(existsSync(goldenPath)).toBe(true);
-        return;
-      }
-
-      const golden = await readFile(goldenPath, "utf8");
-      expect(JSON.parse(findingsJson)).toEqual(JSON.parse(golden));
     });
   }
 });

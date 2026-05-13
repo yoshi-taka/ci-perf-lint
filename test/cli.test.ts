@@ -257,4 +257,72 @@ describe("runCli", () => {
     expect(exitCode).toBe(0);
     expect(errors).toHaveLength(0);
   });
+
+  test("rejects invalid --format value", async () => {
+    const { logger, lines, errors } = createLogger();
+
+    const exitCode = await runCli(
+      [fixtures.sampleRepo, "--format", "invalid"],
+      process.cwd(),
+      logger,
+    );
+
+    expect(exitCode).toBe(2);
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain("Unsupported format: invalid");
+  });
+
+  test("rejects invalid --mode value", async () => {
+    const { logger, lines, errors } = createLogger();
+
+    const exitCode = await runCli(
+      [fixtures.sampleRepo, "--mode", "invalid"],
+      process.cwd(),
+      logger,
+    );
+
+    expect(exitCode).toBe(2);
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain("Unsupported mode: invalid");
+  });
+
+  test("rejects negative --top value", async () => {
+    const { logger, lines, errors } = createLogger();
+
+    const exitCode = await runCli([fixtures.sampleRepo, "--top", "-5"], process.cwd(), logger);
+
+    expect(exitCode).toBe(2);
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain("Invalid --top value: -5");
+  });
+
+  test("rejects non-numeric --top value", async () => {
+    const { logger, lines, errors } = createLogger();
+
+    const exitCode = await runCli([fixtures.sampleRepo, "--top", "abc"], process.cwd(), logger);
+
+    expect(exitCode).toBe(2);
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain("Invalid --top value: abc");
+  });
+
+  test("rejects unknown flag", async () => {
+    const { logger, lines, errors } = createLogger();
+
+    const exitCode = await runCli([fixtures.sampleRepo, "--unknown-flag"], process.cwd(), logger);
+
+    expect(exitCode).toBe(2);
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain("unknown option: --unknown-flag");
+  });
+
+  test("rejects zero --top value", async () => {
+    const { logger, lines, errors } = createLogger();
+
+    const exitCode = await runCli([fixtures.sampleRepo, "--top", "0"], process.cwd(), logger);
+
+    expect(exitCode).toBe(2);
+    expect(lines).toHaveLength(0);
+    expect(errors[0]).toContain("Invalid --top value: 0");
+  });
 });

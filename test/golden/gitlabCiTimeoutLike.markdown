@@ -1,0 +1,13 @@
+# Findings
+
+## missing-timeout-in-minutes-gitlab-ci
+
+- Workflow: `.gitlab-ci.yml`
+- Location: `.gitlab-ci.yml:10:3`
+- Severity: `warning`
+- Confidence: `medium`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-timeout-in-minutes-gitlab-ci`
+- Message: Job "build-app" does not define timeout.
+- Why it matters: GitLab CI uses a project-level default timeout (60 minutes). Heavy jobs should explicitly declare a timeout to prevent runaway builds and wasted CI minutes.
+- Suggested action: Add a timeout to the job, e.g. timeout: 30m.
+- Measurement hint: Monitor the job's typical duration and set timeout to a value that allows for normal variance but catches hangs.

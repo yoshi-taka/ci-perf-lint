@@ -1,0 +1,25 @@
+# Findings
+
+## missing-release-downstream-success-guard
+
+- Workflow: `.github/workflows/release.yml`
+- Location: `.github/workflows/release.yml:19:9`
+- Severity: `warning`
+- Confidence: `medium`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-release-downstream-success-guard`
+- Message: Release-like downstream job "publish" depends on upstream jobs without an explicit success guard.
+- Why it matters: This job already overrides default dependency behavior with a status-based `if:` condition, so release intent is easier to reason about when it also explicitly gates on upstream success and avoids partial follow-up work after failure or cancellation.
+- Suggested action: If this downstream release job really needs a status-based `if:`, confirm which upstream jobs must succeed, preserve any intentional skip-allowing branches, and only then add explicit success checks together with `!failure() && !cancelled()`.
+- Measurement hint: Simulate an upstream failure or cancellation and confirm the downstream release job is skipped instead of partially running.
+
+## missing-timeout-minutes
+
+- Workflow: `.github/workflows/release.yml`
+- Location: `.github/workflows/release.yml:17:3`
+- Severity: `warning`
+- Confidence: `medium`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-timeout-minutes`
+- Message: Job "publish" does not define job-level timeout-minutes.
+- Why it matters: Without a job-level timeout, a hung release-like job falls back to the platform default timeout and can keep holding runner capacity and deployment-critical locks much longer than intended. This repository already uses job-level timeout-minutes in `.github/workflows/release.yml:build`.
+- Suggested action: Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.
+- Measurement hint: Force or simulate a hung run and confirm the job is terminated at the configured timeout.

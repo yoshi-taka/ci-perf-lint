@@ -1,0 +1,37 @@
+# Findings
+
+## docker-build-without-layer-cache
+
+- Workflow: `.github/workflows/docker.yml`
+- Location: `.github/workflows/docker.yml:13:15`
+- Severity: `warning`
+- Confidence: `high`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/docker-build-without-layer-cache`
+- Message: Job "docker" uses docker/build-push-action without cache-from and cache-to configuration.
+- Why it matters: Without layer caching, every CI run rebuilds all Docker layers from scratch, adding minutes per build. docker/build-push-action supports cache-from and cache-to natively; the simplest setup uses the GitHub Actions cache backend.
+- Suggested action: Add cache-from and cache-to to the docker/build-push-action step. For example: `cache-from: type=gha` and `cache-to: type=gha,mode=max`.
+- Measurement hint: Compare Docker build wall-clock time before and after adding layer caching. A multi-minute reduction is common for images with several layers.
+
+## prefer-native-arm-runner-over-qemu
+
+- Workflow: `.github/workflows/docker.yml`
+- Location: `.github/workflows/docker.yml:11:15`
+- Severity: `warning`
+- Confidence: `medium`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/prefer-native-arm-runner-over-qemu`
+- Message: Job "docker" uses QEMU for ARM Docker builds targeting linux/arm64.
+- Why it matters: This job builds ARM Docker images through QEMU emulation for linux/arm64, which is often slower and less reliable than using a native arm64 runner for the same target.
+- Suggested action: If this job primarily targets linux/arm64, consider a native arm64 runner instead of QEMU emulation.
+- Measurement hint: Compare wall-clock build time, cache reuse, and failure rate between the current QEMU path and a native arm64 or split-platform build path.
+
+## missing-concurrency
+
+- Workflow: `.github/workflows/docker.yml`
+- Location: `.github/workflows/docker.yml:4:3`
+- Severity: `suggestion`
+- Confidence: `high`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-concurrency`
+- Message: The workflow has no workflow-level or job-level concurrency setting.
+- Why it matters: Older runs can continue burning runner time after newer commits arrive on the same PR or branch.
+- Suggested action: Add concurrency with cancel-in-progress for pull_request or branch-scoped runs.
+- Measurement hint: Push multiple commits to the same PR and confirm only the latest run continues.
