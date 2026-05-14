@@ -1,9 +1,13 @@
-import type { RepositoryDiagnosticCollector } from "./collector-types.ts";
+import type {
+  RepositoryDiagnosticCollector,
+  RepositoryDiagnosticContext,
+} from "./collector-types.ts";
 import { gateKeys } from "./gates.ts";
 import { collectDatadogLambdaExtensionDiagnostics } from "./datadog-lambda-extension.ts";
 import { collectDockerBuildDiagnostics } from "./docker.ts";
 import { collectElixirOtpVersionDiagnostics } from "./elixir-otp-versions.ts";
 import { collectLargeFileDiagnostics } from "./large-files.ts";
+import { collectPreferMiseOverAsdfDiagnostics } from "./prefer-mise-over-asdf.ts";
 
 export const dockerDiagnosticCollectors = [
   {
@@ -48,5 +52,13 @@ export const elixirDiagnosticCollectors = [
     gate: gateKeys.elixirHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectElixirOtpVersionDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+  },
+] satisfies readonly RepositoryDiagnosticCollector[];
+
+export const toolDiagnosticCollectors = [
+  {
+    id: "prefer-mise-over-asdf",
+    collect: (context: RepositoryDiagnosticContext) =>
+      collectPreferMiseOverAsdfDiagnostics(context),
   },
 ] satisfies readonly RepositoryDiagnosticCollector[];

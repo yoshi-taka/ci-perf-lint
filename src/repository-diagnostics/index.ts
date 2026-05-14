@@ -18,6 +18,7 @@ import {
   dockerDiagnosticCollectors,
   elixirDiagnosticCollectors,
   largeFileDiagnosticCollectors,
+  toolDiagnosticCollectors,
 } from "./collectors-foundation.ts";
 import { javascriptDiagnosticCollectors } from "./collectors-javascript.ts";
 import { pytestDiagnosticCollectors, pythonDiagnosticCollectors } from "./collectors-python.ts";
@@ -42,6 +43,7 @@ export const repositoryDiagnosticCollectors = [
   ...pythonDiagnosticCollectors,
   ...cdkDiagnosticCollectors,
   ...elixirDiagnosticCollectors,
+  ...toolDiagnosticCollectors,
   {
     id: "gradle-parallel-not-enabled",
     gate: gateKeys.gradle,
@@ -110,7 +112,7 @@ export async function collectRepositoryDiagnostics(
 
   const collectorGateResults = new Map(
     repositoryDiagnosticCollectors.map(
-      (c) => [c.id, collectorRequiresAllGatesFromResults(c, gateResults)] as const,
+      (c) => [c.id, collectorRequiresAllGatesFromResults(c as CollectorLike, gateResults)] as const,
     ),
   );
 
@@ -247,7 +249,7 @@ export async function collectRepositoryDiagnostics(
       const collectorLike = c as CollectorLike;
       return {
         id: c.id,
-        gate: c.gate,
+        gate: collectorLike.gate,
         gates: collectorLike.gates,
         gateExpr: collectorLike.gateExpr ? gateExprToString(collectorLike.gateExpr) : undefined,
         findings: r?.status === "fulfilled" ? r.value.length : -1,

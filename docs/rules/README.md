@@ -101,6 +101,7 @@ Current rule registry:
 - `prefer-frozen-lockfile`
 - `prefer-jest-30-for-jest-29`
 - `prefer-lefthook-for-complex-git-hooks`
+- `prefer-mise-over-asdf`
 - `prefer-mypy-performance-milestone`
 - `prefer-native-arm-runner-over-qemu`
 - `prefer-next-typescript-performance-milestone`
