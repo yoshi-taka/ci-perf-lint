@@ -6,6 +6,7 @@ function makeWorkflow(
   overrides: Partial<WorkflowDocument> & { on?: unknown } = {},
 ): WorkflowDocument {
   return {
+    kind: "github-actions",
     path: ".github/workflows/test.yml",
     relativePath: ".github/workflows/test.yml",
     source: "name: test\non: push\njobs: {}",

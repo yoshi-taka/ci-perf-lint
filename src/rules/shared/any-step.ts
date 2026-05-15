@@ -1,14 +1,16 @@
+/* oxlint-disable typescript/prefer-for-of */
 import type { Node } from "yaml";
 import type { WorkflowDocument, WorkflowStep } from "../../workflow.ts";
 import type { PipelineDocument, PipelineStep } from "../../buildkite-workflow.ts";
 import type { CircleCiDocument } from "../../circleci-workflow.ts";
 import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
+import type { AnyWorkflowDocument } from "../../ci-types.ts";
 
 export type AnyStep = WorkflowStep | PipelineStep;
 
 type CIDocumentNormalizer<D> = (doc: D) => CommandEntry[];
 
-export type CIDocument = WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument;
+export type CIDocument = AnyWorkflowDocument;
 
 const MAX_RUN_PREVIEW = 40;
 const ansiRe = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[a-zA-Z]`, "g");
@@ -61,133 +63,93 @@ export interface CommandEntry {
   workingDirectory?: string;
 }
 
-function isCircleCiDoc(doc: unknown): doc is CircleCiDocument {
-  return (
-    typeof doc === "object" &&
-    doc !== null &&
-    "kind" in doc &&
-    (doc as Record<string, unknown>).kind === "circleci"
-  );
-}
-
-function isGitlabCiDoc(doc: unknown): doc is GitlabCiDocument {
-  return (
-    typeof doc === "object" &&
-    doc !== null &&
-    "kind" in doc &&
-    (doc as Record<string, unknown>).kind === "gitlab-ci"
-  );
-}
-
-function isPipelineDoc(doc: unknown): doc is PipelineDocument {
-  return typeof doc === "object" && doc !== null && "steps" in doc && !("jobs" in doc);
-}
-
-function buildCircleCiEntries(doc: CircleCiDocument): CommandEntry[] {
-  const entries: CommandEntry[] = [];
-  for (const job of doc.jobs) {
-    for (const step of job.steps) {
-      if (step.command) {
+const commandEntryCollectors: Record<string, CIDocumentNormalizer<CIDocument>> = {
+  circleci: (doc: CIDocument) => {
+    const d = doc as CircleCiDocument;
+    const entries: CommandEntry[] = [];
+    for (const job of d.jobs) {
+      for (const step of job.steps) {
+        if (step.command) {
+          entries.push({
+            text: step.command,
+            node: step.commandNode as unknown as Node | undefined,
+            jobName: job.name,
+            stepName: step.name ?? "(unnamed)",
+            workingDirectory: step.workingDirectory,
+          });
+        }
+      }
+    }
+    return entries;
+  },
+  "gitlab-ci": (doc: CIDocument) => {
+    const d = doc as GitlabCiDocument;
+    const entries: CommandEntry[] = [];
+    for (const job of d.jobs) {
+      const scriptLines = job.script ?? [];
+      for (let i = 0; i < scriptLines.length; i++) {
         entries.push({
-          text: step.command,
-          node: step.commandNode ?? step.node,
+          text: scriptLines[i]!,
+          node: undefined,
           jobName: job.name,
-          stepName: stepDisplayName(step),
+          stepName: job.name,
+          workingDirectory: undefined,
         });
       }
     }
-  }
-  return entries;
-}
-
-function buildGitlabCiEntries(doc: GitlabCiDocument): CommandEntry[] {
-  const entries: CommandEntry[] = [];
-  for (const job of doc.jobs) {
-    for (const cmd of job.script ?? []) {
-      entries.push({
-        text: cmd,
-        node: job.scriptNode ?? job.node,
-        jobName: job.name,
-        stepName: "script",
-      });
-    }
-  }
-  return entries;
-}
-
-function buildBuildkiteEntries(doc: PipelineDocument): CommandEntry[] {
-  const entries: CommandEntry[] = [];
-  for (const step of doc.steps) {
-    if (step.isWait || step.isBlock || step.isTrigger || step.isGroup) {
-      continue;
-    }
-    const texts: string[] = [];
-    if (step.command) {
-      texts.push(step.command);
-    }
-    if (Array.isArray(step.commands)) {
-      texts.push(...step.commands);
-    }
-    for (const text of texts) {
-      entries.push({
-        text,
-        node: step.commandNode ?? step.node,
-        jobName: step.label ?? "unnamed",
-        stepName: step.label ?? "unnamed",
-      });
-    }
-  }
-  return entries;
-}
-
-function buildGitHubActionsEntries(doc: WorkflowDocument): CommandEntry[] {
-  const entries: CommandEntry[] = [];
-  for (const job of doc.jobs) {
-    for (const step of job.steps) {
-      if (step.run) {
+    return entries;
+  },
+  buildkite: (doc: CIDocument) => {
+    const d = doc as PipelineDocument;
+    const entries: CommandEntry[] = [];
+    for (const step of d.steps) {
+      if (step.isWait || step.isBlock || step.isTrigger || step.isGroup) {
+        continue;
+      }
+      const commands = step.commands ?? (step.command ? [step.command] : []);
+      for (const cmd of commands) {
         entries.push({
-          text: step.run,
-          node: step.runNode ?? step.node,
-          jobName: job.id,
-          stepName: stepDisplayName(step),
-          workingDirectory: step.workingDirectory,
+          text: cmd,
+          node: step.commandNode as unknown as Node | undefined,
+          jobName: step.label ?? step.key ?? "(unnamed)",
+          stepName: step.label ?? step.key ?? "(unnamed)",
+          workingDirectory: undefined,
         });
       }
     }
-  }
-  return entries;
-}
-
-/**
- * Normalize a CI document from any supported provider into a flat CommandEntry[].
- *
- * Invariants:
- * - Traversal order is deterministic (provider order: CircleCI → GitLab → Buildkite → GH Actions)
- * - Same command sequence across providers produces the same CommandEntry[] text values
- * - Noop/empty steps are excluded
- * - Multiple commands within one step are expanded in declaration order
- */
-const normalizeCiDocument: CIDocumentNormalizer<CIDocument> = (doc) => {
-  if (isCircleCiDoc(doc)) {
-    return buildCircleCiEntries(doc);
-  }
-  if (isGitlabCiDoc(doc)) {
-    return buildGitlabCiEntries(doc);
-  }
-  if (isPipelineDoc(doc)) {
-    return buildBuildkiteEntries(doc);
-  }
-  return buildGitHubActionsEntries(doc);
+    return entries;
+  },
+  "github-actions": (doc: CIDocument) => {
+    const d = doc as WorkflowDocument;
+    const entries: CommandEntry[] = [];
+    for (const job of d.jobs) {
+      for (const step of job.steps) {
+        const run = step.run;
+        if (run !== undefined) {
+          entries.push({
+            text: run,
+            node: step.runNode as unknown as Node | undefined,
+            jobName: job.id,
+            stepName: step.name ?? job.id,
+            workingDirectory: step.workingDirectory,
+          });
+        }
+      }
+    }
+    return entries;
+  },
 };
 
-const commandEntriesCache = new WeakMap<CIDocument, CommandEntry[]>();
+const entryCache = new WeakMap<CIDocument, CommandEntry[]>();
 
 export function collectCommandEntries(doc: CIDocument): CommandEntry[] {
-  const cached = commandEntriesCache.get(doc);
+  const cached = entryCache.get(doc);
   if (cached) {
     return cached;
   }
-  const entries = normalizeCiDocument(doc);
-  commandEntriesCache.set(doc, entries);
+
+  const normalizer = commandEntryCollectors[doc.kind];
+  const entries = normalizer ? normalizer(doc) : [];
+  entryCache.set(doc, entries);
   return entries;
 }

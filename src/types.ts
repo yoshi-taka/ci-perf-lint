@@ -205,6 +205,8 @@ export interface RequiredFeatures {
 import type { Predicate } from "./rules/shared/predicate.ts";
 import type { RuleImplication, RuleScheduling } from "./rule-engine/implication.ts";
 
+export type FeatureMaskPredicate = (state: Record<string, unknown>) => boolean;
+
 export interface RuleMeta {
   id: string;
   severity: Severity;
@@ -216,6 +218,7 @@ export interface RuleMeta {
     isHeavy?: boolean;
   };
   requiredFeatures?: RequiredFeatures;
+  featurePredicate?: FeatureMaskPredicate;
   skipIf?: Predicate;
   precheck?: (workflow: { source?: string }) => number;
   precheckBudget?: number;

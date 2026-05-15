@@ -7,6 +7,7 @@ import type { GitlabCiDocument } from "../src/gitlab-ci-workflow.ts";
 
 function makeGithubActionsWorkflow(steps: { run: string; name?: string }[]): WorkflowDocument {
   return {
+    kind: "github-actions",
     source: "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []",
     relativePath: ".github/workflows/ci.yml",
     name: "CI",
@@ -46,6 +47,7 @@ function makeBuildkitePipeline(
   steps: { command?: string; commands?: string[]; label?: string }[],
 ): PipelineDocument {
   return {
+    kind: "buildkite",
     source: "steps:\n  - label: test\n    command: echo hello",
     relativePath: ".buildkite/pipeline.yml",
     steps: steps.map((s, i) => ({
@@ -150,6 +152,7 @@ describe("normalize CI documents invariants", () => {
 
   test("Buildkite wait/block/trigger steps are excluded", () => {
     const bk: PipelineDocument = {
+      kind: "buildkite",
       source: "",
       relativePath: ".buildkite/pipeline.yml",
       steps: [

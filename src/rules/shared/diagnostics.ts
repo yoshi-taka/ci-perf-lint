@@ -1,10 +1,11 @@
 import type { Node } from "yaml";
 import type { Confidence, RuleMeta, Severity, SourceLocation } from "../../types.ts";
 import type { ProvenancedDiagnostic, WorkflowDiagnosticSource } from "../../diagnostic-source.ts";
-import { getLocation, type WorkflowDocument } from "../../workflow.ts";
-import { getPipelineLocation, type PipelineDocument } from "../../buildkite-workflow.ts";
-import { getGitlabCiLocation, type GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
-import { getCircleCiLocation, type CircleCiDocument } from "../../circleci-workflow.ts";
+import type { AnyWorkflowDocument } from "../../ci-types.ts";
+import { getLocation } from "../../workflow.ts";
+import { getPipelineLocation } from "../../buildkite-workflow.ts";
+import { getGitlabCiLocation } from "../../gitlab-ci-workflow.ts";
+import { getCircleCiLocation } from "../../circleci-workflow.ts";
 import {
   reifyDiagnosticFromSource,
   type DiagnosticDetails,
@@ -13,8 +14,6 @@ import {
   type BlueprintDiagnosticDetails,
   type RepairOp,
 } from "../../reification.ts";
-
-type CIWorkflow = WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument;
 
 function isBlueprintDetails(
   details: LegacyDetailsInput | BlueprintDetailsInput,
@@ -51,14 +50,6 @@ function toTaggedDetails(details: LegacyDetailsInput | BlueprintDetailsInput): D
   };
 }
 
-function isGitlabCiDocument(doc: CIWorkflow): doc is GitlabCiDocument {
-  return "kind" in doc && doc.kind === "gitlab-ci";
-}
-
-function isCircleCiDocument(doc: CIWorkflow): doc is CircleCiDocument {
-  return "kind" in doc && doc.kind === "circleci";
-}
-
 interface LegacyDetailsInput {
   scope?: "workflow" | "repository";
   message: string;
@@ -84,22 +75,28 @@ interface BlueprintDetailsInput {
 }
 
 export function buildDiagnostic(
-  workflow: CIWorkflow,
+  workflow: AnyWorkflowDocument,
   meta: RuleMeta,
   node: Node | undefined,
   details: LegacyDetailsInput | BlueprintDetailsInput,
 ): ProvenancedDiagnostic<WorkflowDiagnosticSource> {
   const taggedDetails = toTaggedDetails(details);
-  const isPipeline = "steps" in workflow && !("jobs" in workflow);
-  const isGitlab = isGitlabCiDocument(workflow);
-  const isCircle = isCircleCiDocument(workflow);
-  const docLocation = isPipeline
-    ? getPipelineLocation(workflow, node)
-    : isGitlab
-      ? getGitlabCiLocation(workflow, node)
-      : isCircle
-        ? getCircleCiLocation(workflow, node)
-        : getLocation(workflow, node);
+
+  let docLocation: SourceLocation;
+  switch (workflow.kind) {
+    case "buildkite":
+      docLocation = getPipelineLocation(workflow, node);
+      break;
+    case "gitlab-ci":
+      docLocation = getGitlabCiLocation(workflow, node);
+      break;
+    case "circleci":
+      docLocation = getCircleCiLocation(workflow, node);
+      break;
+    default:
+      docLocation = getLocation(workflow, node);
+      break;
+  }
 
   if (getDetailTag(taggedDetails) === "blueprint") {
     const blueprintDetails = taggedDetails as BlueprintDiagnosticDetails;

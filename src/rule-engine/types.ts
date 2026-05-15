@@ -4,6 +4,7 @@ import type {
   RuleMeta,
   RuleAbstention,
   EpistemicStatus,
+  FeatureMaskPredicate,
 } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
@@ -11,6 +12,7 @@ import type { WorkflowDocument } from "../workflow.ts";
 import type { PipelineDocument } from "../buildkite-workflow.ts";
 import type { GitlabCiDocument } from "../gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "../circleci-workflow.ts";
+import type { AnyWorkflowDocument, CiKind } from "../ci-types.ts";
 import type { WorkflowSemantics } from "../rules/shared/workflow-semantics.ts";
 import type { RepositoryPrecedentIndex } from "../rules/shared/repository-precedent-index.ts";
 import type { RepositoryFileIndex } from "../rules/shared/repository-file-index.ts";
@@ -21,7 +23,7 @@ export type WorkflowNodeKind = "trigger" | "concurrency";
 export interface RuleContext {
   repository: RepositorySignals;
   scanContext?: RepositoryScanContext;
-  workflowSemantics?: WorkflowSemantics | ReadonlyMap<WorkflowDocument, WorkflowSemantics>;
+  workflowSemantics?: WorkflowSemantics | ReadonlyMap<AnyWorkflowDocument, WorkflowSemantics>;
   precedentIndex?: RepositoryPrecedentIndex;
   fileIndex?: RepositoryFileIndex;
   singularities?: SingularityTracker;
@@ -30,35 +32,36 @@ export interface RuleContext {
   allWorkflows?: readonly WorkflowDocument[];
 }
 
-export interface RuleModule {
-  meta: RuleMeta & { scope?: "github-actions" };
+interface RuleBase {
+  meta: RuleMeta;
   nodeTypes?: WorkflowNodeKind[];
+  featurePredicate?: FeatureMaskPredicate;
+}
+
+export interface RuleModule extends RuleBase {
+  meta: RuleMeta & { scope?: "github-actions" };
   check: (workflow: WorkflowDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
-export interface BuildkiteRuleModule {
+export interface BuildkiteRuleModule extends RuleBase {
   meta: RuleMeta & { scope: "buildkite" };
-  nodeTypes?: WorkflowNodeKind[];
   check: (pipeline: PipelineDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
-export interface GitlabCiRuleModule {
+export interface GitlabCiRuleModule extends RuleBase {
   meta: RuleMeta & { scope: "gitlab-ci" };
-  nodeTypes?: WorkflowNodeKind[];
   check: (doc: GitlabCiDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
-export interface CircleCiRuleModule {
+export interface CircleCiRuleModule extends RuleBase {
   meta: RuleMeta & { scope: "circleci" };
-  nodeTypes?: WorkflowNodeKind[];
   check: (doc: CircleCiDocument, context: RuleContext) => Diagnostic[] | Promise<Diagnostic[]>;
 }
 
-export interface BothRuleModule {
+export interface BothRuleModule extends RuleBase {
   meta: RuleMeta & { scope: "all" };
-  nodeTypes?: WorkflowNodeKind[];
   check: (
-    workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
+    workflow: AnyWorkflowDocument,
     context: RuleContext,
   ) => Diagnostic[] | Promise<Diagnostic[]>;
 }
@@ -70,12 +73,9 @@ export type AnyRuleModule =
   | GitlabCiRuleModule
   | CircleCiRuleModule;
 
-export type AnyCheckFn = (
-  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
-  context: RuleContext,
-) => Diagnostic[] | Promise<Diagnostic[]>;
+export type RulesByKind = Record<CiKind, readonly AnyRuleModule[]>;
 
 export interface ScoredWorkflow {
-  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument;
+  workflow: AnyWorkflowDocument;
   score: number;
 }

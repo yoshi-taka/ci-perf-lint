@@ -13,6 +13,7 @@ function makeJob(id: string, steps: WorkflowStep[]): WorkflowJob {
 }
 
 const mockGitHubActionsDoc: WorkflowDocument = {
+  kind: "github-actions",
   path: "/.github/workflows/ci.yml",
   relativePath: ".github/workflows/ci.yml",
   jobs: [

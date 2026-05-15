@@ -1,9 +1,9 @@
 import path from "node:path";
 import { readTextFile } from "./read-text-file.ts";
 import { buildAiHandoff } from "./ai-handoff.ts";
-import { parsePipeline, type PipelineDocument } from "./buildkite-workflow.ts";
-import { parseGitlabCi, type GitlabCiDocument } from "./gitlab-ci-workflow.ts";
-import { parseCircleCi, type CircleCiDocument } from "./circleci-workflow.ts";
+import { parsePipeline } from "./buildkite-workflow.ts";
+import { parseGitlabCi } from "./gitlab-ci-workflow.ts";
+import { parseCircleCi } from "./circleci-workflow.ts";
 import { collectWorkflowFiles, resolveWorkflowTarget } from "./fs.ts";
 import { aggregateFindingsWithMembers } from "./reporters.ts";
 import { RepositoryScanContext, LruMap } from "./repository-scan-context.ts";
@@ -19,6 +19,7 @@ import type {
   WorkflowSummary,
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
+import type { AnyWorkflowDocument, CiKind } from "./ci-types.ts";
 import {
   collectEmbeddedOxlintImportJsonDiagnostics,
   collectEmbeddedOxlintDiagnosticsByCode,
@@ -71,11 +72,7 @@ const buildkiteAltPattern = /(?:^|\/)buildkite\//i;
 const pipelinePattern = /pipeline\.(ya?ml|json)$/i;
 const gitlabCiPattern = /\.gitlab-ci\.(ya?ml)$/i;
 const circleCiPattern = /\/\.circleci\/config\.(ya?ml)$/i;
-type ParsedWorkflowDocument =
-  | WorkflowDocument
-  | PipelineDocument
-  | GitlabCiDocument
-  | CircleCiDocument;
+type ParsedWorkflowDocument = AnyWorkflowDocument;
 
 const HUGE_REPO_FILE_THRESHOLD = 80_000;
 
@@ -268,7 +265,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   }
 
   const githubWorkflows = parsedWorkflows.filter(
-    (w): w is WorkflowDocument => "jobs" in w && !("kind" in w),
+    (w): w is WorkflowDocument => w.kind === "github-actions",
   );
 
   const jobSummaries = collectJobSummaries(githubWorkflows);
@@ -335,7 +332,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     precedentIndex,
     fileIndex,
     measureCompleteness,
-    allWorkflows: wfList as WorkflowDocument[],
+    allWorkflows: githubWorkflows,
     abstain(
       abstention: Omit<RuleAbstention, "epistemicStatus">,
       status: EpistemicStatus = "unknown",
@@ -344,9 +341,9 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     },
   };
 
-  const semanticsByWorkflow = new Map<ParsedWorkflowDocument, WorkflowSemantics>();
+  const semanticsByWorkflow = new Map<AnyWorkflowDocument, WorkflowSemantics>();
   for (const workflow of wfList) {
-    if ("jobs" in workflow && !("kind" in workflow)) {
+    if (workflow.kind === "github-actions") {
       semanticsByWorkflow.set(workflow, buildWorkflowSemantics(workflow));
     }
   }
@@ -381,7 +378,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
               {
                 ...ruleContext,
                 workflowSemantics: semanticsByWorkflow as ReadonlyMap<
-                  WorkflowDocument,
+                  AnyWorkflowDocument,
                   WorkflowSemantics
                 >,
               },
@@ -412,7 +409,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
       : collectRepositoryDiagnostics({
           repoRoot,
           repository: ruleContext.repository,
-          workflows: [...githubWorkflows],
+          workflows: githubWorkflows as WorkflowDocument[],
           workflowSemantics: semanticsByWorkflow as ReadonlyMap<
             WorkflowDocument,
             WorkflowSemantics
@@ -537,8 +534,8 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     const inferenceGraph = buildInferenceGraph(allRules);
     const workflowDocKinds: Record<string, number> = {};
     for (const wf of wfList) {
-      const kind = "kind" in wf ? (wf as { kind: unknown }).kind : "github-actions";
-      const key = typeof kind === "string" ? kind : "github-actions";
+      const kind: string = wf.kind;
+      const key = kind;
       workflowDocKinds[key] = (workflowDocKinds[key] ?? 0) + 1;
     }
     const directEdgeCount = [...inferenceGraph.forwards.values()].reduce(

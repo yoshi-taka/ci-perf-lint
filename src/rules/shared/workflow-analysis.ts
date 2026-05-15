@@ -1,7 +1,5 @@
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../../workflow.ts";
-import type { PipelineDocument } from "../../buildkite-workflow.ts";
-import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
-import type { CircleCiDocument } from "../../circleci-workflow.ts";
+import type { AnyWorkflowDocument } from "../../ci-types.ts";
 import type { SetupActionKind } from "./tools.ts";
 import type { TriggerFacts } from "./trigger-facts.ts";
 import type { RunsOnSpec } from "./runs-on-facts.ts";
@@ -319,18 +317,12 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
   return facts;
 }
 
-export function getWorkflowFacts(
-  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
-): WorkflowFacts {
-  if ("steps" in workflow && !("jobs" in workflow)) {
+export function getWorkflowFacts(workflow: AnyWorkflowDocument): WorkflowFacts {
+  if (workflow.kind !== "github-actions") {
     return emptyWorkflowFacts;
   }
 
-  if ("kind" in workflow) {
-    return emptyWorkflowFacts;
-  }
-
-  const wf = workflow as WorkflowDocument;
+  const wf: WorkflowDocument = workflow;
   const cached = workflowFactsCache.get(wf);
   if (cached) {
     return cached;

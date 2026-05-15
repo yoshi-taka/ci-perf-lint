@@ -1,5 +1,6 @@
-import type { AnyRuleModule } from "../rule-engine.ts";
-import type { RuleMeta } from "../types.ts";
+/* oxlint-disable typescript/prefer-for-of */
+import type { AnyRuleModule, RulesByKind } from "../rule-engine/types.ts";
+import type { RuleMeta, RequiredFeatures } from "../types.ts";
 import type { RegisteredRuleId } from "../rule-engine/rule-id.ts";
 import { RULE_REGISTRY } from "../rule-engine/rule-id.ts";
 import { validateImpliedChecks } from "./validate-implied-checks.ts";
@@ -233,12 +234,75 @@ for (const [id, entry] of Object.entries(RULE_REGISTRY)) {
   }
 }
 
-export const rulesByScope = {
-  "github-actions": allRules.filter(
-    (rule) => ((rule.meta as RuleMeta).scope ?? "github-actions") === "github-actions",
-  ),
-  buildkite: [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "buildkite")],
-  "gitlab-ci": [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "gitlab-ci")],
-  circleci: [...allRules.filter((rule) => (rule.meta as RuleMeta).scope === "circleci")],
-  all: allRules.filter((rule) => (rule.meta as RuleMeta).scope === "all"),
-};
+const _gaRules = allRules.filter(
+  (rule) => ((rule.meta as RuleMeta).scope ?? "github-actions") === "github-actions",
+);
+const _buildkiteRules = allRules.filter((rule) => (rule.meta as RuleMeta).scope === "buildkite");
+const _gitlabRules = allRules.filter((rule) => (rule.meta as RuleMeta).scope === "gitlab-ci");
+const _circleRules = allRules.filter((rule) => (rule.meta as RuleMeta).scope === "circleci");
+const _allScopeRules = allRules.filter((rule) => (rule.meta as RuleMeta).scope === "all");
+
+const _mergedGA = (_gaRules as AnyRuleModule[]).concat(_allScopeRules);
+const _mergedBuildkite = (_buildkiteRules as AnyRuleModule[]).concat(_allScopeRules);
+const _mergedGitlab = (_gitlabRules as AnyRuleModule[]).concat(_allScopeRules);
+const _mergedCircle = (_circleRules as AnyRuleModule[]).concat(_allScopeRules);
+
+function _compileMask(
+  features: RequiredFeatures | undefined,
+): ((state: Record<string, unknown>) => boolean) | undefined {
+  if (!features) {
+    return undefined;
+  }
+  const checks: ((state: Record<string, unknown>) => boolean)[] = [];
+  if (features.workflowFacts) {
+    for (const [key, required] of Object.entries(features.workflowFacts)) {
+      checks.push((state) => state[key] === required);
+    }
+  }
+  if (features.toolPresence) {
+    for (const [key, required] of Object.entries(features.toolPresence)) {
+      checks.push(
+        (state) => (state.toolPresence as ReadonlyMap<string, boolean>).get(key) === required,
+      );
+    }
+  }
+  if (checks.length === 0) {
+    return undefined;
+  }
+  return (state) => {
+    for (let i = 0; i < checks.length; i++) {
+      if (!checks[i]!(state)) {
+        return false;
+      }
+    }
+    return true;
+  };
+}
+
+for (const rule of _mergedGA) {
+  if (rule.meta.requiredFeatures && !rule.meta.featurePredicate) {
+    (rule.meta as RuleMeta).featurePredicate = _compileMask(rule.meta.requiredFeatures);
+  }
+}
+for (const rule of _mergedBuildkite) {
+  if (rule.meta.requiredFeatures && !rule.meta.featurePredicate) {
+    (rule.meta as RuleMeta).featurePredicate = _compileMask(rule.meta.requiredFeatures);
+  }
+}
+for (const rule of _mergedGitlab) {
+  if (rule.meta.requiredFeatures && !rule.meta.featurePredicate) {
+    (rule.meta as RuleMeta).featurePredicate = _compileMask(rule.meta.requiredFeatures);
+  }
+}
+for (const rule of _mergedCircle) {
+  if (rule.meta.requiredFeatures && !rule.meta.featurePredicate) {
+    (rule.meta as RuleMeta).featurePredicate = _compileMask(rule.meta.requiredFeatures);
+  }
+}
+
+export const rulesByKind: RulesByKind = {
+  "github-actions": _mergedGA,
+  buildkite: _mergedBuildkite,
+  "gitlab-ci": _mergedGitlab,
+  circleci: _mergedCircle,
+} as const;

@@ -5,6 +5,7 @@ import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import type { PipelineDocument } from "../buildkite-workflow.ts";
 import type { CircleCiDocument } from "../circleci-workflow.ts";
 import type { GitlabCiDocument } from "../gitlab-ci-workflow.ts";
+import type { AnyWorkflowDocument } from "../ci-types.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
@@ -149,28 +150,6 @@ function npmCompatibilityEvidence(repository: RepositorySignals, script: string)
   return evidence.length > 0
     ? `Visible npm-specific compatibility evidence: ${evidence.join("; ")}.`
     : "Repository scan found no visible .npmrc file, matching pre/post lifecycle script, or npm-specific environment reference.";
-}
-
-function isCircleCiDoc(doc: unknown): doc is CircleCiDocument {
-  return (
-    typeof doc === "object" &&
-    doc !== null &&
-    "kind" in doc &&
-    (doc as Record<string, unknown>).kind === "circleci"
-  );
-}
-
-function isGitlabCiDoc(doc: unknown): doc is GitlabCiDocument {
-  return (
-    typeof doc === "object" &&
-    doc !== null &&
-    "kind" in doc &&
-    (doc as Record<string, unknown>).kind === "gitlab-ci"
-  );
-}
-
-function isPipelineDoc(doc: unknown): doc is PipelineDocument {
-  return typeof doc === "object" && doc !== null && "steps" in doc && !("jobs" in doc);
 }
 
 function checkGithubActions(workflow: WorkflowDocument, context: RuleContext): Diagnostic[] {
@@ -323,19 +302,16 @@ async function checkGitlabCi(doc: GitlabCiDocument, context: RuleContext): Promi
 
 export const preferNodeRunOverNpmRunRule = {
   meta,
-  async check(
-    workflow: WorkflowDocument | PipelineDocument | CircleCiDocument | GitlabCiDocument,
-    context: RuleContext,
-  ): Promise<Diagnostic[]> {
-    if (isCircleCiDoc(workflow)) {
-      return checkCircleCi(workflow, context);
+  async check(workflow: AnyWorkflowDocument, context: RuleContext): Promise<Diagnostic[]> {
+    switch (workflow.kind) {
+      case "circleci":
+        return checkCircleCi(workflow, context);
+      case "gitlab-ci":
+        return checkGitlabCi(workflow, context);
+      case "buildkite":
+        return checkBuildkite(workflow, context);
+      default:
+        return checkGithubActions(workflow, context);
     }
-    if (isGitlabCiDoc(workflow)) {
-      return checkGitlabCi(workflow, context);
-    }
-    if (isPipelineDoc(workflow)) {
-      return checkBuildkite(workflow, context);
-    }
-    return checkGithubActions(workflow, context);
   },
 };

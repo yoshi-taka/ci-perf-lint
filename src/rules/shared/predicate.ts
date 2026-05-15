@@ -1,6 +1,7 @@
+/* oxlint-disable no-unused-vars */
 import type { WorkflowFactsProjection } from "../../types.ts";
 import type { getWorkflowFacts } from "./workflow-analysis.ts";
-import type { WorkflowDocument } from "../../workflow.ts";
+import type { AnyWorkflowDocument } from "../../ci-types.ts";
 
 // ── Predicate AST ────────────────────────────
 
@@ -130,10 +131,10 @@ export function anyWorkflows(operand: Predicate): Predicate {
 // ── Evaluator ─────────────────────────────────
 
 export interface EvalContext {
-  workflow: WorkflowDocument;
+  workflow: AnyWorkflowDocument;
   workflowFacts: ReturnType<typeof getWorkflowFacts>;
   source: string;
-  workflows?: readonly WorkflowDocument[];
+  workflows?: readonly AnyWorkflowDocument[];
 }
 
 export function evaluate(pred: Predicate, ctx: EvalContext): boolean {
@@ -183,7 +184,10 @@ export function evaluate(pred: Predicate, ctx: EvalContext): boolean {
   }
 }
 
-function workflowContainsNodeType(workflow: WorkflowDocument, nodeType: NodeKind): boolean {
+function workflowContainsNodeType(workflow: AnyWorkflowDocument, nodeType: NodeKind): boolean {
+  if (workflow.kind !== "github-actions") {
+    return true;
+  }
   if (nodeType === "trigger") {
     return workflow.on !== undefined;
   }

@@ -1,14 +1,7 @@
-import type {
-  AnalysisWarning,
-  Diagnostic,
-  MeasureCompletenessTracker,
-  RuleMeta,
-} from "../types.ts";
+/* oxlint-disable typescript/prefer-for-of */
+import type { AnalysisWarning, Diagnostic, MeasureCompletenessTracker } from "../types.ts";
 import type { RuleContext, AnyRuleModule, ScoredWorkflow } from "./types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
-import type { PipelineDocument } from "../buildkite-workflow.ts";
-import type { GitlabCiDocument } from "../gitlab-ci-workflow.ts";
-import type { CircleCiDocument } from "../circleci-workflow.ts";
+import type { AnyWorkflowDocument } from "../ci-types.ts";
 import { prewarmStepAnalysisCaches } from "../rules/shared/step-analysis-prewarm.ts";
 import {
   composeRefiners,
@@ -20,18 +13,9 @@ import {
 } from "../refiner-pipeline.ts";
 import { classifySingularity } from "../rules/shared/singularity.ts";
 import { buildInferenceGraph } from "../rules/shared/remediation-checks.ts";
-import { getRulesByScope, pushAnalysisWarning, runConcurrent } from "./utils.ts";
-import {
-  isPipelineDocument,
-  isGitlabCiDocument,
-  isCircleCiDocument,
-  workflowContainsKind,
-  ruleMatchesScope,
-  matchesFeatureMask,
-  shouldSkipForWorkflow,
-  shouldEvaluateRule,
-} from "./filters.ts";
-import { getRuleCheckFn } from "./rule-dispatch.ts";
+import { getRulesForKind, pushAnalysisWarning, runConcurrent } from "./utils.ts";
+import { workflowContainsKind, shouldSkipForWorkflow, shouldEvaluateRule } from "./filters.ts";
+import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 
 async function runRuleSafely(
   ruleId: string,
@@ -83,111 +67,85 @@ function applyMaxFindings(
 const scopeGateDebugEnabled = process.env.CI_PERF_LINT_DUMP_STATE === "1";
 
 export async function evaluateRules(
-  workflow: WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
+  workflow: AnyWorkflowDocument,
   context: RuleContext,
   warnings?: AnalysisWarning[],
   findingCounts?: Map<string, number>,
   ruleFilter?: (rule: AnyRuleModule) => boolean,
 ): Promise<Diagnostic[]> {
   prewarmStepAnalysisCaches(workflow);
-  const isBuildkite = isPipelineDocument(workflow);
-  const isGitlab = isGitlabCiDocument(workflow);
-  const isCircle = isCircleCiDocument(workflow);
 
-  const { createScopeGateState } = await import("./scope-gate.ts");
-  const scopeGateState = createScopeGateState(isBuildkite, isGitlab, isCircle);
+  const docKind = workflow.kind;
+  const rules = await getRulesForKind(docKind);
 
   if (scopeGateDebugEnabled) {
     process.stderr.write(
       `${JSON.stringify({
         type: "scope-gate-state",
         workflowPath: workflow.relativePath,
-        isBuildkite,
-        isGitlab,
-        isCircle,
-        gateState: scopeGateState,
+        kind: docKind,
       })}\n`,
     );
   }
 
-  const rulesByScope = await getRulesByScope();
-  const allRules = [
-    ...(rulesByScope["github-actions"] ?? []),
-    ...(rulesByScope.buildkite ?? []),
-    ...(rulesByScope["gitlab-ci"] ?? []),
-    ...(rulesByScope.circleci ?? []),
-    ...(rulesByScope.all ?? []),
-  ];
+  const allRules = rules as unknown as readonly AnyRuleModule[];
 
   interface RuleTask {
     rule: AnyRuleModule;
     run: () => Promise<Diagnostic[]>;
   }
 
-  interface RuleRunResult {
-    rule: AnyRuleModule;
-    diagnostics: Diagnostic[];
-    errored: boolean;
-  }
-
   const inferenceGraph = buildInferenceGraph(allRules);
   const tasks: RuleTask[] = [];
   const evaluatedRuleIds = new Set<string>();
   const workflowPath = workflow.relativePath;
+  const wfFacts = getWorkflowFacts(workflow);
+  const wfFactsState = wfFacts as unknown as Record<string, unknown>;
 
   for (const rule of allRules) {
     if (!shouldEvaluateRule(rule, context, workflowPath, warnings, ruleFilter)) {
       continue;
     }
 
-    if (!matchesFeatureMask(rule.meta.requiredFeatures, workflow as WorkflowDocument)) {
-      context.measureCompleteness?.skippedGates.add(rule.meta.id);
+    const rmeta = rule.meta;
+    const featurePred =
+      rmeta.featurePredicate ??
+      (rule as AnyRuleModule & { featurePredicate?: (state: Record<string, unknown>) => boolean })
+        .featurePredicate;
+    if (featurePred && !featurePred(wfFactsState)) {
+      context.measureCompleteness?.skippedGates.add(rmeta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: workflowPath,
-        message: `Rule ${rule.meta.id} was not evaluated because the workflow feature mask did not match.`,
+        message: `Rule ${rmeta.id} was not evaluated because the workflow feature mask did not match.`,
       });
       continue;
     }
 
     if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
-      context.measureCompleteness?.skippedGates.add(rule.meta.id);
+      context.measureCompleteness?.skippedGates.add(rmeta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: workflowPath,
-        message: `Rule ${rule.meta.id} was not evaluated because the workflow node types did not match its scope.`,
+        message: `Rule ${rmeta.id} was not evaluated because the workflow node types did not match its scope.`,
       });
       continue;
     }
 
-    if (!ruleMatchesScope(rule, isBuildkite, isGitlab, isCircle)) {
-      context.measureCompleteness?.skippedGates.add(rule.meta.id);
-      pushAnalysisWarning(warnings, {
-        kind: "gate-skipped",
-        source: workflowPath,
-        message: `Rule ${rule.meta.id} was not evaluated because its scope does not apply to this document.`,
-      });
-      continue;
-    }
-
-    const rmeta: RuleMeta = rule.meta;
     const skipPred = rmeta.skipIf;
-    if (
-      skipPred &&
-      shouldSkipForWorkflow(skipPred, workflow as WorkflowDocument, context.allWorkflows)
-    ) {
-      context.measureCompleteness?.skippedGates.add(rule.meta.id);
+    if (skipPred && shouldSkipForWorkflow(skipPred, workflow, context.allWorkflows)) {
+      context.measureCompleteness?.skippedGates.add(rmeta.id);
       pushAnalysisWarning(warnings, {
         kind: "gate-skipped",
         source: workflowPath,
-        message: `Rule ${rule.meta.id} was not evaluated because its skipIf predicate matched.`,
+        message: `Rule ${rmeta.id} was not evaluated because its skipIf predicate matched.`,
       });
       continue;
     }
 
-    const checkFn = getRuleCheckFn(rule, isBuildkite, isGitlab, isCircle);
-    evaluatedRuleIds.add(rule.meta.id);
-    tasks.push({ rule, run: () => Promise.resolve(checkFn(workflow, context)) });
+    const checkFn = rule.check;
+    evaluatedRuleIds.add(rmeta.id);
+    tasks.push({ rule, run: () => Promise.resolve(checkFn(workflow as never, context)) });
   }
 
   if (tasks.length > 0) {
@@ -213,7 +171,8 @@ export async function evaluateRules(
   const idMaxFindings = new Map<string, number>();
   const firedRuleIds = new Set<string>();
 
-  for (const { diagnostics, rule, errored } of settled as RuleRunResult[]) {
+  for (let i = 0; i < settled.length; i++) {
+    const { diagnostics, rule, errored } = settled[i]!;
     const { maxFindings } = rule.meta;
     if (maxFindings !== undefined) {
       idMaxFindings.set(rule.meta.id, maxFindings);
@@ -227,7 +186,9 @@ export async function evaluateRules(
         message: `Rule ${rule.meta.id} ran and found nothing for ${workflowPath}.`,
       });
     }
-    ruleResults.push(...diagnostics);
+    for (let j = 0; j < diagnostics.length; j++) {
+      ruleResults.push(diagnostics[j]!);
+    }
   }
 
   driftDetectionRefiner(firedRuleIds, evaluatedRuleIds, inferenceGraph).refine(ruleResults, {
@@ -281,7 +242,8 @@ export async function evaluateRules(
   }
 
   if (findingCounts) {
-    for (const d of filtered) {
+    for (let i = 0; i < filtered.length; i++) {
+      const d = filtered[i]!;
       findingCounts.set(d.ruleId, (findingCounts.get(d.ruleId) ?? 0) + 1);
     }
   }
@@ -290,7 +252,7 @@ export async function evaluateRules(
 }
 
 export async function evaluateRulesCoarseToFine(
-  workflows: (WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument)[],
+  workflows: AnyWorkflowDocument[],
   context: RuleContext,
   warnings?: AnalysisWarning[],
   findingCounts?: Map<string, number>,
@@ -299,30 +261,34 @@ export async function evaluateRulesCoarseToFine(
   if (workflows.length === 0) {
     return [];
   }
-  const isBuildkite = isPipelineDocument(workflows[0]!);
-  const isGitlab = isGitlabCiDocument(workflows[0]!);
-  const isCircle = isCircleCiDocument(workflows[0]!);
 
-  const rulesByScope = await getRulesByScope();
-  const allRules = [
-    ...(rulesByScope["github-actions"] ?? []),
-    ...(rulesByScope.buildkite ?? []),
-    ...(rulesByScope["gitlab-ci"] ?? []),
-    ...(rulesByScope.circleci ?? []),
-    ...(rulesByScope.all ?? []),
-  ];
+  const docKind = workflows[0]!.kind;
+  const rules = await getRulesForKind(docKind);
+  const allRules = rules as unknown as readonly AnyRuleModule[];
 
   const inferenceGraph = buildInferenceGraph(allRules);
   const evaluatedRuleIds = new Set<string>();
   const firedRuleIds = new Set<string>();
 
-  const workflowResults = workflows.map(() => [] as Diagnostic[]);
-  const workflowIndexByRef = new Map<
-    WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument,
-    number
-  >();
-  for (const [index, workflow] of workflows.entries()) {
-    workflowIndexByRef.set(workflow, index);
+  const workflowResults = new Array<Diagnostic[]>(workflows.length);
+  for (let i = 0; i < workflowResults.length; i++) {
+    workflowResults[i] = [];
+  }
+  const workflowIndexByRef = new Map<AnyWorkflowDocument, number>();
+  for (let i = 0; i < workflows.length; i++) {
+    workflowIndexByRef.set(workflows[i]!, i);
+  }
+
+  const prewarmCache = new Map<string, Record<string, unknown>>();
+  function getWfFactsState(wf: AnyWorkflowDocument): Record<string, unknown> {
+    const path = wf.relativePath;
+    let state = prewarmCache.get(path);
+    if (!state) {
+      prewarmStepAnalysisCaches(wf);
+      state = getWorkflowFacts(wf) as unknown as Record<string, unknown>;
+      prewarmCache.set(path, state);
+    }
+    return state;
   }
 
   for (const rule of allRules) {
@@ -331,23 +297,19 @@ export async function evaluateRulesCoarseToFine(
     }
 
     const ruleId = rule.meta.id;
-
     evaluatedRuleIds.add(ruleId);
 
     const { maxFindings, precheckBudget = 20 } = rule.meta;
-
-    const checkFn = getRuleCheckFn(rule, isBuildkite, isGitlab, isCircle);
     const precheck = rule.meta.precheck;
 
     let candidates: ScoredWorkflow[];
     if (precheck) {
-      const scored = workflows.map((w) => ({ workflow: w, score: precheck(w) }));
-      candidates = scored
-        .filter((s) => s.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, precheckBudget);
+      candidates = selectTopK(workflows, precheck, precheckBudget);
     } else {
-      candidates = workflows.map((w) => ({ workflow: w, score: 1 }));
+      candidates = new Array<ScoredWorkflow>(workflows.length);
+      for (let i = 0; i < workflows.length; i++) {
+        candidates[i] = { workflow: workflows[i]!, score: 1 };
+      }
     }
 
     if (candidates.length === 0) {
@@ -360,7 +322,8 @@ export async function evaluateRulesCoarseToFine(
       continue;
     }
 
-    for (const { workflow } of candidates) {
+    for (let ci = 0; ci < candidates.length; ci++) {
+      const { workflow } = candidates[ci]!;
       const workflowPath = workflow.relativePath;
       context.measureCompleteness?.evaluatedWorkflowPaths.add(workflowPath);
 
@@ -374,7 +337,13 @@ export async function evaluateRulesCoarseToFine(
         continue;
       }
 
-      if (!matchesFeatureMask(rule.meta.requiredFeatures, workflow as WorkflowDocument)) {
+      const wfFactsState = getWfFactsState(workflow);
+      const rmeta = rule.meta;
+      const featurePred =
+        rmeta.featurePredicate ??
+        (rule as AnyRuleModule & { featurePredicate?: (state: Record<string, unknown>) => boolean })
+          .featurePredicate;
+      if (featurePred && !featurePred(wfFactsState)) {
         context.measureCompleteness?.skippedGates.add(ruleId);
         pushAnalysisWarning(warnings, {
           kind: "gate-skipped",
@@ -384,12 +353,8 @@ export async function evaluateRulesCoarseToFine(
         continue;
       }
 
-      const rmetaB: RuleMeta = rule.meta;
-      const skipPred = rmetaB.skipIf;
-      if (
-        skipPred &&
-        shouldSkipForWorkflow(skipPred, workflow as WorkflowDocument, context.allWorkflows)
-      ) {
+      const skipPred = rmeta.skipIf;
+      if (skipPred && shouldSkipForWorkflow(skipPred, workflow, context.allWorkflows)) {
         context.measureCompleteness?.skippedGates.add(ruleId);
         pushAnalysisWarning(warnings, {
           kind: "gate-skipped",
@@ -399,8 +364,7 @@ export async function evaluateRulesCoarseToFine(
         continue;
       }
 
-      prewarmStepAnalysisCaches(workflow);
-      if (rule.nodeTypes && !rule.nodeTypes.some((kind) => workflowContainsKind(workflow, kind))) {
+      if (rule.nodeTypes && !rule.nodeTypes.some((nk) => workflowContainsKind(workflow, nk))) {
         context.measureCompleteness?.skippedGates.add(ruleId);
         pushAnalysisWarning(warnings, {
           kind: "gate-skipped",
@@ -409,9 +373,10 @@ export async function evaluateRulesCoarseToFine(
         });
         continue;
       }
+
       const workflowSemantics =
         context.workflowSemantics instanceof Map
-          ? context.workflowSemantics.get(workflow as WorkflowDocument)
+          ? context.workflowSemantics.get(workflow as never)
           : context.workflowSemantics;
       const perWorkflowContext: RuleContext =
         workflowSemantics !== undefined ? { ...context, workflowSemantics } : context;
@@ -420,7 +385,7 @@ export async function evaluateRulesCoarseToFine(
         workflowPath,
         context,
         warnings,
-        () => checkFn(workflow, perWorkflowContext),
+        () => rule.check(workflow as never, perWorkflowContext),
       );
       const diagnostics = applyMaxFindings(rawDiagnostics, maxFindings, ruleId, {
         source: workflowPath,
@@ -434,7 +399,10 @@ export async function evaluateRulesCoarseToFine(
 
       const workflowIndex = workflowIndexByRef.get(workflow);
       if (workflowIndex !== undefined) {
-        workflowResults[workflowIndex]!.push(...diagnostics);
+        const target = workflowResults[workflowIndex]!;
+        for (let j = 0; j < diagnostics.length; j++) {
+          target.push(diagnostics[j]!);
+        }
       }
       if (findingCounts) {
         findingCounts.set(ruleId, (findingCounts.get(ruleId) ?? 0) + diagnostics.length);
@@ -450,10 +418,91 @@ export async function evaluateRulesCoarseToFine(
     }
   }
 
-  driftDetectionRefiner(firedRuleIds, evaluatedRuleIds, inferenceGraph).refine(
-    workflowResults.flat(),
-    { warnings },
-  );
+  let combined: Diagnostic[];
+  if (workflowResults.length === 1) {
+    combined = workflowResults[0]!;
+  } else {
+    let totalLen = 0;
+    for (let i = 0; i < workflowResults.length; i++) {
+      totalLen += workflowResults[i]!.length;
+    }
+    combined = new Array<Diagnostic>(totalLen);
+    let offset = 0;
+    for (let i = 0; i < workflowResults.length; i++) {
+      const arr = workflowResults[i]!;
+      for (let j = 0; j < arr.length; j++) {
+        combined[offset++] = arr[j]!;
+      }
+    }
+  }
 
-  return deduplicateRefiner().refine(workflowResults.flat(), {});
+  driftDetectionRefiner(firedRuleIds, evaluatedRuleIds, inferenceGraph).refine(combined, {
+    warnings,
+  });
+
+  return deduplicateRefiner().refine(combined, {});
+}
+
+function selectTopK(
+  workflows: AnyWorkflowDocument[],
+  precheck: (workflow: { source?: string }) => number,
+  budget: number,
+): ScoredWorkflow[] {
+  const n = workflows.length;
+  if (n === 0 || budget <= 0) {
+    return [];
+  }
+
+  if (budget >= n) {
+    const result = new Array<ScoredWorkflow>(n);
+    for (let i = 0; i < n; i++) {
+      const w = workflows[i]!;
+      const score = precheck(w);
+      result[i] = { workflow: w, score };
+    }
+    return result;
+  }
+
+  const top = new Array<{ workflow: AnyWorkflowDocument; score: number }>(budget);
+  let filled = 0;
+
+  for (let i = 0; i < n; i++) {
+    const w = workflows[i]!;
+    const score = precheck(w);
+    if (score <= 0) {
+      continue;
+    }
+
+    if (filled < budget) {
+      top[filled++] = { workflow: w, score };
+      if (filled === budget) {
+        top.sort((a, b) => b.score - a.score);
+      }
+    } else if (score > top[budget - 1]!.score) {
+      let lo = 0;
+      let hi = budget;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (top[mid]!.score >= score) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      for (let j = budget - 1; j > lo; j--) {
+        top[j] = top[j - 1]!;
+      }
+      top[lo] = { workflow: w, score };
+    }
+  }
+
+  if (filled < budget) {
+    const result = new Array<ScoredWorkflow>(filled);
+    for (let i = 0; i < filled; i++) {
+      result[i] = top[i]!;
+    }
+    return result;
+  }
+
+  return top as ScoredWorkflow[];
 }

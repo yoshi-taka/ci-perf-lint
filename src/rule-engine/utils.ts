@@ -1,16 +1,17 @@
 import type { AnalysisWarning } from "../types.ts";
-import type { AnyRuleModule } from "./types.ts";
+import type { AnyRuleModule, RulesByKind } from "./types.ts";
+import type { CiKind } from "../ci-types.ts";
 
-let _rulesByScope: Record<string, readonly AnyRuleModule[]> | null = null;
+let _rulesByKind: RulesByKind | null = null;
 
 const analysisWarningsEnabled = process.env.CI_PERF_LINT_DUMP_STATE === "1";
 
-export async function getRulesByScope(): Promise<Record<string, readonly AnyRuleModule[]>> {
-  if (!_rulesByScope) {
+export async function getRulesForKind(kind: CiKind): Promise<readonly AnyRuleModule[]> {
+  if (!_rulesByKind) {
     const mod = await import("../rules/index.ts");
-    _rulesByScope = mod.rulesByScope;
+    _rulesByKind = mod.rulesByKind;
   }
-  return _rulesByScope;
+  return _rulesByKind[kind];
 }
 
 export function pushAnalysisWarning(

@@ -22,8 +22,8 @@ function makeWorkflow(jobCount: number, stepsPerJob: number): WorkflowDocument {
   } as unknown as WorkflowDocument;
 }
 
-function allPairs(seq: ReturnType<typeof buildStepSequence>): Array<[number, number]> {
-  const pairs: Array<[number, number]> = [];
+function allPairs(seq: ReturnType<typeof buildStepSequence>): [number, number][] {
+  const pairs: [number, number][] = [];
   for (let i = 0; i < seq.positions.length; i++) {
     for (let j = i + 1; j < seq.positions.length; j++) {
       pairs.push([i, j]);
@@ -42,7 +42,7 @@ bench
   .add("computePairProximity > 4×8 steps, all pairs (496 pairs)", () => {
     let sum = 0;
     for (const [i, j] of pairs) {
-      sum += computePairProximity(seq.positions[i]!, seq.positions[j]!, seq.boundaries);
+      sum += computePairProximity(seq.positions[i], seq.positions[j], seq.boundaries);
     }
     return sum;
   })
@@ -51,8 +51,8 @@ bench
     const pos = seq.positions;
     for (let i = 0; i < pos.length; i++) {
       for (let j = i + 1; j < pos.length; j++) {
-        if (pos[i]!.jobId === pos[j]!.jobId) {
-          sum += computePairProximity(pos[i]!, pos[j]!, seq.boundaries);
+        if (pos[i].jobId === pos[j].jobId) {
+          sum += computePairProximity(pos[i], pos[j], seq.boundaries);
         }
       }
     }
@@ -63,8 +63,8 @@ bench
     const pos = seq.positions;
     for (let i = 0; i < pos.length; i++) {
       for (let j = i + 1; j < pos.length; j++) {
-        if (pos[i]!.jobId !== pos[j]!.jobId) {
-          sum += computePairProximity(pos[i]!, pos[j]!, seq.boundaries);
+        if (pos[i].jobId !== pos[j].jobId) {
+          sum += computePairProximity(pos[i], pos[j], seq.boundaries);
         }
       }
     }

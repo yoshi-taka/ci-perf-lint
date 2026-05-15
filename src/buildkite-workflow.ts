@@ -65,6 +65,7 @@ export interface PipelineStep {
 }
 
 export interface PipelineDocument {
+  readonly kind: "buildkite";
   path: string;
   relativePath: string;
   source?: string;
@@ -325,6 +326,7 @@ export function parsePipeline(
   }
 
   return {
+    kind: "buildkite" as const,
     path: fullPath,
     relativePath,
     source,

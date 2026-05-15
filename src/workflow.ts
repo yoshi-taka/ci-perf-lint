@@ -60,6 +60,7 @@ export interface WorkflowJob {
 }
 
 export interface WorkflowDocument {
+  readonly kind: "github-actions";
   path: string;
   relativePath: string;
   source?: string;
@@ -305,6 +306,7 @@ export function parseWorkflow(
   }
 
   return {
+    kind: "github-actions" as const,
     path: fullPath,
     relativePath,
     source,

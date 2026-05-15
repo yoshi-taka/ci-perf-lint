@@ -39,7 +39,7 @@ const PATTERNS: PatternDef[] = [
 ];
 
 function loadTextFixtures(): Map<string, string> {
-  const entries: Array<{ label: string; filePath: string }> = [
+  const entries: { label: string; filePath: string }[] = [
     { label: "small (sample ci.yml)", filePath: "sample-repo/.github/workflows/ci.yml" },
     { label: "medium (workflow-efficiency)", filePath: "workflow-efficiency-like/.github/workflows/ci.yml" },
     { label: "large (dd-trace-js)", filePath: "dd-trace-js/.github/workflows/test-optimization.yml" },
@@ -63,7 +63,7 @@ function loadTextFixtures(): Map<string, string> {
     "  - name: Build",
     "    run: docker build .",
   ];
-  for (let i = 0; i < 100; i++) generatedLines.push(...template);
+  for (let i = 0; i < 100; i++) {generatedLines.push(...template);}
   result.set("generated-100x", generatedLines.join("\n").toLowerCase());
 
   return result;

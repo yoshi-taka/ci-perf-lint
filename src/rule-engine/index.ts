@@ -1,2 +1,2 @@
-export type { RuleContext, AnyRuleModule } from "./types.ts";
+export type { RuleContext } from "./types.ts";
 export { evaluateRules, evaluateRulesCoarseToFine } from "./execute.ts";
