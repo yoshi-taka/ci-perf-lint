@@ -95,10 +95,10 @@ jobs:
           echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Publish scoped package
-        run: bun publish --access public --tag "${{ steps.meta.outputs.dist_tag }}"
+        run: npm publish --access public --tag "${{ steps.meta.outputs.dist_tag }}"
 
       - name: Publish unscoped package
-        run: cd packages/ci-perf-lint && bun publish --tag "${{ steps.meta.outputs.dist_tag }}"
+        run: cd packages/ci-perf-lint && npm publish --tag "${{ steps.meta.outputs.dist_tag }}"
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && !contains(github.ref_name, '-')
