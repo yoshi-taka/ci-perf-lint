@@ -164,8 +164,11 @@ export class RepositoryScanContext {
 
   async pathExists(targetPath: string): Promise<boolean> {
     if (this.#filePathSet) {
+      // Files visible in the rg file index return true immediately.
+      // Files NOT in the index fall through to the cached-stat path —
+      // they may exist but be gitignored.
       const relative = path.relative(this.repoRoot, targetPath);
-      if (this.#filePathSet.has(relative) || this.#filePathSet.has(targetPath)) {
+      if (this.#filePathSet.has(relative)) {
         return true;
       }
     }
@@ -186,6 +189,27 @@ export class RepositoryScanContext {
     this.#pathExistsLoads.set(targetPath, pathExistsLoad);
 
     return pathExistsLoad;
+  }
+
+  // Batch existence check for repo-root files.
+  // Uses the in-memory rg file index directly — no path.relative,
+  // no stat(), no microtask interleaving from async.
+  // Returns the first matching filename or null.
+  async findRootFile(filenames: readonly string[]): Promise<string | null> {
+    if (this.#filePathSet) {
+      for (const name of filenames) {
+        if (this.#filePathSet.has(name)) {
+          return name;
+        }
+      }
+      return null;
+    }
+    for (const name of filenames) {
+      if (await this.pathExists(this.resolve(name))) {
+        return name;
+      }
+    }
+    return null;
   }
 
   async readTextFileOrWarn(filePath: string): Promise<string | undefined> {

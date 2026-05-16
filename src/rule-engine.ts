@@ -1,4 +1,5 @@
 export {
+  type AnyRuleModule,
   type RuleContext,
   evaluateRules,
   evaluateRulesCoarseToFine,

@@ -1,12 +1,6 @@
 pre-commit:
   commands:
-    format:
-      glob: "{src,test,scripts}/**/*.ts"
-      run: bun x oxfmt --write {staged_files}
-      stage_fixed: true
-    lint-and-audit:
-      glob: "{src,test,scripts}/**/*.ts"
-      run: bun x oxlint --type-aware --type-check --fix {staged_files} && bun run audit:static
-    config-audit:
-      glob: "{knip.json,.fallowrc.json}"
+    lint-all:
+      run: bun run lint
+    audit-all:
       run: bun run audit:static

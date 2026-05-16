@@ -4,6 +4,7 @@ import { buildAiHandoff } from "./ai-handoff.ts";
 import { parsePipeline } from "./buildkite-workflow.ts";
 import { parseGitlabCi } from "./gitlab-ci-workflow.ts";
 import { parseCircleCi } from "./circleci-workflow.ts";
+import { toastifySource } from "./toastify.ts";
 import { collectWorkflowFiles, resolveWorkflowTarget } from "./fs.ts";
 import { aggregateFindingsWithMembers } from "./reporters.ts";
 import { RepositoryScanContext, LruMap } from "./repository-scan-context.ts";
@@ -163,16 +164,24 @@ async function parseWorkflowFile(
     }
 
     return parseWorkflow(workflowPath, repoRoot, source);
-  })().catch((error) => {
-    const current = parsedWorkflowCache.get(workflowPath);
-    if (current?.parsedWorkflow === parsedWorkflow) {
-      parsedWorkflowCache.delete(workflowPath);
-    }
-    throw error;
-  });
+  })();
 
-  parsedWorkflowCache.set(workflowPath, { source, parsedWorkflow });
-  return parsedWorkflow;
+  // TOAST: compress source after parsing, decompress lazily on first access
+  const wrapped = parsedWorkflow
+    .then((doc) => {
+      toastifySource(doc, source);
+      return doc;
+    })
+    .catch((error) => {
+      const current = parsedWorkflowCache.get(workflowPath);
+      if (current?.parsedWorkflow === wrapped) {
+        parsedWorkflowCache.delete(workflowPath);
+      }
+      throw error;
+    });
+
+  parsedWorkflowCache.set(workflowPath, { source, parsedWorkflow: wrapped });
+  return wrapped;
 }
 
 async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {

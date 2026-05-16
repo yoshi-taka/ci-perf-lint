@@ -86,20 +86,18 @@ export async function collectAvoidEslintPluginPrettierDiagnostics(
     configPatterns.push(/eslint-plugin-prettier/gi);
   }
 
-  for (const fileName of eslintConfigFileNames) {
-    const configPath = context.resolve(fileName);
-    if (!(await context.pathExists(configPath))) {
-      continue;
-    }
-    const configText = await context.readTextFileOrWarn(configPath);
-    if (!configText) {
-      continue;
-    }
-
-    const found = findEvidenceLocation(configText, configPatterns);
-    if (found) {
-      location = { path: fileName, line: found.line, column: found.column };
-      break;
+  // Find the first existing config file with a
+  // single synchronous pass through the in-memory file index, then
+  // read only that one file.  Avoids 14 sequential async pathExists
+  // calls that compete with parallel collectors for the event loop.
+  const foundConfig = await context.findRootFile(eslintConfigFileNames);
+  if (foundConfig) {
+    const configText = await context.readTextFileOrWarn(context.resolve(foundConfig));
+    if (configText) {
+      const found = findEvidenceLocation(configText, configPatterns);
+      if (found) {
+        location = { path: foundConfig, line: found.line, column: found.column };
+      }
     }
   }
 

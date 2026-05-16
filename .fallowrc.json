@@ -17,7 +17,7 @@
     "minLines": 5,
     "minTokens": 50
   },
-  "usedClassMembers": ["clear", "has", "ids", "prerequisites"],
+  "usedClassMembers": ["clear", "has", "ids", "prerequisites", "findRootFile"],
   "ignoreExports": [
     { "file": "src/rules/shared/diagnostic-transform.ts", "exports": ["hasAppliedTransform", "markTransformApplied", "getAppliedTransformLabels", "resetTransformTracking"] },
     { "file": "src/cli-option-resolver.ts", "exports": ["similarFlagDistanceLimit", "levenshteinDistance"] },
@@ -26,6 +26,8 @@
     { "file": "src/finding-grouping.ts", "exports": ["normalizeWorkflowText"] },
     { "file": "src/main.ts", "exports": ["parseArgs"] },
     { "file": "src/repository-diagnostics/index.ts", "exports": ["repositoryDiagnosticCollectors"] },
+    { "file": "src/rule-engine.ts", "exports": ["AnyRuleModule"] },
+    { "file": "src/rule-engine/index.ts", "exports": ["AnyRuleModule"] },
     { "file": "src/repository-similar-workflows-similarity.ts", "exports": ["collectConnectedComponents"] },
     { "file": "src/rules/shared/similar-workflow-consensus-consensus.ts", "exports": ["detectClusterInconsistency"] },
     { "file": "src/severity-promotion.ts", "exports": ["severityPromotionRules"] },
