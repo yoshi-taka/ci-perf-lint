@@ -171,8 +171,10 @@ Run lint + knip + tests after completing work, not incrementally during work.
 ```sh
 bun run lint
 bun run audit:static
-bun test --parallel
+bun run test
 ```
+
+`bun run test` wraps `bun test --parallel` with `AGENT=1` env and includes fuzz tests. Use `bun run test` not bare `bun test`.
 
 For narrow test iteration, prefer a specific Bun test file before the full suite.
 
