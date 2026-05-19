@@ -95,6 +95,7 @@ const emptyGateState: RepositoryDiagnosticGateState = {
   hasCdkManifest: false,
   hasElixirHeavyWorkflow: false,
   hasGradle: false,
+  hasJava: false,
 };
 
 function skippedGateResult(reason: string) {
@@ -120,6 +121,7 @@ const emptyGateResultRecord: GateResultRecord = {
   hasCdkManifest: skippedGateResult("not evaluated"),
   hasElixirHeavyWorkflow: skippedGateResult("not evaluated"),
   hasGradle: skippedGateResult("not evaluated"),
+  hasJava: skippedGateResult("not evaluated"),
 };
 
 function timingsEnabled(): boolean {
@@ -156,6 +158,7 @@ const gates = {
   cdkManifest: (s: RepositoryDiagnosticGateState) => s.hasCdkManifest,
   elixirHeavy: (s: RepositoryDiagnosticGateState) => s.hasElixirHeavyWorkflow,
   gradle: (s: RepositoryDiagnosticGateState) => s.hasGradle,
+  java: (s: RepositoryDiagnosticGateState) => s.hasJava,
 } as const;
 
 export const gateKeys = {
@@ -177,6 +180,7 @@ export const gateKeys = {
   cdkManifest: "hasCdkManifest",
   elixirHeavy: "hasElixirHeavyWorkflow",
   gradle: "hasGradle",
+  java: "hasJava",
 } as const satisfies Record<keyof typeof gates, GateKey>;
 
 export function buildGateProofs(state: RepositoryDiagnosticGateState): GateProofs {
@@ -212,6 +216,31 @@ function collectSignalGateState(
 
 async function repositoryHasCdkManifest(scanContext: RepositoryScanContext): Promise<boolean> {
   return scanContext.pathExists(scanContext.resolve("cdk.out", "manifest.json"));
+}
+
+async function checkForJavaFiles(scanContext: RepositoryScanContext): Promise<boolean> {
+  if (await scanContext.pathExists(scanContext.resolve("pom.xml"))) {
+    return true;
+  }
+
+  const rootEntries = await scanContext.readDirectoryEntries(scanContext.repoRoot);
+  const rootNames = new Set(rootEntries.map((e) => e.name));
+  if (rootNames.has("gradlew") || rootNames.has("gradlew.bat")) {
+    return true;
+  }
+  if (rootNames.has("build.gradle") || rootNames.has("build.gradle.kts")) {
+    return true;
+  }
+
+  const javaSrcExists = await Promise.all([
+    scanContext.pathExists(scanContext.resolve("src", "main", "java")),
+    scanContext.pathExists(scanContext.resolve("src", "test", "java")),
+  ]);
+  if (javaSrcExists.some(Boolean)) {
+    return true;
+  }
+
+  return false;
 }
 
 async function repositoryHasJavaScriptBuildConfigEvidence(
@@ -438,6 +467,9 @@ export async function collectRepositoryDiagnosticGateState(
   markResolved(results, "hasHusky", state.hasHusky);
   state.hasGradle = context.repository.frameworks.usesGradle;
   markResolved(results, "hasGradle", state.hasGradle);
+  state.hasJava = await checkForJavaFiles(context.scanContext);
+  markResolved(results, "hasJava", state.hasJava);
+  observability.observed.push("hasJava");
 
   const jsObservations = buildJavaScriptGateObservations(context);
 

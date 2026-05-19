@@ -48,6 +48,8 @@ Current rule registry:
 - `go-test-repeats-vet-after-go-vet`
 - `gradle-parallel-not-enabled`
 - `hatch-without-uv-installer`
+- `java-cds-opportunity-for-repeated-startup`
+- `java-production-image-uses-jdk-runtime`
 - `large-jest-snapshot`
 - `matrix-test-job-without-test-sharding`
 - `missing-angular-cli-cache`

@@ -1,4 +1,5 @@
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
+import { collectJavaCdsOpportunityDiagnostics } from "./java-cds-opportunity.ts";
 import type { Diagnostic } from "../types.ts";
 import type { GatedContext, GateKey, RepositoryDiagnosticContext } from "./collector-types.ts";
 import {
@@ -49,6 +50,11 @@ export const repositoryDiagnosticCollectors = [
     gate: gateKeys.gradle,
     collect: (context: GatedContext<"hasGradle">) =>
       collectGradleParallelNotEnabledDiagnostics(context),
+  } as const,
+  {
+    id: "java-cds-opportunity-for-repeated-startup",
+    gate: gateKeys.java,
+    collect: (context: GatedContext<"hasJava">) => collectJavaCdsOpportunityDiagnostics(context),
   } as const,
 ] as const;
 
