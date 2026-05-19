@@ -14,7 +14,7 @@ import {
   collectDockerfileImageSizeDiagnostics,
   collectNodeDockerfileInstallDiagnostics,
 } from "./docker-image-diagnostics.ts";
-import { collectJavaProductionImageUsesJdkRuntimeDiagnostics } from "./java-docker-jdk-runtime.ts";
+import { collectJvmProductionImageUsesJdkRuntimeDiagnostics } from "./jvm-docker-jdk-runtime.ts";
 
 interface DockerDiagnosticsOptions {
   warnings?: AnalysisWarning[];
@@ -75,7 +75,7 @@ export async function collectDockerBuildDiagnostics(
       scanContext,
       featureIndex,
     ),
-    collectJavaProductionImageUsesJdkRuntimeDiagnostics(
+    collectJvmProductionImageUsesJdkRuntimeDiagnostics(
       repoRoot,
       repository,
       targets,

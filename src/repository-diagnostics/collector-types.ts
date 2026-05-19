@@ -30,7 +30,7 @@ const GATE_DEFINITIONS = {
   hasCdkManifest: {},
   hasElixirHeavyWorkflow: {},
   hasGradle: {},
-  hasJava: {},
+  hasJvm: {},
 } as const satisfies Record<string, object>;
 
 export type GateKey = keyof typeof GATE_DEFINITIONS;
@@ -61,7 +61,7 @@ export interface RepositoryDiagnosticGateState {
   hasCdkManifest: boolean;
   hasElixirHeavyWorkflow: boolean;
   hasGradle: boolean;
-  hasJava: boolean;
+  hasJvm: boolean;
 }
 
 type _GateStateExhaustiveCheck = keyof RepositoryDiagnosticGateState extends GateKey

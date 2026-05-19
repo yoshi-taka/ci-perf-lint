@@ -153,6 +153,16 @@ function createSignals(): RepositorySignals {
     elixir: { hasMixExs: false, hasToolVersions: false },
     hatch: { usesHatch: false, usesUvInstaller: false },
     pdm: { usesPdm: false, usesUv: false },
+    jvm: {
+      usesJvm: false,
+      usesJava: false,
+      usesKotlin: false,
+      usesScala: false,
+      usesGroovy: false,
+      usesSpringBoot: false,
+      usesMaven: false,
+      usesGradle: false,
+    },
   };
 }
 

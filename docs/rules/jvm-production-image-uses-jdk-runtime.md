@@ -1,4 +1,4 @@
-# java-production-image-uses-jdk-runtime
+# jvm-production-image-uses-jdk-runtime
 
 ## What It Does
 

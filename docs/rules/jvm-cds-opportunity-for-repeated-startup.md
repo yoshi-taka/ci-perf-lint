@@ -1,4 +1,4 @@
-# java-cds-opportunity-for-repeated-startup
+# jvm-cds-opportunity-for-repeated-startup
 
 ## What It Does
 

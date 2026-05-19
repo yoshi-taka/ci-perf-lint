@@ -10,10 +10,10 @@ import {
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 const meta = {
-  id: "java-production-image-uses-jdk-runtime",
+  id: "jvm-production-image-uses-jdk-runtime",
   severity: "warning",
   confidence: "medium",
-  docsPath: "docs/rules/java-production-image-uses-jdk-runtime.md",
+  docsPath: "docs/rules/jvm-production-image-uses-jdk-runtime.md",
 } satisfies RuleMeta;
 
 const DEV_TEST_PATH_PATTERN =
@@ -140,7 +140,7 @@ function instructionIsPackageManagerInstall(instruction: CollectedDockerfileInst
 }
 
 // eslint-disable-next-line max-params
-export async function collectJavaProductionImageUsesJdkRuntimeDiagnostics(
+export async function collectJvmProductionImageUsesJdkRuntimeDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
   targets: DockerBuildTarget[],
@@ -277,7 +277,7 @@ export async function collectJavaProductionImageUsesJdkRuntimeDiagnostics(
           line: finalFromInstruction.startLine,
           column: 1,
         },
-        message: `The final Docker image in ${dockerfileRelativePath} appears to use a full JDK even though it only runs a Java application.`,
+        message: `The final Docker image in ${dockerfileRelativePath} appears to use a full JDK even though it only runs a JVM application.`,
         why:
           "A JDK includes development tools that are usually unnecessary in production runtime images. " +
           "Keeping them in the final image can increase image size, push/pull time, vulnerability scanner findings, and runtime attack surface.",

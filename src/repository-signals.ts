@@ -27,6 +27,7 @@ import {
   collectTailwindSignals,
   collectTypeScriptSignals,
 } from "./repository-tooling-signals.ts";
+import { collectJvmSignals } from "./repository-jvm-signals.ts";
 
 const repositorySignalsCache = new LruMap<
   string,
@@ -147,6 +148,41 @@ async function hasElixirSignalEvidence(
     context.pathExists(context.resolve(".tool-versions")),
   ]);
   return matches.some(Boolean);
+}
+
+async function hasJvmSignalEvidence(
+  context: RepositoryScanContext,
+  workflows: WorkflowDocument[],
+): Promise<boolean> {
+  if (anyWorkflowHasToolFeature(workflows, "hasFrameworkSignal")) {
+    return true;
+  }
+
+  const jvmEvidenceFiles = [
+    "pom.xml",
+    "mvnw",
+    "mvnw.cmd",
+    "build.gradle",
+    "build.gradle.kts",
+    "gradlew",
+    "gradlew.bat",
+    "settings.gradle",
+    "settings.gradle.kts",
+    "build.sbt",
+  ];
+  const fileMatches = await Promise.all(
+    jvmEvidenceFiles.map((f) => context.pathExists(context.resolve(f))),
+  );
+  if (fileMatches.some(Boolean)) {
+    return true;
+  }
+
+  const srcDirMatches = await Promise.all(
+    ["src/main/java", "src/test/java", "src/main/kotlin", "src/test/kotlin"].map((d) =>
+      context.pathExists(context.resolve(d)),
+    ),
+  );
+  return srcDirMatches.some(Boolean);
 }
 
 async function hasNativePackageSignalEvidence(
@@ -427,6 +463,7 @@ export async function collectRepositorySignals(
     hasTailwindEvidence,
     hasHuskyEvidence,
     hasBabelEvidence,
+    hasJvmEvidence,
   ] = await Promise.all([
     hasPythonSignalEvidence(context, workflows),
     hasRustSignalEvidence(context, workflows),
@@ -440,6 +477,7 @@ export async function collectRepositorySignals(
     hasTailwindSignalEvidence(context, workflows, packageJsonText),
     hasHuskySignalEvidence(context, workflows, packageJsonText),
     hasBabelSignalEvidence(context, workflows, packageJsonText),
+    hasJvmSignalEvidence(context, workflows),
   ]);
 
   const [
@@ -457,6 +495,7 @@ export async function collectRepositorySignals(
     rustSignals,
     babelSignals,
     elixirSignals,
+    jvmSignals,
   ] = await Promise.all([
     collectSignalIf(hasEslintEvidence, "eslint", context, collectEslintSignals, {
       usesEslint: false,
@@ -587,6 +626,16 @@ export async function collectRepositorySignals(
       hasMixExs: false,
       hasToolVersions: false,
     }),
+    collectSignalIf(hasJvmEvidence, "jvm", context, collectJvmSignals, {
+      usesJvm: false,
+      usesJava: false,
+      usesKotlin: false,
+      usesScala: false,
+      usesGroovy: false,
+      usesSpringBoot: false,
+      usesMaven: false,
+      usesGradle: false,
+    }),
   ]);
 
   const result = {
@@ -627,6 +676,7 @@ export async function collectRepositorySignals(
       rust: rustSignals,
       babel: babelSignals,
       elixir: elixirSignals,
+      jvm: jvmSignals,
     },
     warnings: [...warnings],
   };

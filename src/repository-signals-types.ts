@@ -270,4 +270,14 @@ export interface RepositorySignals {
     erlangVersion?: string;
     elixirVersion?: string;
   };
+  jvm: {
+    usesJvm: boolean;
+    usesJava: boolean;
+    usesKotlin: boolean;
+    usesScala: boolean;
+    usesGroovy: boolean;
+    usesSpringBoot: boolean;
+    usesMaven: boolean;
+    usesGradle: boolean;
+  };
 }

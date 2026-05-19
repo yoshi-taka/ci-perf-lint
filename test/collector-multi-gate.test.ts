@@ -22,7 +22,7 @@ function makeResults(overrides?: Partial<GateResultRecord>): GateResultRecord {
     hasCdkManifest: { status: "skipped", reason: "not evaluated" },
     hasElixirHeavyWorkflow: { status: "skipped", reason: "not evaluated" },
     hasGradle: { status: "skipped", reason: "not evaluated" },
-    hasJava: { status: "skipped", reason: "not evaluated" },
+    hasJvm: { status: "skipped", reason: "not evaluated" },
     ...overrides,
   };
   return r;

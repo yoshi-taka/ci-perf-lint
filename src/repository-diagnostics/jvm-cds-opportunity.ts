@@ -3,10 +3,10 @@ import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 
 const meta = {
-  id: "java-cds-opportunity-for-repeated-startup",
+  id: "jvm-cds-opportunity-for-repeated-startup",
   severity: "warning",
   confidence: "medium",
-  docsPath: "docs/rules/java-cds-opportunity-for-repeated-startup.md",
+  docsPath: "docs/rules/jvm-cds-opportunity-for-repeated-startup.md",
 } satisfies RuleMeta;
 
 const JVM_COMMAND_PATTERNS: RegExp[] = [
@@ -45,7 +45,7 @@ const BOOSTER_PATTERNS: { pattern: RegExp; label: string; score: number }[] = [
   { pattern: /\bsurefire\b|\bfailsafe\b/i, label: "surefire-failsafe", score: 2 },
 ];
 
-export function collectJavaCdsOpportunityDiagnostics(
+export function collectJvmCdsOpportunityDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Diagnostic[] {
   const { predicateIndex, workflows, repository } = context;
@@ -162,7 +162,7 @@ export function collectJavaCdsOpportunityDiagnostics(
     buildRepositoryDiagnostic(repository, meta, {
       location,
       message:
-        "Java tests appear to repeatedly start short-lived JVMs, but no CDS/AppCDS configuration was detected.",
+        "JVM tests appear to repeatedly start short-lived JVMs, but no CDS/AppCDS configuration was detected.",
       why:
         "Class Data Sharing (CDS/AppCDS) can reduce startup and class-loading overhead by reusing shared class metadata across JVM launches. " +
         "This introduces archive generation/setup cost, so benefits depend on how often similar JVM startup patterns repeat in CI.",
@@ -172,7 +172,7 @@ export function collectJavaCdsOpportunityDiagnostics(
       measurementHint:
         "Compare total workflow duration, archive generation/setup cost, JVM startup count, and average startup latency before and after CDS/AppCDS adoption.",
       aiHandoff:
-        "Review Java CI/test workflows for repeated short-lived JVM startup patterns. " +
+        "Review JVM CI/test workflows for repeated short-lived JVM startup patterns. " +
         "If startup overhead appears significant, prototype CDS/AppCDS in test workflows and measure total CI duration impact. " +
         "Avoid changing production JVM policy unless the organization intentionally allows environment-specific tuning.",
       score,

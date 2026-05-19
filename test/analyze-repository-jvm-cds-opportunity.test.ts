@@ -3,9 +3,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getFixtureReport, tempDirs } from "./repository-diagnostics-test-helpers.ts";
 
-const javaCdsRuleId = "java-cds-opportunity-for-repeated-startup";
+const jvmCdsRuleId = "jvm-cds-opportunity-for-repeated-startup";
 
-describe("analyzeRepository java-cds-opportunity-for-repeated-startup", () => {
+describe("analyzeRepository jvm-cds-opportunity-for-repeated-startup", () => {
   test.serial("detects repeated short-lived JVM startup without CDS (Maven pom.xml)", async () => {
     const fixtureRoot = await tempDirs.create("apl-java-cds-maven-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
@@ -40,7 +40,7 @@ describe("analyzeRepository java-cds-opportunity-for-repeated-startup", () => {
       mode: "strict",
     });
 
-    const finding = report.findings.find((c) => c.ruleId === javaCdsRuleId);
+    const finding = report.findings.find((c) => c.ruleId === jvmCdsRuleId);
     expect(finding).toBeDefined();
     expect(finding?.message).toContain("CDS/AppCDS");
     expect(finding?.severity).toBe("warning");
@@ -79,7 +79,7 @@ describe("analyzeRepository java-cds-opportunity-for-repeated-startup", () => {
       mode: "strict",
     });
 
-    const finding = report.findings.find((c) => c.ruleId === javaCdsRuleId);
+    const finding = report.findings.find((c) => c.ruleId === jvmCdsRuleId);
     expect(finding).toBeDefined();
     expect(finding?.score).toBeGreaterThan(30);
   });
@@ -113,7 +113,7 @@ describe("analyzeRepository java-cds-opportunity-for-repeated-startup", () => {
       mode: "strict",
     });
 
-    expect(report.findings.some((c) => c.ruleId === javaCdsRuleId)).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === jvmCdsRuleId)).toBe(false);
   });
 
   test.serial("does not trigger for single JVM execution", async () => {
@@ -143,7 +143,7 @@ describe("analyzeRepository java-cds-opportunity-for-repeated-startup", () => {
       mode: "strict",
     });
 
-    expect(report.findings.some((c) => c.ruleId === javaCdsRuleId)).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === jvmCdsRuleId)).toBe(false);
   });
 
   test.serial("does not trigger for release-only workflows", async () => {
@@ -175,6 +175,6 @@ describe("analyzeRepository java-cds-opportunity-for-repeated-startup", () => {
       mode: "strict",
     });
 
-    expect(report.findings.some((c) => c.ruleId === javaCdsRuleId)).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === jvmCdsRuleId)).toBe(false);
   });
 });

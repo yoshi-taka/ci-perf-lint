@@ -10,7 +10,7 @@ afterEach(async () => {
   await tempDirs.cleanup();
 });
 
-const ruleId = "java-production-image-uses-jdk-runtime";
+const ruleId = "jvm-production-image-uses-jdk-runtime";
 
 async function createWorkflow(fixtureRoot: string, workflowName: string): Promise<string> {
   const workflowDir = path.join(fixtureRoot, ".github", "workflows");
@@ -42,7 +42,7 @@ async function analyze(fixtureRoot: string) {
   });
 }
 
-describe("analyzeRepository java-production-image-uses-jdk-runtime", () => {
+describe("analyzeRepository jvm-production-image-uses-jdk-runtime", () => {
   test.serial("single-stage JDK image running java -jar triggers finding", async () => {
     const fixtureRoot = await tempDirs.create("apl-jdk-runtime-single-");
     await createWorkflow(fixtureRoot, "docker");

@@ -173,6 +173,16 @@ function createSignals(): RepositorySignals {
       hasMixExs: false,
       hasToolVersions: false,
     },
+    jvm: {
+      usesJvm: false,
+      usesJava: false,
+      usesKotlin: false,
+      usesScala: false,
+      usesGroovy: false,
+      usesSpringBoot: false,
+      usesMaven: false,
+      usesGradle: false,
+    },
   };
 }
 
