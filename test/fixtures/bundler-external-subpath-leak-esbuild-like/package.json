@@ -1,0 +1,14 @@
+{
+  "name": "bundler-external-subpath-leak-esbuild-like",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  },
+  "scripts": {
+    "build": "esbuild src/app.tsx --external:react --external:react-dom --bundle"
+  }
+}

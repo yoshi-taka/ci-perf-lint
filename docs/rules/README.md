@@ -10,6 +10,7 @@ Current rule registry:
 - `async-test-uses-sync-testclient`
 - `avoid-brew-update-on-hosted-macos`
 - `avoid-broad-upload-artifact`
+- `bundler-external-subpath-leak`
 - `avoid-c-drive-on-windows-runner`
 - `avoid-docker-image-via-uses`
 - `avoid-eslint-plugin-prettier`

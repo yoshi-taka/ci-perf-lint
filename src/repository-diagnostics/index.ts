@@ -1,3 +1,4 @@
+import { collectBundlerExternalSubpathLeakDiagnostics } from "./bundler-external-subpath-leak.ts";
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import { collectJvmCdsOpportunityDiagnostics } from "./jvm-cds-opportunity.ts";
 import type { Diagnostic } from "../types.ts";
@@ -45,6 +46,12 @@ export const repositoryDiagnosticCollectors = [
   ...cdkDiagnosticCollectors,
   ...elixirDiagnosticCollectors,
   ...toolDiagnosticCollectors,
+  {
+    id: "bundler-external-subpath-leak",
+    gate: gateKeys.javascriptTooling,
+    collect: (context: GatedContext<"hasJavaScriptTooling">) =>
+      collectBundlerExternalSubpathLeakDiagnostics(context),
+  } as const,
   {
     id: "gradle-parallel-not-enabled",
     gate: gateKeys.gradle,
