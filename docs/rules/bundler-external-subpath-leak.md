@@ -142,3 +142,21 @@ repository root:
 
 It then scans all `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, and `.cjs` source files
 for import/require statements to detect subpath imports of externalized packages.
+
+## Transitive Detection via `node_modules`
+
+When `node_modules` is present, this rule also checks the `exports` field of each
+externalized package's `package.json`. If a package declares subpath exports (e.g.
+`"./query/react"` or `"./jsx-runtime"`) but is listed as a root-only external, the rule
+warns even when your own source code does not directly import those subpaths.
+
+This catches **transitive bundling**: the package's own internal code uses subpath
+imports, which the bundler inlines into your output because only the root name was
+externalized.
+
+```js
+// vite.config - @reduxjs/toolkit declares ./query/react in its exports map
+external: ["@reduxjs/toolkit"] // ❌ ./query/react still gets bundled transitively
+```
+
+This check is skipped automatically when `node_modules` is not installed.

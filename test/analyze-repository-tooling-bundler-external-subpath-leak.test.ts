@@ -93,4 +93,37 @@ describe("analyzeRepository repo-aware rules: bundler-external-subpath-leak", ()
       expect(findings.length).toBe(0);
     });
   });
+
+  describe("node_modules exports transitive check", () => {
+    test("warns when installed package declares subpath exports and external is root-only", async () => {
+      const report = await getFixtureReport(
+        fixtures.bundlerExternalSubpathLeakNodeModulesLike,
+        baseOptions,
+      );
+
+      const findings = report.findings.filter((c) => c.ruleId === "bundler-external-subpath-leak");
+
+      expect(findings.length).toBe(1);
+
+      const f = findings[0]!;
+      expect(f.message).toContain("@reduxjs/toolkit");
+      expect(f.message).toContain("subpath exports");
+      expect(f.scope).toBe("repository");
+      expect(f.severity).toBe("warning");
+      expect(f.location.path).toBe("vite.config.js");
+      expect(f.why).toContain("transitive bundling");
+      expect(f.suggestion).toContain("RegExp");
+      expect(f.score).toBe(55);
+    });
+
+    test("does not warn when external uses RegExp covering subpaths", async () => {
+      const report = await getFixtureReport(
+        fixtures.bundlerExternalSubpathLeakNodeModulesOk,
+        baseOptions,
+      );
+
+      const findings = report.findings.filter((c) => c.ruleId === "bundler-external-subpath-leak");
+      expect(findings.length).toBe(0);
+    });
+  });
 });

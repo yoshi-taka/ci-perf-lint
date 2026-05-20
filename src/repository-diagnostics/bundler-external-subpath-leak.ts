@@ -1,5 +1,6 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
+import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 const CONFIG_CANDIDATES = [
@@ -69,6 +70,8 @@ function extractExternalArrayPackages(text: string): {
           : (entry.split("/")[0] ?? entry);
         if (pkg && pkg !== entry) {
           wildcardPackages.add(pkg);
+        } else {
+          rootOnly.push(entry);
         }
       } else {
         rootOnly.push(entry);
@@ -210,6 +213,47 @@ function basePackageName(specifier: string): string {
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 
+async function readInstalledPackageSubpathExports(
+  scanContext: RepositoryScanContext,
+  pkgName: string,
+): Promise<string[] | null> {
+  const pkgJsonPath = scanContext.resolve(`node_modules/${pkgName}/package.json`);
+  const exists = await scanContext.pathExists(pkgJsonPath);
+  if (!exists) {
+    return null;
+  }
+
+  const text = await scanContext.readTextFileOrWarn(pkgJsonPath);
+  if (!text) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    return null;
+  }
+
+  const exports = (parsed as Record<string, unknown>).exports;
+  if (typeof exports !== "object" || exports === null || Array.isArray(exports)) {
+    return null;
+  }
+
+  const subpaths: string[] = [];
+  for (const key of Object.keys(exports as Record<string, unknown>)) {
+    if (key === "." || key === "./*" || !key.startsWith("./")) {
+      continue;
+    }
+    subpaths.push(key);
+  }
+  return subpaths;
+}
+
 export async function collectBundlerExternalSubpathLeakDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
@@ -286,15 +330,13 @@ export async function collectBundlerExternalSubpathLeakDiagnostics(
       configWildcard = cfg.wildcardPackages;
     }
 
-    rootOnlyByConfig.set(fileName, new Set(configRootOnly.filter((p) => allDeps.has(p))));
+    rootOnlyByConfig.set(fileName, new Set(configRootOnly));
     wildcardClustersByConfig.set(fileName, configWildcard);
   }
 
   let allRootOnly = new Set(rootOnlyByConfig.values().flatMap((s) => [...s]));
   for (const pkgName of cliExternals.rootOnly) {
-    if (allDeps.has(pkgName)) {
-      allRootOnly.add(pkgName);
-    }
+    allRootOnly.add(pkgName);
   }
 
   if (
@@ -350,6 +392,32 @@ export async function collectBundlerExternalSubpathLeakDiagnostics(
     }
   }
 
+  // — node_modules exports check —
+  // For root-only externals that have no subpath imports detected in source,
+  // check whether the installed package itself declares subpath exports.
+  // When it does, its internal imports (transitive subpaths) are likely to be
+  // bundled even though the root is marked external.
+  const pkgsWithExportsButNoSourceSubpath = new Set<string>();
+  const exampleSubpathsByPkg = new Map<string, string[]>();
+
+  await Promise.all(
+    [...allRootOnly].map(async (pkgName) => {
+      if (allWildcardPackages.has(pkgName)) {
+        return;
+      }
+
+      if (subpathImportsByPkg.has(pkgName)) {
+        return;
+      }
+
+      const subpaths = await readInstalledPackageSubpathExports(scanContext, pkgName);
+      if (subpaths && subpaths.length > 0) {
+        pkgsWithExportsButNoSourceSubpath.add(pkgName);
+        exampleSubpathsByPkg.set(pkgName, subpaths.slice(0, 3));
+      }
+    }),
+  );
+
   const diagnostics: Diagnostic[] = [];
 
   for (const [pkgName, subpaths] of subpathImportsByPkg) {
@@ -399,6 +467,44 @@ export async function collectBundlerExternalSubpathLeakDiagnostics(
           "Compare bundle size and module resolution output before and after adding subpath coverage. Tools like `vite build --stats` or `esbuild --metafile` can surface whether subpath modules still appear in the bundle.",
         aiHandoff: `Review the bundler external configuration in ${configNames.join(", ")} for package "${pkgName}". The project imports subpath exports ${exampleStr}${more} which may not be covered by root-only external entries. Add subpath or wildcard entries or switch to a predicate-based external function.`,
         score: 60,
+      }),
+    );
+  }
+
+  // node_modules-based transitive subpath leak findings
+  for (const pkgName of pkgsWithExportsButNoSourceSubpath) {
+    const configsForPkg: string[] = [];
+
+    for (const [fileName, pkgs] of rootOnlyByConfig) {
+      if (pkgs.has(pkgName)) {
+        configsForPkg.push(fileName);
+      }
+    }
+
+    if (cliExternals.rootOnly.includes(pkgName)) {
+      configsForPkg.push("package.json (scripts)");
+    }
+
+    if (configsForPkg.length === 0) {
+      continue;
+    }
+
+    const examples = exampleSubpathsByPkg.get(pkgName) ?? [];
+    const exampleList = examples.map((s) => `"${pkgName}${s.slice(1)}"`).join(", ");
+
+    diagnostics.push(
+      buildRepositoryDiagnostic(repository, meta, {
+        location: {
+          path: configsForPkg[0] ?? ".github/workflows/ci.yml",
+          line: 1,
+          column: 1,
+        },
+        message: `External config in ${configsForPkg.join(", ")} matches only package root "${pkgName}", but the installed package declares subpath exports such as ${exampleList}. These subpaths are likely bundled transitively, causing unexpected dependency inclusion, larger artifacts, and additional build or deploy work.`,
+        why: `Most bundlers treat external entries as exact module IDs. A root-only entry like 'external: ["@reduxjs/toolkit"]' does not cover subpath imports like '@reduxjs/toolkit/query/react' that the package itself uses internally. This causes transitive bundling of peer dependency subpaths, increasing bundle size.`,
+        suggestion: `Replace the string entry for "${pkgName}" with a RegExp: new RegExp("^${pkgName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\/|$)") , or use a predicate function.`,
+        measurementHint: `Compare bundle size before and after switching to a RegExp external. Tools like 'vite build --stats' or 'source-map-explorer' can confirm whether subpath modules still appear in the bundle.`,
+        aiHandoff: `Review the bundler external configuration in ${configsForPkg.join(", ")} for package "${pkgName}". The installed package declares subpath exports (${exampleList}) that are likely bundled transitively. Replace the root-only string external with a RegExp or predicate that covers all subpaths.`,
+        score: 55,
       }),
     );
   }

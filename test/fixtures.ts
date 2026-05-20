@@ -35,6 +35,8 @@ const fixtureNames = {
   bundlerExternalSubpathLeakTsupLike: "bundler-external-subpath-leak-tsup-like",
   bundlerExternalSubpathLeakViteLike: "bundler-external-subpath-leak-vite-like",
   bundlerExternalSubpathLeakWildcardOk: "bundler-external-subpath-leak-wildcard-ok",
+  bundlerExternalSubpathLeakNodeModulesLike: "bundler-external-subpath-leak-node-modules-like",
+  bundlerExternalSubpathLeakNodeModulesOk: "bundler-external-subpath-leak-node-modules-ok",
   gitlabCiTimeoutLike: "gitlab-ci-timeout-like",
   gitlabCiTimeoutOk: "gitlab-ci-timeout-ok",
   circleciFullCloneLike: "circleci-full-clone-like",
