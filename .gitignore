@@ -10,6 +10,8 @@ CPU.*.md
 .rule-coverage-matrix.json
 artifacts
 node_modules
+!test/fixtures/*/node_modules/
+!test/fixtures/*/node_modules/**
 docs/internal
 site/.astro
 site/dist
