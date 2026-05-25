@@ -4,3 +4,9 @@ pre-commit:
       run: bun run lint
     audit-all:
       run: bun run audit:static
+
+pre-push:
+  commands:
+    tag-version-match:
+      run: bash scripts/check-tag-version.sh
+      priority: 1
