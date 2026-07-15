@@ -6,7 +6,7 @@ import { fixtures } from "./fixtures.ts";
 import { getFixtureReport, tempDirs } from "./repository-diagnostics-test-helpers.ts";
 
 describe("analyzeRepository repo-aware and tooling rules: repository diagnostics", () => {
-  test("detects large barrel files with the embedded oxlint scan", async () => {
+  test("keeps embedded oxlint barrel findings after its pre-signal prewarm", async () => {
     const report = await getFixtureReport(fixtures.barrelFileLike, {
       targetPath: ".",
       topCount: 20,

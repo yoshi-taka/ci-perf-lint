@@ -1,9 +1,9 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import path from "node:path";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { getTerraformFileIndex } from "./terraform-files.ts";
 
 const meta = {
   id: "terraform-github-app-auth",
@@ -81,16 +81,8 @@ export async function collectTerraformGitHubAppAuthDiagnostics(
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
   const diagnostics: Diagnostic[] = [];
 
-  for await (const tfPath of context.walkFilesIter(".", {
-    ignoredDirectories: new Set([".git", "node_modules", ".terraform"]),
-    include: (candidatePath) => candidatePath.endsWith(".tf"),
-  })) {
-    const fullPath = path.join(repoRoot, tfPath);
-    const content = await context.readTextFileOrWarn(fullPath);
-    if (!content) {
-      continue;
-    }
-
+  const { files } = await getTerraformFileIndex(context);
+  for (const { relativePath: tfPath, content } of files) {
     PROVIDER_GITHUB_RE.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = PROVIDER_GITHUB_RE.exec(content)) !== null) {

@@ -239,10 +239,11 @@ export async function collectPythonTopLevelHeavyClientInitDiagnostics(
   const repositoryHasLambdaHints = await repositoryHasLambdaMarkers(context);
   const diagnostics: Diagnostic[] = [];
 
-  for await (const relativePath of context.walkFilesIter(".", {
-    include: (candidate) => /^src\/.*\.py$/i.test(candidate) && !pathExcludePattern.test(candidate),
-    cacheKey: "src-python-files",
-  })) {
+  for (const relativePath of await context.pythonFiles()) {
+    if (!/^src\/.*\.py$/i.test(relativePath) || pathExcludePattern.test(relativePath)) {
+      continue;
+    }
+
     if (repositoryHasLambdaHints && lambdaPathPattern.test(relativePath)) {
       continue;
     }

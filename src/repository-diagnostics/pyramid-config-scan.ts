@@ -89,15 +89,15 @@ export async function collectPyramidConfigScanDiagnostics(
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const pyFiles = await context.walkFiles(".", {
-    cacheKey: "pyramid-py-files",
-    ignoredDirectories: new Set([".git", "node_modules", ".venv", "venv", "__pycache__", ".tox"]),
-    include: (relativePath) => relativePath.endsWith(".py"),
-  });
+  const pyFiles = await context.pythonFiles();
 
   const diagnostics: Diagnostic[] = [];
 
   for (const relativePath of pyFiles) {
+    if (!relativePath.endsWith(".py")) {
+      continue;
+    }
+
     const filePath = context.resolve(relativePath);
     const text = await context.readTextFileOrWarn(filePath);
     if (!text) {

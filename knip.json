@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": ["packages/ci-perf-lint/**", "test/fixtures/**", "test/arbitraries/index.ts", ".astro/**"],
   "ignoreDependencies": [],
-  "ignoreBinaries": ["hyperfine"],
+  "ignoreBinaries": ["hyperfine", "rg", "which"],
   "ignoreIssues": {
     "src/repository-similar-workflows-similarity.ts": ["exports"],
     "src/rules/shared/similar-workflow-consensus-consensus.ts": ["exports"],

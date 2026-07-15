@@ -21,11 +21,9 @@ import type {
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
 import type { AnyWorkflowDocument, CiKind } from "./ci-types.ts";
-import {
-  collectEmbeddedOxlintImportJsonDiagnostics,
-  collectEmbeddedOxlintDiagnosticsByCode,
-} from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
+import type { EmbeddedOxlintScanPlan } from "./repository-diagnostics/embedded-oxlint-config.ts";
+import { prewarmEmbeddedOxlint } from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectJobSummaries } from "./repository-similar-workflows-job-summaries.ts";
 import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
@@ -132,6 +130,23 @@ function uniqueWarnings(warnings: AnalysisWarning[]): AnalysisWarning[] {
   return deduped;
 }
 
+async function conservativeEmbeddedOxlintScanPlan(
+  scanContext: RepositoryScanContext,
+): Promise<EmbeddedOxlintScanPlan> {
+  const likelyJavaScript = await scanContext.findRootFile([
+    "package.json",
+    "tsconfig.json",
+    "jsconfig.json",
+  ]);
+  const enabled = likelyJavaScript !== null;
+  return {
+    importExtensions: enabled,
+    restrictedImports: enabled,
+    barrels: enabled,
+    snapshots: enabled,
+  };
+}
+
 async function parseWorkflowFile(
   workflowPath: string,
   repoRoot: string,
@@ -204,22 +219,6 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
       );
     }
   }
-  const shouldPrewarmEmbeddedOxlint =
-    !workflowOnly &&
-    process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM !== "1" &&
-    (await scanContext.pathExists(scanContext.resolve("package.json")));
-  if (shouldPrewarmEmbeddedOxlint) {
-    void collectEmbeddedOxlintImportJsonDiagnostics(target.repoRoot, undefined, scanContext);
-    void collectEmbeddedOxlintDiagnosticsByCode(
-      target.repoRoot,
-      "oxc(no-barrel-file)",
-      undefined,
-      scanContext,
-    );
-  }
-  timer.mark(
-    shouldPrewarmEmbeddedOxlint ? "embedded-oxlint-prewarm" : "embedded-oxlint-prewarm-skipped",
-  );
 
   const allWorkflowFiles = await collectWorkflowFiles(target);
   timer.mark("list-workflows");
@@ -278,6 +277,18 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   );
 
   const jobSummaries = collectJobSummaries(githubWorkflows);
+  let prewarmedEmbeddedOxlint = false;
+  if (!workflowOnly && process.env.AGENT !== "1") {
+    const embeddedOxlintPlan = await conservativeEmbeddedOxlintScanPlan(scanContext);
+    if (Object.values(embeddedOxlintPlan).some(Boolean)) {
+      // Do not attach background warnings to the user-facing report.
+      void prewarmEmbeddedOxlint(target.repoRoot, embeddedOxlintPlan, scanContext).catch(() => {});
+      prewarmedEmbeddedOxlint = true;
+    }
+  }
+  timer.mark(
+    prewarmedEmbeddedOxlint ? "embedded-oxlint-prewarm" : "embedded-oxlint-prewarm-skipped",
+  );
   const repositoryAnalysis = await collectRepositorySignals(
     target.repoRoot,
     githubWorkflows,

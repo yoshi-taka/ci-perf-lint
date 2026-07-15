@@ -4,10 +4,11 @@ import { LruMap } from "../repository-scan-context.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
   cleanupEmbeddedOxlintTempConfigFiles,
-  type EmbeddedOxlintScanKind,
+  type EmbeddedOxlintScanPlan,
   type OxlintDiagnostic,
   runEmbeddedOxlint,
 } from "./embedded-oxlint-runner.ts";
+import { allEmbeddedOxlintScanPlan } from "./embedded-oxlint-config.ts";
 
 export interface EmbeddedOxlintDiagnostic {
   diagnostic: OxlintDiagnostic;
@@ -18,14 +19,10 @@ interface IndexedRestrictedImportDiagnostic extends EmbeddedOxlintDiagnostic {
   source?: string;
 }
 
-const embeddedOxlintImportScanCache = new LruMap<string, Promise<OxlintDiagnostic[] | undefined>>(
+const embeddedOxlintScanCache = new LruMap<string, Promise<OxlintDiagnostic[] | undefined>>(
   64,
   300_000,
 );
-const embeddedOxlintNonImportScanCache = new LruMap<
-  string,
-  Promise<OxlintDiagnostic[] | undefined>
->(64, 300_000);
 const embeddedOxlintDiagnosticsByCodeCache = new LruMap<
   string,
   Promise<EmbeddedOxlintDiagnostic[] | undefined>
@@ -43,6 +40,27 @@ const restrictedImportDiagnosticIndexCache = new LruMap<
 process.on("exit", () => {
   cleanupEmbeddedOxlintTempConfigFiles().catch(() => {});
 });
+
+const embeddedOxlintPlans = new WeakMap<RepositoryScanContext, EmbeddedOxlintScanPlan>();
+
+export function setEmbeddedOxlintScanPlan(
+  scanContext: RepositoryScanContext,
+  plan: EmbeddedOxlintScanPlan,
+): void {
+  embeddedOxlintPlans.set(scanContext, plan);
+}
+
+function embeddedOxlintScanPlan(
+  scanContext: RepositoryScanContext | undefined,
+): EmbeddedOxlintScanPlan {
+  return scanContext
+    ? (embeddedOxlintPlans.get(scanContext) ?? allEmbeddedOxlintScanPlan)
+    : allEmbeddedOxlintScanPlan;
+}
+
+function embeddedOxlintScanPlanKey(plan: EmbeddedOxlintScanPlan): string {
+  return `${Number(plan.importExtensions)}${Number(plan.restrictedImports)}${Number(plan.barrels)}${Number(plan.snapshots)}`;
+}
 
 function normalizeOxlintFilename(repoRoot: string, filename: string | undefined): string {
   if (!filename || filename.trim().length === 0) {
@@ -66,42 +84,32 @@ export function isVendoredDiagnosticPath(relativePath: string): boolean {
   );
 }
 
-function embeddedOxlintScanKindForCode(code: string): EmbeddedOxlintScanKind {
-  return code === "eslint(no-restricted-imports)" || code === "eslint-plugin-import(extensions)"
-    ? "import"
-    : "non-import";
-}
-
-function embeddedOxlintScanCacheForKind(kind: EmbeddedOxlintScanKind) {
-  return kind === "import" ? embeddedOxlintImportScanCache : embeddedOxlintNonImportScanCache;
-}
-
 async function collectEmbeddedOxlintJsonDiagnostics(
   repoRoot: string,
-  kind: EmbeddedOxlintScanKind,
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
+  plan = embeddedOxlintScanPlan(scanContext),
 ): Promise<OxlintDiagnostic[] | undefined> {
-  const scanCache = embeddedOxlintScanCacheForKind(kind);
-  const cached = scanCache.get(repoRoot);
+  const cacheKey = `${repoRoot}\n${embeddedOxlintScanPlanKey(plan)}`;
+  const cached = embeddedOxlintScanCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
   const promise = (async () => {
-    return runEmbeddedOxlint(repoRoot, kind, warnings, scanContext);
+    return runEmbeddedOxlint(repoRoot, plan, warnings, scanContext);
   })();
 
-  scanCache.set(repoRoot, promise);
+  embeddedOxlintScanCache.set(cacheKey, promise);
   return promise;
 }
 
-export async function collectEmbeddedOxlintImportJsonDiagnostics(
+export function prewarmEmbeddedOxlint(
   repoRoot: string,
-  warnings?: AnalysisWarning[],
-  scanContext?: RepositoryScanContext,
+  plan: EmbeddedOxlintScanPlan,
+  scanContext: RepositoryScanContext,
 ): Promise<OxlintDiagnostic[] | undefined> {
-  return collectEmbeddedOxlintJsonDiagnostics(repoRoot, "import", warnings, scanContext);
+  return collectEmbeddedOxlintJsonDiagnostics(repoRoot, undefined, scanContext, plan);
 }
 
 export async function collectEmbeddedOxlintDiagnosticsByCode(
@@ -110,19 +118,14 @@ export async function collectEmbeddedOxlintDiagnosticsByCode(
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<EmbeddedOxlintDiagnostic[] | undefined> {
-  const cacheKey = `${repoRoot}\n${code}`;
+  const cacheKey = `${repoRoot}\n${code}\n${embeddedOxlintScanPlanKey(embeddedOxlintScanPlan(scanContext))}`;
   const cached = embeddedOxlintDiagnosticsByCodeCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
   const diagnosticsLoad = (async () => {
-    const diagnostics = await collectEmbeddedOxlintJsonDiagnostics(
-      repoRoot,
-      embeddedOxlintScanKindForCode(code),
-      warnings,
-      scanContext,
-    );
+    const diagnostics = await collectEmbeddedOxlintJsonDiagnostics(repoRoot, warnings, scanContext);
     if (!diagnostics) {
       return undefined;
     }
@@ -166,13 +169,15 @@ const globLikeImportPatternSuffixes: ReadonlyMap<string, string> = new Map([
 async function collectRestrictedImportDiagnosticIndex(
   repoRoot: string,
   warnings?: AnalysisWarning[],
+  scanContext?: RepositoryScanContext,
 ): Promise<{
   diagnostics: IndexedRestrictedImportDiagnostic[];
   diagnosticsWithSource: IndexedRestrictedImportDiagnostic[];
   diagnosticsBySource: Map<string, IndexedRestrictedImportDiagnostic[]>;
   diagnosticsByImportSuffix: Map<string, IndexedRestrictedImportDiagnostic[]>;
 }> {
-  const cached = restrictedImportDiagnosticIndexCache.get(repoRoot);
+  const cacheKey = `${repoRoot}\n${embeddedOxlintScanPlanKey(embeddedOxlintScanPlan(scanContext))}`;
+  const cached = restrictedImportDiagnosticIndexCache.get(cacheKey);
   if (cached) {
     return cached;
   }
@@ -183,6 +188,7 @@ async function collectRestrictedImportDiagnosticIndex(
         repoRoot,
         "eslint(no-restricted-imports)",
         warnings,
+        scanContext,
       )) ?? [];
     const indexedDiagnostics = diagnostics.map((entry) => ({
       ...entry,
@@ -227,7 +233,7 @@ async function collectRestrictedImportDiagnosticIndex(
       diagnosticsByImportSuffix,
     };
   })();
-  restrictedImportDiagnosticIndexCache.set(repoRoot, indexLoad);
+  restrictedImportDiagnosticIndexCache.set(cacheKey, indexLoad);
 
   return indexLoad;
 }
@@ -235,11 +241,12 @@ async function collectRestrictedImportDiagnosticIndex(
 export async function collectIndexedRestrictedImportDiagnostics(
   repoRoot: string,
   warnings?: AnalysisWarning[],
+  scanContext?: RepositoryScanContext,
 ): Promise<{
   diagnostics: IndexedRestrictedImportDiagnostic[];
   diagnosticsWithSource: IndexedRestrictedImportDiagnostic[];
   diagnosticsBySource: Map<string, IndexedRestrictedImportDiagnostic[]>;
   diagnosticsByImportSuffix: Map<string, IndexedRestrictedImportDiagnostic[]>;
 }> {
-  return collectRestrictedImportDiagnosticIndex(repoRoot, warnings);
+  return collectRestrictedImportDiagnosticIndex(repoRoot, warnings, scanContext);
 }

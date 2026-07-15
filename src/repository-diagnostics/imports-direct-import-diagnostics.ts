@@ -86,7 +86,7 @@ export async function collectRestrictedImportRepositoryDiagnostics(
     [
       context.loadDependencyIndex(),
       repositoryUsesMui(context),
-      collectIndexedRestrictedImportDiagnostics(repoRoot, warnings),
+      collectIndexedRestrictedImportDiagnostics(repoRoot, warnings, scanContext),
     ],
   );
 

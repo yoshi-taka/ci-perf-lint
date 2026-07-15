@@ -2,6 +2,7 @@ import { packageJsonHasDependency } from "../repository-package-helpers.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
+import { largeFileCandidateIndex } from "./large-file-candidates.ts";
 import { workflowStepTextMatches } from "../rules/shared/workflow-analysis.ts";
 import { type GradedEvidence, strong, medium, weak } from "../rules/shared/evidence.ts";
 
@@ -121,43 +122,6 @@ export function repositoryUsesViteFamily(repository: RepositorySignals): boolean
   return usesVite || usesAstro || usesSvelteKit || usesSolidStart;
 }
 
-const largeFileSuffixes = [
-  ".csv",
-  ".tsv",
-  ".jsonl",
-  ".ndjson",
-  ".parquet",
-  ".pdf",
-  ".zip",
-  ".tar",
-  ".tgz",
-  ".tar.gz",
-  ".gz",
-  ".bz2",
-  ".7z",
-  ".rar",
-  ".exe",
-  ".dmg",
-  ".pkg",
-  ".msi",
-  ".war",
-  ".ear",
-  ".bin",
-  ".dat",
-  ".dump",
-];
-
-const largeFileIgnoredDirs: ReadonlySet<string> = new Set([
-  ".git",
-  "node_modules",
-  "vendor",
-  "dist",
-  "build",
-  ".next",
-  ".turbo",
-  "coverage",
-]);
-
 const pytestConfigFileNames = ["pytest.ini", "pyproject.toml", "setup.cfg", "tox.ini"] as const;
 
 export async function repositoryLooksPytestHeavy(
@@ -182,15 +146,8 @@ export async function repositoryLooksPytestHeavy(
 export async function repositoryLooksLargeFilesHeavy(
   scanContext: RepositoryScanContext,
 ): Promise<GradedEvidence<boolean>> {
-  for await (const _relativePath of scanContext.walkFilesIter(".", {
-    ignoredDirectories: largeFileIgnoredDirs,
-    include: (relativePath: string) => {
-      const lower = relativePath.toLowerCase();
-      return largeFileSuffixes.some((suffix) => lower.endsWith(suffix));
-    },
-  })) {
+  if ((await largeFileCandidateIndex(scanContext).gate()).length > 0) {
     return strong(true, "large file suffix found");
   }
-
   return weak(false);
 }

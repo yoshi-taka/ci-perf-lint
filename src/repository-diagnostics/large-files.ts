@@ -1,11 +1,10 @@
 import { stat } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import { rootOnlyArtifactDirs, subdirArtifactDirs } from "./waste-patterns.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
+import { largeFileCandidateIndex } from "./large-file-candidates.ts";
 
 const meta = {
   id: "detected-large-files",
@@ -13,53 +12,6 @@ const meta = {
   confidence: "high",
   docsPath: "docs/rules/detected-large-files.md",
 } satisfies RuleMeta;
-
-const largeFileSuffixes = [
-  ".csv",
-  ".tsv",
-  ".jsonl",
-  ".ndjson",
-  ".parquet",
-  ".pdf",
-  ".zip",
-  ".tar",
-  ".tgz",
-  ".tar.gz",
-  ".gz",
-  ".bz2",
-  ".7z",
-  ".rar",
-  ".exe",
-  ".dmg",
-  ".pkg",
-  ".msi",
-  ".war",
-  ".ear",
-  ".bin",
-  ".dat",
-  ".dump",
-];
-
-const largeFileIgnoredDirs: ReadonlySet<string> = new Set([
-  ".git",
-  "node_modules",
-  "vendor",
-  "dist",
-  "build",
-  ".next",
-  ".turbo",
-  "coverage",
-  ...subdirArtifactDirs,
-]);
-
-function isLargeFileIgnoredPath(relativePath: string): boolean {
-  const segments = relativePath.replace(/\\/g, "/").split("/");
-  if (segments.length < 2) {
-    return false;
-  }
-  const firstSegment = segments[0];
-  return rootOnlyArtifactDirs.includes(firstSegment as (typeof rootOnlyArtifactDirs)[number]);
-}
 
 function isCsvDataFile(relativePath: string): boolean {
   const lower = relativePath.toLowerCase();
@@ -91,35 +43,6 @@ interface ScannedFile {
   isCsvData: boolean;
 }
 
-const gitTrackedFilesCache = new Map<string, Promise<string[] | null>>();
-
-async function getGitTrackedFiles(repoRoot: string): Promise<string[] | null> {
-  const cached = gitTrackedFilesCache.get(repoRoot);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const promise = (async (): Promise<string[] | null> => {
-    try {
-      const proc = spawn("git", ["-C", repoRoot, "ls-files", "-z"], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      const chunks: Buffer[] = [];
-      for await (const chunk of proc.stdout) {
-        chunks.push(chunk);
-      }
-      const stdout = Buffer.concat(chunks).toString("utf8");
-      const exitCode = await new Promise<number>((resolve) => {
-        proc.on("close", resolve);
-      });
-      return exitCode !== 0 || !stdout ? null : stdout.split("\0").filter(Boolean);
-    } catch {
-      return null;
-    }
-  })();
-  gitTrackedFilesCache.set(repoRoot, promise);
-  return promise;
-}
-
 export async function collectLargeFileDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
@@ -133,18 +56,7 @@ export async function collectLargeFileDiagnostics(
     return [];
   }
 
-  const isLargeFile = (p: string) => largeFileSuffixes.some((s) => p.toLowerCase().endsWith(s));
-
-  const gitFiles = await getGitTrackedFiles(repoRoot);
-  let candidates: string[] = gitFiles
-    ? gitFiles.filter(isLargeFile)
-    : await ctx.walkFiles(".", {
-        cacheKey: "large-files-scan",
-        ignoredDirectories: largeFileIgnoredDirs,
-        include: isLargeFile,
-      });
-
-  candidates = candidates.filter((p) => !isLargeFileIgnoredPath(p));
+  const candidates = await largeFileCandidateIndex(ctx).collector();
 
   if (candidates.length === 0) {
     return [];

@@ -3,6 +3,7 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
+import { getTerraformFileIndex } from "./terraform-files.ts";
 
 const meta = {
   id: "terraform-lockfile-missing",
@@ -20,13 +21,7 @@ export async function collectTerraformLockfileDiagnostics(
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
 
-  const lockFiles: string[] = [];
-  for await (const relativePath of context.walkFilesIter(".", {
-    ignoredDirectories: new Set([".git", "node_modules"]),
-    include: (candidatePath) => candidatePath.endsWith(".terraform.lock.hcl"),
-  })) {
-    lockFiles.push(relativePath);
-  }
+  const { lockFiles } = await getTerraformFileIndex(context);
 
   if (lockFiles.length > 0) {
     return [];

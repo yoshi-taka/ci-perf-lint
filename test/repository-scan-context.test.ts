@@ -153,6 +153,23 @@ describe("RepositoryScanContext", () => {
     expect(firstFiles).toEqual(["first.snap"]);
   });
 
+  test("shares a cached index of Python files within a scan", async () => {
+    const repoRoot = await tempDirs.create("actions-perf-context-python-files-");
+    await mkdir(path.join(repoRoot, "src"), { recursive: true });
+    await mkdir(path.join(repoRoot, "node_modules", "dependency"), { recursive: true });
+    await writeFile(path.join(repoRoot, "src", "app.py"), "pass\n");
+    await writeFile(path.join(repoRoot, "src", "module.PY"), "pass\n");
+    await writeFile(path.join(repoRoot, "node_modules", "dependency", "ignored.py"), "pass\n");
+
+    const context = new RepositoryScanContext(repoRoot, []);
+    const firstFiles = await context.pythonFiles();
+    await writeFile(path.join(repoRoot, "src", "added.py"), "pass\n");
+    const secondFiles = await context.pythonFiles();
+
+    expect(firstFiles).toBe(secondFiles);
+    expect([...firstFiles].sort()).toEqual(["src/app.py", "src/module.PY"]);
+  });
+
   test("keeps raw text and records a warning for invalid package.json", async () => {
     const repoRoot = await tempDirs.create("actions-perf-context-invalid-");
     const packageJsonPath = path.join(repoRoot, "package.json");

@@ -1,9 +1,9 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import path from "node:path";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { getTerraformFileIndex } from "./terraform-files.ts";
 
 const meta = {
   id: "terraform-github-slow-resources",
@@ -90,20 +90,8 @@ export async function collectTerraformGitHubSlowResourcesDiagnostics(
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
 
   let usesGitHubProvider = false;
-  const tfFiles: { relativePath: string; content: string }[] = [];
-
-  for await (const tfPath of context.walkFilesIter(".", {
-    ignoredDirectories: new Set([".git", "node_modules", ".terraform"]),
-    include: (candidatePath) => candidatePath.endsWith(".tf"),
-  })) {
-    const fullPath = path.join(repoRoot, tfPath);
-    const content = await context.readTextFileOrWarn(fullPath);
-    if (!content) {
-      continue;
-    }
-
-    tfFiles.push({ relativePath: tfPath, content });
-
+  const { files } = await getTerraformFileIndex(context);
+  for (const { content } of files) {
     if (!usesGitHubProvider && GITHUB_PROVIDER_RE.test(content)) {
       usesGitHubProvider = true;
     }
@@ -116,7 +104,7 @@ export async function collectTerraformGitHubSlowResourcesDiagnostics(
   const diagnostics: Diagnostic[] = [];
   const resourceRe = new RegExp(`resource\\s+"(${TARGET_RESOURCE_PATTERN})"`, "g");
 
-  for (const { relativePath, content } of tfFiles) {
+  for (const { relativePath, content } of files) {
     resourceRe.lastIndex = 0;
 
     let match: RegExpExecArray | null;

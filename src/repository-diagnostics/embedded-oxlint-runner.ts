@@ -1,7 +1,7 @@
 import type { AnalysisWarning } from "../types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
-  type EmbeddedOxlintScanKind,
+  type EmbeddedOxlintScanPlan,
   writeEmbeddedOxlintConfig,
 } from "./embedded-oxlint-config.ts";
 import type { OxlintDiagnostic } from "./embedded-oxlint-parser.ts";
@@ -10,7 +10,7 @@ import { bundledOxlintBinPath, bundledOxlintJsPath } from "./embedded-oxlint-pat
 import { EMBEDDED_OXLINT_TIMEOUT_MS, spawnOxlintProcess } from "./embedded-oxlint-spawn.ts";
 import { stderrWarn } from "../stderr-warn.ts";
 
-export type { EmbeddedOxlintScanKind } from "./embedded-oxlint-config.ts";
+export type { EmbeddedOxlintScanPlan } from "./embedded-oxlint-config.ts";
 export { cleanupEmbeddedOxlintTempConfigFiles } from "./embedded-oxlint-config.ts";
 export type { OxlintDiagnostic } from "./embedded-oxlint-parser.ts";
 
@@ -35,13 +35,11 @@ function timingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
 }
 
-function embeddedOxlintLabel(kind: EmbeddedOxlintScanKind): string {
-  return kind === "import" ? "embedded-oxlint-import" : "embedded-oxlint-non-import";
-}
+const embeddedOxlintLabel = "embedded-oxlint";
 
 export async function runEmbeddedOxlint(
   repoRoot: string,
-  kind: EmbeddedOxlintScanKind,
+  plan: EmbeddedOxlintScanPlan,
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
   spawnOxlint = spawnOxlintProcess,
@@ -136,32 +134,33 @@ export async function runEmbeddedOxlint(
   try {
     const localWarnings: AnalysisWarning[] = [];
     const context = scanContext ?? new RepositoryScanContext(repoRoot, localWarnings);
-    const source = embeddedOxlintLabel(kind);
-    const configPath = await writeEmbeddedOxlintConfig(kind);
+    const source = embeddedOxlintLabel;
+    const configPath = await writeEmbeddedOxlintConfig(plan);
     const startedAt = performance.now();
-    let result = await runOxlintWithFallbacks(context, configPath);
-
-    if (
-      result?.exitCode !== undefined &&
-      result.exitCode !== 0 &&
-      result.diagnostics.length === 0 &&
-      !result.timedOut
-    ) {
-      const fixtureRetryResult = await runOxlintWithFallbacks(context, configPath);
-      if (fixtureRetryResult) {
-        result = fixtureRetryResult;
+    const runTargets = async (): Promise<OxlintRunResult | undefined> => {
+      let result = await runOxlintWithFallbacks(context, configPath);
+      if (
+        result?.exitCode !== undefined &&
+        result.exitCode !== 0 &&
+        result.diagnostics.length === 0 &&
+        !result.timedOut
+      ) {
+        const fixtureRetryResult = await runOxlintWithFallbacks(context, configPath);
+        if (fixtureRetryResult) {
+          result = fixtureRetryResult;
+        }
       }
-    }
+      return result;
+    };
+
+    const result = await runTargets();
 
     const usedFallback = result?.exitCode === 0;
 
     const elapsedMs = performance.now() - startedAt;
 
     if (result === undefined) {
-      const skipped =
-        kind === "import"
-          ? "import restriction and extension checks"
-          : "barrel file and snapshot checks";
+      const skipped = "import, barrel file, and snapshot checks";
       stderrWarn(
         `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
       );
@@ -169,10 +168,7 @@ export async function runEmbeddedOxlint(
     }
 
     if (result.timedOut) {
-      const skipped =
-        kind === "import"
-          ? "import restriction and extension checks"
-          : "barrel file and snapshot checks";
+      const skipped = "import, barrel file, and snapshot checks";
       if (result.diagnostics.length === 0) {
         stderrWarn(
           `[${source}] Oxlint scan timed out after ${EMBEDDED_OXLINT_TIMEOUT_MS}ms. ${skipped} skipped for ${repoRoot}.\n`,
@@ -185,10 +181,7 @@ export async function runEmbeddedOxlint(
     }
 
     if (result.exitCode !== 0 && result.diagnostics.length === 0) {
-      const skipped =
-        kind === "import"
-          ? "import restriction and extension checks"
-          : "barrel file and snapshot checks";
+      const skipped = "import, barrel file, and snapshot checks";
       const code = result.exitCode;
       if (code > 128) {
         stderrWarn(
@@ -220,7 +213,7 @@ export async function runEmbeddedOxlint(
     const localWarnings: AnalysisWarning[] = [];
     const context = new RepositoryScanContext(repoRoot, localWarnings);
     context.warn(
-      embeddedOxlintLabel(kind),
+      embeddedOxlintLabel,
       `Embedded Oxlint scan failed for ${repoRoot}: ${error instanceof Error ? error.message : String(error)}`,
     );
     warnings?.push(...localWarnings);

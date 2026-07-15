@@ -3,8 +3,9 @@ import { bundledOxlintBinPath } from "../src/repository-diagnostics/embedded-oxl
 import { parseOxlintLine } from "../src/repository-diagnostics/embedded-oxlint-parser.ts";
 import { spawnOxlintProcess } from "../src/repository-diagnostics/embedded-oxlint-spawn.ts";
 import { runEmbeddedOxlint } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
+import { allEmbeddedOxlintScanPlan } from "../src/repository-diagnostics/embedded-oxlint-config.ts";
 import { accessSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -51,7 +52,13 @@ describe("embedded oxlint fixture retry", () => {
         };
       };
 
-      const result = await runEmbeddedOxlint(tmpDir, "non-import", undefined, undefined, fakeSpawn);
+      const result = await runEmbeddedOxlint(
+        tmpDir,
+        allEmbeddedOxlintScanPlan,
+        undefined,
+        undefined,
+        fakeSpawn,
+      );
       expect(result).toEqual([]);
       expect(calls).toHaveLength(2);
       expect(calls[1]!.join(" ")).toContain("**/fixtures/**");
@@ -210,6 +217,59 @@ describe("parseOxlintLine", () => {
 });
 
 describe("runEmbeddedOxlint with mock spawn", () => {
+  test("combines import and non-import rules into one scan config", async () => {
+    let configPath = "";
+    const fakeSpawn = (cmd: string[]) => {
+      configPath = cmd[cmd.indexOf("-c") + 1]!;
+      return {
+        stdout: Promise.resolve(""),
+        stderr: Promise.resolve(""),
+        exited: Promise.resolve(0),
+        timedOut: false,
+        signaled: false,
+      };
+    };
+    await runEmbeddedOxlint("/tmp", allEmbeddedOxlintScanPlan, undefined, undefined, fakeSpawn);
+
+    const config = JSON.parse(await readFile(configPath, "utf8")) as {
+      plugins: string[];
+      rules: Record<string, unknown>;
+    };
+    expect(config.plugins).toEqual(["import", "jest", "oxc"]);
+    expect(config.rules).toHaveProperty("no-restricted-imports");
+    expect(config.rules).toHaveProperty("import/extensions");
+    expect(config.rules).toHaveProperty("jest/no-large-snapshots");
+    expect(config.rules).toHaveProperty("oxc/no-barrel-file");
+  });
+
+  test("writes only planned rule groups", async () => {
+    let configPath = "";
+    const fakeSpawn = (cmd: string[]) => {
+      configPath = cmd[cmd.indexOf("-c") + 1]!;
+      return {
+        stdout: Promise.resolve(""),
+        stderr: Promise.resolve(""),
+        exited: Promise.resolve(0),
+        timedOut: false,
+        signaled: false,
+      };
+    };
+    await runEmbeddedOxlint(
+      "/tmp",
+      { importExtensions: true, restrictedImports: false, barrels: false, snapshots: false },
+      undefined,
+      undefined,
+      fakeSpawn,
+    );
+
+    const config = JSON.parse(await readFile(configPath, "utf8")) as {
+      rules: Record<string, unknown>;
+    };
+    expect(config.rules).toEqual({
+      "import/extensions": ["warn", "always", { ignorePackages: true, checkTypeImports: false }],
+    });
+  });
+
   test("returns undefined on timeout with no output", async () => {
     const fakeSpawn = () => ({
       stdout: Promise.resolve(""),
@@ -218,7 +278,13 @@ describe("runEmbeddedOxlint with mock spawn", () => {
       timedOut: true,
       signaled: false,
     });
-    const result = await runEmbeddedOxlint("/tmp", "non-import", undefined, undefined, fakeSpawn);
+    const result = await runEmbeddedOxlint(
+      "/tmp",
+      allEmbeddedOxlintScanPlan,
+      undefined,
+      undefined,
+      fakeSpawn,
+    );
     expect(result).toBeUndefined();
   });
 
@@ -230,7 +296,13 @@ describe("runEmbeddedOxlint with mock spawn", () => {
       timedOut: true,
       signaled: false,
     });
-    const result = await runEmbeddedOxlint("/tmp", "non-import", undefined, undefined, fakeSpawn);
+    const result = await runEmbeddedOxlint(
+      "/tmp",
+      allEmbeddedOxlintScanPlan,
+      undefined,
+      undefined,
+      fakeSpawn,
+    );
     expect(result).toHaveLength(1);
     expect(result![0]!.code).toBe("oxc(no-barrel-file)");
   });
@@ -256,7 +328,13 @@ describe("runEmbeddedOxlint with mock spawn", () => {
         signaled: false,
       };
     };
-    const result = await runEmbeddedOxlint("/tmp", "non-import", undefined, undefined, fakeSpawn);
+    const result = await runEmbeddedOxlint(
+      "/tmp",
+      allEmbeddedOxlintScanPlan,
+      undefined,
+      undefined,
+      fakeSpawn,
+    );
     expect(result).toHaveLength(1);
     expect(callCount).toBe(2);
   });
@@ -276,7 +354,13 @@ describe("runEmbeddedOxlint with mock spawn", () => {
         signaled: false,
       };
     };
-    const result = await runEmbeddedOxlint("/tmp", "non-import", undefined, undefined, fakeSpawn);
+    const result = await runEmbeddedOxlint(
+      "/tmp",
+      allEmbeddedOxlintScanPlan,
+      undefined,
+      undefined,
+      fakeSpawn,
+    );
     expect(result).toHaveLength(1);
     expect(callCount).toBe(2);
     expect(cmds[1]!.join(" ")).toContain("**/fixtures/**");

@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, cp, rm, stat } from "node:fs/promises";
+import { mkdtemp, cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { allEmbeddedOxlintScanPlan } from "../src/repository-diagnostics/embedded-oxlint-config.ts";
+import { runEmbeddedOxlint } from "../src/repository-diagnostics/embedded-oxlint-runner.ts";
 
 const repoRoot = path.resolve(import.meta.dir, "..");
 
@@ -29,6 +31,48 @@ async function ensureCliBuilt(): Promise<void> {
 }
 
 describe("e2e: bundled CLI with oxlint", () => {
+  test("combined config returns the union of separate scan diagnostics", async () => {
+    await withTempDir(async (tmpDir) => {
+      const srcDir = path.join(tmpDir, "src");
+      await mkdir(srcDir);
+      await writeFile(
+        path.join(srcDir, "index.js"),
+        [
+          'import { addDays } from "date-fns";',
+          ...Array.from({ length: 120 }, (_, index) => `export * from "./m${index}.js";`),
+          "console.log(addDays);",
+        ].join("\n"),
+      );
+
+      const [importDiagnostics, nonImportDiagnostics, combinedDiagnostics] = await Promise.all([
+        runEmbeddedOxlint(tmpDir, {
+          importExtensions: true,
+          restrictedImports: true,
+          barrels: false,
+          snapshots: false,
+        }),
+        runEmbeddedOxlint(tmpDir, {
+          importExtensions: false,
+          restrictedImports: false,
+          barrels: true,
+          snapshots: true,
+        }),
+        runEmbeddedOxlint(tmpDir, allEmbeddedOxlintScanPlan),
+      ]);
+      const diagnosticKeys = (diagnostics: Awaited<ReturnType<typeof runEmbeddedOxlint>>) =>
+        (diagnostics ?? [])
+          .map(
+            (diagnostic) =>
+              `${diagnostic.code}\n${diagnostic.filename}\n${diagnostic.line}\n${diagnostic.column}\n${diagnostic.message}`,
+          )
+          .sort();
+
+      expect(diagnosticKeys(combinedDiagnostics)).toEqual(
+        [...diagnosticKeys(importDiagnostics), ...diagnosticKeys(nonImportDiagnostics)].sort(),
+      );
+    });
+  });
+
   test("detects barrel files via node dist/cli.js", async () => {
     await ensureCliBuilt();
     await withTempDir(async (tmpDir) => {

@@ -14,6 +14,10 @@ const meta = {
   docsPath: "docs/rules/cdk-bucket-deployment-memory-unconfigured.md",
 } satisfies RuleMeta;
 
+function timingsEnabled(): boolean {
+  return process.env.CI_PERF_LINT_TIMINGS === "1";
+}
+
 function extractCallBody(content: string, openParenIndex: number): string | undefined {
   let depth = 1;
   let inString = false;
@@ -136,6 +140,8 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
     return [];
   }
 
+  const shouldTime = timingsEnabled();
+  const discoveryStartedAt = shouldTime ? performance.now() : 0;
   const rgResult = await findBucketDeploymentFiles(repoRoot);
   const sourceFiles =
     rgResult.kind === "error"
@@ -154,16 +160,27 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
           })
         ).map((f) => context.resolve(f))
       : rgResult.files;
+  const discoveryElapsedMs = shouldTime ? performance.now() - discoveryStartedAt : 0;
 
   const diagnostics: Diagnostic[] = [];
+  let readElapsedMs = 0;
+  let matchElapsedMs = 0;
 
   for (const filePath of sourceFiles) {
+    const readStartedAt = shouldTime ? performance.now() : 0;
     const content = await context.readTextFileOrWarn(filePath);
+    if (shouldTime) {
+      readElapsedMs += performance.now() - readStartedAt;
+    }
     if (!content) {
       continue;
     }
 
+    const matchStartedAt = shouldTime ? performance.now() : 0;
     if (!content.includes("BucketDeployment")) {
+      if (shouldTime) {
+        matchElapsedMs += performance.now() - matchStartedAt;
+      }
       continue;
     }
 
@@ -197,6 +214,15 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
         }),
       );
     }
+    if (shouldTime) {
+      matchElapsedMs += performance.now() - matchStartedAt;
+    }
+  }
+
+  if (shouldTime) {
+    process.stderr.write(
+      `[timing] cdk-bucket-deployment files=${sourceFiles.length} discovery=${discoveryElapsedMs.toFixed(1)}ms read=${readElapsedMs.toFixed(1)}ms match=${matchElapsedMs.toFixed(1)}ms\n`,
+    );
   }
 
   return diagnostics;

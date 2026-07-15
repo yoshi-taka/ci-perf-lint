@@ -80,10 +80,11 @@ export async function collectAsyncTestUsesSyncTestClientDiagnostics(
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
   const diagnostics: Diagnostic[] = [];
 
-  for await (const relativePath of context.walkFilesIter(".", {
-    include: (candidate) => /^tests\/.*\.py$/i.test(candidate),
-    cacheKey: "tests-python-files",
-  })) {
+  for (const relativePath of await context.pythonFiles()) {
+    if (!/^tests\/.*\.py$/i.test(relativePath)) {
+      continue;
+    }
+
     const text = await context.readTextFileOrWarn(context.resolve(relativePath));
     if (!text) {
       continue;

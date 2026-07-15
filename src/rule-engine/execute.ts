@@ -12,7 +12,7 @@ import {
   isRefinerDumpStateEnabled,
 } from "../refiner-pipeline.ts";
 import { classifySingularity } from "../rules/shared/singularity.ts";
-import { buildInferenceGraph } from "../rules/shared/remediation-checks.ts";
+import { buildInferenceGraph, type InferenceGraph } from "../rules/shared/remediation-checks.ts";
 import { getRulesForKind, pushAnalysisWarning, runConcurrent } from "./utils.ts";
 import { workflowContainsKind, shouldSkipForWorkflow, shouldEvaluateRule } from "./filters.ts";
 import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
@@ -65,6 +65,18 @@ function applyMaxFindings(
 }
 
 const scopeGateDebugEnabled = process.env.CI_PERF_LINT_DUMP_STATE === "1";
+const inferenceGraphsByRules = new WeakMap<readonly AnyRuleModule[], InferenceGraph>();
+
+function inferenceGraphForRules(rules: readonly AnyRuleModule[]): InferenceGraph {
+  const cached = inferenceGraphsByRules.get(rules);
+  if (cached) {
+    return cached;
+  }
+
+  const graph = buildInferenceGraph(rules);
+  inferenceGraphsByRules.set(rules, graph);
+  return graph;
+}
 
 export async function evaluateRules(
   workflow: AnyWorkflowDocument,
@@ -95,7 +107,7 @@ export async function evaluateRules(
     run: () => Promise<Diagnostic[]>;
   }
 
-  const inferenceGraph = buildInferenceGraph(allRules);
+  const inferenceGraph = inferenceGraphForRules(allRules);
   const tasks: RuleTask[] = [];
   const evaluatedRuleIds = new Set<string>();
   const workflowPath = workflow.relativePath;
@@ -266,7 +278,7 @@ export async function evaluateRulesCoarseToFine(
   const rules = await getRulesForKind(docKind);
   const allRules = rules as unknown as readonly AnyRuleModule[];
 
-  const inferenceGraph = buildInferenceGraph(allRules);
+  const inferenceGraph = inferenceGraphForRules(allRules);
   const evaluatedRuleIds = new Set<string>();
   const firedRuleIds = new Set<string>();
 

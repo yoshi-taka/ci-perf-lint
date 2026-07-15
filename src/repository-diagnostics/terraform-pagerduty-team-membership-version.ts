@@ -1,9 +1,9 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import path from "node:path";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { getTerraformFileIndex } from "./terraform-files.ts";
 
 const meta = {
   id: "terraform-pagerduty-team-membership-version",
@@ -102,20 +102,8 @@ export async function collectTerraformPagerDutyTeamMembershipVersionDiagnostics(
   let usesPagerDutyProvider = false;
   let usesTeamMembership = false;
   let versionOk = false;
-  const tfFiles: { relativePath: string; content: string }[] = [];
-
-  for await (const tfPath of context.walkFilesIter(".", {
-    ignoredDirectories: new Set([".git", "node_modules", ".terraform"]),
-    include: (candidatePath) => candidatePath.endsWith(".tf"),
-  })) {
-    const fullPath = path.join(repoRoot, tfPath);
-    const content = await context.readTextFileOrWarn(fullPath);
-    if (!content) {
-      continue;
-    }
-
-    tfFiles.push({ relativePath: tfPath, content });
-
+  const { files } = await getTerraformFileIndex(context);
+  for (const { content } of files) {
     if (!usesPagerDutyProvider && PAGERDUTY_PROVIDER_RE.test(content)) {
       usesPagerDutyProvider = true;
     }
@@ -155,7 +143,7 @@ export async function collectTerraformPagerDutyTeamMembershipVersionDiagnostics(
   const diagnostics: Diagnostic[] = [];
   const teamMembershipRe = new RegExp(TEAM_MEMBERSHIP_RESOURCE_RE.source, "g");
 
-  for (const { relativePath, content } of tfFiles) {
+  for (const { relativePath, content } of files) {
     teamMembershipRe.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = teamMembershipRe.exec(content)) !== null) {

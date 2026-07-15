@@ -1,8 +1,8 @@
 import type { Severity, Diagnostic, RuleMeta } from "../types.ts";
-import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { getLoweredWorkflowStepText } from "../rules/shared/workflow-step-text.ts";
+import { getTerraformFileIndex } from "./terraform-files.ts";
 
 const meta = {
   id: "terraform-parallelism-unconfigured",
@@ -12,21 +12,6 @@ const meta = {
 } satisfies RuleMeta;
 
 const TF_COMMANDS = /\bterraform\s+(?:plan|apply|destroy)\b/;
-
-const TF_FILE_EXTENSIONS = /\.tf$/;
-
-async function countTerraformFiles(scanContext: RepositoryScanContext): Promise<number> {
-  let count = 0;
-
-  for await (const _relativePath of scanContext.walkFilesIter(".", {
-    ignoredDirectories: new Set([".git", "node_modules", ".terraform"]),
-    include: (candidatePath) => TF_FILE_EXTENSIONS.test(candidatePath),
-  })) {
-    count += 1;
-  }
-
-  return count;
-}
 
 export async function collectTerraformParallelismDiagnostics(
   context: RepositoryDiagnosticContext,
@@ -66,7 +51,8 @@ export async function collectTerraformParallelismDiagnostics(
     return [];
   }
 
-  const tfFileCount = await countTerraformFiles(context.scanContext);
+  const { files } = await getTerraformFileIndex(context.scanContext);
+  const tfFileCount = files.length;
   const severity: Severity = tfFileCount >= 10 ? "warning" : "suggestion";
 
   return [

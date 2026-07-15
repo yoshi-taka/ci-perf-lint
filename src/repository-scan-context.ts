@@ -388,6 +388,13 @@ export class RepositoryScanContext {
     return walkFileLoad;
   }
 
+  async pythonFiles(): Promise<string[]> {
+    return this.walkFiles(".", {
+      cacheKey: "python-files",
+      include: (relativePath) => /\.py$/i.test(relativePath),
+    });
+  }
+
   async #getRgFileList(): Promise<string[] | null> {
     this.#rgFileListPromise ??= this.#doRgFileList().then((files) => {
       if (files) {
