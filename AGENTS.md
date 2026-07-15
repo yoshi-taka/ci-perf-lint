@@ -12,6 +12,8 @@ Use `bun` not `npm` for package management and script execution.
 Changes are reviewed locally first. Only push when explicitly told to.
 Before every commit, ensure `oxlint --type-aware --fix` passes; `nano-staged` runs that hook.
 
+**On failure: never apologize. Analyze the root cause and propose a prevention mechanism (CI guard, git hook, or automation). Do not implement without approval. Process notes in AGENTS.md are not prevention.**
+
 ## Main Entry Points
 
 - CLI wrapper: `src/cli.ts`
