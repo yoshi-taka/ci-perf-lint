@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ci-perf-lint.veritycost.com/sitemap-index.xml

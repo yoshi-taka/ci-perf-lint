@@ -1,0 +1,5 @@
+name = "ci-perf-lint"
+pages_build_output_dir = "site/dist"
+
+[vars]
+SKIP_DEPENDENCY_INSTALL = "1"
