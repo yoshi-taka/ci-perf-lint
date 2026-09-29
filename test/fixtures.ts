@@ -385,12 +385,12 @@ export const fixtures = new Proxy<{ [K in keyof typeof fixtureNames]: string }>(
     get(_, key: string) {
       const name = (fixtureNames as Record<string, string>)[key];
       if (!name) {
-        return undefined as unknown as string;
+        return undefined;
       }
       return resolve(name);
     },
     ownKeys() {
-      return Reflect.ownKeys(fixtureNames) as string[];
+      return Reflect.ownKeys(fixtureNames);
     },
     getOwnPropertyDescriptor() {
       return { enumerable: true, configurable: true };

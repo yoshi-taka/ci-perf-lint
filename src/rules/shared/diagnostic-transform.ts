@@ -102,10 +102,10 @@ function applyMergeStrategy<T>(
     }
     case "coalesce": {
       const all = [base, ...overrides].filter((v) => v !== undefined && v !== null);
-      return (all[0] ?? (base as unknown)) as T;
+      return all[0] ?? base;
     }
     default:
-      return (strategy as (base: T, overrides: readonly T[]) => T)(base, overrides);
+      return strategy(base, overrides);
   }
 }
 
@@ -176,7 +176,7 @@ function makeTaggedIdentityDiagnosticTransform(): TaggedDiagnosticTransform {
     isIdentity: true,
     axes: [] as const,
     labels: [] as const,
-  }) as TaggedDiagnosticTransform;
+  });
 }
 
 function isIdentityDiagnosticTransform(transform: DiagnosticTransform): boolean {
@@ -292,7 +292,7 @@ function composeTransforms(
   return Object.assign(composed, {
     transforms: normalized,
     isIdentity: false,
-  }) as ComposedDiagnosticTransform;
+  });
 }
 
 function composeTagged(...taggedTransforms: readonly TaggedTransform[]): TaggedDiagnosticTransform {
@@ -334,7 +334,7 @@ function composeTagged(...taggedTransforms: readonly TaggedTransform[]): TaggedD
     isIdentity: false,
     axes: normalized.flatMap((taggedTransform) => taggedTransform.axes),
     labels: normalized.map((taggedTransform) => taggedTransform.label),
-  }) as TaggedDiagnosticTransform;
+  });
 }
 
 export function pipe(...transforms: readonly DiagnosticTransform[]): ComposedDiagnosticTransform {

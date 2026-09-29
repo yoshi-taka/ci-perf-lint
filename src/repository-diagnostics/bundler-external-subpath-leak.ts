@@ -245,7 +245,7 @@ async function readInstalledPackageSubpathExports(
   }
 
   const subpaths: string[] = [];
-  for (const key of Object.keys(exports as Record<string, unknown>)) {
+  for (const key of Object.keys(exports)) {
     if (key === "." || key === "./*" || !key.startsWith("./")) {
       continue;
     }
@@ -269,7 +269,7 @@ export async function collectBundlerExternalSubpathLeakDiagnostics(
   for (const section of ["dependencies", "peerDependencies", "devDependencies"] as const) {
     const deps = pkgVal[section];
     if (typeof deps === "object" && deps !== null) {
-      for (const key of Object.keys(deps as Record<string, unknown>)) {
+      for (const key of Object.keys(deps)) {
         if (!key.startsWith("@types/")) {
           allDeps.add(key);
         }

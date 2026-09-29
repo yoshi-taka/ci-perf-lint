@@ -13,14 +13,14 @@ describe("gate DAG", () => {
   test("buildDag constructs correct successors/ predecessors", () => {
     const dag = buildDag(gatePrerequisites);
 
-    const toolingSuccs = dag.successors.get("hasJavaScriptTooling" as GateKey);
+    const toolingSuccs = dag.successors.get("hasJavaScriptTooling");
     expect(toolingSuccs).toBeDefined();
     expect(toolingSuccs).toContain("hasJavaScriptLinting");
     expect(toolingSuccs).toContain("hasJavaScriptBuildConfig");
     expect(toolingSuccs).toContain("hasJavaScriptPackageScripts");
     expect(toolingSuccs).toContain("hasJavaScriptFrameworks");
 
-    const lintingPreds = dag.predecessors.get("hasJavaScriptLinting" as GateKey);
+    const lintingPreds = dag.predecessors.get("hasJavaScriptLinting");
     expect(lintingPreds).toBeDefined();
     expect(lintingPreds).toContain("hasJavaScriptTooling");
   });
@@ -29,11 +29,11 @@ describe("gate DAG", () => {
     const dag = buildDag(gatePrerequisites);
     const order = dag.evaluationOrder;
 
-    const toolingIdx = order.indexOf("hasJavaScriptTooling" as GateKey);
-    const lintingIdx = order.indexOf("hasJavaScriptLinting" as GateKey);
-    const buildConfigIdx = order.indexOf("hasJavaScriptBuildConfig" as GateKey);
-    const packageScriptsIdx = order.indexOf("hasJavaScriptPackageScripts" as GateKey);
-    const frameworksIdx = order.indexOf("hasJavaScriptFrameworks" as GateKey);
+    const toolingIdx = order.indexOf("hasJavaScriptTooling");
+    const lintingIdx = order.indexOf("hasJavaScriptLinting");
+    const buildConfigIdx = order.indexOf("hasJavaScriptBuildConfig");
+    const packageScriptsIdx = order.indexOf("hasJavaScriptPackageScripts");
+    const frameworksIdx = order.indexOf("hasJavaScriptFrameworks");
 
     expect(toolingIdx).toBeLessThan(lintingIdx);
     expect(toolingIdx).toBeLessThan(buildConfigIdx);
@@ -51,8 +51,8 @@ describe("gate DAG", () => {
 
   test("prerequisites are included as nodes even without their own prerequisites", () => {
     const dag = buildDag(gatePrerequisites);
-    expect(dag.successors.has("hasJavaScriptTooling" as GateKey)).toBe(true);
-    expect(dag.successors.has("hasJavaScriptLinting" as GateKey)).toBe(true);
+    expect(dag.successors.has("hasJavaScriptTooling")).toBe(true);
+    expect(dag.successors.has("hasJavaScriptLinting")).toBe(true);
   });
 });
 

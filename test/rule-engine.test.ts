@@ -477,8 +477,7 @@ describe("evaluateRules", () => {
     });
 
     afterEach(() => {
-      (missingConcurrencyRule as { check: AnyRuleModule["check"] }).check =
-        originalCheck as unknown as AnyRuleModule["check"];
+      (missingConcurrencyRule as { check: AnyRuleModule["check"] }).check = originalCheck;
     });
 
     test("records singularity and warning when a rule throws", async () => {
@@ -825,8 +824,7 @@ describe("evaluateRulesCoarseToFine", () => {
     });
 
     afterEach(() => {
-      (missingConcurrencyRule as { check: AnyRuleModule["check"] }).check =
-        originalCheck as unknown as AnyRuleModule["check"];
+      (missingConcurrencyRule as { check: AnyRuleModule["check"] }).check = originalCheck;
     });
 
     test("records singularity and warning when a rule throws in coarse-to-fine", async () => {
@@ -1071,13 +1069,7 @@ describe("getRuleCheckFn scope dispatch (orthogonal array)", () => {
 
   for (const { type, doc } of docs) {
     test(`scope=all rule fires for ${type} document`, async () => {
-      const result = await evaluateRules(
-        doc as never,
-        context,
-        undefined,
-        undefined,
-        allScopeRuleFilter,
-      );
+      const result = await evaluateRules(doc, context, undefined, undefined, allScopeRuleFilter);
       expect(result.some((d) => d.ruleId === "prefer-node-run-over-npm-run")).toBe(true);
     });
   }
@@ -1085,7 +1077,7 @@ describe("getRuleCheckFn scope dispatch (orthogonal array)", () => {
   test("default (github-actions) rule does not fire for buildkite document", async () => {
     const bkDoc = docs.find((d) => d.type === "buildkite")!.doc;
     const result = await evaluateRules(
-      bkDoc as never,
+      bkDoc,
       context,
       undefined,
       undefined,
@@ -1097,7 +1089,7 @@ describe("getRuleCheckFn scope dispatch (orthogonal array)", () => {
   test("default (github-actions) rule does not fire for gitlab-ci document", async () => {
     const glDoc = docs.find((d) => d.type === "gitlab-ci")!.doc;
     const result = await evaluateRules(
-      glDoc as never,
+      glDoc,
       context,
       undefined,
       undefined,
@@ -1109,7 +1101,7 @@ describe("getRuleCheckFn scope dispatch (orthogonal array)", () => {
   test("default (github-actions) rule does not fire for circleci document", async () => {
     const ciDoc = docs.find((d) => d.type === "circleci")!.doc;
     const result = await evaluateRules(
-      ciDoc as never,
+      ciDoc,
       context,
       undefined,
       undefined,
@@ -1121,7 +1113,7 @@ describe("getRuleCheckFn scope dispatch (orthogonal array)", () => {
   test("default (github-actions) rule fires for github-actions document", async () => {
     const ghaDoc = docs.find((d) => d.type === "github-actions")!.doc;
     const result = await evaluateRules(
-      ghaDoc as never,
+      ghaDoc,
       context,
       undefined,
       undefined,

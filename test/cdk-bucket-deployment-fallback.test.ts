@@ -34,7 +34,7 @@ describe("cdk-bucket-deployment fallback (no rg)", () => {
       const diagnostics = await collectCdkBucketDeploymentMemoryDiagnostics(
         tmpDir,
         signals,
-        [] as unknown as WorkflowDocument[],
+        [],
         [],
         scanContext,
       );
@@ -67,7 +67,7 @@ describe("cdk-bucket-deployment fallback (no rg)", () => {
       const diagnostics = await collectCdkBucketDeploymentMemoryDiagnostics(
         tmpDir,
         signals,
-        [] as unknown as WorkflowDocument[],
+        [],
         [],
         scanContext,
       );

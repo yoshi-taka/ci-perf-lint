@@ -54,8 +54,8 @@ describe("fuzz: buildDiagnostic", () => {
 
           const meta: RuleMeta = {
             id: "fuzz-rule",
-            severity: "warning" as Severity,
-            confidence: "high" as Confidence,
+            severity: "warning",
+            confidence: "high",
             docsPath: "docs/rules/fuzz-rule.md",
           };
 

@@ -591,7 +591,7 @@ describe("getLocation: missing equivalence classes", () => {
         "      - run: echo",
       ].join("\n"),
     );
-    const pos = getLocation(workflow, workflow.jobsNode?.items[0] as never);
+    const pos = getLocation(workflow, workflow.jobsNode?.items[0]);
     expect(pos.line).toBeGreaterThanOrEqual(1);
   });
 });

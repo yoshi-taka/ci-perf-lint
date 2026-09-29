@@ -69,7 +69,7 @@ function buildResourceDag(
   }
 
   return {
-    successors: successors as Map<ResourceId, readonly ResourceId[]>,
+    successors: successors,
     allNodes,
   };
 }
@@ -218,7 +218,7 @@ function makeGetter(
     if (cached !== undefined) {
       const value = await cached;
       resolved.set(id, value);
-      return value as T;
+      return value;
     }
 
     const def = registry.get<T>(id);

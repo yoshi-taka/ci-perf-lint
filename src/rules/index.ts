@@ -281,22 +281,22 @@ function _compileMask(
 
 for (const rule of _mergedGA) {
   if (rule.meta.requiredFeatures && !rule.meta.featurePredicate) {
-    (rule.meta as RuleMeta).featurePredicate = _compileMask(rule.meta.requiredFeatures);
+    rule.meta.featurePredicate = _compileMask(rule.meta.requiredFeatures);
   }
 }
 for (const rule of _mergedBuildkite) {
   if (rule.meta.requiredFeatures && !rule.meta.featurePredicate) {
-    (rule.meta as RuleMeta).featurePredicate = _compileMask(rule.meta.requiredFeatures);
+    rule.meta.featurePredicate = _compileMask(rule.meta.requiredFeatures);
   }
 }
 for (const rule of _mergedGitlab) {
   if (rule.meta.requiredFeatures && !rule.meta.featurePredicate) {
-    (rule.meta as RuleMeta).featurePredicate = _compileMask(rule.meta.requiredFeatures);
+    rule.meta.featurePredicate = _compileMask(rule.meta.requiredFeatures);
   }
 }
 for (const rule of _mergedCircle) {
   if (rule.meta.requiredFeatures && !rule.meta.featurePredicate) {
-    (rule.meta as RuleMeta).featurePredicate = _compileMask(rule.meta.requiredFeatures);
+    rule.meta.featurePredicate = _compileMask(rule.meta.requiredFeatures);
   }
 }
 

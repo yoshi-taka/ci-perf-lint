@@ -94,7 +94,7 @@ describe("Evidence lifting", () => {
 
   test("lifting same-scope node returns it unchanged", () => {
     const node = buildJobNode(true, "already-job", "weak");
-    const lifted = liftStepToJob(node as unknown as EvidenceNode<boolean>, "some-job");
+    const lifted = liftStepToJob(node, "some-job");
     expect(lifted).toBe(node);
   });
 

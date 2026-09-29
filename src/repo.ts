@@ -397,10 +397,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
               wfList,
               {
                 ...ruleContext,
-                workflowSemantics: semanticsByWorkflow as ReadonlyMap<
-                  AnyWorkflowDocument,
-                  WorkflowSemantics
-                >,
+                workflowSemantics: semanticsByWorkflow,
               },
               analysisWarnings,
               ruleFindingCounts,

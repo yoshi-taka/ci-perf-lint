@@ -57,10 +57,10 @@ describe("runCli", () => {
     const stderrLines: string[] = [];
 
     process.env.CI_PERF_LINT_TIMINGS = "1";
-    process.stderr.write = ((chunk: string | Uint8Array) => {
+    process.stderr.write = (chunk: string | Uint8Array) => {
       stderrLines.push(String(chunk));
       return true;
-    }) as typeof process.stderr.write;
+    };
 
     try {
       const exitCode = await runCli(

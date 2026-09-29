@@ -100,7 +100,7 @@ export function renderAiHandoff(
   ruleId: string,
   source?: DiagnosticSource | SourceRef,
 ): string {
-  const sourceStr = source ? formatSourceRef(source as SourceRef) : "";
+  const sourceStr = source ? formatSourceRef(source) : "";
   const prefix = sourceStr ? `Review ${sourceStr} for ${ruleId}.` : `Review for ${ruleId}.`;
 
   if (op.action === "review") {

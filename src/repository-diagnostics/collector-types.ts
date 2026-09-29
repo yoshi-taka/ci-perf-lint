@@ -237,7 +237,7 @@ export function buildTypedContext<G extends GateKey>(
   return {
     ...context,
     __typedGate: { __gate: gate, __proof: proof },
-  } as GatedContext<G>;
+  };
 }
 
 export function assertGateProof<G extends GateKey>(gate: G, proofs: GateProofs): GateTrue<G> {

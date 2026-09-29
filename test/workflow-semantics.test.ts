@@ -13,7 +13,7 @@ function makeWorkflow(
     jobs: overrides.jobs ?? [],
     on: overrides.on,
     ...overrides,
-  } as WorkflowDocument;
+  };
 }
 
 describe("buildWorkflowSemantics", () => {

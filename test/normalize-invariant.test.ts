@@ -81,7 +81,7 @@ function makeCircleCiWorkflow(steps: { command: string; name?: string }[]): Circ
       },
     ],
     source: "",
-  } as CircleCiDocument;
+  };
 }
 
 function makeGitlabCiWorkflow(commands: string[]): GitlabCiDocument {
@@ -97,7 +97,7 @@ function makeGitlabCiWorkflow(commands: string[]): GitlabCiDocument {
       },
     ],
     source: "",
-  } as GitlabCiDocument;
+  };
 }
 
 describe("normalize CI documents invariants", () => {

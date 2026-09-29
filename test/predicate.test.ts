@@ -311,7 +311,7 @@ describe("Realistic skip predicates (derived from existing rules)", () => {
         ...dummyCtx().workflowFacts,
         isHeavyWorkflow: false,
         hasConcurrency: true,
-      } as unknown as EvalContext["workflowFacts"],
+      },
     });
     expect(evaluate(skipPred, ctx)).toBe(true);
   });
@@ -326,7 +326,7 @@ describe("Realistic skip predicates (derived from existing rules)", () => {
         ...dummyCtx().workflowFacts,
         isHeavyWorkflow: false,
         looksMetaCheckLike: true,
-      } as unknown as EvalContext["workflowFacts"],
+      },
     });
     expect(evaluate(skipPred, ctx)).toBe(true);
   });

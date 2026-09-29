@@ -72,7 +72,7 @@ const commandEntryCollectors: Record<string, CIDocumentNormalizer<CIDocument>> =
         if (step.command) {
           entries.push({
             text: step.command,
-            node: step.commandNode as unknown as Node | undefined,
+            node: step.commandNode,
             jobName: job.name,
             stepName: step.name ?? "(unnamed)",
             workingDirectory: step.workingDirectory,
@@ -110,7 +110,7 @@ const commandEntryCollectors: Record<string, CIDocumentNormalizer<CIDocument>> =
       for (const cmd of commands) {
         entries.push({
           text: cmd,
-          node: step.commandNode as unknown as Node | undefined,
+          node: step.commandNode,
           jobName: step.label ?? step.key ?? "(unnamed)",
           stepName: step.label ?? step.key ?? "(unnamed)",
           workingDirectory: undefined,
@@ -128,7 +128,7 @@ const commandEntryCollectors: Record<string, CIDocumentNormalizer<CIDocument>> =
         if (run !== undefined) {
           entries.push({
             text: run,
-            node: step.runNode as unknown as Node | undefined,
+            node: step.runNode,
             jobName: job.id,
             stepName: step.name ?? job.id,
             workingDirectory: step.workingDirectory,

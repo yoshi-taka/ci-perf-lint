@@ -8,8 +8,8 @@ function makeStep(name?: string, run?: string): WorkflowStep {
     run,
     uses: undefined,
     node: undefined as never,
-    runNode: undefined as never,
-  } as unknown as WorkflowStep;
+    runNode: undefined,
+  };
 }
 
 function makeJob(id: string, stepCount: number): WorkflowJob {

@@ -4,7 +4,7 @@ export class ResourceRegistry {
   private readonly defs = new Map<ResourceId, SemanticResource<unknown>>();
 
   register<T>(def: SemanticResource<T>): void {
-    this.defs.set(def.id, def as SemanticResource<unknown>);
+    this.defs.set(def.id, def);
   }
 
   get<T>(id: ResourceId): SemanticResource<T> | undefined {

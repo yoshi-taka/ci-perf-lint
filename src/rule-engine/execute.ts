@@ -100,7 +100,7 @@ export async function evaluateRules(
     );
   }
 
-  const allRules = rules as unknown as readonly AnyRuleModule[];
+  const allRules = rules;
 
   interface RuleTask {
     rule: AnyRuleModule;
@@ -120,10 +120,7 @@ export async function evaluateRules(
     }
 
     const rmeta = rule.meta;
-    const featurePred =
-      rmeta.featurePredicate ??
-      (rule as AnyRuleModule & { featurePredicate?: (state: Record<string, unknown>) => boolean })
-        .featurePredicate;
+    const featurePred = rmeta.featurePredicate ?? rule.featurePredicate;
     if (featurePred && !featurePred(wfFactsState)) {
       context.measureCompleteness?.skippedGates.add(rmeta.id);
       pushAnalysisWarning(warnings, {
@@ -276,7 +273,7 @@ export async function evaluateRulesCoarseToFine(
 
   const docKind = workflows[0]!.kind;
   const rules = await getRulesForKind(docKind);
-  const allRules = rules as unknown as readonly AnyRuleModule[];
+  const allRules = rules;
 
   const inferenceGraph = inferenceGraphForRules(allRules);
   const evaluatedRuleIds = new Set<string>();
@@ -351,10 +348,7 @@ export async function evaluateRulesCoarseToFine(
 
       const wfFactsState = getWfFactsState(workflow);
       const rmeta = rule.meta;
-      const featurePred =
-        rmeta.featurePredicate ??
-        (rule as AnyRuleModule & { featurePredicate?: (state: Record<string, unknown>) => boolean })
-          .featurePredicate;
+      const featurePred = rmeta.featurePredicate ?? rule.featurePredicate;
       if (featurePred && !featurePred(wfFactsState)) {
         context.measureCompleteness?.skippedGates.add(ruleId);
         pushAnalysisWarning(warnings, {
@@ -388,7 +382,7 @@ export async function evaluateRulesCoarseToFine(
 
       const workflowSemantics =
         context.workflowSemantics instanceof Map
-          ? context.workflowSemantics.get(workflow as never)
+          ? context.workflowSemantics.get(workflow)
           : context.workflowSemantics;
       const perWorkflowContext: RuleContext =
         workflowSemantics !== undefined ? { ...context, workflowSemantics } : context;
@@ -516,5 +510,5 @@ function selectTopK(
     return result;
   }
 
-  return top as ScoredWorkflow[];
+  return top;
 }

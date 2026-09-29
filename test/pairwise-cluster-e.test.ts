@@ -40,8 +40,8 @@ function hasPR(v: string): boolean {
 
 function expectedClusterERules(p: Params): Set<string> {
   const expected = new Set<string>();
-  const push = hasPush(p.trigger as string);
-  const pr = hasPR(p.trigger as string);
+  const push = hasPush(p.trigger);
+  const pr = hasPR(p.trigger);
   const hasPushOrPR = push || pr;
   const isHeavy = p.workflowName === "CI";
 
@@ -99,7 +99,7 @@ function generateWorkflowYAML(p: Params): string {
   const out: string[] = [];
   out.push(`name: ${p.workflowName}`);
   out.push("on:");
-  out.push(...genTrigger(p.trigger as string, p.hasPathsFilter));
+  out.push(...genTrigger(p.trigger, p.hasPathsFilter));
 
   if (p.hasConcurrency) {
     out.push("concurrency:");
