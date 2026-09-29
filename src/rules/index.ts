@@ -57,7 +57,7 @@ import { missingTestWorkerTuningForStandardRunnerRule } from "./missing-test-wor
 import { nativeDependencyMayFallBackToSourceBuildRule } from "./native-dependency-may-fall-back-to-source-build.ts";
 import { outdatedDatadogLambdaExtensionRule } from "./outdated-datadog-lambda-extension.ts";
 import { outdatedSetupActionWithoutCacheRule } from "./outdated-setup-action-without-cache.ts";
-import { preferUv010Rule } from "./prefer-uv-0-10.ts";
+import { preferUv012Rule } from "./prefer-uv-0-12.ts";
 import { preferUvPipOverPipRule } from "./prefer-uv-pip-over-pip.ts";
 import { preferBuildxBuildOverDockerBuildRule } from "./prefer-buildx-build-over-docker-build.ts";
 import { dbIoReduceRule } from "./db-io-reduce.ts";
@@ -185,7 +185,7 @@ export const allRules = [
   preferStandardArmRunnerForPortableToolingRule,
   preferSetupBunForLightweightNodeToolingRule,
   preferSetupUvForLightweightPythonToolingRule,
-  preferUv010Rule,
+  preferUv012Rule,
   preferUvPipOverPipRule,
   preferZstdCompressionForPushedDockerImagesRule,
   railsDbSchemaLoadOverMigrateRule,

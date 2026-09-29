@@ -345,14 +345,14 @@ describe("migrations: python and platform tooling", () => {
     );
   });
 
-  test("warns when a job pins uv below 0.10", async () => {
-    const report = await getFixtureReport(fixtures.preferUv010Like, {
+  test("warns when a job pins uv below 0.12", async () => {
+    const report = await getFixtureReport(fixtures.preferUv012Like, {
       targetPath: ".",
       topCount: 20,
     });
 
     const hits = report.findings
-      .filter((candidate) => candidate.ruleId === "prefer-uv-0-10")
+      .filter((candidate) => candidate.ruleId === "prefer-uv-0-12")
       .map((candidate) => candidate.message);
 
     expect(report.workflowCount).toBe(1);
@@ -361,13 +361,13 @@ describe("migrations: python and platform tooling", () => {
     expect(hits).toHaveLength(2);
   });
 
-  test("skips when uv is at or above 0.10 or unpinned", async () => {
-    const report = await getFixtureReport(fixtures.preferUv010Ok, {
+  test("skips when uv is at or above 0.12 or unpinned", async () => {
+    const report = await getFixtureReport(fixtures.preferUv012Ok, {
       targetPath: ".",
       topCount: 20,
     });
 
-    expect(report.findings.some((candidate) => candidate.ruleId === "prefer-uv-0-10")).toBe(false);
+    expect(report.findings.some((candidate) => candidate.ruleId === "prefer-uv-0-12")).toBe(false);
   });
 
   test("warns when nox is used without --uv flag", async () => {

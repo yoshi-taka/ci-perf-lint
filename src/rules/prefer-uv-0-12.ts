@@ -51,7 +51,7 @@ function collectJobOffenders(job: WorkflowJob): OffendingStep[] {
   return offenders;
 }
 
-export const preferUv010Rule = {
+export const preferUv012Rule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const findings: Diagnostic[] = [];
@@ -71,11 +71,11 @@ export const preferUv010Rule = {
 
       findings.push(
         buildDiagnostic(workflow, meta, anchor.node, {
-          message: `Job "${job.id}" installs uv below 0.10 (${detailText}).`,
-          why: "uv 0.10 stabilized Python version management and carried a batch of correctness and performance fixes. Pinning an older uv keeps CI on the slower resolver and misses the stabilized upgrade paths and bug fixes that reduce repeated resolution and install work.",
+          message: `Job "${job.id}" installs uv below 0.12 (${detailText}).`,
+          why: "uv 0.11 and 0.12 shipped large performance batches: a reworked resolver (IDs-only PubGrub, reused resolver work, compact lazy-version indexes), SIMD-accelerated TOML parsing, faster local and cold wheel extraction, cache-write batching, and profile-guided optimization builds. Pinning uv below 0.12 keeps CI on the slower resolver and installer, so dependency resolution and installs take longer than necessary.",
           suggestion: preferModernUvVersionSuggestion,
           measurementHint: preferModernUvVersionMeasurementHint,
-          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and raise the uv version to at least 0.10.x. Update the astral-sh/setup-uv version input and any pinned pip/pipx uv installs together, then re-run the job to confirm dependency resolution and installs are unchanged.`,
+          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and raise the uv version to at least 0.12.x. Update the astral-sh/setup-uv version input and any pinned pip/pipx uv installs together, then re-run the job to confirm dependency resolution and installs are unchanged.`,
           score: 52,
         }),
       );

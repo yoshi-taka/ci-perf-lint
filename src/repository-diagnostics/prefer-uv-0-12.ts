@@ -81,11 +81,11 @@ export async function collectPreferModernUvVersionDiagnostics(
     return [
       buildRepositoryDiagnostic(repository, meta, {
         location,
-        message: `The repository pins uv ${detected.spec} in ${fileName}, below 0.10.`,
-        why: "uv 0.10 stabilized Python version management and carried a batch of correctness and performance fixes. Keeping uv below 0.10 leaves CI on the slower resolver and misses the stabilized upgrade paths that reduce repeated resolution and install work.",
+        message: `The repository pins uv ${detected.spec} in ${fileName}, below 0.12.`,
+        why: "uv 0.11 and 0.12 shipped large performance batches: a reworked resolver (IDs-only PubGrub, reused resolver work, compact lazy-version indexes), SIMD-accelerated TOML parsing, faster local and cold wheel extraction, cache-write batching, and profile-guided optimization builds. Keeping uv below 0.12 leaves CI on the slower resolver and installer, so dependency resolution and installs take longer than necessary.",
         suggestion: preferModernUvVersionSuggestion,
         measurementHint: preferModernUvVersionMeasurementHint,
-        aiHandoff: `Review ${fileName} at ${location.line}:${location.column} and raise the uv constraint to at least 0.10.x. Keep the rest of the configuration unchanged and re-run the CI job to confirm dependency resolution is unchanged.`,
+        aiHandoff: `Review ${fileName} at ${location.line}:${location.column} and raise the uv constraint to at least 0.12.x. Keep the rest of the configuration unchanged and re-run the CI job to confirm dependency resolution is unchanged.`,
         score: 50,
       }),
     ];

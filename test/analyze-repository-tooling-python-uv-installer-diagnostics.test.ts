@@ -93,34 +93,34 @@ describe("analyzeRepository repo-aware and tooling rules: python uv installer di
     });
   });
 
-  describe("prefer-uv-0-10 repository diagnostics", () => {
-    test("warns when config constrains uv below 0.10", async () => {
-      const report = await getFixtureReport(fixtures.preferUv010RepoLike, {
+  describe("prefer-uv-0-12 repository diagnostics", () => {
+    test("warns when config constrains uv below 0.12", async () => {
+      const report = await getFixtureReport(fixtures.preferUv012RepoLike, {
         targetPath: ".",
         topCount: 20,
         mode: "strict",
       });
 
       const finding = report.findings.find(
-        (c) => c.ruleId === "prefer-uv-0-10" && c.scope === "repository",
+        (c) => c.ruleId === "prefer-uv-0-12" && c.scope === "repository",
       );
       expect(finding).toBeDefined();
       expect(finding?.scope).toBe("repository");
       expect(finding?.severity).toBe("warning");
-      expect(finding?.docsPath).toBe("docs/rules/prefer-uv-0-10.md");
+      expect(finding?.docsPath).toBe("docs/rules/prefer-uv-0-12.md");
       expect(finding?.location.path).toBe("pyproject.toml");
-      expect(finding?.message).toContain("below 0.10");
+      expect(finding?.message).toContain("below 0.12");
     });
 
-    test("skips warning when uv is at or above 0.10", async () => {
-      const report = await getFixtureReport(fixtures.preferUv010RepoOk, {
+    test("skips warning when uv is at or above 0.12", async () => {
+      const report = await getFixtureReport(fixtures.preferUv012RepoOk, {
         targetPath: ".",
         topCount: 20,
         mode: "strict",
       });
 
       expect(
-        report.findings.some((c) => c.ruleId === "prefer-uv-0-10" && c.scope === "repository"),
+        report.findings.some((c) => c.ruleId === "prefer-uv-0-12" && c.scope === "repository"),
       ).toBe(false);
     });
   });

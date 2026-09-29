@@ -1,19 +1,19 @@
 import type { RuleMeta } from "../../types.ts";
 
 export const preferModernUvVersionMeta = {
-  id: "prefer-uv-0-10",
+  id: "prefer-uv-0-12",
   severity: "warning",
   confidence: "medium",
-  docsPath: "docs/rules/prefer-uv-0-10.md",
+  docsPath: "docs/rules/prefer-uv-0-12.md",
 } satisfies RuleMeta;
 
-const modernUvMinorFloor = 10;
+const modernUvMinorFloor = 12;
 
 export const preferModernUvVersionSuggestion =
-  "Raise the uv floor to at least 0.10.x so CI installs a current uv. Update setup-uv version inputs, pip or pipx uv pins, and pyproject/uv.toml required-version constraints together.";
+  "Raise the uv floor to at least 0.12.x so CI installs a current uv. Update setup-uv version inputs, pip or pipx uv pins, and pyproject/uv.toml required-version constraints together.";
 
 export const preferModernUvVersionMeasurementHint =
-  "Compare Python dependency resolution and install wall-clock time before and after moving uv to 0.10.x or newer.";
+  "Compare Python dependency resolution and install wall-clock time before and after moving uv to 0.12.x or newer.";
 
 type VersionPair = readonly [major: number, minor: number];
 
@@ -27,8 +27,8 @@ function isAtOrAboveModern([major, minor]: VersionPair): boolean {
 
 /**
  * Detects whether a uv version or version constraint forces an effective uv
- * below 0.10. Bare versions and lower bounds are treated as the floor; an
- * upper bound below 0.10 also forces an outdated uv.
+ * below 0.12. Bare versions and lower bounds are treated as the floor; an
+ * upper bound below 0.12 also forces an outdated uv.
  */
 export function uvVersionSpecIsBelowModern(spec: string | undefined): boolean {
   if (!spec) {

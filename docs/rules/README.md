@@ -131,7 +131,7 @@ Current rule registry:
 - `prefer-turborepo-over-npm-workspaces`
 - `prefer-typescript-5-performance-milestone`
 - `prefer-typescript-7-native-compiler`
-- `prefer-uv-0-10`
+- `prefer-uv-0-12`
 - `prefer-uv-pip-over-pip`
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`

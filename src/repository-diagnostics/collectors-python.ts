@@ -11,7 +11,7 @@ import { collectPythonTopLevelHeavyClientInitDiagnostics } from "./python-top-le
 import { collectNoxWithoutUvBackendDiagnostics } from "./nox-without-uv-backend.ts";
 import { collectPreferRuffFormatOverBlackDiagnostics } from "./prefer-ruff-format-over-black.ts";
 import { collectPreferRuffImportSortingOverIsortDiagnostics } from "./prefer-ruff-import-sorting-over-isort.ts";
-import { collectPreferModernUvVersionDiagnostics } from "./prefer-uv-0-10.ts";
+import { collectPreferModernUvVersionDiagnostics } from "./prefer-uv-0-12.ts";
 import { collectToxWithoutToxUvDiagnostics } from "./tox-without-tox-uv.ts";
 import { collectHatchWithoutUvInstallerDiagnostics } from "./hatch-without-uv-installer.ts";
 import { collectAsyncTestUsesSyncTestClientDiagnostics } from "./async-test-uses-sync-testclient.ts";
@@ -86,7 +86,7 @@ export const pythonDiagnosticCollectors = [
       ),
   },
   {
-    id: "prefer-uv-0-10",
+    id: "prefer-uv-0-12",
     gate: gateKeys.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPreferModernUvVersionDiagnostics(repoRoot, repository, warnings, scanContext),
