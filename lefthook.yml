@@ -10,3 +10,6 @@ pre-push:
     tag-version-match:
       run: bash scripts/check-tag-version.sh
       priority: 1
+    lockfile-sync:
+      run: bash scripts/check-lockfile-sync.sh
+      priority: 2

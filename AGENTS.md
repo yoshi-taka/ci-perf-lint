@@ -211,6 +211,7 @@ See `docs/publishing.md`. TL;DR:
 - **Tag push**: `git tag v<ver> && git push origin v<ver>` — fully automated publish + release
 - **NEVER use `git push --tags` or `git push origin main --tags`**. They push every local tag, including stale development tags, which triggers publish workflows for already-published versions. Always push exactly one tag: `git push origin v<ver>`.
 - **workflow_dispatch**: manual from GitHub Actions UI, supports `bump_version` and `dist_tag`
+- **Lockfile**: commit `package.json` dependency changes together with `bun.lock`. CI and the pre-push `lockfile-sync` hook run `bun install --frozen-lockfile`.
 - Keep `packages/ci-perf-lint/package.json` dep `@yoshi-taka/ci-perf-lint` at `"*"`
 
 すべてのやり取り、計画、において、極端に簡潔にし、簡潔さのために文法を犠牲にすること。
