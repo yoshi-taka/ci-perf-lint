@@ -11,4 +11,6 @@ export default {
   checkers: [],
   tempDirName: ".stryker-tmp/rule-engine",
   cleanTempDir: true,
+  // typescript@7 lacks parseConfigFileTextToJson; inPlace skips TSConfigPreprocessor
+  inPlace: true,
 };
