@@ -345,6 +345,31 @@ describe("migrations: python and platform tooling", () => {
     );
   });
 
+  test("warns when a job pins uv below 0.10", async () => {
+    const report = await getFixtureReport(fixtures.preferUv010Like, {
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    const hits = report.findings
+      .filter((candidate) => candidate.ruleId === "prefer-uv-0-10")
+      .map((candidate) => candidate.message);
+
+    expect(report.workflowCount).toBe(1);
+    expect(hits.some((message) => message.includes('Job "lint"'))).toBe(true);
+    expect(hits.some((message) => message.includes('Job "typecheck"'))).toBe(true);
+    expect(hits).toHaveLength(2);
+  });
+
+  test("skips when uv is at or above 0.10 or unpinned", async () => {
+    const report = await getFixtureReport(fixtures.preferUv010Ok, {
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(report.findings.some((candidate) => candidate.ruleId === "prefer-uv-0-10")).toBe(false);
+  });
+
   test("warns when nox is used without --uv flag", async () => {
     const report = await getFixtureReport(fixtures.noxWithoutUvBackendLike, {
       targetPath: ".",
