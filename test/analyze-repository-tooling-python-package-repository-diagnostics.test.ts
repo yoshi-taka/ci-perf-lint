@@ -576,4 +576,193 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(report.findings.some((c) => c.ruleId === "prefer-pydantic-v2")).toBe(false);
     });
   });
+
+  describe("outdated-pydantic-v2", () => {
+    test("warns when pyproject constrains pydantic below 2.11", async () => {
+      const report = await getFixtureReport(fixtures.outdatedPydanticV2Like, {
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      const finding = report.findings.find((c) => c.ruleId === "outdated-pydantic-v2");
+      expect(finding).toBeDefined();
+      expect(finding?.scope).toBe("repository");
+      expect(finding?.severity).toBe("warning");
+      expect(finding?.docsPath).toBe("docs/rules/outdated-pydantic-v2.md");
+      expect(finding?.location.path).toBe("pyproject.toml");
+      expect(finding?.message).toContain("older than 2.11");
+    });
+
+    test("skips when pydantic is at or above 2.11", async () => {
+      const report = await getFixtureReport(fixtures.outdatedPydanticV2Ok, {
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "outdated-pydantic-v2")).toBe(false);
+    });
+
+    test("warns when requirements.txt pins pydantic 2.10", async () => {
+      const fixtureRoot = await tempDirs.create("apl-pydantic-v2-reqs-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(
+        path.join(fixtureRoot, "requirements.txt"),
+        ["requests", "pydantic==2.10.6", "pytest"].join("\n"),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install -r requirements.txt",
+          "      - run: pytest",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      const finding = report.findings.find((c) => c.ruleId === "outdated-pydantic-v2");
+      expect(finding).toBeDefined();
+      expect(finding?.location.path).toBe("requirements.txt");
+    });
+
+    test("warns when poetry.lock pins pydantic below 2.11", async () => {
+      const fixtureRoot = await tempDirs.create("apl-pydantic-v2-poetry-lock-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(
+        path.join(fixtureRoot, "poetry.lock"),
+        [
+          "[[package]]",
+          'name = "pydantic"',
+          'version = "2.10.6"',
+          "",
+          "[[package]]",
+          'name = "requests"',
+          'version = "2.32.0"',
+        ].join("\n"),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install poetry",
+          "      - run: poetry install",
+          "      - run: pytest",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      const finding = report.findings.find((c) => c.ruleId === "outdated-pydantic-v2");
+      expect(finding).toBeDefined();
+      expect(finding?.location.path).toBe("poetry.lock");
+    });
+
+    test("skips floor-only and caret ranges that can resolve 2.11", async () => {
+      const fixtureRoot = await tempDirs.create("apl-pydantic-v2-flexible-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(
+        path.join(fixtureRoot, "pyproject.toml"),
+        [
+          "[project]",
+          'name = "example"',
+          "dependencies = [",
+          '  "pydantic>=2.0",',
+          '  "pydantic-core>=2.0",',
+          "]",
+        ].join("\n"),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install -e .",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "outdated-pydantic-v2")).toBe(false);
+    });
+
+    test("does not flag pydantic v1 constraints", async () => {
+      const fixtureRoot = await tempDirs.create("apl-pydantic-v2-v1-only-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(
+        path.join(fixtureRoot, "pyproject.toml"),
+        ["[project]", 'name = "example"', "dependencies = [", '  "pydantic>=1.10,<2",', "]"].join(
+          "\n",
+        ),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install -e .",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "outdated-pydantic-v2")).toBe(false);
+      expect(report.findings.some((c) => c.ruleId === "prefer-pydantic-v2")).toBe(true);
+    });
+  });
 });

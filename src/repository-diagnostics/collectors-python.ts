@@ -3,6 +3,7 @@ import { gateKeys } from "./gates.ts";
 import { collectPytestDiagnostics } from "./pytest.ts";
 import { collectPytestXdistInstalledButNotUsedDiagnostics } from "./pytest-xdist-installed-but-not-used.ts";
 import { collectAvoidMypyProductionBundleDiagnostics } from "./avoid-mypy-production-bundle.ts";
+import { collectOutdatedPydanticV2Diagnostics } from "./outdated-pydantic-v2.ts";
 import { collectMypyMilestoneDiagnostics } from "./mypy-milestone.ts";
 import { collectPreferPydanticV2Diagnostics } from "./prefer-pydantic-v2.ts";
 import { collectPyramidConfigScanDiagnostics } from "./pyramid-config-scan.ts";
@@ -55,6 +56,12 @@ export const pythonDiagnosticCollectors = [
         warnings,
         scanContext,
       ),
+  },
+  {
+    id: "outdated-pydantic-v2",
+    gate: gateKeys.pythonHeavy,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectOutdatedPydanticV2Diagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-mypy-performance-milestone",

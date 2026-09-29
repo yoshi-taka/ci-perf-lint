@@ -162,6 +162,8 @@ const fixtureNames = {
   preinstalledCliLike: "preinstalled-cli-like",
   preferPydanticV2Like: "prefer-pydantic-v2-like",
   preferPydanticV2Ok: "prefer-pydantic-v2-ok",
+  outdatedPydanticV2Like: "outdated-pydantic-v2-like",
+  outdatedPydanticV2Ok: "outdated-pydantic-v2-ok",
   frozenLockfileLike: "frozen-lockfile-like",
   prettierEslintLike: "prettier-eslint-like",
   prettierThroughEslintLike: "prettier-through-eslint-like",

@@ -72,6 +72,7 @@ Current rule registry:
 - `npm-audit-in-ci`
 - `npm-ci-over-npm-install`
 - `outdated-datadog-lambda-extension`
+- `outdated-pydantic-v2`
 - `outdated-setup-action-without-cache`
 - `pdm-without-use-uv`
 - `prefer-buildx-bake-for-multiple-images`
