@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "ignorePatterns": ["dist/**", "site/**", "test/fixtures/**", "fuzz/**", "profile-*.ts", "scripts/**", "src/rules/shared/evidence-propagation.ts", "src/rules/shared/finding-sheet.ts", "src/rules/shared/singularity.ts", "src/rules/shared/workflow-interaction.ts", "src/transform-stability.ts"],
-  "ignoreDependencies": ["bun"],
+  "ignoreDependencies": ["bun", "@codspeed/tinybench-plugin"],
   "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts", "src/rules/shared/predicate.ts"],
   "rules": {
     "circular-dependencies": "error",
@@ -17,7 +17,7 @@
     "minLines": 5,
     "minTokens": 50
   },
-  "usedClassMembers": ["clear", "has", "ids", "prerequisites", "findRootFile"],
+  "usedClassMembers": ["clear", "has", "ids", "pythonFiles", "prerequisites", "findRootFile"],
   "ignoreExports": [
     { "file": "src/rules/shared/diagnostic-transform.ts", "exports": ["hasAppliedTransform", "markTransformApplied", "getAppliedTransformLabels", "resetTransformTracking"] },
     { "file": "src/cli-option-resolver.ts", "exports": ["similarFlagDistanceLimit", "levenshteinDistance"] },

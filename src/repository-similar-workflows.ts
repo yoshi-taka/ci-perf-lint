@@ -9,12 +9,9 @@ import {
   encodeFeatureMasks,
 } from "./repository-similar-workflows-similarity.ts";
 import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts";
-import {
-  collectRepositoryPrecedentSignals as collectRepositoryPrecedentSignalsFromPrecedents,
-  type RepositoryPrecedentSignals,
-} from "./repository-similar-workflows-precedents.ts";
 import { collectWorkflowSummary } from "./repository-similar-workflows-workflow-summaries.ts";
 
+export { collectRepositoryPrecedentSignals } from "./repository-similar-workflows-precedents.ts";
 export type { RepositoryPrecedentSignals } from "./repository-similar-workflows-precedents.ts";
 
 const minimumPeerCount = 3;
@@ -325,11 +322,4 @@ export function collectSimilarWorkflowSignals(
       nonCodeIgnore: buildWorkflowIndex(nonCodeIgnore),
     },
   };
-}
-
-export function collectRepositoryPrecedentSignals(
-  workflows: WorkflowDocument[],
-  sharedJobSummaries: JobSummary[],
-): RepositoryPrecedentSignals {
-  return collectRepositoryPrecedentSignalsFromPrecedents(workflows, sharedJobSummaries);
 }
