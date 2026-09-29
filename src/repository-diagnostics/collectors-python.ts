@@ -9,6 +9,7 @@ import { collectPreferPydanticV2Diagnostics } from "./prefer-pydantic-v2.ts";
 import { collectPyramidConfigScanDiagnostics } from "./pyramid-config-scan.ts";
 import { collectPdmWithoutUseUvDiagnostics } from "./pdm-without-use-uv.ts";
 import { collectPythonTopLevelHeavyClientInitDiagnostics } from "./python-top-level-heavy-client-init.ts";
+import { collectPythonVersion311Diagnostics } from "./python-version-3-11.ts";
 import { collectNoxWithoutUvBackendDiagnostics } from "./nox-without-uv-backend.ts";
 import { collectPreferRuffFormatOverBlackDiagnostics } from "./prefer-ruff-format-over-black.ts";
 import { collectPreferRuffImportSortingOverIsortDiagnostics } from "./prefer-ruff-import-sorting-over-isort.ts";
@@ -127,6 +128,12 @@ export const pythonDiagnosticCollectors = [
     gate: gateKeys.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPythonTopLevelHeavyClientInitDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-python-3-11",
+    gate: gateKeys.pythonHeavy,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPythonVersion311Diagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "tox-without-tox-uv",

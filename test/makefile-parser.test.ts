@@ -88,7 +88,14 @@ function createSignals(): RepositorySignals {
       pluginNames: [],
       usesPrettierEslint: false,
     },
-    python: { usesBlack: false, usesIsort: false, usesRuff: false, usesTox: false, usesNox: false },
+    python: {
+      usesBlack: false,
+      usesIsort: false,
+      usesRuff: false,
+      usesTox: false,
+      usesNox: false,
+      versionOccurrences: [],
+    },
     nativePackages: { node: [], python: [] },
     npm: {
       npmrcFiles: [],

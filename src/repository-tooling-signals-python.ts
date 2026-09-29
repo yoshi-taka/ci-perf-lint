@@ -1,6 +1,11 @@
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import { dependencySectionsOf } from "./repository-package-helpers.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
+import {
+  extractPythonVersionLiteral,
+  pythonVersionIsBelow311,
+  requiresPythonConstrainsBelow311,
+} from "./rules/shared/python-versions.ts";
 
 const pythonToolSignalFileNames = [
   "pyproject.toml",
@@ -12,6 +17,12 @@ const pythonToolSignalFileNames = [
   ".pre-commit-config.yaml",
   ".pre-commit-config.yml",
 ] as const;
+
+const pythonVersionFileNames = [".python-version", "runtime.txt"] as const;
+
+function lineOfIndex(text: string, index: number): number {
+  return text.slice(0, Math.max(0, index)).split("\n").length;
+}
 
 const hatchConfigFileNames = ["pyproject.toml", "hatch.toml"] as const;
 
@@ -50,6 +61,66 @@ async function loadExistingTextFiles(
   return loads.filter((entry): entry is { fileName: string; text: string } => Boolean(entry));
 }
 
+async function collectPythonVersionOccurrences(
+  context: RepositoryScanContext,
+  signalFiles: { fileName: string; text: string }[],
+): Promise<RepositorySignals["python"]["versionOccurrences"]> {
+  const occurrences: RepositorySignals["python"]["versionOccurrences"] = [];
+
+  const pushExact = (path: string, text: string, line: number): void => {
+    const parsed = extractPythonVersionLiteral(text);
+    if (parsed && pythonVersionIsBelow311(parsed.major, parsed.minor)) {
+      occurrences.push({
+        versionSpec: `${parsed.major}.${parsed.minor}`,
+        major: parsed.major,
+        minor: parsed.minor,
+        path,
+        line,
+      });
+    }
+  };
+
+  for (const { fileName, text } of signalFiles) {
+    if (fileName === "pyproject.toml" || fileName === "setup.cfg") {
+      const match = /(?:requires-python|python_requires)\s*=\s*["']?([^"'\n]+)["']?/i.exec(text);
+      if (match?.[1] && requiresPythonConstrainsBelow311(match[1])) {
+        occurrences.push({
+          versionSpec: match[1].trim(),
+          path: fileName,
+          line: lineOfIndex(text, match.index),
+        });
+      }
+    } else if (fileName === "tox.ini") {
+      const match = /basepython\s*=\s*(?:python)?v?([0-9.]+)/i.exec(text);
+      if (match?.[1]) {
+        const parsed = extractPythonVersionLiteral(match[1]);
+        if (parsed && pythonVersionIsBelow311(parsed.major, parsed.minor)) {
+          occurrences.push({
+            versionSpec: `${parsed.major}.${parsed.minor}`,
+            major: parsed.major,
+            minor: parsed.minor,
+            path: fileName,
+            line: lineOfIndex(text, match.index),
+          });
+        }
+      }
+    }
+  }
+
+  for (const fileName of pythonVersionFileNames) {
+    const filePath = context.resolve(fileName);
+    if (!(await context.pathExists(filePath))) {
+      continue;
+    }
+    const text = await context.readTextFileOrWarn(filePath);
+    if (text) {
+      pushExact(fileName, text, 1);
+    }
+  }
+
+  return occurrences;
+}
+
 export async function collectPythonSignals(
   context: RepositoryScanContext,
 ): Promise<RepositorySignals["python"]> {
@@ -74,12 +145,15 @@ export async function collectPythonSignals(
     usesNox = await context.pathExists(context.resolve("noxfile.py")).catch(() => false);
   }
 
+  const versionOccurrences = await collectPythonVersionOccurrences(context, signalFiles);
+
   return {
     usesBlack,
     usesIsort,
     usesRuff,
     usesTox,
     usesNox,
+    versionOccurrences,
   };
 }
 

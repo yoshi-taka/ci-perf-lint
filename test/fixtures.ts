@@ -165,6 +165,8 @@ const fixtureNames = {
   preinstalledCliLike: "preinstalled-cli-like",
   preferPydanticV2Like: "prefer-pydantic-v2-like",
   preferPydanticV2Ok: "prefer-pydantic-v2-ok",
+  preferPython311Like: "prefer-python-3-11-like",
+  preferPython311Ok: "prefer-python-3-11-ok",
   outdatedPydanticV2Like: "outdated-pydantic-v2-like",
   outdatedPydanticV2Ok: "outdated-pydantic-v2-ok",
   frozenLockfileLike: "frozen-lockfile-like",

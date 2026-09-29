@@ -147,6 +147,13 @@ export interface RepositorySignals {
     usesRuff: boolean;
     usesTox: boolean;
     usesNox: boolean;
+    versionOccurrences: {
+      versionSpec: string;
+      major?: number;
+      minor?: number;
+      path: string;
+      line: number;
+    }[];
   };
   nativePackages: {
     node: string[];

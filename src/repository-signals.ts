@@ -526,6 +526,7 @@ export async function collectRepositorySignals(
       usesRuff: false,
       usesTox: false,
       usesNox: false,
+      versionOccurrences: [],
     }),
     collectSignalIf(
       hasNativePackageEvidence,

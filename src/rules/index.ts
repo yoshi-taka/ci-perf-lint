@@ -91,6 +91,7 @@ import { preferSetupBunForLightweightNodeToolingRule } from "./prefer-setup-bun-
 import { preferSetupUvForLightweightPythonToolingRule } from "./prefer-setup-uv-for-lightweight-python-tooling.ts";
 import { preferZstdCompressionForPushedDockerImagesRule } from "./prefer-zstd-compression-for-pushed-docker-images.ts";
 import { railsDbSchemaLoadOverMigrateRule } from "./rails-db-schema-load-over-migrate.ts";
+import { preferPython311Rule } from "./prefer-python-3-11.ts";
 import { preferRailsPerformanceMilestoneRule } from "./prefer-rails-performance-milestone.ts";
 import { preferRuby33YjitRule } from "./prefer-ruby-33-yjit.ts";
 import { preferRuffImportSortingOverIsortRule } from "./prefer-ruff-import-sorting-over-isort.ts";
@@ -172,6 +173,7 @@ export const allRules = [
   preferNextjs12MinorPerformanceMilestoneRule,
   preferNextjs13MinorPerformanceMilestoneRule,
   preferNextjs14MinorPerformanceMilestoneRule,
+  preferPython311Rule,
   preferRailsPerformanceMilestoneRule,
   preferRuby33YjitRule,
   preferStorybook6MinorPerformanceMilestoneRule,

@@ -118,6 +118,7 @@ Current rule registry:
 - `prefer-oxlint-over-eslint`
 - `prefer-oxlint-type-check-over-tsc`
 - `prefer-pydantic-v2`
+- `prefer-python-3-11`
 - `prefer-rails-performance-milestone`
 - `prefer-ruby-33-yjit`
 - `prefer-ruff-format-over-black`

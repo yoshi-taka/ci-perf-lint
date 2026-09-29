@@ -765,4 +765,112 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(report.findings.some((c) => c.ruleId === "prefer-pydantic-v2")).toBe(true);
     });
   });
+
+  describe("prefer-python-3-11", () => {
+    test("warns on setup-python, matrix, and requires-python below 3.11", async () => {
+      const report = await getFixtureReport(fixtures.preferPython311Like, {
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      const repositoryFinding = report.findings.find(
+        (c) => c.ruleId === "prefer-python-3-11" && c.scope === "repository",
+      );
+      expect(repositoryFinding).toBeDefined();
+      expect(repositoryFinding?.severity).toBe("warning");
+      expect(repositoryFinding?.docsPath).toBe("docs/rules/prefer-python-3-11.md");
+      expect(repositoryFinding?.location.path).toBe("pyproject.toml");
+      expect(repositoryFinding?.message).toContain("below 3.11");
+
+      const workflowFindings = report.findings.filter(
+        (c) => c.ruleId === "prefer-python-3-11" && c.scope !== "repository",
+      );
+      expect(workflowFindings.some((c) => c.message.includes('Job "test"'))).toBe(true);
+      expect(workflowFindings.some((c) => c.message.includes('Job "lint"'))).toBe(true);
+    });
+
+    test("skips when Python is at or above 3.11", async () => {
+      const report = await getFixtureReport(fixtures.preferPython311Ok, {
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-python-3-11")).toBe(false);
+    });
+
+    test("warns on .python-version below 3.11", async () => {
+      const fixtureRoot = await tempDirs.create("apl-python-311-file-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(path.join(fixtureRoot, ".python-version"), "3.10.13\n");
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "        with:",
+          "          python-version-file: .python-version",
+          "      - run: pytest",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      const finding = report.findings.find(
+        (c) => c.ruleId === "prefer-python-3-11" && c.scope === "repository",
+      );
+      expect(finding).toBeDefined();
+      expect(finding?.location.path).toBe(".python-version");
+    });
+
+    test("skips floor-only requires-python", async () => {
+      const fixtureRoot = await tempDirs.create("apl-python-311-floor-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(
+        path.join(fixtureRoot, "pyproject.toml"),
+        ["[project]", 'name = "example"', 'requires-python = ">=3.9"'].join("\n"),
+      );
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "        with:",
+          '          python-version: "3.12"',
+          "      - run: pip install -e .",
+        ].join("\n"),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-python-3-11")).toBe(false);
+    });
+  });
 });
