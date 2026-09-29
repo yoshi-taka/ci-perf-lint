@@ -16,11 +16,7 @@ export interface RunsOnSpec {
   readonly isMacos: boolean;
 }
 
-const standardHostedLabels = new Set([
-  "ubuntu-latest",
-  "ubuntu-24.04",
-  "ubuntu-22.04",
-  "ubuntu-20.04",
+const standardHostedNonUbuntuLabels = new Set([
   "windows-latest",
   "windows-2025",
   "windows-2022",
@@ -33,7 +29,16 @@ const standardHostedLabels = new Set([
   "macos-26-intel",
 ]);
 
-const standardX64UbuntuLabels = new Set(["ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"]);
+const standardUbuntuX64LabelPattern = /^ubuntu-(?:latest|\d{2}\.\d{2})$/;
+const standardUbuntuArmLabelPattern = /^ubuntu-\d{2}\.\d{2}-arm$/;
+
+function isStandardUbuntuX64Label(label: string): boolean {
+  return standardUbuntuX64LabelPattern.test(label);
+}
+
+function isStandardUbuntuLabel(label: string): boolean {
+  return isStandardUbuntuX64Label(label) || standardUbuntuArmLabelPattern.test(label);
+}
 
 const runsOnSpecCache = new WeakMap<WorkflowJob, RunsOnSpec>();
 
@@ -83,11 +88,12 @@ function detectArch(labels: readonly string[]): RunsOnArch {
 }
 
 function isStandardHosted(labels: readonly string[]): boolean {
-  const lowered = labels.map((l) => l.toLowerCase());
-  if (lowered.length === 0) {
+  if (labels.length === 0) {
     return false;
   }
-  return lowered.every((l) => standardHostedLabels.has(l));
+  return labels.every(
+    (label) => standardHostedNonUbuntuLabels.has(label) || isStandardUbuntuLabel(label),
+  );
 }
 
 export function getRunsOnSpec(job: WorkflowJob): RunsOnSpec {
@@ -124,7 +130,7 @@ export function getRunsOnSpec(job: WorkflowJob): RunsOnSpec {
 }
 
 export function jobRunsOnStandardX64Ubuntu(job: WorkflowJob): boolean {
-  return getRunsOnSpec(job).labels.some((l) => standardX64UbuntuLabels.has(l));
+  return getRunsOnSpec(job).labels.some((label) => isStandardUbuntuX64Label(label));
 }
 
 export function jobRunsOnArmLikeRunner(job: WorkflowJob): boolean {

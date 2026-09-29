@@ -207,6 +207,39 @@ describe("analyzeRepository workflow and execution rules: docker and runner heur
     expect(pulumiFinding?.suggestion).toContain("ubuntu-22.04-arm");
   });
 
+  test("derives the matching arm64 label for newer Ubuntu versions", async () => {
+    const fixtureRoot = await tempDirs.create("apl-arm-newer-ubuntu-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "deploy.yml"),
+      [
+        "name: Deploy",
+        "on: push",
+        "jobs:",
+        "  terraform:",
+        "    runs-on: ubuntu-26.04",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: terraform plan",
+      ].join("\n"),
+    );
+
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    const finding = report.findings.find(
+      (candidate) => candidate.ruleId === "prefer-standard-arm-runner-for-api-cli",
+    );
+
+    expect(finding).toBeDefined();
+    expect(finding?.suggestion).toContain("ubuntu-26.04-arm");
+  });
+
   test("recommends standard arm64 runners for portable fast tooling", async () => {
     const report = await getWorkflowFocusedFixtureReport(fixtures.portableToolingArmRunnerLike, {
       targetPath: ".",

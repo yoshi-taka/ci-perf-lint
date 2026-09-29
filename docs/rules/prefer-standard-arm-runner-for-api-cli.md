@@ -22,7 +22,7 @@ For these jobs, runner CPU architecture may matter less than CLI startup, depend
 
 This rule only fires when all of the following are visible:
 
-- the job runs on `ubuntu-latest`, `ubuntu-24.04`, or `ubuntu-22.04`
+- the job runs on any standard x64 Ubuntu label (`ubuntu-latest`, `ubuntu-24.04`, `ubuntu-22.04`, and later versions)
 - the job does not already run on an arm64-like runner
 - the job is not configured with a job container
 - a known API-bound CLI command is visible

@@ -7,7 +7,25 @@ import {
 
 export { jobRunsOnStandardX64Ubuntu, jobRunsOnArmLikeRunner };
 
+const latestUbuntuArmLabel = "ubuntu-24.04-arm";
+const minimumUbuntuArmMajor = 22;
+const minimumUbuntuArmMinor = 4;
+
 export function suggestedStandardArmUbuntuRunner(job: WorkflowJob): string {
-  const labels = getRunsOnSpec(job).labels;
-  return labels.includes("ubuntu-22.04") ? "ubuntu-22.04-arm" : "ubuntu-24.04-arm";
+  for (const label of getRunsOnSpec(job).labels) {
+    const match = /^ubuntu-(\d{2})\.(\d{2})$/.exec(label);
+    if (!match) {
+      continue;
+    }
+    const major = Number(match[1]);
+    const minor = Number(match[2]);
+    if (
+      major > minimumUbuntuArmMajor ||
+      (major === minimumUbuntuArmMajor && minor >= minimumUbuntuArmMinor)
+    ) {
+      return `${label}-arm`;
+    }
+    return latestUbuntuArmLabel;
+  }
+  return latestUbuntuArmLabel;
 }
