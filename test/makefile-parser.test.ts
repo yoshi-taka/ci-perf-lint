@@ -79,6 +79,7 @@ function createSignals(): RepositorySignals {
       usesImportXPlugin: false,
       usesNoBarrelFilesPlugin: false,
       usesBarrelFilesPlugin: false,
+      hasOxlintTsgolint: false,
     },
     prettier: {
       usesPrettier: false,

@@ -67,6 +67,7 @@ import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-comp
 import { preferJest30ForJest29Rule } from "./prefer-jest-30-for-jest-29.ts";
 import { preferRuffFormatOverBlackRule } from "./prefer-ruff-format-over-black.ts";
 import { preferOxlintOverEslintRule } from "./prefer-oxlint-over-eslint.ts";
+import { preferOxlintTypeCheckOverTscRule } from "./prefer-oxlint-type-check-over-tsc.ts";
 import { preferOxfmtOverPrettierRule } from "./prefer-oxfmt-over-prettier.ts";
 import {
   preferNextjs12MinorPerformanceMilestoneRule,
@@ -166,6 +167,7 @@ export const allRules = [
   dbIoReduceRule,
   preferDirectUploadForCompressedArtifactsRule,
   preferOxlintOverEslintRule,
+  preferOxlintTypeCheckOverTscRule,
   preferOxfmtOverPrettierRule,
   preferNextjs12MinorPerformanceMilestoneRule,
   preferNextjs13MinorPerformanceMilestoneRule,

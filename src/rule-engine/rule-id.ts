@@ -72,6 +72,7 @@ export const RULE_REGISTRY = {
   "prefer-nextjs-13-minor-performance-milestone": { kind: "workflow" },
   "prefer-nextjs-14-minor-performance-milestone": { kind: "workflow" },
   "prefer-oxlint-over-eslint": { kind: "workflow" },
+  "prefer-oxlint-type-check-over-tsc": { kind: "workflow" },
   "prefer-oxfmt-over-prettier": { kind: "workflow" },
   "prefer-rails-performance-milestone": { kind: "workflow" },
   "prefer-ruff-format-over-black": { kind: "workflow" },

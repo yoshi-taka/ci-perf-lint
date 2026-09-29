@@ -129,6 +129,10 @@ export interface RepositorySignals {
     usesImportXPlugin: boolean;
     usesNoBarrelFilesPlugin: boolean;
     usesBarrelFilesPlugin: boolean;
+    oxlintVersionSpec?: string;
+    oxlintMajor?: number;
+    oxlintMinor?: number;
+    hasOxlintTsgolint: boolean;
   };
   prettier: {
     usesPrettier: boolean;

@@ -511,6 +511,7 @@ export async function collectRepositorySignals(
       usesImportXPlugin: false,
       usesNoBarrelFilesPlugin: false,
       usesBarrelFilesPlugin: false,
+      hasOxlintTsgolint: false,
     }),
     collectSignalIf(hasPrettierEvidence, "prettier", context, collectPrettierSignals, {
       usesPrettier: false,

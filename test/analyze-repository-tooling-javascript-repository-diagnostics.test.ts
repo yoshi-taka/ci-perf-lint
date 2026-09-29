@@ -443,4 +443,46 @@ describe("analyzeRepository repo-aware and tooling rules: javascript repository 
       }
     });
   });
+
+  describe("prefer-oxlint-type-check-over-tsc", () => {
+    test("warns for a tsc type-check script and workflow step when oxlint is used", async () => {
+      const report = await getFixtureReport(fixtures.preferOxlintTypeCheckOverTscLike, baseOptions);
+
+      const repositoryFinding = report.findings.find(
+        (c) => c.ruleId === "prefer-oxlint-type-check-over-tsc" && c.scope === "repository",
+      );
+      expect(repositoryFinding).toBeDefined();
+      expect(repositoryFinding?.severity).toBe("warning");
+      expect(repositoryFinding?.docsPath).toBe("docs/rules/prefer-oxlint-type-check-over-tsc.md");
+      expect(repositoryFinding?.location.path).toBe("package.json");
+      expect(repositoryFinding?.message).toContain("typecheck");
+      expect(repositoryFinding?.suggestion).toContain("oxlint-tsgolint");
+      expect(repositoryFinding?.suggestion).toContain("TypeScript 7");
+
+      const workflowFinding = report.findings.find(
+        (c) => c.ruleId === "prefer-oxlint-type-check-over-tsc" && c.scope !== "repository",
+      );
+      expect(workflowFinding).toBeDefined();
+      expect(workflowFinding?.message).toContain('Job "checks"');
+    });
+
+    test("skips when the lint path already runs oxlint type-check", async () => {
+      const report = await getFixtureReport(fixtures.preferOxlintTypeCheckOverTscOk, baseOptions);
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-oxlint-type-check-over-tsc")).toBe(
+        false,
+      );
+    });
+
+    test("skips when oxlint is not a dependency", async () => {
+      const report = await getFixtureReport(
+        fixtures.preferOxlintTypeCheckOverTscNoOxlint,
+        baseOptions,
+      );
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-oxlint-type-check-over-tsc")).toBe(
+        false,
+      );
+    });
+  });
 });

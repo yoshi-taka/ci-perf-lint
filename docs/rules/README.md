@@ -116,6 +116,7 @@ Current rule registry:
 - `prefer-npm-ci`
 - `prefer-oxfmt-over-prettier`
 - `prefer-oxlint-over-eslint`
+- `prefer-oxlint-type-check-over-tsc`
 - `prefer-pydantic-v2`
 - `prefer-rails-performance-milestone`
 - `prefer-ruby-33-yjit`

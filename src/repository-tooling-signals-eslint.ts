@@ -1,5 +1,10 @@
 import type { RepositorySignals } from "./repository-signals-types.ts";
-import { dependencySectionsOf, packageJsonHasDependency } from "./repository-package-helpers.ts";
+import {
+  dependencySectionsOf,
+  packageJsonDependencyVersionSpec,
+  packageJsonHasDependency,
+  parseSemverLikeVersionSpec,
+} from "./repository-package-helpers.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
 
 const eslintConfigFileNames = [
@@ -304,6 +309,8 @@ export async function collectEslintSignals(
   let usesImportXPlugin = false;
   let usesNoBarrelFilesPlugin = false;
   let usesBarrelFilesPlugin = false;
+  let hasOxlintTsgolint = false;
+  let oxlintVersionSpec: string | undefined;
 
   const packageJsonEntry = await context.loadPackageJson();
   if (packageJsonEntry.text && packageJsonEntry.value) {
@@ -314,6 +321,8 @@ export async function collectEslintSignals(
     }
     usesEslint ||= packageJsonHasDependency(packageJson, "eslint");
     usesOxlint ||= packageJsonHasDependency(packageJson, "oxlint");
+    oxlintVersionSpec ??= packageJsonDependencyVersionSpec(packageJson, "oxlint");
+    hasOxlintTsgolint ||= packageJsonHasDependency(packageJson, "oxlint-tsgolint");
     collectPluginNamesFromPackageJson(packageJson, pluginNames);
     usesPrettierPlugin ||= packageJsonHasDependency(packageJson, "eslint-plugin-prettier");
     usesPrettierRecommendedConfig ||= textMentionsPrettierRecommendedConfig(packageJsonText);
@@ -358,6 +367,7 @@ export async function collectEslintSignals(
   const unsupportedPluginNames = normalizedPluginNames.filter(
     (pluginName) => !supportedOxlintPluginNames.has(pluginName),
   );
+  const oxlintParsed = oxlintVersionSpec ? parseSemverLikeVersionSpec(oxlintVersionSpec) : {};
 
   return {
     usesEslint,
@@ -373,6 +383,10 @@ export async function collectEslintSignals(
     usesImportXPlugin,
     usesNoBarrelFilesPlugin,
     usesBarrelFilesPlugin,
+    oxlintVersionSpec,
+    oxlintMajor: oxlintParsed.major,
+    oxlintMinor: oxlintParsed.minor,
+    hasOxlintTsgolint,
   };
 }
 

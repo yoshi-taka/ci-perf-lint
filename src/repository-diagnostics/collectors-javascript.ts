@@ -8,6 +8,7 @@ import { collectLargeBarrelFileDiagnostics } from "./large-barrel.ts";
 import { collectLargeJestSnapshotDiagnostics } from "./jest-snapshot.ts";
 import { collectNpmCiOverNpmInstallDiagnostics } from "./npm-ci-over-npm-install.ts";
 import { collectPackageJsonNodeRunDiagnostics } from "./package-json-node-run.ts";
+import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxlint-type-check.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
 import { collectPreferTypeScript7NativeCompilerDiagnostics } from "./typescript-7-native-compiler.ts";
@@ -92,6 +93,12 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptPackageScripts,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPackageJsonNodeRunDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-oxlint-type-check-over-tsc",
+    gate: gateKeys.javascriptLinting,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPackageJsonOxlintTypeCheckDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-explicit-import-extensions",
