@@ -10,7 +10,6 @@ Current rule registry:
 - `async-test-uses-sync-testclient`
 - `avoid-brew-update-on-hosted-macos`
 - `avoid-broad-upload-artifact`
-- `bundler-external-subpath-leak`
 - `avoid-c-drive-on-windows-runner`
 - `avoid-docker-image-via-uses`
 - `avoid-eslint-plugin-prettier`
@@ -21,6 +20,7 @@ Current rule registry:
 - `avoid-prettier-eslint`
 - `avoid-svg-component-imports`
 - `avoid-xcode-install-on-hosted-macos`
+- `bundler-external-subpath-leak`
 - `cache-terraform-providers`
 - `cargo-build-before-test`
 - `cdk-asset-waste-files`
@@ -107,7 +107,6 @@ Current rule registry:
 - `prefer-mise-over-asdf`
 - `prefer-mypy-performance-milestone`
 - `prefer-native-arm-runner-over-qemu`
-- `prefer-next-typescript-performance-milestone`
 - `prefer-nextest-for-heavy-rust-tests`
 - `prefer-nextjs-12-minor-performance-milestone`
 - `prefer-nextjs-13-minor-performance-milestone`
@@ -130,6 +129,8 @@ Current rule registry:
 - `prefer-storybook-7-minor-performance-milestone`
 - `prefer-tailwind-v4-upgrade-tool`
 - `prefer-turborepo-over-npm-workspaces`
+- `prefer-typescript-5-performance-milestone`
+- `prefer-typescript-7-native-compiler`
 - `prefer-uv-pip-over-pip`
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`

@@ -42,7 +42,7 @@ describe("migrations: framework milestones and bundler migration", () => {
       const report = await getFixtureReport(testCase.fixture, baseOptions);
 
       const finding = report.findings.find(
-        (candidate) => candidate.ruleId === "prefer-next-typescript-performance-milestone",
+        (candidate) => candidate.ruleId === "prefer-typescript-5-performance-milestone",
       );
 
       expect(finding?.message).toContain(testCase.message);
@@ -57,6 +57,39 @@ describe("migrations: framework milestones and bundler migration", () => {
       }
     },
   );
+
+  test("recommends the TypeScript 7 native compiler for a TypeScript 6 project", async () => {
+    const report = await getFixtureReport(fixtures.typescript7NativeLike, baseOptions);
+
+    const finding = report.findings.find(
+      (candidate) => candidate.ruleId === "prefer-typescript-7-native-compiler",
+    );
+
+    expect(finding?.message).toContain("TypeScript 7 native compiler");
+    expect(finding?.suggestion).toContain("7.x");
+    expect(finding?.why).toContain("Go port");
+  });
+
+  test("recommends the TypeScript 7 native compiler for a TypeScript 5 project", async () => {
+    const report = await getFixtureReport(fixtures.typescriptMilestoneLike, baseOptions);
+
+    const finding = report.findings.find(
+      (candidate) => candidate.ruleId === "prefer-typescript-7-native-compiler",
+    );
+
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("TypeScript 7 native compiler");
+  });
+
+  test("does not recommend a TypeScript 7 upgrade for a TypeScript 7 project", async () => {
+    const report = await getFixtureReport(fixtures.typescript7NativeOk, baseOptions);
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "prefer-typescript-7-native-compiler",
+      ),
+    ).toBe(false);
+  });
 
   const frameworkMilestonePositiveCases = [
     {

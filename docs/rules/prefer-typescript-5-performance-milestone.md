@@ -1,4 +1,4 @@
-# prefer-next-typescript-performance-milestone
+# prefer-typescript-5-performance-milestone
 
 ## What it flags
 

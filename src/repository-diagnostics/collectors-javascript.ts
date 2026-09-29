@@ -9,7 +9,8 @@ import { collectLargeJestSnapshotDiagnostics } from "./jest-snapshot.ts";
 import { collectNpmCiOverNpmInstallDiagnostics } from "./npm-ci-over-npm-install.ts";
 import { collectPackageJsonNodeRunDiagnostics } from "./package-json-node-run.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
-import { collectTypeScriptMilestoneDiagnostics } from "./typescript-milestone.ts";
+import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
+import { collectPreferTypeScript7NativeCompilerDiagnostics } from "./typescript-7-native-compiler.ts";
 import { collectAvoidEslintPluginPrettierDiagnostics } from "./avoid-eslint-plugin-prettier.ts";
 import { collectAvoidPrettierEslintDiagnostics } from "./avoid-prettier-eslint.ts";
 import { collectPreferEslintPluginImportXDiagnostics } from "./prefer-eslint-plugin-import-x.ts";
@@ -116,10 +117,21 @@ export const javascriptDiagnosticCollectors = [
     collect: (context) => collectSetupNodeCacheDependencyPathUnsetDiagnostics(context),
   },
   {
-    id: "prefer-next-typescript-performance-milestone",
+    id: "prefer-typescript-5-performance-milestone",
     gate: gateKeys.javascriptHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectTypeScriptMilestoneDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-typescript-7-native-compiler",
+    gate: gateKeys.javascriptHeavy,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPreferTypeScript7NativeCompilerDiagnostics(
+        repoRoot,
+        repository,
+        warnings,
+        scanContext,
+      ),
   },
   {
     id: "recommend-webpack-4-latest-patch",

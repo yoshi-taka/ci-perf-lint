@@ -5,10 +5,10 @@ import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 const meta = {
-  id: "prefer-next-typescript-performance-milestone",
+  id: "prefer-typescript-5-performance-milestone",
   severity: "warning",
   confidence: "medium",
-  docsPath: "docs/rules/prefer-next-typescript-performance-milestone.md",
+  docsPath: "docs/rules/prefer-typescript-5-performance-milestone.md",
 } satisfies RuleMeta;
 
 function getNextPerformanceMilestone(minor: number): 2 | 5 | 9 | undefined {

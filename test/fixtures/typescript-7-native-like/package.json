@@ -1,0 +1,7 @@
+{
+  "name": "typescript-7-native-like",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
+}

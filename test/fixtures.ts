@@ -287,6 +287,8 @@ const fixtureNames = {
   tsToolingLike: "ts-tooling-like",
   turboCacheLike: "turbo-cache-like",
   turboCacheOk: "turbo-cache-ok",
+  typescript7NativeLike: "typescript-7-native-like",
+  typescript7NativeOk: "typescript-7-native-ok",
   typescriptMilestone52Like: "typescript-milestone-52-like",
   typescriptMilestone59Like: "typescript-milestone-59-like",
   typescriptMilestoneLike: "typescript-milestone-like",
