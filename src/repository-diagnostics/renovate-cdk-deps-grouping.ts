@@ -148,17 +148,6 @@ export async function collectRenovateCdkDepsGroupingDiagnostics(
       return [];
     }
 
-    if (hasDefaultCdkGrouping(config)) {
-      const deps = await context.loadDependencyIndex();
-      if (!deps.has("constructs")) {
-        return [];
-      }
-    }
-
-    if (hasCdkGrouping(config)) {
-      return [];
-    }
-
     return [
       buildRepositoryDiagnostic(repository, meta, {
         location: {

@@ -4,7 +4,7 @@ import type { WorkflowDocument } from "../../workflow.ts";
 
 export const AWS_CDK_CLI_PACKAGE = "aws-cdk";
 
-export const AWS_CDK_LIB_PACKAGE = "aws-cdk-lib";
+const AWS_CDK_LIB_PACKAGE = "aws-cdk-lib";
 
 export type SemverTuple = readonly [number, number, number];
 
@@ -92,16 +92,29 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-export async function readCdkCliVersionFromScanContext(
+async function readDeclaredDependencyVersion(
   scanContext: RepositoryScanContext | undefined,
+  packageName: string,
 ): Promise<SemverTuple | undefined> {
   const packageJson = await scanContext?.loadPackageJson();
   const dependencies = {
     ...asRecord(packageJson?.value?.dependencies),
     ...asRecord(packageJson?.value?.devDependencies),
   };
-  const declared = dependencies[AWS_CDK_CLI_PACKAGE];
+  const declared = dependencies[packageName];
   return parseDependencyVersionSpec(typeof declared === "string" ? declared : undefined);
+}
+
+export function readCdkCliVersionFromScanContext(
+  scanContext: RepositoryScanContext | undefined,
+): Promise<SemverTuple | undefined> {
+  return readDeclaredDependencyVersion(scanContext, AWS_CDK_CLI_PACKAGE);
+}
+
+export function readCdkLibVersionFromScanContext(
+  scanContext: RepositoryScanContext | undefined,
+): Promise<SemverTuple | undefined> {
+  return readDeclaredDependencyVersion(scanContext, AWS_CDK_LIB_PACKAGE);
 }
 
 export async function resolveCdkCliVersion(

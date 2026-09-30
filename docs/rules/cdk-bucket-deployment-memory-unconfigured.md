@@ -2,15 +2,19 @@
 
 ## What it flags
 
-CDK code that uses `BucketDeployment` without setting the `memoryLimit` property.
+CDK code that uses `BucketDeployment` without setting the `memoryLimit` property, on projects where the memory default is still relevant.
+
+- `aws-cdk-lib` 2.267.0 or later is not flagged: the default memory limit is 1024 MB there.
+- Older pinned versions are flagged with an upgrade recommendation.
+- When the declared `aws-cdk-lib` version cannot be read (for example a caret range), the rule falls back to recommending an explicit `memoryLimit`.
 
 ## Why it matters
 
-`BucketDeployment` uses a Lambda-backed custom resource. Without explicit `memoryLimit`, Lambda defaults to 128 MB — often too low for processing non-trivial website assets, resulting in slow deploy times.
+`BucketDeployment` uses a Lambda-backed custom resource. Before `aws-cdk-lib` 2.267.0 the default was 128 MB, which can throttle S3 sync to tens of KB/s and cause slow deploys or 15-minute timeouts on non-trivial website assets. `aws-cdk-lib` 2.267.0 raises the default memory limit to 1024 MB.
 
 ## Recommended approach
 
-Add `memoryLimit` to the `BucketDeployment` construct props:
+Prefer upgrading, or set `memoryLimit` explicitly:
 
 ```typescript
 new BucketDeployment(this, "Deployment", {
@@ -19,6 +23,10 @@ new BucketDeployment(this, "Deployment", {
   memoryLimit: 1024,
 });
 ```
+
+## Verification
+
+Compare the deploy step duration before and after upgrading `aws-cdk-lib` or setting `memoryLimit`.
 
 ## Caveats
 

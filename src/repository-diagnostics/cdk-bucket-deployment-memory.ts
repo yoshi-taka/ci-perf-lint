@@ -6,6 +6,14 @@ import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { hasBun } from "../bun.ts";
 import { spawn } from "node:child_process";
+import {
+  compareSemver,
+  formatSemver,
+  readCdkLibVersionFromScanContext,
+  type SemverTuple,
+} from "../rules/shared/cdk-express.ts";
+
+const S3_DEPLOYMENT_MEMORY_FLOOR: SemverTuple = [2, 267, 0];
 
 const meta = {
   id: "cdk-bucket-deployment-memory-unconfigured",
@@ -140,6 +148,14 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
     return [];
   }
 
+  const libVersion = await readCdkLibVersionFromScanContext(context);
+  if (libVersion !== undefined && compareSemver(libVersion, S3_DEPLOYMENT_MEMORY_FLOOR) >= 0) {
+    return [];
+  }
+  const versionLabel = libVersion ? formatSemver(libVersion) : undefined;
+  const needsUpgrade = versionLabel !== undefined;
+  const versionClause = versionLabel ? ` on aws-cdk-lib ${versionLabel}` : "";
+
   const shouldTime = timingsEnabled();
   const discoveryStartedAt = shouldTime ? performance.now() : 0;
   const rgResult = await findBucketDeploymentFiles(repoRoot);
@@ -203,13 +219,18 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
       diagnostics.push(
         buildRepositoryDiagnostic(repository, meta, {
           location: { path: relPath, line: pos.line, column: pos.column },
-          message: `BucketDeployment at ${relPath}:${pos.line} is created without memoryLimit. Default is 128 MB, which may cause slow asset processing.`,
-          why: "BucketDeployment uses a Lambda-backed custom resource. The default memory (128 MB) is often too low for deploying non-trivial assets, resulting in slow deploy times.",
-          suggestion:
-            "Add 'memoryLimit: 512' or a higher value to the BucketDeployment props. For large deployments consider values between 1024 and 3008 MB.",
+          message: `BucketDeployment at ${relPath}:${pos.line} is created without memoryLimit${versionClause}.`,
+          why: needsUpgrade
+            ? `BucketDeployment uses a Lambda-backed custom resource. This project declares aws-cdk-lib ${versionLabel}, whose 128 MB default can throttle S3 sync to tens of KB/s and cause slow deploys or timeouts. aws-cdk-lib 2.267.0 raises the default memory limit to 1024 MB.`
+            : "BucketDeployment uses a Lambda-backed custom resource. A low default memory limit can throttle S3 sync to tens of KB/s and cause slow deploys or timeouts, so a larger explicit memoryLimit is safer.",
+          suggestion: needsUpgrade
+            ? "Upgrade aws-cdk-lib to 2.267.0 or later so BucketDeployment defaults to 1024 MB, or set memoryLimit explicitly (1024 MB or higher for large assets)."
+            : "Set memoryLimit on BucketDeployment (for example 1024 MB or higher for large assets).",
           measurementHint:
-            "Monitor the deploy step duration before and after setting memoryLimit. A value of 512–1024 MB typically gives the best perf/cost trade-off.",
-          aiHandoff: `Set memoryLimit on BucketDeployment in ${relPath}:${pos.line}.`,
+            "Compare the deploy step duration before and after upgrading aws-cdk-lib or setting memoryLimit.",
+          aiHandoff: needsUpgrade
+            ? `Upgrade aws-cdk-lib to 2.267.0 or later, or set memoryLimit on the BucketDeployment in ${relPath}:${pos.line}. This project is on ${versionLabel}.`
+            : `Set memoryLimit on the BucketDeployment in ${relPath}:${pos.line}. The declared aws-cdk-lib version could not be read, so do not rely on the default.`,
           score: 70,
         }),
       );

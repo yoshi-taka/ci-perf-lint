@@ -4,10 +4,9 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import {
-  AWS_CDK_LIB_PACKAGE,
   compareSemver,
   formatSemver,
-  parseDependencyVersionSpec,
+  readCdkLibVersionFromScanContext,
   type SemverTuple,
 } from "../rules/shared/cdk-express.ts";
 
@@ -50,18 +49,6 @@ function normalizeRelativePath(repoRoot: string, filePath: string): string {
   return path.relative(repoRoot, filePath).replace(/\\/g, "/") || path.basename(filePath);
 }
 
-async function readDeclaredCdkLibVersion(
-  context: RepositoryScanContext,
-): Promise<SemverTuple | undefined> {
-  const packageJson = await context.loadPackageJson();
-  const dependencies = {
-    ...asRecord(packageJson.value?.dependencies),
-    ...asRecord(packageJson.value?.devDependencies),
-  };
-  const declared = dependencies[AWS_CDK_LIB_PACKAGE];
-  return parseDependencyVersionSpec(typeof declared === "string" ? declared : undefined);
-}
-
 interface CdkJsonEntry {
   path: string;
   value: Record<string, unknown>;
@@ -94,7 +81,7 @@ export async function collectCdkVersionReportingDiagnostics(
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const version = await readDeclaredCdkLibVersion(context);
+  const version = await readCdkLibVersionFromScanContext(context);
   if (!version || compareSemver(version, METADATA_COLLECTION_MIN) < 0) {
     return [];
   }
@@ -140,7 +127,7 @@ export async function collectCdkLibVersionDiagnostics(
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const version = await readDeclaredCdkLibVersion(context);
+  const version = await readCdkLibVersionFromScanContext(context);
   if (!version) {
     return [];
   }
@@ -179,7 +166,7 @@ export async function collectCdkOfflineValidationDiagnostics(
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  const version = await readDeclaredCdkLibVersion(context);
+  const version = await readCdkLibVersionFromScanContext(context);
   if (!version) {
     return [];
   }

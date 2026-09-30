@@ -52,6 +52,63 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
     ).toBe(false);
   });
 
+  test("recommends upgrading aws-cdk-lib for unconfigured BucketDeployment on an old version", async () => {
+    const fixtureRoot = await tempDirs.create("apl-cdk-bucket-old-version-");
+    await mkdir(path.join(fixtureRoot, "lib"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "package.json"),
+      '{"name": "test-cdk", "dependencies": {"aws-cdk-lib": "2.260.0"}}',
+    );
+    await writeFile(path.join(fixtureRoot, "cdk.json"), '{"app": "lib/stack.ts"}');
+    await writeFile(
+      path.join(fixtureRoot, "lib", "stack.ts"),
+      [
+        'import { BucketDeployment } from "aws-cdk-lib/aws-s3-deployment";',
+        "new BucketDeployment(this, 'DeploySite', { destinationBucket: bucket, sources: [] });",
+      ].join("\n"),
+    );
+
+    const report = await getFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find(
+      (c) => c.ruleId === "cdk-bucket-deployment-memory-unconfigured",
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("2.260.0");
+    expect(finding?.suggestion).toContain("Upgrade aws-cdk-lib to 2.267.0");
+  });
+
+  test("does not flag unconfigured BucketDeployment on aws-cdk-lib 2.267.0", async () => {
+    const fixtureRoot = await tempDirs.create("apl-cdk-bucket-new-version-");
+    await mkdir(path.join(fixtureRoot, "lib"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "package.json"),
+      '{"name": "test-cdk", "dependencies": {"aws-cdk-lib": "2.267.0"}}',
+    );
+    await writeFile(path.join(fixtureRoot, "cdk.json"), '{"app": "lib/stack.ts"}');
+    await writeFile(
+      path.join(fixtureRoot, "lib", "stack.ts"),
+      [
+        'import { BucketDeployment } from "aws-cdk-lib/aws-s3-deployment";',
+        "new BucketDeployment(this, 'DeploySite', { destinationBucket: bucket, sources: [] });",
+      ].join("\n"),
+    );
+
+    const report = await getFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some((c) => c.ruleId === "cdk-bucket-deployment-memory-unconfigured"),
+    ).toBe(false);
+  });
+
   test("detects BucketDeployment without memoryLimit even without CDK package metadata", async () => {
     const fixtureRoot = await tempDirs.create("apl-cdk-bucket-usage-only-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
