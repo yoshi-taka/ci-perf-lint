@@ -8,6 +8,7 @@ import { collectLargeBarrelFileDiagnostics } from "./large-barrel.ts";
 import { collectLargeJestSnapshotDiagnostics } from "./jest-snapshot.ts";
 import { collectNpmCiOverNpmInstallDiagnostics } from "./npm-ci-over-npm-install.ts";
 import { collectPackageJsonNodeRunDiagnostics } from "./package-json-node-run.ts";
+import { collectPackageJsonCdkExpressDiagnostics } from "./package-json-cdk-express.ts";
 import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxlint-type-check.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
@@ -87,6 +88,12 @@ export const javascriptDiagnosticCollectors = [
     id: "npm-ci-over-npm-install",
     gate: gateKeys.javascriptPackageScripts,
     collect: (context) => collectNpmCiOverNpmInstallDiagnostics(context),
+  },
+  {
+    id: "prefer-cdk-express-mode-in-development",
+    gate: gateKeys.javascriptPackageScripts,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPackageJsonCdkExpressDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-node-run-over-npm-run",

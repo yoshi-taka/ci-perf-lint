@@ -1,0 +1,12 @@
+{
+  "name": "cdk-express-like",
+  "private": true,
+  "scripts": {
+    "deploy:dev": "cdk deploy --all",
+    "synth": "cdk synth"
+  },
+  "devDependencies": {
+    "aws-cdk": "2.1122.0",
+    "typescript": "5.6.0"
+  }
+}

@@ -61,6 +61,7 @@ export const RULE_REGISTRY = {
   "pdm-without-use-uv": { kind: "workflow" },
   "prefer-buildx-bake-for-multiple-images": { kind: "workflow" },
   "prefer-buildx-build-over-docker-build": { kind: "workflow" },
+  "prefer-cdk-express-mode-in-development": { kind: "workflow" },
   "prefer-direct-upload-for-compressed-artifacts": { kind: "workflow" },
   "prefer-dorny-paths-filter-for-scoped-jobs": { kind: "workflow" },
   "prefer-frozen-lockfile": { kind: "workflow" },

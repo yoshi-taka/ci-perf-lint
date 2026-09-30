@@ -77,6 +77,7 @@ Current rule registry:
 - `pdm-without-use-uv`
 - `prefer-buildx-bake-for-multiple-images`
 - `prefer-buildx-build-over-docker-build`
+- `prefer-cdk-express-mode-in-development`
 - `prefer-direct-angular-material-imports`
 - `prefer-direct-ant-design-icons-imports`
 - `prefer-direct-antd-imports`
