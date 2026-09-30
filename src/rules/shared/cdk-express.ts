@@ -1,6 +1,7 @@
 import type { RepositoryScanContext } from "../../repository-scan-context.ts";
 import type { RuleContext } from "../../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob } from "../../workflow.ts";
+import { parse as parseLockfile, type PackageJsonLike, type ParsedLockFile } from "lockparse";
 import { workflowLooksReleaseLike } from "./workflow-jobs.ts";
 import { getTriggerSemantics } from "./workflow-triggers.ts";
 
@@ -146,10 +147,83 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
+const LOCKFILE_FILENAMES = [
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lock",
+] as const;
+
+const lockfileParseCache = new Map<string, Promise<ParsedLockFile | undefined>>();
+
+async function parseLockfileCached(
+  scanContext: RepositoryScanContext,
+  fileName: string,
+): Promise<ParsedLockFile | undefined> {
+  const lockfilePath = scanContext.resolve(fileName);
+  const cached = lockfileParseCache.get(lockfilePath);
+  if (cached) {
+    return cached;
+  }
+
+  const load = (async () => {
+    if (!(await scanContext.pathExists(lockfilePath))) {
+      return undefined;
+    }
+    const text = await scanContext.readTextFileOrWarn(lockfilePath);
+    if (!text) {
+      return undefined;
+    }
+    const packageJson = (await scanContext.loadPackageJson()).value;
+    try {
+      return await parseLockfile(text, fileName, packageJson);
+    } catch {
+      return undefined;
+    }
+  })();
+  lockfileParseCache.set(lockfilePath, load);
+  return load;
+}
+
+async function readInstalledDependencyVersion(
+  scanContext: RepositoryScanContext | undefined,
+  packageName: string,
+): Promise<SemverTuple | undefined> {
+  if (!scanContext) {
+    return undefined;
+  }
+
+  for (const fileName of LOCKFILE_FILENAMES) {
+    const lockfile = await parseLockfileCached(scanContext, fileName);
+    if (!lockfile) {
+      continue;
+    }
+    let best: SemverTuple | undefined;
+    for (const dependency of lockfile.packages) {
+      if (dependency.name !== packageName) {
+        continue;
+      }
+      const version = parseDependencyVersionSpec(dependency.version);
+      if (version && (!best || compareSemver(version, best) > 0)) {
+        best = version;
+      }
+    }
+    if (best) {
+      return best;
+    }
+  }
+  return undefined;
+}
+
 async function readDeclaredDependencyVersion(
   scanContext: RepositoryScanContext | undefined,
   packageName: string,
 ): Promise<SemverTuple | undefined> {
+  const installed = await readInstalledDependencyVersion(scanContext, packageName);
+  if (installed) {
+    return installed;
+  }
+
   const packageJson = await scanContext?.loadPackageJson();
   const dependencies = {
     ...asRecord(packageJson?.value?.dependencies),

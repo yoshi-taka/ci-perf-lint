@@ -12,7 +12,7 @@ Flags `aws-cdk-lib` versions from 2.262.0 up to (but not including) 2.267.0.
 ## What it flags
 
 - `aws-cdk-lib` pinned at 2.262.0 or later but below 2.267.0 in `package.json`.
-- Versions below 2.262.0 (no built-in validator) and 2.267.0 or later are not flagged. Loose ranges such as `^2.262.0` are not treated as a version because the installed version is unknown.
+- Versions below 2.262.0 (no built-in validator) and 2.267.0 or later are not flagged. The version is resolved from the committed lockfile (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, or `bun.lock`) when available, then from an exact pin in `package.json`. A caret range without a lockfile is treated as unknown and is not flagged.
 
 ## Suggested action
 

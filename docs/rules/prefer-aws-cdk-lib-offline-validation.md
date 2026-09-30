@@ -14,7 +14,7 @@ Upgrading also picks up synthesis performance work released in the same period, 
 ## What it flags
 
 - `aws-cdk-lib` below 2.262.0 in `package.json`.
-- Versions at 2.262.0 or later are handled by `prefer-aws-cdk-lib-2-267` or are already safe. Loose ranges such as `^2.0.0` are not treated as a version because the installed version is unknown.
+- Versions at 2.262.0 or later are handled by `prefer-aws-cdk-lib-2-267` or are already safe. The version is resolved from the committed lockfile when available, then from an exact pin in `package.json`. A caret range without a lockfile is treated as unknown and is not flagged.
 
 ## Suggested action
 
