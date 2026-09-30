@@ -13,7 +13,7 @@ describe("analyzeRepository: prefer-aws-cdk-cli-2-1125-for-hotswap", () => {
       (finding) => finding.ruleId === RULE_ID && finding.location.path.endsWith("dev.yml"),
     );
     expect(workflowFinding).toBeDefined();
-    expect(workflowFinding!.severity).toBe("suggestion");
+    expect(workflowFinding!.severity).toBe("warning");
 
     const scriptFinding = report.findings.find(
       (finding) => finding.ruleId === RULE_ID && finding.location.path === "package.json",

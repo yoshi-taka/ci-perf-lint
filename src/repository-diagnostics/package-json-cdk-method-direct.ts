@@ -13,7 +13,7 @@ import {
 
 const meta = {
   id: "prefer-cdk-method-direct-in-development",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-cdk-method-direct-in-development.md",
 } satisfies RuleMeta;

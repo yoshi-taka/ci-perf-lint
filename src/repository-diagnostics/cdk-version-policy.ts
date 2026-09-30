@@ -23,14 +23,14 @@ const versionReportingMeta = {
 
 const cdkLibVersionMeta = {
   id: "prefer-aws-cdk-lib-2-267",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-aws-cdk-lib-2-267.md",
 } satisfies RuleMeta;
 
 const cdkOfflineValidationMeta = {
   id: "prefer-aws-cdk-lib-offline-validation",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-aws-cdk-lib-offline-validation.md",
 } satisfies RuleMeta;

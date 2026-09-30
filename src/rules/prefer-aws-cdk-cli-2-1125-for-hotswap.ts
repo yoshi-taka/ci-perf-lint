@@ -13,7 +13,7 @@ import {
 
 const meta = {
   id: "prefer-aws-cdk-cli-2-1125-for-hotswap",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-aws-cdk-cli-2-1125-for-hotswap.md",
   precheck: predicateToPrecheck([
