@@ -80,6 +80,7 @@ Current rule registry:
 - `prefer-aws-cdk-lib-offline-validation`
 - `prefer-buildx-bake-for-multiple-images`
 - `prefer-buildx-build-over-docker-build`
+- `prefer-cdk-asset-build-concurrency`
 - `prefer-cdk-express-mode-in-development`
 - `prefer-cdk-method-direct-in-development`
 - `prefer-cdk-version-reporting-disabled`

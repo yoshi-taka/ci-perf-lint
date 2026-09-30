@@ -102,6 +102,12 @@ export function textDeploysCdkWithoutMethodDirect(text: string): boolean {
   );
 }
 
+const ASSET_BUILD_CONCURRENCY_FLAG = /--asset-build-concurrency\b/;
+
+export function textDeploysCdkWithoutAssetBuildConcurrency(text: string): boolean {
+  return CDK_DEPLOY_ONLY.test(text) && !ASSET_BUILD_CONCURRENCY_FLAG.test(text);
+}
+
 export function cdkCliVersionSupportsMethodDirect(version: SemverTuple | undefined): boolean {
   return version === undefined || compareSemver(version, CDK_METHOD_DIRECT_MIN) >= 0;
 }

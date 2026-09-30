@@ -62,6 +62,7 @@ export const RULE_REGISTRY = {
   "prefer-aws-cdk-cli-2-1125-for-hotswap": { kind: "workflow" },
   "prefer-aws-cdk-lib-2-267": { kind: "repository" },
   "prefer-aws-cdk-lib-offline-validation": { kind: "repository" },
+  "prefer-cdk-asset-build-concurrency": { kind: "repository" },
   "prefer-buildx-bake-for-multiple-images": { kind: "workflow" },
   "prefer-buildx-build-over-docker-build": { kind: "workflow" },
   "prefer-cdk-express-mode-in-development": { kind: "workflow" },

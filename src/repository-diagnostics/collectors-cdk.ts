@@ -2,6 +2,7 @@ import type { RepositoryDiagnosticCollector } from "./collector-types.ts";
 import { gateKeys } from "./gates.ts";
 import { collectCdkBucketDeploymentMemoryDiagnostics } from "./cdk-bucket-deployment-memory.ts";
 import { collectCdkAssetWasteFilesDiagnostics } from "./cdk-asset-waste-files.ts";
+import { collectCdkAssetBuildConcurrencyDiagnostics } from "./cdk-asset-build-concurrency.ts";
 import { collectCdkDuplicateAssetHashDiagnostics } from "./cdk-duplicate-asset-hash.ts";
 import {
   collectCdkLibVersionDiagnostics,
@@ -15,6 +16,18 @@ export const cdkDiagnosticCollectors = [
     gate: gateKeys.javascriptTooling,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectCdkBucketDeploymentMemoryDiagnostics(
+        repoRoot,
+        repository,
+        workflows,
+        warnings,
+        scanContext,
+      ),
+  },
+  {
+    id: "prefer-cdk-asset-build-concurrency",
+    gate: gateKeys.javascriptTooling,
+    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
+      collectCdkAssetBuildConcurrencyDiagnostics(
         repoRoot,
         repository,
         workflows,
