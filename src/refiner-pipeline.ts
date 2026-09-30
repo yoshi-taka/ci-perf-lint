@@ -284,11 +284,16 @@ function maxFindingsListOp(
   };
 }
 
+// Collapses findings that share a `location.path:location.line`, regardless of rule.
+// Only the first occurrence in input order survives, so when two different rules point at the
+// same line (for example two rules that both anchor on the same workflow step), the one evaluated
+// first wins and the other is dropped. Input order follows rule registry order, which is
+// deterministic, but callers must not expect two co-located rules to both surface.
 function deduplicateListOp(): DiagnosticListOp {
   return {
     name: "deduplicate-by-path-line",
     kind: "list-op",
-    description: "Deduplicates by path:line key (first occurrence wins)",
+    description: "Deduplicates by path:line key across all rules (first occurrence wins)",
     apply: (diagnostics) => {
       const seen = new Map<string, Diagnostic>();
       for (const d of diagnostics) {
@@ -320,6 +325,7 @@ export function findingSorter(): DiagnosticSorter {
 // Each delegates to the new phase implementation via adapter.
 // ============================================================
 
+// Rule-agnostic: keeps only the first finding per path:line, so co-located rules shadow each other.
 export function deduplicateRefiner(): Refiner {
   return listOpToRefiner(deduplicateListOp());
 }
