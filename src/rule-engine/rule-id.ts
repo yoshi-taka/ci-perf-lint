@@ -70,6 +70,7 @@ export const RULE_REGISTRY = {
   "prefer-cdk-version-reporting-disabled": { kind: "repository" },
   "prefer-direct-upload-for-compressed-artifacts": { kind: "workflow" },
   "prefer-dorny-paths-filter-for-scoped-jobs": { kind: "workflow" },
+  "prefer-eslint-concurrency": { kind: "workflow" },
   "prefer-frozen-lockfile": { kind: "workflow" },
   "prefer-jest-30-for-jest-29": { kind: "workflow" },
   "prefer-lefthook-for-complex-git-hooks": { kind: "workflow" },

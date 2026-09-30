@@ -129,6 +129,9 @@ export interface RepositorySignals {
     usesImportXPlugin: boolean;
     usesNoBarrelFilesPlugin: boolean;
     usesBarrelFilesPlugin: boolean;
+    eslintVersionSpec?: string;
+    eslintMajor?: number;
+    eslintMinor?: number;
     oxlintVersionSpec?: string;
     oxlintMajor?: number;
     oxlintMinor?: number;

@@ -1,0 +1,10 @@
+{
+  "name": "eslint-concurrency-eslint8",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  },
+  "scripts": {
+    "lint": "eslint ."
+  }
+}

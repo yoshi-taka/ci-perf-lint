@@ -38,19 +38,26 @@ Findings: full finding list from strict mode.
    Suggested action: Read OXC's 'Migrate from ESLint' guide first, then consider migrating the current ESLint entrypoint with @oxlint/migrate or running Oxlint before ESLint for a staged rollout.
    Measurement hint: Compare lint wall-clock time and rule coverage on the same target files before changing CI defaults.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/prefer-oxlint-over-eslint
-7. missing-dependency-cache at .github/workflows/ci.yml:14:15
+7. prefer-eslint-concurrency at package.json:9:5
+   Scope: repository-wide source/tooling.
+   Message: Repository pins eslint ^9.0.0, below the release that added multithread linting.
+   Why: ESLint v9.34.0 added multithread linting and the --concurrency CLI flag. On large projects with multiple CPU cores, ESLint reports a speedup of roughly 1.30x to 3.01x once files are linted across worker threads, and the driver also spent years fixing config-loader caching regressions. Staying on an older ESLint leaves CI lint jobs single-threaded and slower.
+   Suggested action: Move the ESLint dependency to the latest 9.x release (at least 9.34), then enable multithread linting by passing --concurrency=auto in lint commands or package scripts.
+   Measurement hint: Compare ESLint wall-clock time before and after the upgrade and the --concurrency change, and re-measure on the actual CI runner because virtualized or limited CPU cores can reduce the gain.
+   Rule docs: https://ci-perf-lint.veritycost.com/rules/prefer-eslint-concurrency
+8. missing-dependency-cache at .github/workflows/ci.yml:14:15
    Message: actions/setup-node@v4 is used without visible dependency caching for npm in job "lint".
    Why: Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths.
    Suggested action: If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.
    Measurement hint: Compare total job duration, not just install duration, before and after enabling cache.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-dependency-cache
-8. prefer-node-run-over-npm-run at .github/workflows/ci.yml:18:14
+9. prefer-node-run-over-npm-run at .github/workflows/ci.yml:18:14
    Message: Job "lint" runs package script "lint" through npm run.
    Why: For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.
    Suggested action: Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.
    Measurement hint: Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/prefer-node-run-over-npm-run
-9. missing-timeout-minutes at .github/workflows/ci.yml:10:3
+10. missing-timeout-minutes at .github/workflows/ci.yml:10:3
    Message: Job "lint" does not define job-level timeout-minutes.
    Why: Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.
    Suggested action: Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.

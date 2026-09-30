@@ -1,0 +1,10 @@
+{
+  "name": "eslint-concurrency-old-like",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.10.0"
+  },
+  "scripts": {
+    "lint": "eslint ."
+  }
+}

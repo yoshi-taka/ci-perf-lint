@@ -8,6 +8,7 @@ import { collectLargeBarrelFileDiagnostics } from "./large-barrel.ts";
 import { collectLargeJestSnapshotDiagnostics } from "./jest-snapshot.ts";
 import { collectNpmCiOverNpmInstallDiagnostics } from "./npm-ci-over-npm-install.ts";
 import { collectPackageJsonNodeRunDiagnostics } from "./package-json-node-run.ts";
+import { collectPreferEslintConcurrencyDiagnostics } from "./package-json-eslint-concurrency.ts";
 import { collectPackageJsonCdkExpressDiagnostics } from "./package-json-cdk-express.ts";
 import { collectPackageJsonCdkHotswapVersionDiagnostics } from "./package-json-cdk-hotswap-version.ts";
 import { collectPackageJsonCdkMethodDirectDiagnostics } from "./package-json-cdk-method-direct.ts";
@@ -61,6 +62,12 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectAvoidPrettierEslintDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-eslint-concurrency",
+    gate: gateKeys.javascriptLinting,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPreferEslintConcurrencyDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-eslint-plugin-import-x",

@@ -72,6 +72,18 @@
 - Suggested action: Read OXC's 'Migrate from ESLint' guide first, then consider migrating the current ESLint entrypoint with @oxlint/migrate or running Oxlint before ESLint for a staged rollout.
 - Measurement hint: Compare lint wall-clock time and rule coverage on the same target files before changing CI defaults.
 
+## prefer-eslint-concurrency
+
+- Location: `package.json:9:5`
+- Severity: `warning`
+- Confidence: `medium`
+- Scope: `repository-wide source/tooling`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/prefer-eslint-concurrency`
+- Message: Repository pins eslint ^9.0.0, below the release that added multithread linting.
+- Why it matters: ESLint v9.34.0 added multithread linting and the --concurrency CLI flag. On large projects with multiple CPU cores, ESLint reports a speedup of roughly 1.30x to 3.01x once files are linted across worker threads, and the driver also spent years fixing config-loader caching regressions. Staying on an older ESLint leaves CI lint jobs single-threaded and slower.
+- Suggested action: Move the ESLint dependency to the latest 9.x release (at least 9.34), then enable multithread linting by passing --concurrency=auto in lint commands or package scripts.
+- Measurement hint: Compare ESLint wall-clock time before and after the upgrade and the --concurrency change, and re-measure on the actual CI runner because virtualized or limited CPU cores can reduce the gain.
+
 ## missing-dependency-cache
 
 - Workflow: `.github/workflows/ci.yml`

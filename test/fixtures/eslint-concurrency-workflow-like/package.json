@@ -1,0 +1,10 @@
+{
+  "name": "eslint-concurrency-workflow-like",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.34.0"
+  },
+  "scripts": {
+    "lint": "eslint . --concurrency=auto"
+  }
+}

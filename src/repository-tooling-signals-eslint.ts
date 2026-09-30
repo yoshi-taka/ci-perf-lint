@@ -311,6 +311,7 @@ export async function collectEslintSignals(
   let usesBarrelFilesPlugin = false;
   let hasOxlintTsgolint = false;
   let oxlintVersionSpec: string | undefined;
+  let eslintVersionSpec: string | undefined;
 
   const packageJsonEntry = await context.loadPackageJson();
   if (packageJsonEntry.text && packageJsonEntry.value) {
@@ -320,6 +321,7 @@ export async function collectEslintSignals(
       hasConfig = true;
     }
     usesEslint ||= packageJsonHasDependency(packageJson, "eslint");
+    eslintVersionSpec ??= packageJsonDependencyVersionSpec(packageJson, "eslint");
     usesOxlint ||= packageJsonHasDependency(packageJson, "oxlint");
     oxlintVersionSpec ??= packageJsonDependencyVersionSpec(packageJson, "oxlint");
     hasOxlintTsgolint ||= packageJsonHasDependency(packageJson, "oxlint-tsgolint");
@@ -368,6 +370,7 @@ export async function collectEslintSignals(
     (pluginName) => !supportedOxlintPluginNames.has(pluginName),
   );
   const oxlintParsed = oxlintVersionSpec ? parseSemverLikeVersionSpec(oxlintVersionSpec) : {};
+  const eslintParsed = eslintVersionSpec ? parseSemverLikeVersionSpec(eslintVersionSpec) : {};
 
   return {
     usesEslint,
@@ -383,6 +386,9 @@ export async function collectEslintSignals(
     usesImportXPlugin,
     usesNoBarrelFilesPlugin,
     usesBarrelFilesPlugin,
+    eslintVersionSpec,
+    eslintMajor: eslintParsed.major,
+    eslintMinor: eslintParsed.minor,
     oxlintVersionSpec,
     oxlintMajor: oxlintParsed.major,
     oxlintMinor: oxlintParsed.minor,
