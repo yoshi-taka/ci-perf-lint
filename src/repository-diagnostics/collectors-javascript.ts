@@ -9,6 +9,7 @@ import { collectLargeJestSnapshotDiagnostics } from "./jest-snapshot.ts";
 import { collectNpmCiOverNpmInstallDiagnostics } from "./npm-ci-over-npm-install.ts";
 import { collectPackageJsonNodeRunDiagnostics } from "./package-json-node-run.ts";
 import { collectPackageJsonCdkExpressDiagnostics } from "./package-json-cdk-express.ts";
+import { collectPackageJsonCdkHotswapVersionDiagnostics } from "./package-json-cdk-hotswap-version.ts";
 import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxlint-type-check.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
@@ -88,6 +89,12 @@ export const javascriptDiagnosticCollectors = [
     id: "npm-ci-over-npm-install",
     gate: gateKeys.javascriptPackageScripts,
     collect: (context) => collectNpmCiOverNpmInstallDiagnostics(context),
+  },
+  {
+    id: "prefer-aws-cdk-cli-2-1125-for-hotswap",
+    gate: gateKeys.javascriptPackageScripts,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPackageJsonCdkHotswapVersionDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-cdk-express-mode-in-development",

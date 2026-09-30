@@ -53,6 +53,8 @@ const fixtureNames = {
   preferCdkExpressModeInDevelopmentLike: "prefer-cdk-express-mode-in-development-like",
   preferCdkExpressModeInDevelopmentOk: "prefer-cdk-express-mode-in-development-ok",
   preferCdkExpressModeInDevelopmentProd: "prefer-cdk-express-mode-in-development-prod",
+  preferAwsCdkCli21125HotswapLike: "prefer-aws-cdk-cli-2-1125-hotswap-like",
+  preferAwsCdkCli21125HotswapOk: "prefer-aws-cdk-cli-2-1125-hotswap-ok",
   cdkVersionPolicyLike: "cdk-version-policy-like",
   cdkVersionPolicyOk: "cdk-version-policy-ok",
   cdkVersionPolicyOld: "cdk-version-policy-old",

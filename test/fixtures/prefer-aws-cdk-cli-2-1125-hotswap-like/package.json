@@ -1,0 +1,12 @@
+{
+  "name": "cdk-hotswap-like",
+  "private": true,
+  "scripts": {
+    "dev": "cdk watch",
+    "deploy:hotswap": "cdk deploy --hotswap"
+  },
+  "devDependencies": {
+    "aws-cdk": "2.1100.0",
+    "typescript": "5.6.0"
+  }
+}

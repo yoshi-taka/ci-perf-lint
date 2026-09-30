@@ -60,6 +60,7 @@ import { outdatedSetupActionWithoutCacheRule } from "./outdated-setup-action-wit
 import { preferUv012Rule } from "./prefer-uv-0-12.ts";
 import { preferUvPipOverPipRule } from "./prefer-uv-pip-over-pip.ts";
 import { preferBuildxBuildOverDockerBuildRule } from "./prefer-buildx-build-over-docker-build.ts";
+import { preferAwsCdkCli21125ForHotswapRule } from "./prefer-aws-cdk-cli-2-1125-for-hotswap.ts";
 import { preferCdkExpressModeInDevelopmentRule } from "./prefer-cdk-express-mode-in-development.ts";
 import { dbIoReduceRule } from "./db-io-reduce.ts";
 import { preferDirectUploadForCompressedArtifactsRule } from "./prefer-direct-upload-for-compressed-artifacts.ts";
@@ -166,6 +167,7 @@ export const allRules = [
   preferDornyPathsFilterForScopedJobsRule,
   preferJest30ForJest29Rule,
   preferBuildxBuildOverDockerBuildRule,
+  preferAwsCdkCli21125ForHotswapRule,
   preferCdkExpressModeInDevelopmentRule,
   dbIoReduceRule,
   preferDirectUploadForCompressedArtifactsRule,

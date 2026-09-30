@@ -7,15 +7,13 @@ import { predicateToPrecheck } from "./shared/predicate-score.ts";
 import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
 import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import {
-  AWS_CDK_CLI_PACKAGE,
   CDK_EXPRESS_MEASUREMENT_HINT,
   CDK_EXPRESS_SUGGESTION,
   CDK_EXPRESS_UPGRADE_SUGGESTION,
   CDK_EXPRESS_WHY,
   cdkVersionIsBelowExpressFloor,
-  extractCdkCliVersionFromText,
   formatSemver,
-  parseDependencyVersionSpec,
+  resolveCdkCliVersion,
   textDeploysCdkWithoutExpress,
   type SemverTuple,
 } from "./shared/cdk-express.ts";
@@ -46,7 +44,6 @@ function readEnvironmentNames(job: WorkflowJob): string[] {
   const name = record?.name;
   return typeof name === "string" ? [name] : [];
 }
-
 function jobTargetsDevelopment(
   workflow: WorkflowDocument,
   job: WorkflowJob,
@@ -59,28 +56,6 @@ function jobTargetsDevelopment(
   const development =
     environmentNames.some((name) => DEVELOPMENT_ENVIRONMENT.test(name)) || triggers.hasPullRequest;
   return { development, production: production || triggers.hasTagOnlyPush };
-}
-
-async function resolveCdkCliVersion(
-  workflow: WorkflowDocument,
-  context: RuleContext,
-): Promise<SemverTuple | undefined> {
-  for (const job of workflow.jobs) {
-    for (const step of job.steps) {
-      const version = extractCdkCliVersionFromText(step.run ?? "");
-      if (version) {
-        return version;
-      }
-    }
-  }
-
-  const packageJson = await context.scanContext?.loadPackageJson();
-  const dependencies = {
-    ...asRecord(packageJson?.value?.dependencies),
-    ...asRecord(packageJson?.value?.devDependencies),
-  };
-  const declared = dependencies[AWS_CDK_CLI_PACKAGE];
-  return parseDependencyVersionSpec(typeof declared === "string" ? declared : undefined);
 }
 
 export const preferCdkExpressModeInDevelopmentRule = {

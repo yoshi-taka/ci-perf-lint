@@ -59,6 +59,7 @@ export const RULE_REGISTRY = {
   "outdated-datadog-lambda-extension": { kind: "workflow" },
   "outdated-setup-action-without-cache": { kind: "workflow" },
   "pdm-without-use-uv": { kind: "workflow" },
+  "prefer-aws-cdk-cli-2-1125-for-hotswap": { kind: "workflow" },
   "prefer-aws-cdk-lib-2-267": { kind: "repository" },
   "prefer-aws-cdk-lib-offline-validation": { kind: "repository" },
   "prefer-buildx-bake-for-multiple-images": { kind: "workflow" },
