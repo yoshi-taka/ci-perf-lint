@@ -1,5 +1,7 @@
 export const AWS_CDK_CLI_PACKAGE = "aws-cdk";
 
+export const AWS_CDK_LIB_PACKAGE = "aws-cdk-lib";
+
 export type SemverTuple = readonly [number, number, number];
 
 const CDK_EXPRESS_MIN: SemverTuple = [2, 1138, 0];
@@ -10,14 +12,14 @@ const CDK_INSTALL_VERSION = /\b(?:aws-cdk|cdk)@(\d+\.\d+(?:\.\d+)?)/;
 
 const EXPRESS_FLAG = /(?:^|\s)--express(?=\s|=|$)/;
 
-const LOOSE_VERSION_SPEC = /(?:^|[^\d])[\^*xX]$|latest|workspace|\*/i;
+const EXACT_VERSION_SPEC = /^[=v]?\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/;
 
 export function parseDependencyVersionSpec(spec: string | undefined): SemverTuple | undefined {
   if (!spec) {
     return undefined;
   }
   const trimmed = spec.trim();
-  if (trimmed.length === 0 || LOOSE_VERSION_SPEC.test(trimmed)) {
+  if (!EXACT_VERSION_SPEC.test(trimmed)) {
     return undefined;
   }
   const match = trimmed.match(/(\d+)\.(\d+)(?:\.(\d+))?/);
@@ -38,7 +40,7 @@ export function extractCdkCliVersionFromText(text: string): SemverTuple | undefi
   return match?.[1] ? parseDependencyVersionSpec(match[1]) : undefined;
 }
 
-function compareSemver(a: SemverTuple, b: SemverTuple): number {
+export function compareSemver(a: SemverTuple, b: SemverTuple): number {
   for (let i = 0; i < 3; i++) {
     if (a[i] !== b[i]) {
       return a[i]! < b[i]! ? -1 : 1;

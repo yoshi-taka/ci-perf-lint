@@ -1,0 +1,8 @@
+{
+  "name": "cdk-version-policy-like",
+  "private": true,
+  "devDependencies": {
+    "aws-cdk-lib": "2.263.0",
+    "typescript": "5.6.0"
+  }
+}

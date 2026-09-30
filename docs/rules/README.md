@@ -75,9 +75,12 @@ Current rule registry:
 - `outdated-pydantic-v2`
 - `outdated-setup-action-without-cache`
 - `pdm-without-use-uv`
+- `prefer-aws-cdk-lib-2-267`
+- `prefer-aws-cdk-lib-offline-validation`
 - `prefer-buildx-bake-for-multiple-images`
 - `prefer-buildx-build-over-docker-build`
 - `prefer-cdk-express-mode-in-development`
+- `prefer-cdk-version-reporting-disabled`
 - `prefer-direct-angular-material-imports`
 - `prefer-direct-ant-design-icons-imports`
 - `prefer-direct-antd-imports`

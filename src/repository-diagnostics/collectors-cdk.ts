@@ -3,6 +3,11 @@ import { gateKeys } from "./gates.ts";
 import { collectCdkBucketDeploymentMemoryDiagnostics } from "./cdk-bucket-deployment-memory.ts";
 import { collectCdkAssetWasteFilesDiagnostics } from "./cdk-asset-waste-files.ts";
 import { collectCdkDuplicateAssetHashDiagnostics } from "./cdk-duplicate-asset-hash.ts";
+import {
+  collectCdkLibVersionDiagnostics,
+  collectCdkOfflineValidationDiagnostics,
+  collectCdkVersionReportingDiagnostics,
+} from "./cdk-version-policy.ts";
 
 export const cdkDiagnosticCollectors = [
   {
@@ -16,6 +21,24 @@ export const cdkDiagnosticCollectors = [
         warnings,
         scanContext,
       ),
+  },
+  {
+    id: "prefer-aws-cdk-lib-2-267",
+    gate: gateKeys.javascriptTooling,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectCdkLibVersionDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-aws-cdk-lib-offline-validation",
+    gate: gateKeys.javascriptTooling,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectCdkOfflineValidationDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-cdk-version-reporting-disabled",
+    gate: gateKeys.javascriptTooling,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectCdkVersionReportingDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "cdk-asset-waste-files",
