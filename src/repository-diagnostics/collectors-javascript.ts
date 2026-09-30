@@ -10,6 +10,7 @@ import { collectNpmCiOverNpmInstallDiagnostics } from "./npm-ci-over-npm-install
 import { collectPackageJsonNodeRunDiagnostics } from "./package-json-node-run.ts";
 import { collectPackageJsonCdkExpressDiagnostics } from "./package-json-cdk-express.ts";
 import { collectPackageJsonCdkHotswapVersionDiagnostics } from "./package-json-cdk-hotswap-version.ts";
+import { collectPackageJsonCdkMethodDirectDiagnostics } from "./package-json-cdk-method-direct.ts";
 import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxlint-type-check.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
@@ -101,6 +102,12 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptPackageScripts,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPackageJsonCdkExpressDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-cdk-method-direct-in-development",
+    gate: gateKeys.javascriptPackageScripts,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPackageJsonCdkMethodDirectDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-node-run-over-npm-run",

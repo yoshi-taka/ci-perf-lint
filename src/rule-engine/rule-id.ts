@@ -65,6 +65,7 @@ export const RULE_REGISTRY = {
   "prefer-buildx-bake-for-multiple-images": { kind: "workflow" },
   "prefer-buildx-build-over-docker-build": { kind: "workflow" },
   "prefer-cdk-express-mode-in-development": { kind: "workflow" },
+  "prefer-cdk-method-direct-in-development": { kind: "workflow" },
   "prefer-cdk-version-reporting-disabled": { kind: "repository" },
   "prefer-direct-upload-for-compressed-artifacts": { kind: "workflow" },
   "prefer-dorny-paths-filter-for-scoped-jobs": { kind: "workflow" },

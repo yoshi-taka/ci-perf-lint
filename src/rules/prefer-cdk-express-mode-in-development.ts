@@ -1,11 +1,9 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
+import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { sourceContains } from "./shared/predicate.ts";
 import { predicateToPrecheck } from "./shared/predicate-score.ts";
-import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
-import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import {
   CDK_EXPRESS_MEASUREMENT_HINT,
   CDK_EXPRESS_SUGGESTION,
@@ -13,6 +11,7 @@ import {
   CDK_EXPRESS_WHY,
   cdkVersionIsBelowExpressFloor,
   formatSemver,
+  jobTargetsDevelopment,
   resolveCdkCliVersion,
   textDeploysCdkWithoutExpress,
   type SemverTuple,
@@ -25,38 +24,6 @@ const meta = {
   docsPath: "docs/rules/prefer-cdk-express-mode-in-development.md",
   precheck: predicateToPrecheck([{ pred: sourceContains("cdk"), weight: 1, label: "has-cdk" }]),
 } satisfies RuleMeta;
-
-const PRODUCTION_ENVIRONMENT = /(?:^|[^a-z])(?:prod|production|prd)(?:$|[^a-z])/i;
-const DEVELOPMENT_ENVIRONMENT = /(?:^|[^a-z])(?:dev|development|sandbox|preview)(?:$|[^a-z])/i;
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function readEnvironmentNames(job: WorkflowJob): string[] {
-  const environment = job.raw.environment;
-  if (typeof environment === "string") {
-    return [environment];
-  }
-  const record = asRecord(environment);
-  const name = record?.name;
-  return typeof name === "string" ? [name] : [];
-}
-function jobTargetsDevelopment(
-  workflow: WorkflowDocument,
-  job: WorkflowJob,
-): { development: boolean; production: boolean } {
-  const environmentNames = readEnvironmentNames(job);
-  const production =
-    environmentNames.some((name) => PRODUCTION_ENVIRONMENT.test(name)) ||
-    workflowLooksReleaseLike(workflow, job);
-  const triggers = getTriggerSemantics(workflow);
-  const development =
-    environmentNames.some((name) => DEVELOPMENT_ENVIRONMENT.test(name)) || triggers.hasPullRequest;
-  return { development, production: production || triggers.hasTagOnlyPush };
-}
 
 export const preferCdkExpressModeInDevelopmentRule = {
   meta,

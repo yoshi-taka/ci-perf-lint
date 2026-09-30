@@ -1,6 +1,8 @@
 import type { RepositoryScanContext } from "../../repository-scan-context.ts";
 import type { RuleContext } from "../../rule-engine.ts";
-import type { WorkflowDocument } from "../../workflow.ts";
+import type { WorkflowDocument, WorkflowJob } from "../../workflow.ts";
+import { workflowLooksReleaseLike } from "./workflow-jobs.ts";
+import { getTriggerSemantics } from "./workflow-triggers.ts";
 
 export const AWS_CDK_CLI_PACKAGE = "aws-cdk";
 
@@ -11,6 +13,8 @@ export type SemverTuple = readonly [number, number, number];
 const CDK_EXPRESS_MIN: SemverTuple = [2, 1138, 0];
 
 const CDK_HOTSWAP_MIN: SemverTuple = [2, 1125, 0];
+
+const CDK_METHOD_DIRECT_MIN: SemverTuple = [2, 118, 0];
 
 const CDK_DEPLOY_VERB = /\b(?:aws-cdk|cdk)\s+(?:deploy|destroy|bootstrap)\b/;
 
@@ -84,6 +88,50 @@ export function textUsesCdkHotswap(text: string): boolean {
 
 export function cdkCliVersionIsBelowHotswapFloor(version: SemverTuple | undefined): boolean {
   return version !== undefined && compareSemver(version, CDK_HOTSWAP_MIN) < 0;
+}
+
+const CDK_DEPLOY_ONLY = /\b(?:aws-cdk|cdk)\s+deploy\b/;
+
+const METHOD_FLAG = /(?:^|\s)(?:--method|-m)(?=\s|=|$)/;
+
+const METHOD_DIRECT_INCOMPATIBLE = /--import-existing-resources\b|--revert-drift\b/;
+
+export function textDeploysCdkWithoutMethodDirect(text: string): boolean {
+  return (
+    CDK_DEPLOY_ONLY.test(text) && !METHOD_FLAG.test(text) && !METHOD_DIRECT_INCOMPATIBLE.test(text)
+  );
+}
+
+export function cdkCliVersionSupportsMethodDirect(version: SemverTuple | undefined): boolean {
+  return version === undefined || compareSemver(version, CDK_METHOD_DIRECT_MIN) >= 0;
+}
+
+const PRODUCTION_ENVIRONMENT = /(?:^|[^a-z])(?:prod|production|prd)(?:$|[^a-z])/i;
+
+const DEVELOPMENT_ENVIRONMENT = /(?:^|[^a-z])(?:dev|development|sandbox|preview)(?:$|[^a-z])/i;
+
+function readEnvironmentNames(job: WorkflowJob): string[] {
+  const environment = job.raw.environment;
+  if (typeof environment === "string") {
+    return [environment];
+  }
+  const record = asRecord(environment);
+  const name = record?.name;
+  return typeof name === "string" ? [name] : [];
+}
+
+export function jobTargetsDevelopment(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+): { development: boolean; production: boolean } {
+  const environmentNames = readEnvironmentNames(job);
+  const production =
+    environmentNames.some((name) => PRODUCTION_ENVIRONMENT.test(name)) ||
+    workflowLooksReleaseLike(workflow, job);
+  const triggers = getTriggerSemantics(workflow);
+  const development =
+    environmentNames.some((name) => DEVELOPMENT_ENVIRONMENT.test(name)) || triggers.hasPullRequest;
+  return { development, production: production || triggers.hasTagOnlyPush };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

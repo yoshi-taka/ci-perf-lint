@@ -1,0 +1,11 @@
+{
+  "name": "cdk-method-direct-ok",
+  "private": true,
+  "scripts": {
+    "deploy:dev": "cdk deploy --all --method=direct"
+  },
+  "devDependencies": {
+    "aws-cdk": "2.118.0",
+    "typescript": "5.6.0"
+  }
+}

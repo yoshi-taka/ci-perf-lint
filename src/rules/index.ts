@@ -62,6 +62,7 @@ import { preferUvPipOverPipRule } from "./prefer-uv-pip-over-pip.ts";
 import { preferBuildxBuildOverDockerBuildRule } from "./prefer-buildx-build-over-docker-build.ts";
 import { preferAwsCdkCli21125ForHotswapRule } from "./prefer-aws-cdk-cli-2-1125-for-hotswap.ts";
 import { preferCdkExpressModeInDevelopmentRule } from "./prefer-cdk-express-mode-in-development.ts";
+import { preferCdkMethodDirectInDevelopmentRule } from "./prefer-cdk-method-direct-in-development.ts";
 import { dbIoReduceRule } from "./db-io-reduce.ts";
 import { preferDirectUploadForCompressedArtifactsRule } from "./prefer-direct-upload-for-compressed-artifacts.ts";
 import { preferDornyPathsFilterForScopedJobsRule } from "./prefer-dorny-paths-filter-for-scoped-jobs.ts";
@@ -169,6 +170,7 @@ export const allRules = [
   preferBuildxBuildOverDockerBuildRule,
   preferAwsCdkCli21125ForHotswapRule,
   preferCdkExpressModeInDevelopmentRule,
+  preferCdkMethodDirectInDevelopmentRule,
   dbIoReduceRule,
   preferDirectUploadForCompressedArtifactsRule,
   preferOxlintOverEslintRule,
