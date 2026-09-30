@@ -43,3 +43,7 @@ Compare the following before and after the change:
 ## Compatibility notes
 
 mypy is almost never a legitimate production dependency. The only exceptions are tools that embed mypy as a library for runtime type-checking, which is extremely rare and should be explicitly reviewed.
+
+## Scanner requirements
+
+The CDK-asset part of this rule reads `cdk.out/manifest.json` and files under `cdk.out/`. Run `cdk synth` before scanning and make sure `cdk.out` is present in the workspace. In CI, add a synth step and pass `cdk.out` as an artifact when the scanner runs in a separate job. The dependency-file checks (`pyproject.toml`, `requirements.txt`, and so on) do not depend on `cdk.out`.

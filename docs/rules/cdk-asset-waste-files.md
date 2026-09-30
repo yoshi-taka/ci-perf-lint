@@ -61,3 +61,7 @@ new AssetCode(path.join(__dirname, "my-asset"), {
 ## Measurement
 
 Compare asset size and `cdk deploy` duration before and after adding exclusions.
+
+## Scanner requirements
+
+This rule reads `cdk.out/manifest.json` and the files under `cdk.out/`, so the CDK app must be synthesized before scanning. Run `cdk synth` first, and make sure the synthesized output is present in the workspace being scanned. In CI this usually means adding a synth step, and passing `cdk.out` as an artifact when the scanner runs in a separate job. Without `cdk.out`, the rule cannot evaluate the assets and stays silent.

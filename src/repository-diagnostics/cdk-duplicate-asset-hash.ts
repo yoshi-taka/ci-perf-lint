@@ -98,7 +98,7 @@ export async function collectCdkDuplicateAssetHashDiagnostics(
         suggestion:
           "Review the duplicate assets for potential reuse. Consider extracting shared logic into a Lambda Layer or a shared library. If the functions are meant to be identical, use a single construct instantiated with different input parameters instead of duplicating the bundling configuration.",
         measurementHint:
-          "After refactoring, verify that the number of unique CDK assets decreases by running `bun run fallow` again.",
+          "After refactoring, re-run cdk synth and verify that the number of unique CDK asset hashes in cdk.out/manifest.json decreases.",
         aiHandoff: `Review the following CDK assets with identical source hash ${hash}: ${assetIds.join(", ")} at paths: ${assetPaths.join(", ")}. Consolidate duplicate function code.`,
         score: 70,
       }),

@@ -26,3 +26,7 @@ Detects Datadog Lambda Extension versions below v88 in GitHub Actions workflows 
 - If you set the layer via a Lambda Layer ARN, bump the version number to 88 or higher.
 - Verify Lambda function behavior after the upgrade (cold start duration, memory usage, and custom metrics/traces).
 - If you use Terraform, CDK, or Serverless Framework, update the layer version there as well.
+
+## Scanner requirements
+
+The workflow check needs no extra input. When the repository contains `cdk.out/manifest.json`, the rule also inspects the synthesized templates under `cdk.out/` for the extension version, so run `cdk synth` first if you want that coverage. Without `cdk.out`, only the workflow check runs.

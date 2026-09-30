@@ -21,3 +21,7 @@ CDK computes a content hash of each asset's bundle directory. When two or more a
 ## Measurement
 
 After refactoring, verify the number of unique CDK assets has decreased.
+
+## Scanner requirements
+
+This rule reads `cdk.out/manifest.json`, so the CDK app must be synthesized before scanning. Run `cdk synth` first and make sure `cdk.out` is present in the workspace being scanned. In CI this usually means adding a synth step, and passing `cdk.out` as an artifact when the scanner runs in a separate job. Without `cdk.out`, the rule stays silent.
