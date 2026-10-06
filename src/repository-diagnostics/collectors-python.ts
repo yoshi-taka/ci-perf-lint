@@ -3,8 +3,11 @@ import { gateKeys } from "./gates.ts";
 import { collectPytestDiagnostics } from "./pytest.ts";
 import { collectPytestXdistInstalledButNotUsedDiagnostics } from "./pytest-xdist-installed-but-not-used.ts";
 import { collectAvoidMypyProductionBundleDiagnostics } from "./avoid-mypy-production-bundle.ts";
+import { collectConsiderMypy2UpgradeDiagnostics } from "./mypy-2-upgrade.ts";
 import { collectOutdatedPydanticV2Diagnostics } from "./outdated-pydantic-v2.ts";
 import { collectMypyMilestoneDiagnostics } from "./mypy-milestone.ts";
+import { collectMypy2MilestoneDiagnostics } from "./mypy-2-milestone.ts";
+import { collectPreferMypyNumWorkersDiagnostics } from "./prefer-mypy-num-workers.ts";
 import { collectPreferPydanticV2Diagnostics } from "./prefer-pydantic-v2.ts";
 import { collectPyramidConfigScanDiagnostics } from "./pyramid-config-scan.ts";
 import { collectPdmWithoutUseUvDiagnostics } from "./pdm-without-use-uv.ts";
@@ -59,10 +62,34 @@ export const pythonDiagnosticCollectors = [
       ),
   },
   {
+    id: "consider-mypy-2-upgrade",
+    gate: gateKeys.pythonHeavy,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectConsiderMypy2UpgradeDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
     id: "outdated-pydantic-v2",
     gate: gateKeys.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectOutdatedPydanticV2Diagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-mypy-2-performance-milestone",
+    gate: gateKeys.pythonHeavy,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectMypy2MilestoneDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-mypy-num-workers",
+    gate: gateKeys.pythonHeavy,
+    collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
+      collectPreferMypyNumWorkersDiagnostics(
+        repoRoot,
+        repository,
+        workflows,
+        warnings,
+        scanContext,
+      ),
   },
   {
     id: "prefer-mypy-performance-milestone",

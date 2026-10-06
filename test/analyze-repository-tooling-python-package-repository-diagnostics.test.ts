@@ -433,6 +433,249 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
     });
   });
 
+  describe("prefer-mypy-2-performance-milestone", () => {
+    async function reportFor(version: string) {
+      const fixtureRoot = await tempDirs.create("apl-mypy-2-milestone-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(path.join(fixtureRoot, "requirements-dev.txt"), `mypy==${version}\n`);
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install -r requirements-dev.txt",
+          "      - run: pytest",
+        ].join("\n"),
+      );
+
+      return analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+    }
+
+    test("warns when mypy 2.0 is pinned", async () => {
+      const report = await reportFor("2.0.0");
+
+      const finding = report.findings.find(
+        (c) => c.ruleId === "prefer-mypy-2-performance-milestone",
+      );
+      expect(finding).toBeDefined();
+      expect(finding?.scope).toBe("repository");
+      expect(finding?.severity).toBe("warning");
+      expect(finding?.docsPath).toBe("docs/rules/prefer-mypy-2-performance-milestone.md");
+      expect(finding?.location.path).toBe("requirements-dev.txt");
+      expect(finding?.message).toContain("2.0.0");
+      expect(finding?.message).toContain("2.2");
+    });
+
+    test("suggests 2.4 when mypy 2.3 is pinned", async () => {
+      const report = await reportFor("2.3.0");
+
+      const finding = report.findings.find(
+        (c) => c.ruleId === "prefer-mypy-2-performance-milestone",
+      );
+      expect(finding).toBeDefined();
+      expect(finding?.message).toContain("2.4");
+    });
+
+    test("skips when mypy 2.4 is already at the milestone", async () => {
+      const report = await reportFor("2.4.0");
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-mypy-2-performance-milestone")).toBe(
+        false,
+      );
+    });
+
+    test("skips when mypy is still on 1.x", async () => {
+      const report = await reportFor("1.20.0");
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-mypy-2-performance-milestone")).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("consider-mypy-2-upgrade", () => {
+    async function reportFor(version: string) {
+      const fixtureRoot = await tempDirs.create("apl-mypy-2-upgrade-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(path.join(fixtureRoot, "requirements-dev.txt"), `mypy==${version}\n`);
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        [
+          "name: CI",
+          "on: push",
+          "jobs:",
+          "  test:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - uses: actions/checkout@v4",
+          "      - uses: actions/setup-python@v5",
+          "      - run: pip install -r requirements-dev.txt",
+          "      - run: pytest",
+        ].join("\n"),
+      );
+
+      return analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+    }
+
+    test("suggests a 2.x upgrade when mypy is on 1.x", async () => {
+      const report = await reportFor("1.20.0");
+
+      const finding = report.findings.find((c) => c.ruleId === "consider-mypy-2-upgrade");
+      expect(finding).toBeDefined();
+      expect(finding?.scope).toBe("repository");
+      expect(finding?.severity).toBe("warning");
+      expect(finding?.docsPath).toBe("docs/rules/consider-mypy-2-upgrade.md");
+      expect(finding?.location.path).toBe("requirements-dev.txt");
+      expect(finding?.message).toContain("1.20.0");
+      expect(finding?.message).toContain("2.0");
+    });
+
+    test("skips when mypy 2.0 is already used", async () => {
+      const report = await reportFor("2.0.0");
+
+      expect(report.findings.some((c) => c.ruleId === "consider-mypy-2-upgrade")).toBe(false);
+    });
+  });
+
+  describe("prefer-mypy-num-workers", () => {
+    function ciWorkflow(mypyCommand: string, extraLines: string[] = []): string {
+      return [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        ...extraLines,
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: actions/setup-python@v5",
+        "      - run: pip install -r requirements-dev.txt",
+        `      - run: ${mypyCommand}`,
+      ].join("\n");
+    }
+
+    test("warns when mypy 2.0 runs without parallel workers", async () => {
+      const fixtureRoot = await tempDirs.create("apl-mypy-workers-like-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(path.join(fixtureRoot, "requirements-dev.txt"), "mypy==2.0.0\n");
+      await writeFile(path.join(workflowDir, "ci.yml"), ciWorkflow("mypy src"));
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      const finding = report.findings.find((c) => c.ruleId === "prefer-mypy-num-workers");
+      expect(finding).toBeDefined();
+      expect(finding?.scope).toBe("repository");
+      expect(finding?.severity).toBe("warning");
+      expect(finding?.docsPath).toBe("docs/rules/prefer-mypy-num-workers.md");
+      expect(finding?.location.path).toBe(".github/workflows/ci.yml");
+      expect(finding?.message).toContain("mypy 2.0.0");
+      expect(finding?.message).toContain("without parallel workers");
+    });
+
+    test("skips when the mypy command passes --num-workers", async () => {
+      const fixtureRoot = await tempDirs.create("apl-mypy-workers-flag-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(path.join(fixtureRoot, "requirements-dev.txt"), "mypy==2.0.0\n");
+      await writeFile(path.join(workflowDir, "ci.yml"), ciWorkflow("mypy --num-workers 8 src"));
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-mypy-num-workers")).toBe(false);
+    });
+
+    test("skips when num_workers is configured", async () => {
+      const fixtureRoot = await tempDirs.create("apl-mypy-workers-config-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(path.join(fixtureRoot, "requirements-dev.txt"), "mypy==2.0.0\n");
+      await writeFile(path.join(fixtureRoot, "mypy.ini"), "[mypy]\nnum_workers = auto\n");
+      await writeFile(path.join(workflowDir, "ci.yml"), ciWorkflow("mypy src"));
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-mypy-num-workers")).toBe(false);
+    });
+
+    test("skips when MYPY_NUM_WORKERS is set in the workflow", async () => {
+      const fixtureRoot = await tempDirs.create("apl-mypy-workers-env-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(path.join(fixtureRoot, "requirements-dev.txt"), "mypy==2.0.0\n");
+      await writeFile(
+        path.join(workflowDir, "ci.yml"),
+        ciWorkflow("mypy src", ["    env:", "      MYPY_NUM_WORKERS: '8'"]),
+      );
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-mypy-num-workers")).toBe(false);
+    });
+
+    test("skips when mypy is below 2.0", async () => {
+      const fixtureRoot = await tempDirs.create("apl-mypy-workers-old-");
+      const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+      await mkdir(workflowDir, { recursive: true });
+      await writeFile(path.join(fixtureRoot, "requirements-dev.txt"), "mypy==1.12.0\n");
+      await writeFile(path.join(workflowDir, "ci.yml"), ciWorkflow("mypy src"));
+
+      const report = await analyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "strict",
+      });
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-mypy-num-workers")).toBe(false);
+    });
+  });
+
   describe("prefer-pydantic-v2", () => {
     test("warns when pydantic v1 is pinned in pyproject.toml", async () => {
       const report = await getFixtureReport(fixtures.preferPydanticV2Like, {

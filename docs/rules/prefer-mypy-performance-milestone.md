@@ -9,6 +9,8 @@ Detects mypy versions below known performance milestones in the 1.x series and s
   - below 1.15 → suggest 1.15
   - 1.18.0 or earlier → suggest 1.18.1
 
+The major 2.x upgrade path is handled separately: `consider-mypy-2-upgrade` (1.x → 2.0, with a breaking-change note) and `prefer-mypy-2-performance-milestone` (2.x → 2.x), because mypy 2.0 is a breaking major release.
+
 ## Why it matters
 
 Each milestone release includes measurable type-checking speed improvements. Upgrading incrementally reduces risk while still delivering faster CI runs.

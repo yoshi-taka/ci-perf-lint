@@ -30,6 +30,7 @@ Current rule registry:
 - `collapse-multiple-go-builds-in-job`
 - `consider-caching-os-packages-or-using-a-custom-image`
 - `consider-filter-blob-none-for-release-metadata`
+- `consider-mypy-2-upgrade`
 - `consider-slim-over-alpine-for-ci`
 - `cuda-torch-install-on-cpu-runner`
 - `cypress-github-action-uses-npm-run`
@@ -117,6 +118,8 @@ Current rule registry:
 - `prefer-jest-30-for-jest-29`
 - `prefer-lefthook-for-complex-git-hooks`
 - `prefer-mise-over-asdf`
+- `prefer-mypy-2-performance-milestone`
+- `prefer-mypy-num-workers`
 - `prefer-mypy-performance-milestone`
 - `prefer-native-arm-runner-over-qemu`
 - `prefer-nextest-for-heavy-rust-tests`
