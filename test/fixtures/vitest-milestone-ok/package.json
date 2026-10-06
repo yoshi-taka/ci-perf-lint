@@ -1,0 +1,7 @@
+{
+  "name": "vitest-milestone-ok",
+  "private": true,
+  "devDependencies": {
+    "vitest": "^5.0.0"
+  }
+}

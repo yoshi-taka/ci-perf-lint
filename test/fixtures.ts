@@ -160,6 +160,8 @@ const fixtureNames = {
   mypyMilestoneOk: "mypy-milestone-ok",
   mypyProductionBundleLike: "mypy-production-bundle-like",
   mypyProductionBundleOk: "mypy-production-bundle-ok",
+  mswV2Like: "msw-2-like",
+  mswV3Ok: "msw-3-ok",
   matrixShardLike: "matrix-shard-like",
   matrixShardOk: "matrix-shard-ok",
   matrixLintSkipLike: "matrix-lint-skip-like",
@@ -339,6 +341,10 @@ const fixtureNames = {
   unnecessaryCheckoutArtifactCreatePrOk: "unnecessary-checkout-artifact-create-pr-ok",
   vitest3MinorLike: "vitest-3-minor-like",
   vitest3MinorOk: "vitest-3-minor-ok",
+  vitestMilestoneV2Like: "vitest-milestone-v2-like",
+  vitestMilestoneV3Like: "vitest-milestone-v3-like",
+  vitestMilestoneV4Like: "vitest-milestone-v4-like",
+  vitestMilestoneOk: "vitest-milestone-ok",
   unnecessaryNpmGlobalUpgradeBeforeNpmInstallLike:
     "unnecessary-npm-global-upgrade-before-npm-install-like",
   unnecessaryNpmGlobalUpgradeBeforeNpmInstallOk:

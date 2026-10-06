@@ -1,0 +1,7 @@
+{
+  "name": "msw-2-like",
+  "private": true,
+  "devDependencies": {
+    "msw": "^2.15.0"
+  }
+}

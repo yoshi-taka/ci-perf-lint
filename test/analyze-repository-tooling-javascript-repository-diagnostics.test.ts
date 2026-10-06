@@ -593,4 +593,57 @@ describe("analyzeRepository repo-aware and tooling rules: javascript repository 
       );
     });
   });
+
+  describe("consider-msw-3-upgrade", () => {
+    const exploratoryOptions = { targetPath: ".", topCount: 20, mode: "exploratory" as const };
+
+    test("suggests reviewing MSW 3.0 for an MSW 2.x project", async () => {
+      const report = await getFixtureReport(fixtures.mswV2Like, exploratoryOptions);
+
+      const finding = report.findings.find((c) => c.ruleId === "consider-msw-3-upgrade");
+      expect(finding).toBeDefined();
+      expect(finding?.scope).toBe("repository");
+      expect(finding?.severity).toBe("suggestion");
+      expect(finding?.docsPath).toBe("docs/rules/consider-msw-3-upgrade.md");
+      expect(finding?.location.path).toBe("package.json");
+      expect(finding?.message).toContain("MSW 3.0");
+      expect(finding?.suggestion).toContain("link-first");
+    });
+
+    test("skips when already on MSW 3.x", async () => {
+      const report = await getFixtureReport(fixtures.mswV3Ok, exploratoryOptions);
+
+      expect(report.findings.some((c) => c.ruleId === "consider-msw-3-upgrade")).toBe(false);
+    });
+  });
+
+  describe("prefer-vitest-performance-milestone", () => {
+    const milestoneCases: { name: string; fixture: string; target: string }[] = [
+      { name: "points Vitest 2.x at 3", fixture: fixtures.vitestMilestoneV2Like, target: "3" },
+      { name: "points Vitest 3.x at 4", fixture: fixtures.vitestMilestoneV3Like, target: "4" },
+      { name: "points Vitest 4.x at 5", fixture: fixtures.vitestMilestoneV4Like, target: "5" },
+    ];
+
+    test.each(milestoneCases)("$name", async ({ fixture, target }) => {
+      const report = await getFixtureReport(fixture, baseOptions);
+
+      const finding = report.findings.find(
+        (c) => c.ruleId === "prefer-vitest-performance-milestone",
+      );
+      expect(finding).toBeDefined();
+      expect(finding?.scope).toBe("repository");
+      expect(finding?.severity).toBe("warning");
+      expect(finding?.docsPath).toBe("docs/rules/prefer-vitest-performance-milestone.md");
+      expect(finding?.location.path).toBe("package.json");
+      expect(finding?.message).toContain(`Vitest ${target} speed milestone`);
+    });
+
+    test("skips when already on Vitest 5.x", async () => {
+      const report = await getFixtureReport(fixtures.vitestMilestoneOk, baseOptions);
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-vitest-performance-milestone")).toBe(
+        false,
+      );
+    });
+  });
 });

@@ -1,0 +1,7 @@
+{
+  "name": "msw-3-ok",
+  "private": true,
+  "devDependencies": {
+    "msw": "^3.0.0"
+  }
+}

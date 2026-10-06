@@ -1,0 +1,7 @@
+{
+  "name": "vitest-milestone-v2-like",
+  "private": true,
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}
