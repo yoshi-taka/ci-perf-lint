@@ -297,4 +297,112 @@ describe("migrations: typescript and developer tooling", () => {
     expect(report.workflowCount).toBe(1);
     expect(ruleIds.has("prefer-nextest-for-heavy-rust-tests")).toBe(false);
   });
+
+  async function rustWorkspaceRepo(workflowLines: string[], cargoToml?: string) {
+    const fixtureRoot = await tempDirs.create("apl-cargo-shear-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "Cargo.toml"),
+      cargoToml ?? ["[workspace]", 'members = ["a", "b"]'].join("\n"),
+    );
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        ...workflowLines,
+      ].join("\n"),
+    );
+    return fixtureRoot;
+  }
+
+  test("recommends cargo-shear for a Rust workspace without an unused-dependency check", async () => {
+    const fixtureRoot = await rustWorkspaceRepo(["      - run: cargo build --workspace"]);
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    const finding = report.findings.find((c) => c.ruleId === "prefer-cargo-shear-in-ci");
+    expect(finding).toBeDefined();
+    expect(finding?.scope).toBe("repository");
+    expect(finding?.severity).toBe("warning");
+    expect(finding?.docsPath).toBe("docs/rules/prefer-cargo-shear-in-ci.md");
+    expect(finding?.message).toContain("cargo-shear");
+    expect(finding?.suggestion).toContain("cargo shear");
+  });
+
+  test("skips cargo-shear suggestion when CI already runs it", async () => {
+    const fixtureRoot = await rustWorkspaceRepo([
+      "      - run: cargo build --workspace",
+      "      - run: cargo shear --deny-warnings",
+    ]);
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "prefer-cargo-shear-in-ci")).toBe(false);
+  });
+
+  test("skips cargo-shear suggestion when the manifest carries machete metadata", async () => {
+    const fixtureRoot = await rustWorkspaceRepo(
+      ["      - run: cargo build --workspace"],
+      [
+        "[workspace]",
+        'members = ["a", "b"]',
+        "",
+        "[workspace.metadata.machete]",
+        "ignored = []",
+      ].join("\n"),
+    );
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "prefer-cargo-shear-in-ci")).toBe(false);
+  });
+
+  test("recommends cargo-shear for a single crate with dependencies", async () => {
+    const fixtureRoot = await rustWorkspaceRepo(
+      ["      - run: cargo build"],
+      ["[package]", 'name = "solo"', 'version = "0.1.0"', "", "[dependencies]", 'serde = "1"'].join(
+        "\n",
+      ),
+    );
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "prefer-cargo-shear-in-ci")).toBe(true);
+  });
+
+  test("skips cargo-shear for a crate without dependencies", async () => {
+    const fixtureRoot = await rustWorkspaceRepo(
+      ["      - run: cargo build"],
+      ["[package]", 'name = "solo"', 'version = "0.1.0"'].join("\n"),
+    );
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "prefer-cargo-shear-in-ci")).toBe(false);
+  });
 });

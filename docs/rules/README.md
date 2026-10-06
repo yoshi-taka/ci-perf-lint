@@ -30,6 +30,7 @@ Current rule registry:
 - `collapse-multiple-go-builds-in-job`
 - `consider-caching-os-packages-or-using-a-custom-image`
 - `consider-filter-blob-none-for-release-metadata`
+- `consider-msw-3-upgrade`
 - `consider-mypy-2-upgrade`
 - `consider-slim-over-alpine-for-ci`
 - `cuda-torch-install-on-cpu-runner`
@@ -85,6 +86,7 @@ Current rule registry:
 - `prefer-aws-cdk-lib-offline-validation`
 - `prefer-buildx-bake-for-multiple-images`
 - `prefer-buildx-build-over-docker-build`
+- `prefer-cargo-shear-in-ci`
 - `prefer-cdk-asset-build-concurrency`
 - `prefer-cdk-express-mode-in-development`
 - `prefer-cdk-method-direct-in-development`
@@ -154,6 +156,7 @@ Current rule registry:
 - `prefer-typescript-7-native-compiler`
 - `prefer-uv-0-12`
 - `prefer-uv-pip-over-pip`
+- `prefer-vitest-performance-milestone`
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`
 - `pytest-norecursedirs-override`
@@ -161,6 +164,7 @@ Current rule registry:
 - `pytest-xdist-installed-but-not-used`
 - `python-top-level-heavy-client-init`
 - `rails-db-schema-load-over-migrate`
+- `recommend-modern-test-runner`
 - `recommend-rspack-over-webpack`
 - `recommend-swc-over-babel`
 - `recommend-webpack-4-latest-patch`

@@ -16,6 +16,10 @@ import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxl
 import { collectCypressGithubActionNpmRunDiagnostics } from "./cypress-github-action-npm-run.ts";
 import { collectPlaywrightConfigNpmRunDiagnostics } from "./playwright-config-npm-run.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
+import { collectConsiderMsw3UpgradeDiagnostics } from "./consider-msw-3-upgrade.ts";
+import { collectPreferVitestPerformanceMilestoneDiagnostics } from "./prefer-vitest-performance-milestone.ts";
+import { collectRecommendModernTestRunnerDiagnostics } from "./recommend-modern-test-runner.ts";
+import { collectPreferCargoShearInCiDiagnostics } from "./prefer-cargo-shear-in-ci.ts";
 import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
 import { collectPreferTypeScript7NativeCompilerDiagnostics } from "./typescript-7-native-compiler.ts";
 import { collectAvoidEslintPluginPrettierDiagnostics } from "./avoid-eslint-plugin-prettier.ts";
@@ -162,6 +166,28 @@ export const javascriptDiagnosticCollectors = [
     id: "setup-node-cache-dependency-path-unset",
     gate: gateKeys.javascriptHeavy,
     collect: (context) => collectSetupNodeCacheDependencyPathUnsetDiagnostics(context),
+  },
+  {
+    id: "consider-msw-3-upgrade",
+    gate: gateKeys.javascriptTooling,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectConsiderMsw3UpgradeDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-vitest-performance-milestone",
+    gate: gateKeys.javascriptTooling,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPreferVitestPerformanceMilestoneDiagnostics(
+        repoRoot,
+        repository,
+        warnings,
+        scanContext,
+      ),
+  },
+  {
+    id: "recommend-modern-test-runner",
+    gate: gateKeys.javascriptTooling,
+    collect: (context) => collectRecommendModernTestRunnerDiagnostics(context),
   },
   {
     id: "prefer-typescript-5-performance-milestone",
@@ -322,6 +348,11 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.rust,
     collect: ({ repoRoot, repository, warnings }) =>
       collectPreferNextestForHeavyRustTestsDiagnostics(repoRoot, repository, warnings),
+  },
+  {
+    id: "prefer-cargo-shear-in-ci",
+    gate: gateKeys.rust,
+    collect: (context) => collectPreferCargoShearInCiDiagnostics(context),
   },
   {
     id: "vercel-json-commands",
