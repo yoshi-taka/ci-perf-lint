@@ -173,7 +173,7 @@ export async function collectAmplifyYmlDiagnostics(
             measurementHint:
               "Compare the build step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
             aiHandoff: `Review amplify.yml ${phase.phase} phase command "${cmd}". Only replace it with \`${npmRun.replacement}\` after checking npm compatibility.`,
-            score: 38,
+            score: 30,
           }),
         );
       }

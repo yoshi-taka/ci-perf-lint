@@ -175,7 +175,7 @@ function checkGithubActions(workflow: WorkflowDocument, context: RuleContext): D
           measurementHint:
             "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" step running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
-          score: 38,
+          score: 30,
         }),
       );
     }
@@ -222,7 +222,7 @@ async function checkBuildkite(
           measurementHint:
             "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
           aiHandoff: `Review ${pipeline.relativePath} step "${step.label ?? step.key ?? "(unnamed)"}" running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
-          score: 38,
+          score: 30,
         }),
       );
     }
@@ -256,7 +256,7 @@ async function checkCircleCi(doc: CircleCiDocument, context: RuleContext): Promi
           measurementHint:
             "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
           aiHandoff: `Review ${doc.relativePath} job "${job.name}" step running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
-          score: 38,
+          score: 30,
         }),
       );
     }
@@ -291,7 +291,7 @@ async function checkGitlabCi(doc: GitlabCiDocument, context: RuleContext): Promi
           measurementHint:
             "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
           aiHandoff: `Review ${doc.relativePath} job "${job.name}" running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
-          score: 38,
+          score: 30,
         }),
       );
     }

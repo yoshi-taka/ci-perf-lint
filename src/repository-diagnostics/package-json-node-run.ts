@@ -157,7 +157,7 @@ export async function collectPackageJsonNodeRunDiagnostics(
         measurementHint:
           "Compare the package script duration before and after the change, and verify that the delegated scripts still receive the same arguments and environment they need.",
         aiHandoff: `Review package.json script "${scriptName}". Only replace its npm run delegation(s) with ${replacementText} after checking the collected compatibility evidence. ${evidence}`,
-        score: 36,
+        score: 30,
       }),
     );
   }

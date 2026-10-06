@@ -15,6 +15,7 @@ interface CliOptions {
   targetPath: string;
   format: OutputFormat;
   top: number;
+  topSpecified: boolean;
   mode: AuditMode;
   workflowOnly: boolean;
   repositoryOnly: boolean;
@@ -73,6 +74,19 @@ function printHelp(logger: LoggerLike) {
 Usage:
   bunx ci-perf-lint [path] [--format handoff|text|json|markdown] [--mode strict|exploratory] [--top N] [--workflow-only|--repository-only] [--findings-only] [--show-workflows] [--show-all-locations]
 
+Options:
+  --format              Output format: handoff (default), text, json, markdown.
+  --top N               Limit output to the top N findings. N counts rule groups
+                        (aggregated findings); with --findings-only it counts flat findings.
+  --mode                strict (default) or exploratory (includes suggestions).
+  --workflow-only       Only workflow-scoped findings.
+  --repository-only     Only repository-wide source/tooling findings.
+  --findings-only       Emit a flat finding list with no aggregation or handoff guidance.
+                        --format json becomes a raw finding array. --top N limits the list
+                        only when explicitly passed; otherwise the full list is emitted.
+  --show-workflows      List selected workflow files without auditing.
+  --show-all-locations  Show all affected locations instead of a truncated list.
+
 Examples:
   bunx ci-perf-lint .
   bunx ci-perf-lint . --format handoff
@@ -80,6 +94,7 @@ Examples:
   bunx ci-perf-lint . --workflow-only
   bunx ci-perf-lint . --repository-only
   bunx ci-perf-lint . --findings-only
+  bunx ci-perf-lint . --findings-only --format json --top 20
   bunx ci-perf-lint . --show-workflows
   bunx ci-perf-lint . --show-all-locations
   bunx ci-perf-lint /path/to/repo --format markdown
@@ -91,6 +106,7 @@ export function parseArgs(args: string[]): CliOptions | null {
     targetPath: ".",
     format: "handoff",
     top: 5,
+    topSpecified: false,
     mode: "strict",
     workflowOnly: false,
     repositoryOnly: false,
@@ -138,6 +154,7 @@ export function parseArgs(args: string[]): CliOptions | null {
         throw new Error(`Invalid --top value: ${String(args[index + 1])}`);
       }
       options.top = value;
+      options.topSpecified = true;
       index += 1;
       continue;
     }
@@ -265,6 +282,7 @@ export async function runCli(args: string[], cwd: string, logger: LoggerLike): P
       renderReport(report, options.format, {
         findingsOnly: options.findingsOnly,
         topCount: options.top,
+        topCountExplicit: options.topSpecified,
         mode: options.mode,
         showAllLocations: options.showAllLocations,
         hyperlinks: isTty,

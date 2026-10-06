@@ -188,6 +188,20 @@ JSON output:
 ci-perf-lint . --format json --top 10
 ```
 
+Findings-only flat output:
+
+```sh
+ci-perf-lint . --findings-only
+ci-perf-lint . --findings-only --format json --top 20
+```
+
+`--findings-only` skips aggregation and handoff guidance and emits a flat finding list. With
+`--format json` it becomes a raw finding array. `--top N` limits this flat list only when passed
+explicitly; without `--top`, the full list is emitted.
+
+`--top N` counts rule groups (aggregated findings) in the default and handoff output, but raw
+findings with `--findings-only`.
+
 Focus modes:
 
 ```sh

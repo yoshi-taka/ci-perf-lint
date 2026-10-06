@@ -280,17 +280,14 @@ describe("metamorphic relations", () => {
     const markdownWithNote = renderReport(report, "markdown", { topCount: 5 });
     const markdownWithoutNote = renderReport(report, "markdown", { topCount: 1 });
 
-    expect(textWithNote).toContain("Only 1 finding available in this scan mode.");
-    expect(textWithoutNote).not.toContain("Only 1 finding available in this scan mode.");
-    expect(textWithNote.replace("\n\nOnly 1 finding available in this scan mode.", "")).toBe(
-      textWithoutNote,
-    );
+    const availabilityNote = "Only 1 rule group available in this scan mode (2 findings total).";
+    expect(textWithNote).toContain(availabilityNote);
+    expect(textWithoutNote).not.toContain(availabilityNote);
+    expect(textWithNote.replace(`\n\n${availabilityNote}`, "")).toBe(textWithoutNote);
 
-    expect(markdownWithNote).toContain("_Only 1 finding available in this scan mode._");
-    expect(markdownWithoutNote).not.toContain("_Only 1 finding available in this scan mode._");
-    expect(markdownWithNote.replace("\n\n_Only 1 finding available in this scan mode._", "")).toBe(
-      markdownWithoutNote,
-    );
+    expect(markdownWithNote).toContain(`_${availabilityNote}_`);
+    expect(markdownWithoutNote).not.toContain(`_${availabilityNote}_`);
+    expect(markdownWithNote.replace(`\n\n_${availabilityNote}_`, "")).toBe(markdownWithoutNote);
   });
 
   test("json render is semantically stable across render options after normalization", () => {

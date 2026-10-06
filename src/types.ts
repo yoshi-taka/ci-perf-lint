@@ -9,6 +9,7 @@ export type AuditMode = "strict" | "exploratory";
 export interface RenderOptions {
   findingsOnly?: boolean;
   topCount?: number;
+  topCountExplicit?: boolean;
   mode?: AuditMode;
   showAllLocations?: boolean;
   hyperlinks?: boolean;

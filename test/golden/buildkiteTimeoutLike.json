@@ -33,6 +33,6 @@
     "suggestion": "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
     "measurementHint": "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
     "aiHandoff": "Review .buildkite/pipeline.yml step \":package: Build\" running `npm run build`. Only replace it with `node --run build` after checking the collected compatibility evidence: Repository scan found no visible .npmrc file, matching pre/post lifecycle script, or npm-specific environment reference.",
-    "score": 68
+    "score": 60
   }
 ]

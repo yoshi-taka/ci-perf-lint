@@ -125,8 +125,11 @@ function renderTopAvailabilityNote(report: ReportData, options: RenderOptions): 
     return undefined;
   }
 
-  const findingLabel = report.topAggregatedFindings.length === 1 ? "finding" : "findings";
-  return `Only ${report.topAggregatedFindings.length} ${findingLabel} available in this scan mode.`;
+  const groupCount = report.topAggregatedFindings.length;
+  const findingCount = report.findings.length;
+  const groupLabel = groupCount === 1 ? "rule group" : "rule groups";
+  const findingLabel = findingCount === 1 ? "finding" : "findings";
+  return `Only ${groupCount} ${groupLabel} available in this scan mode (${findingCount} ${findingLabel} total).`;
 }
 
 function renderSourceLocation(finding: Diagnostic, options?: RenderOptions): string {
@@ -292,14 +295,19 @@ function renderText(report: ReportData, options: RenderOptions = {}): string {
   return lines.join("\n");
 }
 
+function findingsOnlyList(report: ReportData, options: RenderOptions): Diagnostic[] {
+  return options.topCountExplicit && typeof options.topCount === "number"
+    ? report.findings.slice(0, options.topCount)
+    : report.findings;
+}
+
 function renderFindingsOnlyText(report: ReportData, options?: RenderOptions): string {
-  if (report.findings.length === 0) {
+  const findings = findingsOnlyList(report, options ?? {});
+  if (findings.length === 0) {
     return "No findings in the current scan mode.";
   }
 
-  return report.findings
-    .map((finding, index) => renderFindingText(finding, index, options))
-    .join("\n");
+  return findings.map((finding, index) => renderFindingText(finding, index, options)).join("\n");
 }
 
 function renderMarkdown(report: ReportData, options: RenderOptions = {}): string {
@@ -399,15 +407,16 @@ function renderMarkdown(report: ReportData, options: RenderOptions = {}): string
   return lines.join("\n");
 }
 
-function renderFindingsOnlyMarkdown(report: ReportData): string {
+function renderFindingsOnlyMarkdown(report: ReportData, options: RenderOptions): string {
+  const findings = findingsOnlyList(report, options);
   const lines = ["# Findings", ""];
 
-  if (report.findings.length === 0) {
+  if (findings.length === 0) {
     lines.push("- No findings in the current scan mode.");
     return lines.join("\n");
   }
 
-  report.findings.forEach((finding) => {
+  findings.forEach((finding) => {
     lines.push(`## ${finding.ruleId}`);
     lines.push("");
     if (finding.scope !== "repository") {
@@ -566,13 +575,18 @@ function renderHandoff(report: ReportData, options: RenderOptions): string {
 }
 
 function renderFindingsOnlyHandoff(report: ReportData, options: RenderOptions): string {
-  if (report.findings.length === 0) {
+  const findings = findingsOnlyList(report, options);
+  if (findings.length === 0) {
     return "No findings in the current scan mode.";
   }
 
   const mode = options.mode ?? "strict";
-  const lines = [`Findings: full finding list from ${mode} mode.`, ""];
-  report.findings.forEach((finding, index) => {
+  const scopeLabel =
+    options.topCountExplicit && typeof options.topCount === "number"
+      ? `top ${options.topCount} findings from ${mode} mode`
+      : `full finding list from ${mode} mode`;
+  const lines = [`Findings: ${scopeLabel}.`, ""];
+  findings.forEach((finding, index) => {
     const ruleId = maybeColor(ansi.highlight, finding.ruleId, options);
     lines.push(`${index + 1}. ${ruleId} at ${renderSourceLocation(finding, options)}`);
     if (finding.scope === "repository") {
@@ -628,16 +642,21 @@ export function renderReport(
     const plainOptions: RenderOptions = {
       findingsOnly: options.findingsOnly,
       topCount: options.topCount,
+      topCountExplicit: options.topCountExplicit,
       mode: options.mode,
       showAllLocations: options.showAllLocations,
     };
     if (options.findingsOnly) {
       switch (format) {
         case "json":
-          return JSON.stringify(report.findings.map(stripDiagnosticSource), null, 2);
+          return JSON.stringify(
+            findingsOnlyList(report, options).map(stripDiagnosticSource),
+            null,
+            2,
+          );
         case "markdown":
         default:
-          return renderFindingsOnlyMarkdown(report);
+          return renderFindingsOnlyMarkdown(report, options);
       }
     }
     switch (format) {

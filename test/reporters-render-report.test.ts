@@ -89,9 +89,10 @@ describe("renderReport", () => {
     const markdown = renderReport(report, "markdown", { topCount: 8, mode: "strict" });
 
     expect(report.topAggregatedFindings.length).toBeLessThan(8);
-    expect(handoff).toContain("Only 2 findings available in this scan mode.");
-    expect(text).toContain("Only 2 findings available in this scan mode.");
-    expect(markdown).toContain("_Only 2 findings available in this scan mode._");
+    const availabilityNote = `Only ${report.topAggregatedFindings.length} rule groups available in this scan mode (${report.findings.length} findings total).`;
+    expect(handoff).toContain(availabilityNote);
+    expect(text).toContain(availabilityNote);
+    expect(markdown).toContain(`_${availabilityNote}_`);
   });
 
   test("aggregates repeated workflow-rule handoff guidance into one line", async () => {
@@ -411,6 +412,26 @@ describe("renderReport", () => {
     expect(text).not.toContain("Top fixes to consider:");
     expect(text).not.toContain("AI handoff:");
     expect(Array.isArray(JSON.parse(json))).toBe(true);
+  });
+
+  test("limits findings-only output to topCount when explicitly requested", async () => {
+    const report = await sampleRepoExploratoryReport;
+    expect(report.findings.length).toBeGreaterThan(1);
+
+    const full = JSON.parse(renderReport(report, "json", { findingsOnly: true })) as unknown[];
+    const limited = JSON.parse(
+      renderReport(report, "json", { findingsOnly: true, topCount: 1, topCountExplicit: true }),
+    ) as unknown[];
+    const handoff = renderReport(report, "handoff", {
+      findingsOnly: true,
+      topCount: 1,
+      topCountExplicit: true,
+      mode: "exploratory",
+    });
+
+    expect(full).toHaveLength(report.findings.length);
+    expect(limited).toHaveLength(1);
+    expect(handoff).toContain("Findings: top 1 findings from exploratory mode.");
   });
 
   test("renders findings-only output with the actual source location when it differs from the workflow", async () => {

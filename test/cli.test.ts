@@ -169,6 +169,19 @@ describe("runCli", () => {
     expect(findings.every((finding) => finding.scope === "repository")).toBe(true);
   });
 
+  test("applies --top to --findings-only output", async () => {
+    const { exitCode, lines, errors } = await memoizedRunCliCapture(
+      [fixtures.barrelFileLike, "--findings-only", "--format", "json", "--top", "1"],
+      process.cwd(),
+    );
+
+    const findings = JSON.parse(lines[0] ?? "[]") as unknown[];
+
+    expect(exitCode).toBe(1);
+    expect(errors).toHaveLength(0);
+    expect(findings).toHaveLength(1);
+  });
+
   test("accepts unique option prefixes", async () => {
     const { exitCode, lines, errors } = await memoizedRunCliCapture(
       [fixtures.barrelFileLike, "--repo", "--find", "--form", "json"],
