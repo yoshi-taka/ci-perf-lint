@@ -5,15 +5,13 @@ Detects mypy versions below known performance milestones in the 2.x series and s
 ## What it detects
 
 - `pyproject.toml`, `requirements.txt`, `setup.cfg`, `setup.py`, `poetry.lock`, or similar files pinning mypy below a known 2.x speed milestone:
-  - 2.0.x or 2.1.x → suggest 2.2
-  - 2.2.x or 2.3.x → suggest 2.4
+  - 2.0.x, 2.1.x, 2.2.x, or 2.3.x → suggest 2.4
 
-The 1.x ladder is handled by `prefer-mypy-performance-milestone`, and the jump from 1.x to 2.0 (a breaking major release) is handled by `consider-mypy-2-upgrade`.
+The 1.x ladder is handled by `prefer-mypy-performance-milestone`, and the jump from 1.x to 2.x is handled by `consider-mypy-2-upgrade`.
 
 ## Why it matters
 
-- mypy 2.2 adds internal performance improvements (memoized options snapshot, faster transitive dependency hashing for singleton SCCs, optimized TypeForm checks).
-- mypy 2.4 enables the native Rust parser by default (significantly faster parsing), makes parallel type checking non-experimental with automatic worker selection (up to 5x with 8 workers), and speeds up generators and coroutines.
+mypy 2.4 enables the native Rust parser by default (significantly faster parsing), makes parallel type checking non-experimental with automatic worker selection (up to 5x with 8 workers), and speeds up generators and coroutines. It also includes the internal performance improvements from mypy 2.2. The 2.x migration is light, so this rule points straight at the latest 2.x milestone.
 
 These are non-breaking upgrades within the 2.x series, so they are treated as `warning` rather than an advisory.
 

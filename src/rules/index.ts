@@ -98,7 +98,7 @@ import { preferZstdCompressionForPushedDockerImagesRule } from "./prefer-zstd-co
 import { railsDbSchemaLoadOverMigrateRule } from "./rails-db-schema-load-over-migrate.ts";
 import { preferPython311Rule } from "./prefer-python-3-11.ts";
 import { preferRailsPerformanceMilestoneRule } from "./prefer-rails-performance-milestone.ts";
-import { preferRuby33YjitRule } from "./prefer-ruby-33-yjit.ts";
+import { preferRuby3YjitRule } from "./prefer-ruby-3-yjit.ts";
 import { preferRuffImportSortingOverIsortRule } from "./prefer-ruff-import-sorting-over-isort.ts";
 import { rubySetupRubyMissingBundlerCacheRule } from "./ruby-setup-ruby-missing-bundler-cache.ts";
 import { redundantNpxOrBootstrapRule } from "./redundant-npx-or-bootstrap.ts";
@@ -185,7 +185,7 @@ export const allRules = [
   preferNextjs14MinorPerformanceMilestoneRule,
   preferPython311Rule,
   preferRailsPerformanceMilestoneRule,
-  preferRuby33YjitRule,
+  preferRuby3YjitRule,
   preferStorybook6MinorPerformanceMilestoneRule,
   preferStorybook7MinorPerformanceMilestoneRule,
   preferTailwindV4UpgradeToolRule,

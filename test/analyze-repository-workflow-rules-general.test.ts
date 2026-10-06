@@ -265,6 +265,78 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     expect(elixir14Findings.length).toBeGreaterThanOrEqual(1);
   });
 
+  test("flags Elixir 1.18 and recommends 1.19", async () => {
+    const fixtureRoot = await tempDirs.create("apl-elixir-119-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: [push]",
+        "jobs:",
+        "  ci:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: erlef/setup-beam@v1",
+        "        with:",
+        "          otp-version: 27.0",
+        "          elixir-version: 1.18",
+        "      - run: mix test",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 50,
+      mode: "exploratory",
+    });
+
+    const finding = report.findings.find(
+      (f) => f.ruleId === "elixir-otp-version-performance" && f.message.includes("Elixir 1.18"),
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.suggestion).toContain("1.19");
+    expect(finding?.suggestion).toContain("OTP 26+");
+  });
+
+  test("flags Elixir 1.19 and recommends 1.20", async () => {
+    const fixtureRoot = await tempDirs.create("apl-elixir-120-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: [push]",
+        "jobs:",
+        "  ci:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: erlef/setup-beam@v1",
+        "        with:",
+        "          otp-version: 27.0",
+        "          elixir-version: 1.19",
+        "      - run: mix test",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 50,
+      mode: "exploratory",
+    });
+
+    const finding = report.findings.find(
+      (f) => f.ruleId === "elixir-otp-version-performance" && f.message.includes("Elixir 1.19"),
+    );
+    expect(finding).toBeDefined();
+    expect(finding?.suggestion).toContain("1.20");
+    expect(finding?.suggestion).toContain("OTP 27+");
+  });
+
   test("flags npm audit in a push/PR workflow", async () => {
     const report = await getFixtureReport(fixtures.npmAuditInCiLike, {
       targetPath: ".",

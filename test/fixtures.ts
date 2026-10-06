@@ -405,8 +405,8 @@ const fixtureNames = {
   preferRailsPerformanceMilestoneLike: "prefer-rails-performance-milestone-like",
   preferRailsPerformanceMilestoneOk: "prefer-rails-performance-milestone-ok",
   preferRailsPerformanceMilestoneOk72: "prefer-rails-performance-milestone-ok-72",
-  preferRuby33YjitLike: "prefer-ruby-33-yjit-like",
-  preferRuby33YjitOk: "prefer-ruby-33-yjit-ok",
+  preferRuby3YjitLike: "prefer-ruby-3-yjit-like",
+  preferRuby3YjitOk: "prefer-ruby-3-yjit-ok",
 } as const;
 
 const cache = new Map<string, string>();

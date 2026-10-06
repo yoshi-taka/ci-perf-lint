@@ -476,7 +476,7 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(finding?.docsPath).toBe("docs/rules/prefer-mypy-2-performance-milestone.md");
       expect(finding?.location.path).toBe("requirements-dev.txt");
       expect(finding?.message).toContain("2.0.0");
-      expect(finding?.message).toContain("2.2");
+      expect(finding?.message).toContain("2.4");
     });
 
     test("suggests 2.4 when mypy 2.3 is pinned", async () => {
@@ -547,7 +547,8 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(finding?.docsPath).toBe("docs/rules/consider-mypy-2-upgrade.md");
       expect(finding?.location.path).toBe("requirements-dev.txt");
       expect(finding?.message).toContain("1.20.0");
-      expect(finding?.message).toContain("2.0");
+      expect(finding?.message).toContain("2.x");
+      expect(finding?.suggestion).toContain("2.4");
     });
 
     test("skips when mypy 2.0 is already used", async () => {

@@ -33,12 +33,30 @@ Only the highest-priority source per pipeline is used.
 |---|---|---|
 | OTP 25 | warning | Upgrade to OTP 26 for improved CI test/runtime performance |
 | Elixir < 1.15 (i.e. 1.13, 1.14) | warning | Upgrade to Elixir 1.15 for compile and boot-time improvements |
-| Elixir 1.17, 1.18 | warning | Upgrade to Elixir 1.19 for improved compile performance in dependency-heavy projects |
+| Elixir 1.15–1.18 | warning | Upgrade to Elixir 1.19 for up to 4x faster compilation in dependency-heavy projects (requires Erlang/OTP 26+) |
+| Elixir 1.19 | warning | Upgrade to Elixir 1.20 for further compile-time improvements (requires Erlang/OTP 27+) |
+
+## OTP Compatibility
+
+Elixir minor versions require specific Erlang/OTP ranges, so raising Elixir can force an OTP upgrade:
+
+| Elixir | Supported Erlang/OTP |
+|---|---|
+| 1.20 | 27–29 |
+| 1.19 | 26–28 |
+| 1.18 | 25–27 |
+| 1.17 | 25–27 |
+| 1.16 | 24–26 |
+| 1.15 | 24–26 |
+
+Elixir 1.19 is the last minor that runs on Erlang/OTP 26; Elixir 1.20 requires Erlang/OTP 27+.
 
 ## Why This Matters
 
 - **OTP version** directly affects BEAM runtime performance in tests and during job
   execution. OTP 26 introduced significant BEAM improvements.
 - **Elixir version** affects compile-time performance. Elixir 1.15 improved boot
-  time; Elixir 1.19 includes compiler optimizations particularly beneficial for
-  dependency-heavy projects.
+  time; Elixir 1.19 made modules load lazily and added parallel dependency
+  compilation (`MIX_OS_DEPS_COMPILE_PARTITION_COUNT`), delivering up to 4x faster
+  builds in large projects; Elixir 1.20 continues those compile-time improvements,
+  especially on machines with many cores.

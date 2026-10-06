@@ -8,7 +8,7 @@ Suggests planning a mypy 2.x upgrade for repositories still on mypy 1.x.
 
 ## Why it matters
 
-mypy 2.0 adds parallel type checking (`--num-workers`, up to 5x with 8 workers), a native Rust parser, and fixed-format plus SQLite caches enabled by default. It is also a major release:
+mypy 2.0 adds parallel type checking (`--num-workers`, up to 5x with 8 workers), a native Rust parser, and fixed-format plus SQLite caches enabled by default. mypy 2.4 enables the native parser by default and makes parallel checking non-experimental with automatic worker selection. It is also a major release:
 
 - `--local-partial-types` enabled by default
 - `--strict-bytes` enabled by default (`bytearray`/`memoryview` no longer assignable to `bytes`)
@@ -18,13 +18,13 @@ mypy 2.0 adds parallel type checking (`--num-workers`, up to 5x with 8 workers),
 
 ## Migration effort
 
-Despite the major version, the migration is usually light. The main changes are default flips that surface a few new errors, and escape hatches exist (for example `--allow-redefinition-old`). Most projects need only a handful of adjustments, so the rule is reported as a `warning` with this note rather than as a blocking change.
+Despite the major version, the migration is usually light. The main changes are default flips that surface a few new errors, and escape hatches exist (for example `--allow-redefinition-old`). Most projects need only a handful of adjustments, so the rule recommends going straight to the latest 2.x (2.4) and is reported as a `warning` with this note rather than as a blocking change.
 
 The safe incremental 1.x ladder is handled by `prefer-mypy-performance-milestone`, and the non-breaking 2.x milestones by `prefer-mypy-2-performance-milestone`.
 
 ## Suggested action
 
-Upgrade in a branch, run mypy, and fix or explicitly re-enable the changed defaults. Most projects need only a handful of adjustments.
+Upgrade in a branch to mypy 2.4 (or the latest 2.x), run mypy, and fix or explicitly re-enable the changed defaults. Most projects need only a handful of adjustments.
 
 ## Measurement
 

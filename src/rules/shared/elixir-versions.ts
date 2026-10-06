@@ -61,12 +61,21 @@ export function checkElixirVersion(elixirVersion: string): ElixirRuleFinding | u
     };
   }
 
-  if (major === 1 && (minor === 17 || minor === 18)) {
+  if (major === 1 && minor >= 15 && minor <= 18) {
     return {
       message: `Elixir ${elixirVersion} may increase compile times in dependency-heavy projects.`,
       why: "Elixir 1.19 makes modules load lazily, reducing code-server pressure, and supports parallel dependency compilation (MIX_OS_DEPS_COMPILE_PARTITION_COUNT), delivering up to 4x faster builds in large projects.",
       suggestion:
-        "Upgrade to Elixir 1.19 for up to 4x faster compilation in dependency-heavy projects.",
+        "Upgrade to Elixir 1.19 for up to 4x faster compilation in dependency-heavy projects (Elixir 1.19 requires Erlang/OTP 26+).",
+    };
+  }
+
+  if (major === 1 && minor === 19) {
+    return {
+      message: `Elixir ${elixirVersion} is one minor behind the latest compile improvements.`,
+      why: "Elixir 1.20 continues the compile-time improvements from 1.19 (lazy modules and parallel dependency compilation), especially on machines with many cores.",
+      suggestion:
+        "Upgrade to Elixir 1.20 for further compile-time improvements (Elixir 1.20 requires Erlang/OTP 27+).",
     };
   }
 

@@ -21,17 +21,10 @@ function getNextMypy2PerformanceMilestone(version: {
     return undefined;
   }
 
-  if (minor < 2) {
-    return {
-      target: "2.2",
-      why: "mypy 2.2 includes internal performance improvements such as a memoized options snapshot, faster transitive dependency hashing for singleton SCCs, and optimized TypeForm checks.",
-    };
-  }
-
   if (minor < 4) {
     return {
       target: "2.4",
-      why: "mypy 2.4 enables the native Rust parser by default (significantly faster parsing), makes parallel type checking non-experimental with automatic worker selection (up to 5x with 8 workers), and speeds up generators and coroutines.",
+      why: "mypy 2.4 enables the native Rust parser by default (significantly faster parsing), makes parallel type checking non-experimental with automatic worker selection (up to 5x with 8 workers), and speeds up generators and coroutines. It also includes the internal performance improvements from mypy 2.2.",
     };
   }
 

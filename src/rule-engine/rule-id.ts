@@ -99,7 +99,7 @@ export const RULE_REGISTRY = {
   "prefer-uv-pip-over-pip": { kind: "workflow" },
   "prefer-zstd-compression-for-pushed-docker-images": { kind: "workflow" },
   "rails-db-schema-load-over-migrate": { kind: "workflow" },
-  "prefer-ruby-33-yjit": { kind: "workflow" },
+  "prefer-ruby-3-yjit": { kind: "workflow" },
   "redundant-install-for-preinstalled-cli": { kind: "workflow" },
   "redundant-manual-cache-with-setup-action": { kind: "workflow" },
   "redundant-npx-or-bootstrap": { kind: "workflow" },

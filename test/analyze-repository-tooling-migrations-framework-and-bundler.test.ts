@@ -141,11 +141,11 @@ describe("migrations: framework milestones and bundler migration", () => {
       why: ["YJIT"],
     },
     {
-      name: "Ruby 3.3 from 3.2 builds",
-      fixture: fixtures.preferRuby33YjitLike,
-      ruleId: "prefer-ruby-33-yjit",
-      message: "below the 3.3 YJIT milestone",
-      suggestion: "at least 3.3.x",
+      name: "Ruby 3.4 from 3.2 builds",
+      fixture: fixtures.preferRuby3YjitLike,
+      ruleId: "prefer-ruby-3-yjit",
+      message: "below the 3.4 YJIT milestone",
+      suggestion: "at least 3.4.x",
       why: ["production-ready"],
     },
   ] as const;
@@ -218,8 +218,8 @@ describe("migrations: framework milestones and bundler migration", () => {
     },
     {
       name: "Ruby once already on 3.3",
-      fixture: fixtures.preferRuby33YjitOk,
-      ruleId: "prefer-ruby-33-yjit",
+      fixture: fixtures.preferRuby3YjitOk,
+      ruleId: "prefer-ruby-3-yjit",
     },
   ] as const;
 

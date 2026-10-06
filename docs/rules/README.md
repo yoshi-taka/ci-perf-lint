@@ -134,7 +134,7 @@ Current rule registry:
 - `prefer-pydantic-v2`
 - `prefer-python-3-11`
 - `prefer-rails-performance-milestone`
-- `prefer-ruby-33-yjit`
+- `prefer-ruby-3-yjit`
 - `prefer-ruff-format-over-black`
 - `prefer-ruff-import-sorting-over-isort`
 - `prefer-setup-bun-for-lightweight-node-tooling`

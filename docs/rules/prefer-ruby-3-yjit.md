@@ -1,15 +1,15 @@
-# prefer-ruby-33-yjit
+# prefer-ruby-3-yjit
 
 Detects repositories that use Ruby 3.2.x in CI and recommends upgrading to
-Ruby 3.3+ for faster YJIT.
+Ruby 3.4+ for faster YJIT.
 
 ## Why This Matters
 
-YJIT became production-ready in Ruby 3.2, and Ruby 3.3's YJIT is roughly
-**13% faster** than 3.2's on production workloads (and ~15% faster than the
-Ruby 3.3 interpreter). With YJIT enabled, Ruby code in CI typically runs
-**30-60% faster** — the single largest performance improvement available
-without changing application code.
+YJIT became production-ready in Ruby 3.2. Ruby 3.3's YJIT is roughly **13%
+faster** than 3.2's, and Ruby 3.4 is another **5-7% faster** with lower memory
+use. With YJIT enabled, Ruby code in CI typically runs **30-60% faster** — the
+single largest performance improvement available without changing application
+code.
 
 YJIT is opt-in at the Ruby level (`--yjit` or `RUBY_YJIT_ENABLE=1`), so it is
 not enabled by default even on Ruby 3.3+. Rails 7.2+ enables it by default on
@@ -35,14 +35,14 @@ Update `.ruby-version`:
 
 ```diff
 - 3.2.3
-+ 3.3.0
++ 3.4.11
 ```
 
 Update `Gemfile` if pinned:
 
 ```diff
 - ruby "~> 3.2.0"
-+ ruby "~> 3.3.0"
++ ruby "~> 3.4.0"
 ```
 
 Enable YJIT in CI:
