@@ -1,6 +1,7 @@
 import { collectBundlerExternalSubpathLeakDiagnostics } from "./bundler-external-subpath-leak.ts";
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import { collectJvmCdsOpportunityDiagnostics } from "./jvm-cds-opportunity.ts";
+import { collectMavenParallelNotEnabledDiagnostics } from "./maven-parallel-not-enabled.ts";
 import type { Diagnostic } from "../types.ts";
 import type { GatedContext, GateKey, RepositoryDiagnosticContext } from "./collector-types.ts";
 import {
@@ -73,6 +74,12 @@ export const repositoryDiagnosticCollectors = [
     id: "jvm-cds-opportunity-for-repeated-startup",
     gate: gateKeys.jvm,
     collect: (context: GatedContext<"hasJvm">) => collectJvmCdsOpportunityDiagnostics(context),
+  } as const,
+  {
+    id: "maven-parallel-not-enabled",
+    gate: gateKeys.jvm,
+    collect: (context: GatedContext<"hasJvm">) =>
+      collectMavenParallelNotEnabledDiagnostics(context),
   } as const,
 ] as const;
 

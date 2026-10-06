@@ -122,6 +122,7 @@ export const RULE_REGISTRY = {
   "prefer-node-run-over-npm-run": { kind: "repository" },
   "setup-node-cache-dependency-path-unset": { kind: "repository" },
   "gradle-parallel-not-enabled": { kind: "repository" },
+  "maven-parallel-not-enabled": { kind: "repository" },
 } as const satisfies Record<string, RegisteredRuleEntry>;
 
 export type RegisteredRuleId = keyof typeof RULE_REGISTRY;

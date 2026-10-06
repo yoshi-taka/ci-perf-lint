@@ -306,4 +306,147 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
 
     expect(report.findings.some((c) => c.ruleId === "gradle-parallel-not-enabled")).toBe(false);
   });
+
+  test.serial("reports when Maven parallel build is not enabled for multi-module", async () => {
+    const fixtureRoot = await tempDirs.create("apl-maven-parallel-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "pom.xml"),
+      [
+        "<project>",
+        "  <modelVersion>4.0.0</modelVersion>",
+        "  <groupId>com.example</groupId>",
+        "  <artifactId>root</artifactId>",
+        "  <version>1.0.0</version>",
+        "  <packaging>pom</packaging>",
+        "  <modules>",
+        "    <module>module-a</module>",
+        "  </modules>",
+        "</project>",
+      ].join("\n"),
+    );
+    await mkdir(path.join(fixtureRoot, "module-a"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "module-a", "pom.xml"),
+      [
+        "<project>",
+        "  <modelVersion>4.0.0</modelVersion>",
+        "  <groupId>com.example</groupId>",
+        "  <artifactId>module-a</artifactId>",
+        "  <version>1.0.0</version>",
+        "</project>",
+      ].join("\n"),
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: mvn -B verify",
+      ].join("\n"),
+    );
+
+    const report = await getFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    const finding = report.findings.find((c) => c.ruleId === "maven-parallel-not-enabled");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("parallel");
+    expect(finding?.scope).toBe("repository");
+    expect(finding?.severity).toBe("warning");
+  });
+
+  test.serial("skips when CI uses the Maven --threads flag", async () => {
+    const fixtureRoot = await tempDirs.create("apl-maven-parallel-flag-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "pom.xml"),
+      [
+        "<project>",
+        "  <modelVersion>4.0.0</modelVersion>",
+        "  <packaging>pom</packaging>",
+        "  <modules>",
+        "    <module>module-a</module>",
+        "  </modules>",
+        "</project>",
+      ].join("\n"),
+    );
+    await mkdir(path.join(fixtureRoot, "module-a"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "module-a", "pom.xml"),
+      "<project><modelVersion>4.0.0</modelVersion></project>",
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: mvn -B --threads 1C verify",
+      ].join("\n"),
+    );
+
+    const report = await getFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "maven-parallel-not-enabled")).toBe(false);
+  });
+
+  test.serial("skips when only a single Maven module exists", async () => {
+    const fixtureRoot = await tempDirs.create("apl-maven-single-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "pom.xml"),
+      [
+        "<project>",
+        "  <modelVersion>4.0.0</modelVersion>",
+        "  <groupId>com.example</groupId>",
+        "  <artifactId>app</artifactId>",
+        "  <version>1.0.0</version>",
+        "</project>",
+      ].join("\n"),
+    );
+    await writeFile(
+      path.join(workflowDir, "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: mvn -B verify",
+      ].join("\n"),
+    );
+
+    const report = await getFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "maven-parallel-not-enabled")).toBe(false);
+  });
 });

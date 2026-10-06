@@ -56,6 +56,7 @@ Current rule registry:
 - `jvm-production-image-uses-jdk-runtime`
 - `large-jest-snapshot`
 - `matrix-test-job-without-test-sharding`
+- `maven-parallel-not-enabled`
 - `missing-angular-cli-cache`
 - `missing-concurrency`
 - `missing-dependency-cache`
