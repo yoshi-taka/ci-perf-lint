@@ -144,6 +144,7 @@ Current rule registry:
 - `prefer-standard-arm-runner-for-portable-tooling`
 - `prefer-storybook-6-minor-performance-milestone`
 - `prefer-storybook-7-minor-performance-milestone`
+- `prefer-storybook-test-flag`
 - `prefer-tailwind-v4-upgrade-tool`
 - `prefer-turborepo-over-npm-workspaces`
 - `prefer-typescript-5-performance-milestone`

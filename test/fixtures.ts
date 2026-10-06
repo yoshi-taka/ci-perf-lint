@@ -280,6 +280,8 @@ const fixtureNames = {
   storybook8MinorOk: "storybook-8-minor-ok",
   storybook9MinorLike: "storybook-9-minor-like",
   storybook9MinorOk: "storybook-9-minor-ok",
+  preferStorybookTestFlagLike: "prefer-storybook-test-flag-like",
+  preferStorybookTestFlagOk: "prefer-storybook-test-flag-ok",
   svgComponentImportLike: "svg-component-import-like",
   swcBabelLike: "swc-babel-like",
   swcBabelOk: "swc-babel-ok",

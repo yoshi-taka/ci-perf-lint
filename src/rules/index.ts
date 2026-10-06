@@ -83,6 +83,7 @@ import {
   preferStorybook6MinorPerformanceMilestoneRule,
   preferStorybook7MinorPerformanceMilestoneRule,
 } from "./prefer-storybook-minor-performance-milestone.ts";
+import { preferStorybookTestFlagRule } from "./prefer-storybook-test-flag.ts";
 import { preferTailwindV4UpgradeToolRule } from "./prefer-tailwind-v4-upgrade-tool.ts";
 import { preferNativeArmRunnerOverQemuRule } from "./prefer-native-arm-runner-over-qemu.ts";
 import { preferFrozenLockfileRule } from "./prefer-frozen-lockfile.ts";
@@ -188,6 +189,7 @@ export const allRules = [
   preferRuby3YjitRule,
   preferStorybook6MinorPerformanceMilestoneRule,
   preferStorybook7MinorPerformanceMilestoneRule,
+  preferStorybookTestFlagRule,
   preferTailwindV4UpgradeToolRule,
   preferNativeArmRunnerOverQemuRule,
   preferFrozenLockfileRule,

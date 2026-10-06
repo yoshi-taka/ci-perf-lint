@@ -330,4 +330,23 @@ describe("migrations: framework milestones and bundler migration", () => {
       }
     });
   });
+
+  describe("prefer-storybook-test-flag", () => {
+    test("warns when a test Storybook build omits --test", async () => {
+      const report = await getFixtureReport(fixtures.preferStorybookTestFlagLike, baseOptions);
+
+      const finding = report.findings.find((c) => c.ruleId === "prefer-storybook-test-flag");
+      expect(finding).toBeDefined();
+      expect(finding?.severity).toBe("warning");
+      expect(finding?.docsPath).toBe("docs/rules/prefer-storybook-test-flag.md");
+      expect(finding?.message).toContain("--test");
+      expect(finding?.suggestion).toContain("--test");
+    });
+
+    test("does not warn when the build already passes --test", async () => {
+      const report = await getFixtureReport(fixtures.preferStorybookTestFlagOk, baseOptions);
+
+      expect(report.findings.some((c) => c.ruleId === "prefer-storybook-test-flag")).toBe(false);
+    });
+  });
 });
