@@ -1,0 +1,14 @@
+{
+  "name": "playwright-config-npm-run-npm-ok",
+  "private": true,
+  "packageManager": "npm@10.9.0",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -444,6 +444,36 @@ describe("analyzeRepository repo-aware and tooling rules: javascript repository 
     });
   });
 
+  describe("playwright-config-uses-npm-run", () => {
+    test("warns when a pnpm repository uses npm run in webServer", async () => {
+      const report = await getFixtureReport(fixtures.playwrightConfigNpmRunPnpmLike, baseOptions);
+      const finding = report.findings.find((c) => c.ruleId === "playwright-config-uses-npm-run");
+
+      expect(finding).toBeDefined();
+      expect(finding!.scope).toBe("repository");
+      expect(finding!.severity).toBe("warning");
+      expect(finding!.confidence).toBe("high");
+      expect(finding!.docsPath).toBe("docs/rules/playwright-config-uses-npm-run.md");
+      expect(finding!.location.path).toBe("playwright.config.ts");
+      expect(finding!.message).toContain("npm run build");
+      expect(finding!.message).toContain("pnpm");
+    });
+
+    test("skips when the config uses the repository package manager", async () => {
+      const report = await getFixtureReport(fixtures.playwrightConfigNpmRunPnpmOk, baseOptions);
+      expect(report.findings.some((c) => c.ruleId === "playwright-config-uses-npm-run")).toBe(
+        false,
+      );
+    });
+
+    test("skips when the repository uses npm", async () => {
+      const report = await getFixtureReport(fixtures.playwrightConfigNpmRunNpmOk, baseOptions);
+      expect(report.findings.some((c) => c.ruleId === "playwright-config-uses-npm-run")).toBe(
+        false,
+      );
+    });
+  });
+
   describe("prefer-oxlint-type-check-over-tsc", () => {
     test("warns for a tsc type-check script and workflow step when oxlint is used", async () => {
       const report = await getFixtureReport(fixtures.preferOxlintTypeCheckOverTscLike, baseOptions);
