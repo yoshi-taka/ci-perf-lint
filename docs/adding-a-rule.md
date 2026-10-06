@@ -167,6 +167,16 @@ Use `suggestion` when:
 
 Use `confidence: "high"` when the rule has direct evidence. Use `confidence: "medium"` when the rule is still useful but depends on compatibility checks, conventions, or incomplete repository visibility.
 
+## Version Thresholds
+
+Hardcode a version number only when it maps to a concrete, named change: a release that introduced a feature, a performance fix, a changed default, or a breaking change.
+
+- OK: `MINIMUM_MAJOR = 88` because v88 is the first Datadog extension release without the Go Agent.
+- OK: a milestone constant tied to a specific feature or performance release.
+- Not OK: a number that is only "the current latest release" with no tied change. It goes stale every release and forces manual churn.
+
+When the goal is to point users at the newest release, use generic wording such as `upgrade to the latest 5.x release` instead of a specific version number. When a milestone is superseded, replace the old milestone rather than adding a second "latest" reference. The same rule applies to `why` and docs prose: do not cite a specific "newest" version unless it is the milestone the finding is built on.
+
 ## Diagnostic Text
 
 Every diagnostic should answer:

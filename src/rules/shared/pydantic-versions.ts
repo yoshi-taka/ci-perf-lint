@@ -1,19 +1,19 @@
 export const outdatedPydanticV2Suggestion =
-  "Raise the pydantic requirement to >=2.11 (2.11.x or newer).";
+  "Raise the pydantic requirement to >=2.13 (2.13.x or newer).";
 
 export const outdatedPydanticV2MeasurementHint =
-  "Compare model import, schema-build/startup time, and peak memory in CI before and after upgrading pydantic.";
+  "Compare model import, schema-build/startup time, validation/serialization throughput, and peak memory in CI before and after upgrading pydantic.";
 
 export function outdatedPydanticV2Message(spec: string, fileName: string): string {
-  return `Pydantic is constrained to ${spec} in ${fileName}, a v2 release older than 2.11.`;
+  return `Pydantic is constrained to ${spec} in ${fileName}, a v2 release older than 2.13.`;
 }
 
 export const outdatedPydanticV2Why =
-  "Pydantic 2.9 and 2.11 introduced substantial schema-build/startup improvements. 2.9 cut import times (~35% faster `import pydantic`, up to 10x in model-heavy files) and sped up schema building, while 2.11 delivered up to 2x faster schema build times and a 2-5x reduction in model schema memory. Staying below 2.11 keeps CI on the slower schema-build path.";
+  "Pydantic 2.9, 2.11, and 2.13 introduced substantial startup and runtime improvements. 2.9 cut import times (~35% faster `import pydantic`, up to 10x in model-heavy files) and sped up schema building; 2.11 delivered up to 2x faster schema build times and a 2-5x reduction in model schema memory; 2.13 focused on validation and serialization performance, optimizing union serialization, Literal validators, and model-class building. Staying below 2.13 keeps CI on the slower validation/serialization path.";
 
 type Triple = readonly [number, number, number];
 
-const v2Milestone: Triple = [2, 11, 0];
+const v2Milestone: Triple = [2, 13, 0];
 const v2Floor: Triple = [2, 0, 0];
 
 function compare(a: Triple, b: Triple): number {
@@ -42,11 +42,11 @@ function wildcardUpper(major: number, minor: number, hasMinor: boolean): Triple 
 const tokenPattern = /^(\^|~=|~|==|!=|>=|<=|>|<)?\s*v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(\.\*)?$/;
 
 /**
- * Detects a pydantic v2 requirement that cannot resolve to >= 2.11.
+ * Detects a pydantic v2 requirement that cannot resolve to >= 2.13.
  *
  * A floor-only requirement such as `>=2.0` is not flagged because it can
- * resolve to a current 2.11+ release. Exact pins, compatible-release
- * specifiers, and explicit upper bounds below 2.11 are flagged.
+ * resolve to a current 2.13+ release. Exact pins, compatible-release
+ * specifiers, and explicit upper bounds below 2.13 are flagged.
  */
 export function pydanticV2SpecIsOutdated(spec: string): boolean {
   const cleaned = spec

@@ -254,6 +254,48 @@ describe("analyzeRepository repo-aware and tooling rules: javascript repository 
     });
   });
 
+  describe("recommend-webpack-4-latest-patch", () => {
+    test("warns when package.json declares webpack below 4.47", async () => {
+      const report = await getFixtureReport(fixtures.webpack4LatestPatchLike, baseOptions);
+      const finding = report.findings.find((c) => c.ruleId === "recommend-webpack-4-latest-patch");
+      expect(finding).toBeDefined();
+      expect(finding!.scope).toBe("repository");
+      expect(finding!.severity).toBe("warning");
+      expect(finding!.confidence).toBe("medium");
+      expect(finding!.docsPath).toBe("docs/rules/recommend-webpack-4-latest-patch.md");
+      expect(finding!.location.path).toBe("package.json");
+      expect(finding!.message).toContain("below 4.47");
+    });
+
+    test("skips when webpack is at or above 4.47", async () => {
+      const report = await getFixtureReport(fixtures.webpack4LatestPatchOk, baseOptions);
+      expect(report.findings.some((c) => c.ruleId === "recommend-webpack-4-latest-patch")).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("recommend-webpack-5-latest-patch", () => {
+    test("warns when package.json declares webpack below 5.53", async () => {
+      const report = await getFixtureReport(fixtures.webpack5LatestPatchLike, baseOptions);
+      const finding = report.findings.find((c) => c.ruleId === "recommend-webpack-5-latest-patch");
+      expect(finding).toBeDefined();
+      expect(finding!.scope).toBe("repository");
+      expect(finding!.severity).toBe("warning");
+      expect(finding!.confidence).toBe("medium");
+      expect(finding!.docsPath).toBe("docs/rules/recommend-webpack-5-latest-patch.md");
+      expect(finding!.location.path).toBe("package.json");
+      expect(finding!.message).toContain("below 5.53");
+    });
+
+    test("skips when webpack is at or above 5.53", async () => {
+      const report = await getFixtureReport(fixtures.webpack5LatestPatchOk, baseOptions);
+      expect(report.findings.some((c) => c.ruleId === "recommend-webpack-5-latest-patch")).toBe(
+        false,
+      );
+    });
+  });
+
   describe("tailwind-content-config", () => {
     type TailwindCase = {
       name: string;

@@ -822,7 +822,7 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
   });
 
   describe("outdated-pydantic-v2", () => {
-    test("warns when pyproject constrains pydantic below 2.11", async () => {
+    test("warns when pyproject constrains pydantic below 2.13", async () => {
       const report = await getFixtureReport(fixtures.outdatedPydanticV2Like, {
         targetPath: ".",
         topCount: 20,
@@ -835,10 +835,10 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(finding?.severity).toBe("warning");
       expect(finding?.docsPath).toBe("docs/rules/outdated-pydantic-v2.md");
       expect(finding?.location.path).toBe("pyproject.toml");
-      expect(finding?.message).toContain("older than 2.11");
+      expect(finding?.message).toContain("older than 2.13");
     });
 
-    test("skips when pydantic is at or above 2.11", async () => {
+    test("skips when pydantic is at or above 2.13", async () => {
       const report = await getFixtureReport(fixtures.outdatedPydanticV2Ok, {
         targetPath: ".",
         topCount: 20,
@@ -848,14 +848,14 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(report.findings.some((c) => c.ruleId === "outdated-pydantic-v2")).toBe(false);
     });
 
-    test("warns when requirements.txt pins pydantic 2.10", async () => {
+    test("warns when requirements.txt pins pydantic 2.12", async () => {
       const fixtureRoot = await tempDirs.create("apl-pydantic-v2-reqs-");
       const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
       await mkdir(workflowDir, { recursive: true });
       await writeFile(
         path.join(fixtureRoot, "requirements.txt"),
-        ["requests", "pydantic==2.10.6", "pytest"].join("\n"),
+        ["requests", "pydantic==2.12.5", "pytest"].join("\n"),
       );
       await writeFile(
         path.join(workflowDir, "ci.yml"),
@@ -885,7 +885,7 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(finding?.location.path).toBe("requirements.txt");
     });
 
-    test("warns when poetry.lock pins pydantic below 2.11", async () => {
+    test("warns when poetry.lock pins pydantic below 2.13", async () => {
       const fixtureRoot = await tempDirs.create("apl-pydantic-v2-poetry-lock-");
       const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 
@@ -895,7 +895,7 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
         [
           "[[package]]",
           'name = "pydantic"',
-          'version = "2.10.6"',
+          'version = "2.12.5"',
           "",
           "[[package]]",
           'name = "requests"',
@@ -931,7 +931,7 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       expect(finding?.location.path).toBe("poetry.lock");
     });
 
-    test("skips floor-only and caret ranges that can resolve 2.11", async () => {
+    test("skips floor-only and caret ranges that can resolve 2.13", async () => {
       const fixtureRoot = await tempDirs.create("apl-pydantic-v2-flexible-");
       const workflowDir = path.join(fixtureRoot, ".github", "workflows");
 

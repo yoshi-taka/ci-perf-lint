@@ -134,7 +134,7 @@ export async function collectOutdatedPydanticV2Diagnostics(
         why: outdatedPydanticV2Why,
         suggestion: outdatedPydanticV2Suggestion,
         measurementHint: outdatedPydanticV2MeasurementHint,
-        aiHandoff: `Review ${fileName} at ${location.line}:${location.column} and raise the pydantic constraint to >=2.11 (2.11.x or newer). Re-run model import and validation tests to confirm behavior is unchanged.`,
+        aiHandoff: `Review ${fileName} at ${location.line}:${location.column} and raise the pydantic constraint to >=2.13 (2.13.x or newer). Re-run model import and validation tests to confirm behavior is unchanged.`,
         score: 49,
       }),
     ];

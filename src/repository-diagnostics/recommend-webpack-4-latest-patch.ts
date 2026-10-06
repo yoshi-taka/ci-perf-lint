@@ -7,9 +7,11 @@ import {
 } from "../repository-package-helpers.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
+const WEBPACK_4_TARGET_MINOR = 47;
+
 const recommendWebpack4LatestPatchMeta = {
   id: "recommend-webpack-4-latest-patch",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/recommend-webpack-4-latest-patch.md",
 } satisfies RuleMeta;
@@ -38,8 +40,8 @@ export async function collectRecommendWebpack4LatestPatchDiagnostics(
     return [];
   }
 
-  const currentPatch = parsed.patch ?? 0;
-  if (currentPatch >= 47) {
+  const currentMinor = parsed.minor ?? 0;
+  if (currentMinor >= WEBPACK_4_TARGET_MINOR) {
     return [];
   }
 
@@ -54,7 +56,7 @@ export async function collectRecommendWebpack4LatestPatchDiagnostics(
         line: 1,
         column: 1,
       },
-      message: `webpack ${webpackVersionSpec} is pinned to 4.x but below 4.47.`,
+      message: `webpack ${webpackVersionSpec} is declared below 4.${WEBPACK_4_TARGET_MINOR}.`,
       why: "webpack 4.47 includes performance improvements and bug fixes accumulated across the 4.x lifecycle. Upgrading to 4.47 first reduces risk and prepares the codebase for a future webpack 5 migration.",
       suggestion: `Upgrade webpack to ^4.47.0 in ${relativePath}. Review the webpack 4 changelog for breaking changes between your current version and 4.47.`,
       measurementHint:

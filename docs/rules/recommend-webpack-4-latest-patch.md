@@ -2,7 +2,9 @@
 
 ## What This Rule Detects
 
-This rule detects repositories using webpack 4.x at a version below 4.47.
+This rule detects repositories that declare webpack 4.x below 4.47.
+
+It reports the declared dependency spec, so a range such as `^4.40.0` is flagged even though a fresh install may resolve to a newer 4.x. The intent is to keep the declared floor on the final 4.x release.
 
 ## Why It Matters
 
@@ -27,3 +29,7 @@ Compare CI build time before and after the upgrade. Verify that the build output
 - webpack 4.47 is the last 4.x release and is well-tested
 - Most projects can upgrade from 4.x to 4.47 without configuration changes
 - After upgrading to 4.47, consider using `webpack migrate` to prepare for webpack 5
+
+## Sources
+
+- https://github.com/webpack/webpack/releases/tag/v4.47.0
