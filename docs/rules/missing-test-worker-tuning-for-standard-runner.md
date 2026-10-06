@@ -21,6 +21,11 @@ The rule looks for:
   - Vitest: `--maxWorkers` or `--minWorkers`
   - Playwright: `--workers`
   - pytest-xdist: `-n` or `--numprocesses`
+- no worker tuning in the common repository config files:
+  - Jest: `maxWorkers` in `jest.config.*` or the `jest` field of `package.json`
+  - Vitest/Vite: `maxWorkers`, `minWorkers`, or `poolOptions` in `vitest.config.*` or `vite.config.*`
+  - Playwright: `workers` in `playwright.config.*`
+  - pytest-xdist: `-n` / `--numprocesses` in `addopts` in `pytest.ini`, `setup.cfg`, `tox.ini`, or `pyproject.toml`
 
 It intentionally ignores custom runners, larger runners, self-hosted runners, and wrapper scripts where CPU shape is not obvious from workflow YAML.
 
@@ -30,7 +35,7 @@ Ignore this finding when:
 
 - the runner is intentionally using framework defaults and that behavior is already understood
 - the suite is IO-bound or contention-heavy, so more workers would not help
-- worker tuning is handled in config files or wrapper scripts that are not visible from the workflow YAML
+- worker tuning is handled in wrapper scripts that are not visible from the workflow YAML (common config files are checked automatically)
 
 ## Suggested verification
 

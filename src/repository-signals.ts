@@ -260,6 +260,12 @@ async function hasFrameworkSignalEvidence(
     return true;
   }
 
+  if (
+    await anyPathExists(context, ["pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini"] as const)
+  ) {
+    return true;
+  }
+
   return context.pathExists(context.resolve("package.json"));
 }
 
@@ -554,6 +560,7 @@ export async function collectRepositorySignals(
       usesLerna: false,
       usesGradle: false,
       gradleBuildCacheConfigured: false,
+      testWorkerTuningConfigured: false,
       usesAngularCli: false,
       angularCliCacheEnabledForCi: false,
       usesRails: false,

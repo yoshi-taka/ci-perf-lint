@@ -78,7 +78,11 @@ function getUntunedTestStep(job: WorkflowJob): { step: WorkflowStep; tool: TestT
 
 export const missingTestWorkerTuningForStandardRunnerRule = {
   meta,
-  check(workflow: WorkflowDocument, _context: RuleContext) {
+  check(workflow: WorkflowDocument, context: RuleContext) {
+    if (context.repository.frameworks.testWorkerTuningConfigured) {
+      return [];
+    }
+
     const findings: Diagnostic[] = [];
     for (const job of workflow.jobs) {
       if (!jobRunsOnStandardHostedRunner(job) || job.usesReusableWorkflow) {

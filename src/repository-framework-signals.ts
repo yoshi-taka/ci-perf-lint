@@ -40,6 +40,50 @@ const gradleBuildFileNames = ["build.gradle", "build.gradle.kts"] as const;
 const gradlePropertiesFileNames = ["gradle.properties"] as const;
 const GRADLE_CACHING_ENABLED = /^\s*org\.gradle\.caching\s*=\s*true\s*$/im;
 
+const testWorkerConfigFileNames = [
+  "jest.config.js",
+  "jest.config.cjs",
+  "jest.config.mjs",
+  "jest.config.ts",
+  "jest.config.json",
+  "vitest.config.js",
+  "vitest.config.ts",
+  "vitest.config.mjs",
+  "vitest.config.mts",
+  "vite.config.js",
+  "vite.config.ts",
+  "vite.config.mjs",
+  "vite.config.mts",
+  "vite.config.cjs",
+  "vite.config.cts",
+  "playwright.config.js",
+  "playwright.config.ts",
+  "playwright.config.mjs",
+  "playwright.config.mts",
+  "pytest.ini",
+  "setup.cfg",
+  "tox.ini",
+  "pyproject.toml",
+] as const;
+
+const JS_TEST_WORKER_SETTING = /\bmaxWorkers\b|\bminWorkers\b|\bpoolOptions\b/;
+const PLAYWRIGHT_WORKER_SETTING = /\bworkers\s*[:=]/;
+const PYTEST_WORKER_ADDOPTS = /(?:^|\s)(?:-n\b|--numprocesses\b)/;
+
+function pytestAddoptsTuneWorkers(text: string): boolean {
+  const iniMatch = text.match(/^addopts\s*=\s*(.+)$/m);
+  if (iniMatch?.[1] && PYTEST_WORKER_ADDOPTS.test(iniMatch[1])) {
+    return true;
+  }
+  const tomlMatch = text.match(/addopts\s*=\s*["']([^"']*)["']/);
+  return Boolean(tomlMatch?.[1] && PYTEST_WORKER_ADDOPTS.test(tomlMatch[1]));
+}
+
+function packageJsonJestTunesWorkers(packageJson: Record<string, unknown> | undefined): boolean {
+  const jest = packageJson?.jest;
+  return typeof jest === "object" && jest !== null && "maxWorkers" in jest;
+}
+
 async function loadExistingRootFiles(
   context: RepositoryScanContext,
   fileNames: readonly string[],
@@ -131,6 +175,7 @@ export async function collectFrameworkSignals(
   let usesLerna = false;
   let usesGradle = false;
   let gradleBuildCacheConfigured = false;
+  let testWorkerTuningConfigured = false;
   let usesAngularCli = false;
   let angularCliCacheEnabledForCi = false;
   let usesRails = false;
@@ -222,6 +267,21 @@ export async function collectFrameworkSignals(
     }
   }
 
+  testWorkerTuningConfigured = packageJsonJestTunesWorkers(packageJsonEntry.value);
+  if (!testWorkerTuningConfigured) {
+    const testWorkerConfigFiles = await loadExistingRootFiles(context, testWorkerConfigFileNames);
+    for (const { text: configText } of testWorkerConfigFiles) {
+      if (
+        JS_TEST_WORKER_SETTING.test(configText) ||
+        PLAYWRIGHT_WORKER_SETTING.test(configText) ||
+        pytestAddoptsTuneWorkers(configText)
+      ) {
+        testWorkerTuningConfigured = true;
+        break;
+      }
+    }
+  }
+
   for (const fileName of gradleBuildFileNames) {
     if (rootHasEntry(fileName)) {
       usesGradle = true;
@@ -293,6 +353,7 @@ export async function collectFrameworkSignals(
     usesLerna,
     usesGradle,
     gradleBuildCacheConfigured,
+    testWorkerTuningConfigured,
     usesAngularCli,
     angularCliCacheEnabledForCi,
     usesRails,

@@ -189,6 +189,7 @@ export interface RepositorySignals {
     usesLerna: boolean;
     usesGradle: boolean;
     gradleBuildCacheConfigured: boolean;
+    testWorkerTuningConfigured: boolean;
     usesAngularCli: boolean;
     angularCliCacheEnabledForCi: boolean;
     usesRails: boolean;

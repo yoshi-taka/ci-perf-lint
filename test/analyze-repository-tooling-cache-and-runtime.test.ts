@@ -212,6 +212,75 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
     ).toBe(false);
   });
 
+  test("does not flag jest when maxWorkers is set in jest.config", async () => {
+    const fixtureRoot = await tempDirs.create("apl-worker-tuning-jest-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(path.join(fixtureRoot, "package.json"), "{}\n");
+    await writeFile(
+      path.join(fixtureRoot, "jest.config.js"),
+      "module.exports = { maxWorkers: 2 };\n",
+    );
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "test.yml"),
+      [
+        "name: test",
+        "on: pull_request",
+        "jobs:",
+        "  jest_default:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: npx jest",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(false);
+  });
+
+  test("does not flag pytest when addopts enables xdist workers", async () => {
+    const fixtureRoot = await tempDirs.create("apl-worker-tuning-pytest-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "pyproject.toml"),
+      '[tool.pytest.ini_options]\naddopts = "-n auto"\n',
+    );
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "test.yml"),
+      [
+        "name: test",
+        "on: pull_request",
+        "jobs:",
+        "  pytest_default:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: pytest",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(false);
+  });
+
   test("suggests checking logs when native-heavy packages overlap with source-build smells", async () => {
     const report = await memoizedAnalyzeRepository({
       cwd: fixtures.nativeBuildRiskLike,

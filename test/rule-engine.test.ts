@@ -123,6 +123,7 @@ function createSignals(): RepositorySignals {
       usesLerna: false,
       usesGradle: false,
       gradleBuildCacheConfigured: false,
+      testWorkerTuningConfigured: false,
       usesAngularCli: false,
       angularCliCacheEnabledForCi: false,
       usesRails: false,
