@@ -31,6 +31,7 @@ Current rule registry:
 - `consider-caching-os-packages-or-using-a-custom-image`
 - `consider-filter-blob-none-for-release-metadata`
 - `consider-slim-over-alpine-for-ci`
+- `cypress-github-action-uses-npm-run`
 - `db-io-reduce`
 - `deep-checkout-excessive-depth`
 - `deep-checkout-without-need`

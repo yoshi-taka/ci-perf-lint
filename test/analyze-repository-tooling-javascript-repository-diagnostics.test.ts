@@ -474,6 +474,42 @@ describe("analyzeRepository repo-aware and tooling rules: javascript repository 
     });
   });
 
+  describe("cypress-github-action-uses-npm-run", () => {
+    test("warns when a pnpm repository passes npm commands to the Cypress action", async () => {
+      const report = await getFixtureReport(
+        fixtures.cypressGithubActionNpmRunPnpmLike,
+        baseOptions,
+      );
+      const finding = report.findings.find(
+        (c) => c.ruleId === "cypress-github-action-uses-npm-run",
+      );
+
+      expect(finding).toBeDefined();
+      expect(finding!.scope).toBe("repository");
+      expect(finding!.severity).toBe("warning");
+      expect(finding!.confidence).toBe("high");
+      expect(finding!.docsPath).toBe("docs/rules/cypress-github-action-uses-npm-run.md");
+      expect(finding!.location.path).toBe(".github/workflows/cypress.yml");
+      expect(finding!.message).toContain("npm run build");
+      expect(finding!.message).toContain("npm start");
+      expect(finding!.message).toContain("pnpm");
+    });
+
+    test("skips when the action uses the repository package manager", async () => {
+      const report = await getFixtureReport(fixtures.cypressGithubActionNpmRunPnpmOk, baseOptions);
+      expect(report.findings.some((c) => c.ruleId === "cypress-github-action-uses-npm-run")).toBe(
+        false,
+      );
+    });
+
+    test("skips when the repository uses npm", async () => {
+      const report = await getFixtureReport(fixtures.cypressGithubActionNpmRunNpmOk, baseOptions);
+      expect(report.findings.some((c) => c.ruleId === "cypress-github-action-uses-npm-run")).toBe(
+        false,
+      );
+    });
+  });
+
   describe("prefer-oxlint-type-check-over-tsc", () => {
     test("warns for a tsc type-check script and workflow step when oxlint is used", async () => {
       const report = await getFixtureReport(fixtures.preferOxlintTypeCheckOverTscLike, baseOptions);

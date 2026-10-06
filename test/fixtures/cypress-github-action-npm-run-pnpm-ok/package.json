@@ -1,0 +1,13 @@
+{
+  "name": "cypress-github-action-npm-run-pnpm-ok",
+  "private": true,
+  "packageManager": "pnpm@10.19.0",
+  "scripts": {
+    "build": "vite build",
+    "start": "vite preview"
+  },
+  "devDependencies": {
+    "cypress": "^13.15.0",
+    "typescript": "^5.6.0"
+  }
+}

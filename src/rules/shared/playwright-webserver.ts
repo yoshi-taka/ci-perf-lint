@@ -183,15 +183,3 @@ export function extractWebServerCommands(configText: string): WebServerCommand[]
 
   return commands;
 }
-
-const npmRunPattern = /\bnpm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)/g;
-
-export function findNpmRunScripts(command: string): string[] {
-  const scripts: string[] = [];
-  for (const match of command.matchAll(npmRunPattern)) {
-    if (match[1]) {
-      scripts.push(match[1]);
-    }
-  }
-  return scripts;
-}

@@ -13,6 +13,7 @@ import { collectPackageJsonCdkExpressDiagnostics } from "./package-json-cdk-expr
 import { collectPackageJsonCdkHotswapVersionDiagnostics } from "./package-json-cdk-hotswap-version.ts";
 import { collectPackageJsonCdkMethodDirectDiagnostics } from "./package-json-cdk-method-direct.ts";
 import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxlint-type-check.ts";
+import { collectCypressGithubActionNpmRunDiagnostics } from "./cypress-github-action-npm-run.ts";
 import { collectPlaywrightConfigNpmRunDiagnostics } from "./playwright-config-npm-run.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
@@ -103,6 +104,11 @@ export const javascriptDiagnosticCollectors = [
     id: "playwright-config-uses-npm-run",
     gate: gateKeys.javascriptTooling,
     collect: (context) => collectPlaywrightConfigNpmRunDiagnostics(context),
+  },
+  {
+    id: "cypress-github-action-uses-npm-run",
+    gate: gateKeys.javascriptTooling,
+    collect: (context) => collectCypressGithubActionNpmRunDiagnostics(context),
   },
   {
     id: "prefer-aws-cdk-cli-2-1125-for-hotswap",
