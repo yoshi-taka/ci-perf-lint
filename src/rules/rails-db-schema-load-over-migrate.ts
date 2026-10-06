@@ -121,13 +121,13 @@ export const railsDbSchemaLoadOverMigrateRule = {
 
       findings.push(
         buildDiagnostic(workflow, meta, dbMigrateInfo.step.runNode ?? dbMigrateInfo.step.node, {
-          message: `Job "${job.id}" uses \`db:migrate\` for ephemeral CI test database setup instead of \`db:schema:load\`.`,
+          message: `Job "${job.id}" uses \`db:migrate\` for ephemeral CI test database setup instead of loading the schema directly (\`db:schema:load\`).`,
           why: "Ephemeral CI databases do not persist schema state between runs. Replaying all migrations on every CI run is slower than loading the schema directly.",
           suggestion:
-            "Replace `db:migrate` with `db:schema:load` or `db:structure:load` in this step. Keep `db:migrate` only in jobs that intentionally verify migration correctness.",
+            "Replace `db:migrate` with `db:schema:load` (Rails 6.1+, loads db/schema.rb or db/structure.sql). On Rails older than 6.1, use `db:structure:load` for db/structure.sql. Keep `db:migrate` only in jobs that intentionally verify migration correctness.",
           measurementHint:
-            "Compare test database setup time before and after switching from db:migrate to db:schema:load.",
-          aiHandoff: `Review ${workflow.relativePath} job "${job.id}", step "${dbMigrateInfo.step.name ?? "(unnamed)"}". If this CI path uses an ephemeral database service and does not need to verify migration correctness, replace \`${dbMigrateInfo.match}\` with \`rails db:schema:load\` (or \`rails db:structure:load\` if \`db/structure.sql\` is used) to speed up test database setup.`,
+            "Compare test database setup time before and after switching from db:migrate to a schema load.",
+          aiHandoff: `Review ${workflow.relativePath} job "${job.id}", step "${dbMigrateInfo.step.name ?? "(unnamed)"}". If this CI path uses an ephemeral database service and does not need to verify migration correctness, replace \`${dbMigrateInfo.match}\` with \`rails db:schema:load\` (or \`rails db:structure:load\` on Rails older than 6.1) to speed up test database setup.`,
           score: 62,
         }),
       );

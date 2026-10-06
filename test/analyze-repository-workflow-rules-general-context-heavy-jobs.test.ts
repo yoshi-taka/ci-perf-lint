@@ -404,6 +404,8 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
     const finding = findings.find((f) => f.message.includes("db:migrate"));
     expect(finding).toBeDefined();
     expect(finding?.message).toContain("db:schema:load");
+    expect(finding?.suggestion).toContain("db:schema:load");
+    expect(finding?.suggestion).toContain("db:structure:load");
     expect(finding?.severity).toBe("warning");
   });
 

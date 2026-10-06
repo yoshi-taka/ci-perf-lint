@@ -1,16 +1,15 @@
 # rails-db-schema-load-over-migrate
 
 Detects GitHub Actions jobs that initialize an ephemeral Rails test database by
-replaying all migrations with `rails db:migrate`, and recommends
-`rails db:schema:load` instead.
+replaying all migrations with `rails db:migrate`, and recommends loading the
+schema directly instead.
 
 ## Why This Matters
 
 In CI, test databases are ephemeral—they are created fresh for each run and
 discarded afterward. Running `db:migrate` on every CI run executes every
 migration in sequence, which can take significantly longer than loading the
-current schema directly via `db:schema:load` (or `db:structure:load` for SQL
-schema dumps).
+current schema directly.
 
 For large Rails applications with hundreds of migrations, the difference can be
 minutes per CI run.
@@ -40,19 +39,24 @@ The rule fires when a job meets **all** of the following:
 
 ## Resolution
 
-Replace the migration step:
+On **Rails 6.1 and newer**, `db:schema:load` loads either `db/schema.rb` or
+`db/structure.sql`, so it replaces both the old schema and structure loaders:
 
 ```diff
 - bundle exec rails db:migrate
 + bundle exec rails db:schema:load
 ```
 
-If your project uses `db/structure.sql` instead of `db/schema.rb`:
+On **Rails older than 6.1**, use `db:schema:load` when the project uses
+`db/schema.rb`, and `db:structure:load` when it uses `db/structure.sql`:
 
 ```diff
 - bundle exec rails db:migrate
 + bundle exec rails db:structure:load
 ```
+
+The suggestion text mentions both commands, so no Rails version detection is
+required.
 
 Keep `db:migrate` only in jobs that intentionally test migration correctness,
 such as a "schema check" or "migration verification" workflow.

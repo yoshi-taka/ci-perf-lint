@@ -42,7 +42,7 @@ export const preferRailsPerformanceMilestoneRule = {
       .map((job) =>
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs Rails CI while the repository is on Rails ${railsVersionSpec}, below the 7.2 performance milestone.`,
-          why: "Rails 7.2 enables YJIT by default in development and test environments. With Ruby 3.3+ YJIT, Rails test suites typically run 30-50% faster—the single highest-impact CI performance change available without rewriting application code.",
+          why: "Rails 7.2 enables YJIT by default in development and test environments, and with Ruby 3.3+ YJIT test suites can run noticeably faster without rewriting application code. Note that the benefit depends on the suite: Rails 8.1 changed this default to enable YJIT only outside local environments, because development and test reload code and redefine methods (for example with mocking), where YJIT is not generally faster.",
           suggestion:
             "If a major-version upgrade is not feasible yet, upgrade Rails from the current version to at least 7.2.x and ensure `config.yjit = true` is present (default since 7.2).",
           measurementHint:

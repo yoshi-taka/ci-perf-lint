@@ -6,9 +6,14 @@ and recommends upgrading to Rails 7.2.x for CI performance improvements.
 ## Why This Matters
 
 Rails 7.2 enables YJIT by default in development and test environments
-(`config.yjit = true`). With Ruby 3.3+ YJIT, Rails test suites typically run
-**30-50% faster** — the single highest-impact CI performance change available
-without rewriting application code.
+(`config.yjit = true`). With Ruby 3.3+ YJIT, Rails test suites can run
+noticeably faster without rewriting application code.
+
+The benefit depends on the suite. Rails 8.1 changed the default to enable YJIT
+only outside local environments (`config.yjit = !Rails.env.local?`), because
+development and test reload code and redefine methods (for example with
+mocking), where YJIT is not generally faster. This rule therefore stays scoped
+to the 7.0/7.1 → 7.2 milestone and does not push newer Rails majors for YJIT.
 
 ## Detection
 
