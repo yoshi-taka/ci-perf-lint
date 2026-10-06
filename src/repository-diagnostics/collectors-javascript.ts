@@ -20,6 +20,7 @@ import { collectConsiderMsw3UpgradeDiagnostics } from "./consider-msw-3-upgrade.
 import { collectPreferVitestPerformanceMilestoneDiagnostics } from "./prefer-vitest-performance-milestone.ts";
 import { collectRecommendModernTestRunnerDiagnostics } from "./recommend-modern-test-runner.ts";
 import { collectPreferCargoShearInCiDiagnostics } from "./prefer-cargo-shear-in-ci.ts";
+import { collectPreferKnipInCiDiagnostics } from "./prefer-knip-in-ci.ts";
 import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
 import { collectPreferTypeScript7NativeCompilerDiagnostics } from "./typescript-7-native-compiler.ts";
 import { collectAvoidEslintPluginPrettierDiagnostics } from "./avoid-eslint-plugin-prettier.ts";
@@ -188,6 +189,11 @@ export const javascriptDiagnosticCollectors = [
     id: "recommend-modern-test-runner",
     gate: gateKeys.javascriptTooling,
     collect: (context) => collectRecommendModernTestRunnerDiagnostics(context),
+  },
+  {
+    id: "prefer-knip-in-ci",
+    gate: gateKeys.javascriptTooling,
+    collect: (context) => collectPreferKnipInCiDiagnostics(context),
   },
   {
     id: "prefer-typescript-5-performance-milestone",

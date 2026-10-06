@@ -120,6 +120,7 @@ Current rule registry:
 - `prefer-explicit-import-extensions`
 - `prefer-frozen-lockfile`
 - `prefer-jest-30-for-jest-29`
+- `prefer-knip-in-ci`
 - `prefer-lefthook-for-complex-git-hooks`
 - `prefer-mise-over-asdf`
 - `prefer-mypy-2-performance-milestone`

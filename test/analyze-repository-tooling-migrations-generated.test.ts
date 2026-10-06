@@ -265,4 +265,127 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
 
     expect(report.findings.some((c) => c.ruleId === "recommend-modern-test-runner")).toBe(false);
   });
+
+  async function jsRepo(
+    packageJson: Record<string, unknown>,
+    options: { workflowLines?: string[]; extraFiles?: Record<string, string> } = {},
+  ) {
+    const fixtureRoot = await tempDirs.create("apl-knip-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(path.join(fixtureRoot, "package.json"), JSON.stringify(packageJson));
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        ...(options.workflowLines ?? ["      - run: npm test"]),
+      ].join("\n"),
+    );
+    for (const [name, contents] of Object.entries(options.extraFiles ?? {})) {
+      await writeFile(path.join(fixtureRoot, name), contents);
+    }
+    return fixtureRoot;
+  }
+
+  test("recommends knip when there is no visible unused-code check", async () => {
+    const fixtureRoot = await jsRepo({
+      name: "knip-like",
+      scripts: { test: "jest" },
+      dependencies: { react: "^19.0.0", lodash: "^4.17.21" },
+      devDependencies: {
+        jest: "^30.5.1",
+        typescript: "^5.9.0",
+        eslint: "^9.0.0",
+        vite: "^8.0.0",
+      },
+    });
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    const finding = report.findings.find((c) => c.ruleId === "prefer-knip-in-ci");
+    expect(finding).toBeDefined();
+    expect(finding?.severity).toBe("warning");
+    expect(finding?.docsPath).toBe("docs/rules/prefer-knip-in-ci.md");
+    expect(finding?.message).toContain("knip");
+    expect(finding?.suggestion).toContain("npx knip");
+  });
+
+  test("skips knip suggestion when knip is a dependency", async () => {
+    const fixtureRoot = await jsRepo({
+      name: "knip-dep",
+      dependencies: { react: "^19.0.0", lodash: "^4.17.21" },
+      devDependencies: { vitest: "^4.1.0", typescript: "^5.9.0", knip: "^5.0.0" },
+    });
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "prefer-knip-in-ci")).toBe(false);
+  });
+
+  test("skips knip suggestion when CI runs knip", async () => {
+    const fixtureRoot = await jsRepo(
+      {
+        name: "knip-ci",
+        dependencies: { react: "^19.0.0", lodash: "^4.17.21" },
+        devDependencies: { vitest: "^4.1.0", typescript: "^5.9.0", eslint: "^9.0.0" },
+      },
+      { workflowLines: ["      - run: npx knip"] },
+    );
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "prefer-knip-in-ci")).toBe(false);
+  });
+
+  test("skips knip suggestion when a knip config file exists", async () => {
+    const fixtureRoot = await jsRepo(
+      {
+        name: "knip-config",
+        dependencies: { react: "^19.0.0", lodash: "^4.17.21" },
+        devDependencies: { vitest: "^4.1.0", typescript: "^5.9.0", eslint: "^9.0.0" },
+      },
+      { extraFiles: { "knip.json": "{}" } },
+    );
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "prefer-knip-in-ci")).toBe(false);
+  });
+
+  test("skips knip suggestion when the project has no dependencies", async () => {
+    const fixtureRoot = await jsRepo({ name: "knip-empty", scripts: { test: "node --test" } });
+
+    const report = await memoizedAnalyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(report.findings.some((c) => c.ruleId === "prefer-knip-in-ci")).toBe(false);
+  });
 });

@@ -127,6 +127,7 @@ export const RULE_REGISTRY = {
   "prefer-vitest-performance-milestone": { kind: "repository" },
   "recommend-modern-test-runner": { kind: "repository" },
   "prefer-cargo-shear-in-ci": { kind: "repository" },
+  "prefer-knip-in-ci": { kind: "repository" },
 } as const satisfies Record<string, RegisteredRuleEntry>;
 
 export type RegisteredRuleId = keyof typeof RULE_REGISTRY;
