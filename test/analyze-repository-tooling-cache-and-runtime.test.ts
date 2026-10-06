@@ -295,6 +295,12 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
         expectAbsent: true as const,
       },
       {
+        name: "Gradle: does not warn when org.gradle.caching is enabled in gradle.properties",
+        fixture: fixtures.gradleCachePropertiesOk,
+        ruleId: "missing-gradle-build-cache",
+        expectAbsent: true as const,
+      },
+      {
         name: "Angular CLI: warns when cache is not wired for CI",
         fixture: fixtures.angularCacheLike,
         ruleId: "missing-angular-cli-cache",

@@ -10,7 +10,9 @@ This rule only fires when:
 
 - the repository looks like it uses Gradle
 - the workflow visibly runs Gradle tasks such as `build`, `test`, `assemble`, or `check`
-- no visible `buildCache` configuration appears in `settings.gradle` or `settings.gradle.kts`
+- no visible build cache configuration is found, meaning neither
+  - a `buildCache` block in `settings.gradle` or `settings.gradle.kts`, nor
+  - `org.gradle.caching=true` in `gradle.properties`
 
 ## Suggested fix
 

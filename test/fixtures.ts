@@ -135,6 +135,7 @@ const fixtureNames = {
   geminiCli: "gemini-cli",
   gradleCacheLike: "gradle-cache-like",
   gradleCacheOk: "gradle-cache-ok",
+  gradleCachePropertiesOk: "gradle-cache-properties-ok",
   headlessUiFloatReactRootImportLike: "headlessui-float-react-root-import-like",
   headlessUiReactRootImportLike: "headlessui-react-root-import-like",
   heroiconsGroupedImportLike: "heroicons-grouped-import-like",

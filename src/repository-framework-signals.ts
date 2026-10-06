@@ -37,6 +37,8 @@ const svelteConfigFileNames = [
 const angularWorkspaceFileNames = ["angular.json", ".angular.json"] as const;
 const gradleSettingsFileNames = ["settings.gradle", "settings.gradle.kts"] as const;
 const gradleBuildFileNames = ["build.gradle", "build.gradle.kts"] as const;
+const gradlePropertiesFileNames = ["gradle.properties"] as const;
+const GRADLE_CACHING_ENABLED = /^\s*org\.gradle\.caching\s*=\s*true\s*$/im;
 
 async function loadExistingRootFiles(
   context: RepositoryScanContext,
@@ -209,6 +211,13 @@ export async function collectFrameworkSignals(
   for (const { text: settingsText } of gradleSettingsFiles) {
     usesGradle = true;
     if (/\bbuildCache\b/i.test(settingsText)) {
+      gradleBuildCacheConfigured = true;
+    }
+  }
+
+  const gradlePropertiesFiles = await loadExistingRootFiles(context, gradlePropertiesFileNames);
+  for (const { text: propertiesText } of gradlePropertiesFiles) {
+    if (GRADLE_CACHING_ENABLED.test(propertiesText)) {
       gradleBuildCacheConfigured = true;
     }
   }
