@@ -90,17 +90,20 @@ export const preferStandardArmRunnerForApiCliRule = {
       }
 
       const severity = hasArchitectureSensitiveWork(job) ? "suggestion" : "warning";
-      const armRunner = suggestedStandardArmUbuntuRunner(job);
+      const armLabel = suggestedStandardArmUbuntuRunner(job);
+      const armTarget = armLabel
+        ? `\`${armLabel}\``
+        : "the standard arm64 Ubuntu runner matching this job's image";
 
       findings.push(
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           severity,
           message: `Job "${job.id}" runs ${apiTool} API-bound CLI work on a standard x64 Ubuntu runner.`,
           why: `${apiTool} jobs often spend time in provider API calls or CLI orchestration rather than CPU-bound local work. These CLIs commonly run on arm64, so the matching standard GitHub-hosted arm64 Ubuntu runner can be a practical runner choice when every action and install path in the job supports arm64.`,
-          suggestion: `Test this API-bound CLI job on \`${armRunner}\` and keep the switch if the provider CLIs, setup actions, credentials flow, and command behavior stay compatible.`,
+          suggestion: `Test this API-bound CLI job on ${armTarget} and keep the switch if the provider CLIs, setup actions, credentials flow, and command behavior stay compatible.`,
           measurementHint:
             "Compare wall-clock duration, setup time, and failure rate across several runs before and after changing the runner label.",
-          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether its ${apiTool} CLI path can run on ${armRunner}. Verify all third-party actions and CLI installs support arm64 before changing the default runner.`,
+          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether its ${apiTool} CLI path can run on ${armTarget}. Verify all third-party actions and CLI installs support arm64 before changing the default runner.`,
           score: severity === "warning" ? 52 : 36,
         }),
       );

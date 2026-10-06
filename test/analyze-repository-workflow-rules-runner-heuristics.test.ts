@@ -240,6 +240,40 @@ describe("analyzeRepository workflow and execution rules: docker and runner heur
     expect(finding?.suggestion).toContain("ubuntu-26.04-arm");
   });
 
+  test("does not pin a hardcoded arm64 label for ubuntu-latest jobs", async () => {
+    const fixtureRoot = await tempDirs.create("apl-arm-latest-generic-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "deploy.yml"),
+      [
+        "name: Deploy",
+        "on: push",
+        "jobs:",
+        "  terraform:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - run: terraform plan",
+      ].join("\n"),
+    );
+
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    const finding = report.findings.find(
+      (candidate) => candidate.ruleId === "prefer-standard-arm-runner-for-api-cli",
+    );
+
+    expect(finding).toBeDefined();
+    expect(finding?.suggestion).toContain("standard arm64 Ubuntu runner");
+    expect(finding?.suggestion).not.toMatch(/ubuntu-\d{2}\.\d{2}-arm/);
+  });
+
   test("recommends standard arm64 runners for portable fast tooling", async () => {
     const report = await getWorkflowFocusedFixtureReport(fixtures.portableToolingArmRunnerLike, {
       targetPath: ".",

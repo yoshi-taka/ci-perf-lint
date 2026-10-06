@@ -103,16 +103,19 @@ export const preferStandardArmRunnerForPortableToolingRule = {
         continue;
       }
 
-      const armRunner = suggestedStandardArmUbuntuRunner(job);
+      const armLabel = suggestedStandardArmUbuntuRunner(job);
+      const armTarget = armLabel
+        ? `\`${armLabel}\``
+        : "the standard arm64 Ubuntu runner matching this job's image";
 
       findings.push(
         buildDiagnostic(workflow, meta, portableTool.step.runNode ?? portableTool.step.node, {
           message: `Job "${job.id}" is lightweight, architecture-portable tooling on a standard x64 Ubuntu runner (detected: ${portableTool.name}).`,
           why: `${portableTool.name} is only the portability signal; the recommendation is about the runner. This job looks like lint/format tooling without visible native builds, browser tests, typechecking, or containers, so it is a reasonable candidate for the matching standard GitHub-hosted arm64 Ubuntu runner. For short portable jobs, many runs are still rounded to a whole billable minute, so switching eligible work off standard x64 can improve cost or runner efficiency, but only if installs, caches, and output stay compatible on arm64.`,
-          suggestion: `Test changing this job's runner label to \`${armRunner}\`; keep the switch only if the same tooling command installs cleanly, reuses caches as expected, and produces equivalent output.`,
+          suggestion: `Test changing this job's runner label to ${armTarget}; keep the switch only if the same tooling command installs cleanly, reuses caches as expected, and produces equivalent output.`,
           measurementHint:
             "Compare wall-clock duration, billed runner time, setup/cache time, and failure rate across several runs before and after changing only the runner label.",
-          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether this lightweight portable tooling path can run on ${armRunner}. Treat ${portableTool.name} as the compatibility signal, not as the optimization itself; verify install/cache behavior and output before changing the default runner.`,
+          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether this lightweight portable tooling path can run on ${armTarget}. Treat ${portableTool.name} as the compatibility signal, not as the optimization itself; verify install/cache behavior and output before changing the default runner.`,
           score: 50,
         }),
       );
