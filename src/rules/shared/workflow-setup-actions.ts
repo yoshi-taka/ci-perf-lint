@@ -40,5 +40,5 @@ export function isSetupActionRelevantForDependencyFamily(
 }
 
 export function isOutdatedSetupAction(uses: string): boolean {
-  return /actions\/setup-(node|python|go)@v[12]\b/i.test(uses);
+  return /actions\/setup-(node|python|go|java|dotnet)@v[12]\b/i.test(uses);
 }

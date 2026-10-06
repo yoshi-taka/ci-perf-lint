@@ -10,8 +10,10 @@ Why this rule exists:
 
 Current MVP heuristic:
 
-- the workflow uses `actions/setup-node`, `actions/setup-python`, or `actions/setup-go` at `v1` or `v2`
+- the workflow uses `actions/setup-node`, `actions/setup-python`, `actions/setup-go`, `actions/setup-java`, or `actions/setup-dotnet` at `v1` or `v2`
 - no cache configuration is visible on that setup step
+
+`v1`/`v2` predate the built-in dependency cache in these actions (npm/pip/go modules, Maven/Gradle/sbt, and NuGet respectively). `shivammathur/setup-php` is intentionally not covered because it has no built-in dependency cache.
 
 Typical remediation:
 

@@ -247,6 +247,111 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     ).toBe(false);
   });
 
+  test("flags outdated setup-java without cache", async () => {
+    const fixtureRoot = await tempDirs.create("apl-setup-java-old-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: actions/setup-java@v2",
+        "        with:",
+        "          distribution: temurin",
+        "          java-version: '17'",
+        "      - run: mvn -B verify",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) =>
+          candidate.ruleId === "outdated-setup-action-without-cache" &&
+          candidate.message.includes("actions/setup-java@v2"),
+      ),
+    ).toBe(true);
+  });
+
+  test("flags outdated setup-dotnet without cache", async () => {
+    const fixtureRoot = await tempDirs.create("apl-setup-dotnet-old-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: actions/setup-dotnet@v1",
+        "        with:",
+        "          dotnet-version: '8.0.x'",
+        "      - run: dotnet test",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) =>
+          candidate.ruleId === "outdated-setup-action-without-cache" &&
+          candidate.message.includes("actions/setup-dotnet@v1"),
+      ),
+    ).toBe(true);
+  });
+
+  test("does not flag shivammathur/setup-php for this rule", async () => {
+    const fixtureRoot = await tempDirs.create("apl-setup-php-skip-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: shivammathur/setup-php@v2",
+        "      - run: composer install",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 20,
+      mode: "exploratory",
+    });
+
+    expect(
+      report.findings.some(
+        (candidate) => candidate.ruleId === "outdated-setup-action-without-cache",
+      ),
+    ).toBe(false);
+  });
+
   test("flags elixir with outdated OTP (25) and Elixir (1.14) in setup-beam", async () => {
     const report = await getFixtureReport(fixtures.elixirSecurityAdvisoriesOk, {
       targetPath: ".",
