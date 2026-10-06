@@ -337,6 +337,141 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     expect(finding?.suggestion).toContain("OTP 27+");
   });
 
+  test("warns when Elixir 1.19 runs mix without partition count", async () => {
+    const fixtureRoot = await tempDirs.create("apl-elixir-partition-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: [push]",
+        "jobs:",
+        "  ci:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: erlef/setup-beam@v1",
+        "        with:",
+        "          otp-version: 27.0",
+        "          elixir-version: 1.19",
+        "      - run: mix deps.compile",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 50,
+      mode: "exploratory",
+    });
+
+    const finding = report.findings.find((f) => f.ruleId === "prefer-elixir-parallel-deps-compile");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("Elixir 1.19");
+    expect(finding?.suggestion).toContain("MIX_OS_DEPS_COMPILE_PARTITION_COUNT");
+  });
+
+  test("skips partition warning when the env var is set", async () => {
+    const fixtureRoot = await tempDirs.create("apl-elixir-partition-env-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: [push]",
+        "jobs:",
+        "  ci:",
+        "    runs-on: ubuntu-latest",
+        "    env:",
+        "      MIX_OS_DEPS_COMPILE_PARTITION_COUNT: 4",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: erlef/setup-beam@v1",
+        "        with:",
+        "          otp-version: 27.0",
+        "          elixir-version: 1.19",
+        "      - run: mix deps.compile",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 50,
+      mode: "exploratory",
+    });
+
+    expect(report.findings.some((f) => f.ruleId === "prefer-elixir-parallel-deps-compile")).toBe(
+      false,
+    );
+  });
+
+  test("skips partition warning below Elixir 1.19", async () => {
+    const fixtureRoot = await tempDirs.create("apl-elixir-partition-old-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: [push]",
+        "jobs:",
+        "  ci:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: erlef/setup-beam@v1",
+        "        with:",
+        "          otp-version: 27.0",
+        "          elixir-version: 1.18",
+        "      - run: mix test",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 50,
+      mode: "exploratory",
+    });
+
+    expect(report.findings.some((f) => f.ruleId === "prefer-elixir-parallel-deps-compile")).toBe(
+      false,
+    );
+  });
+
+  test("skips partition warning for non-compiling mix commands", async () => {
+    const fixtureRoot = await tempDirs.create("apl-elixir-partition-nocompile-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: [push]",
+        "jobs:",
+        "  ci:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: erlef/setup-beam@v1",
+        "        with:",
+        "          otp-version: 27.0",
+        "          elixir-version: 1.19",
+        "      - run: mix deps.get",
+      ].join("\n"),
+    );
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 50,
+      mode: "exploratory",
+    });
+
+    expect(report.findings.some((f) => f.ruleId === "prefer-elixir-parallel-deps-compile")).toBe(
+      false,
+    );
+  });
+
   test("flags npm audit in a push/PR workflow", async () => {
     const report = await getFixtureReport(fixtures.npmAuditInCiLike, {
       targetPath: ".",

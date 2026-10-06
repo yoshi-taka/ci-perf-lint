@@ -1,3 +1,7 @@
+import type { Node } from "yaml";
+import type { WorkflowJob, WorkflowStep } from "../../workflow.ts";
+import { getMapValue, getScalarValue } from "../../workflow.ts";
+
 export function parseOtpVersion(value: string): number | undefined {
   const match = value.trim().match(/^(\d+)/);
   return match ? Number.parseInt(match[1]!, 10) : undefined;
@@ -20,6 +24,70 @@ export function extractOtpFromElixirVersion(elixirVersion: string): number | und
 export function extractOtpFromContainerImage(image: string): number | undefined {
   const match = image.match(/elixir:.*?otp[-.]?(\d+)/i);
   return match ? Number.parseInt(match[1]!, 10) : undefined;
+}
+
+export function elixirHasParallelDepsCompile(value: string): boolean {
+  const parsed = parseElixirMajorMinor(value);
+  if (!parsed) {
+    return false;
+  }
+  const { major, minor } = parsed;
+  return major > 1 || (major === 1 && minor >= 19);
+}
+
+export interface SetupBeamDetected {
+  step: WorkflowStep;
+  otpVersion?: string;
+  elixirVersion?: string;
+}
+
+export function detectSetupBeam(job: WorkflowJob): SetupBeamDetected | undefined {
+  for (const step of job.steps) {
+    const uses = step.uses?.toLowerCase() ?? "";
+    if (!uses.startsWith("erlef/setup-beam@")) {
+      continue;
+    }
+
+    const withValues = step.with;
+    if (!withValues) {
+      continue;
+    }
+
+    const rawOtp = withValues["otp-version"];
+    const rawElixir = withValues["elixir-version"];
+    return {
+      step,
+      otpVersion:
+        typeof rawOtp === "string" || typeof rawOtp === "number" ? String(rawOtp) : undefined,
+      elixirVersion:
+        typeof rawElixir === "string" || typeof rawElixir === "number"
+          ? String(rawElixir)
+          : undefined,
+    };
+  }
+  return undefined;
+}
+
+export interface ElixirContainerDetected {
+  image: string;
+  node?: Node;
+}
+
+export function detectElixirContainer(job: WorkflowJob): ElixirContainerDetected | undefined {
+  const containerStr = getScalarValue(job.node, "container");
+  if (typeof containerStr === "string" && containerStr.toLowerCase().startsWith("elixir:")) {
+    return { image: containerStr, node: job.node };
+  }
+
+  const containerMap = getMapValue(job.node, "container");
+  if (containerMap) {
+    const image = containerMap.image;
+    if (typeof image === "string" && image.toLowerCase().startsWith("elixir:")) {
+      return { image, node: job.node };
+    }
+  }
+
+  return undefined;
 }
 
 interface OtpRuleFinding {

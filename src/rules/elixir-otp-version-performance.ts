@@ -1,12 +1,13 @@
 import type { Node } from "yaml";
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
-import { getMapValue, getScalarValue } from "../workflow.ts";
+import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import {
   checkElixirVersion,
   checkOtpVersion,
+  detectElixirContainer,
+  detectSetupBeam,
   extractOtpFromContainerImage,
   extractOtpFromElixirVersion,
   parseOtpVersion,
@@ -18,61 +19,6 @@ const meta = {
   confidence: "high",
   docsPath: "docs/rules/elixir-otp-version-performance.md",
 } satisfies RuleMeta;
-
-interface SetupBeamDetected {
-  step: WorkflowStep;
-  otpVersion?: string;
-  elixirVersion?: string;
-}
-
-function detectSetupBeam(job: WorkflowJob): SetupBeamDetected | undefined {
-  for (const step of job.steps) {
-    const uses = step.uses?.toLowerCase() ?? "";
-    if (!uses.startsWith("erlef/setup-beam@")) {
-      continue;
-    }
-
-    const withValues = step.with;
-    if (!withValues) {
-      continue;
-    }
-
-    const rawOtp = withValues["otp-version"];
-    const rawElixir = withValues["elixir-version"];
-    return {
-      step,
-      otpVersion:
-        typeof rawOtp === "string" || typeof rawOtp === "number" ? String(rawOtp) : undefined,
-      elixirVersion:
-        typeof rawElixir === "string" || typeof rawElixir === "number"
-          ? String(rawElixir)
-          : undefined,
-    };
-  }
-  return undefined;
-}
-
-interface ContainerDetected {
-  image: string;
-  node?: Node;
-}
-
-function detectElixirContainer(job: WorkflowJob): ContainerDetected | undefined {
-  const containerStr = getScalarValue(job.node, "container");
-  if (typeof containerStr === "string" && containerStr.toLowerCase().startsWith("elixir:")) {
-    return { image: containerStr, node: job.node };
-  }
-
-  const containerMap = getMapValue(job.node, "container");
-  if (containerMap) {
-    const image = containerMap.image;
-    if (typeof image === "string" && image.toLowerCase().startsWith("elixir:")) {
-      return { image, node: job.node };
-    }
-  }
-
-  return undefined;
-}
 
 export const elixirOtpVersionPerformanceRule = {
   meta,
