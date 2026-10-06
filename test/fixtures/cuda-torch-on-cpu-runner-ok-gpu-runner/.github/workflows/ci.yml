@@ -1,0 +1,11 @@
+name: ci
+
+on: [push]
+
+jobs:
+  train:
+    runs-on: [self-hosted, linux, x64, gpu]
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install torch
+      - run: python train.py

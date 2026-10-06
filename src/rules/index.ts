@@ -20,6 +20,7 @@ import { collapseMultipleGoBuildsInJobRule } from "./collapse-multiple-go-builds
 import { considerCachingOsPackagesOrUsingACustomImageRule } from "./consider-caching-os-packages-or-using-a-custom-image.ts";
 import { considerFilterBlobNoneForReleaseMetadataRule } from "./consider-filter-blob-none-for-release-metadata.ts";
 import { considerSlimOverAlpineForCiRule } from "./consider-slim-over-alpine-for-ci.ts";
+import { cudaTorchInstallOnCpuRunnerRule } from "./cuda-torch-install-on-cpu-runner.ts";
 import { dockerBuildCacheDisabledInCiRule } from "./docker-build-cache-disabled-in-ci.ts";
 import { dockerBuildLoadTrueUnnecessaryRule } from "./docker-build-load-true-unnecessary.ts";
 import { dockerBuildWithoutLayerCacheRule } from "./docker-build-without-layer-cache.ts";
@@ -130,6 +131,7 @@ export const allRules = [
   considerCachingOsPackagesOrUsingACustomImageRule,
   considerFilterBlobNoneForReleaseMetadataRule,
   considerSlimOverAlpineForCiRule,
+  cudaTorchInstallOnCpuRunnerRule,
   dockerBuildCacheDisabledInCiRule,
   dockerBuildLoadTrueUnnecessaryRule,
   dockerBuildWithoutLayerCacheRule,

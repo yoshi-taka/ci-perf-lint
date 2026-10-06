@@ -1,0 +1,22 @@
+name: rllm with cuda
+
+on:
+  push:
+    branches: [main]
+
+env:
+  TORCH_CUDA_ARCH_LIST: "8.0"
+  CUDA_COMPUTE_CAP: "80"
+  LIBTORCH_USE_PYTORCH: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install torch==2.1.0
+      - uses: Jimver/cuda-toolkit@v0.2.13
+        with:
+          cuda: "12.3.2"
+      - run: nvcc -V
+      - run: cargo build --release

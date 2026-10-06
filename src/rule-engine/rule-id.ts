@@ -23,6 +23,7 @@ export const RULE_REGISTRY = {
   "consider-caching-os-packages-or-using-a-custom-image": { kind: "workflow" },
   "consider-filter-blob-none-for-release-metadata": { kind: "workflow" },
   "consider-slim-over-alpine-for-ci": { kind: "workflow" },
+  "cuda-torch-install-on-cpu-runner": { kind: "workflow" },
   "db-io-reduce": { kind: "workflow" },
   "deep-checkout-excessive-depth": { kind: "workflow" },
   "deep-checkout-without-need": { kind: "workflow" },
