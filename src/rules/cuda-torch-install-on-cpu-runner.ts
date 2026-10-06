@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobRunsOnStandardX64Ubuntu } from "./shared/runs-on-facts.ts";
+import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
 
 const meta = {
   id: "cuda-torch-install-on-cpu-runner",
@@ -123,15 +124,10 @@ function stepIfExcludesLinux(step: WorkflowStep): boolean {
   return mentionsNonLinux && !mentionsLinux;
 }
 
-function hasCpuInstallIntent(
-  stepRun: string,
-  jobEnvText: string,
-  workflowEnvText: string,
-): boolean {
+function hasCpuInstallIntent(stepRun: string, env: string): boolean {
   if (cpuInstallPattern.test(stepRun)) {
     return true;
   }
-  const env = `${workflowEnvText}\n${jobEnvText}`;
   return cpuEnvPattern.test(env) || cpuIndexEnvPattern.test(env);
 }
 
@@ -179,7 +175,12 @@ export const cudaTorchInstallOnCpuRunnerRule = {
       const packages = new Set<string>();
       let anchor: WorkflowStep | undefined;
       for (const step of job.steps) {
-        if (hasCpuInstallIntent(step.run ?? "", jobEnvText, workflowEnvText)) {
+        if (
+          hasCpuInstallIntent(
+            step.run ?? "",
+            textify(effectiveStepEnvironment(workflow, job, step)),
+          )
+        ) {
           continue;
         }
         const stepPackages = collectTorchPackages(step);

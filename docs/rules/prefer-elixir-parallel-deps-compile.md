@@ -8,9 +8,11 @@ Detects GitHub Actions jobs that use Elixir 1.19+ and run `mix` without enabling
   - `erlef/setup-beam` (`elixir-version`), or
   - a job container image (`elixir:1.19-otp-27`), and
 - a `mix` command that compiles the project or its dependencies (`mix deps.compile`, `mix compile`, `mix test`, ...), and
-- no `MIX_OS_DEPS_COMPILE_PARTITION_COUNT` set anywhere in the workflow.
+- no effective `MIX_OS_DEPS_COMPILE_PARTITION_COUNT` greater than 1 for that compile command.
 
 Commands that do not compile dependencies (`mix local.hex`, `mix deps.get`, `mix format`, ...) are ignored.
+
+Commands are checked separately even when dependency download and compilation share a step. Workflow, job, and step environment values follow their normal override order; shell assignments are recognized too. Comments, values 0/1, and settings on another job do not prove parallel compilation.
 
 ## Why it matters
 

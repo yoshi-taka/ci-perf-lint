@@ -12,9 +12,8 @@ import {
   cdkVersionIsBelowExpressFloor,
   formatSemver,
   jobTargetsDevelopment,
-  resolveCdkCliVersion,
+  groupCdkStepsByCliVersion,
   textDeploysCdkWithoutExpress,
-  type SemverTuple,
 } from "./shared/cdk-express.ts";
 
 const meta = {
@@ -29,18 +28,14 @@ export const preferCdkExpressModeInDevelopmentRule = {
   meta,
   async check(workflow: WorkflowDocument, context: RuleContext): Promise<Diagnostic[]> {
     const findings: Diagnostic[] = [];
-    let resolvedVersion: SemverTuple | undefined;
-    let versionResolved = false;
 
     for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow) {
         continue;
       }
 
-      const offendingSteps = job.steps.filter((step) =>
-        textDeploysCdkWithoutExpress(step.run ?? ""),
-      );
-      if (offendingSteps.length === 0) {
+      const candidates = job.steps.filter((step) => textDeploysCdkWithoutExpress(step.run ?? ""));
+      if (candidates.length === 0) {
         continue;
       }
 
@@ -49,31 +44,32 @@ export const preferCdkExpressModeInDevelopmentRule = {
         continue;
       }
 
-      if (!versionResolved) {
-        resolvedVersion = await resolveCdkCliVersion(workflow, context);
-        versionResolved = true;
+      for (const {
+        version: resolvedVersion,
+        steps: offendingSteps,
+      } of await groupCdkStepsByCliVersion(job, context, candidates)) {
+        const needsUpgrade = cdkVersionIsBelowExpressFloor(resolvedVersion);
+        const versionLabel = resolvedVersion ? formatSemver(resolvedVersion) : undefined;
+
+        const stepList = offendingSteps
+          .map((step) => step.name ?? step.run?.trim() ?? "(unnamed step)")
+          .map((label) => `"${label}"`)
+          .join(", ");
+        const versionClause = versionLabel ? ` (aws-cdk ${versionLabel})` : "";
+
+        findings.push(
+          buildDiagnostic(workflow, meta, offendingSteps[0]!.runNode ?? offendingSteps[0]!.node, {
+            message: needsUpgrade
+              ? `Job "${job.id}" runs development CDK deploy commands without express mode, and the pinned aws-cdk ${versionLabel} predates --express support: ${stepList}.`
+              : `Job "${job.id}" runs development CDK deploy commands without express mode${versionClause}: ${stepList}.`,
+            why: CDK_EXPRESS_WHY,
+            suggestion: needsUpgrade ? CDK_EXPRESS_UPGRADE_SUGGESTION : CDK_EXPRESS_SUGGESTION,
+            measurementHint: CDK_EXPRESS_MEASUREMENT_HINT,
+            aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Its CDK deploy, destroy, or bootstrap command(s) (${stepList}) target a development context but omit --express. ${needsUpgrade ? `First bump the aws-cdk CLI to 2.1138.0 or later (currently ${versionLabel}), then ` : ""}add --express. Do not apply express mode to production or release deployments, and keep automatic rollback behavior intentional for development.`,
+            score: 40,
+          }),
+        );
       }
-      const needsUpgrade = cdkVersionIsBelowExpressFloor(resolvedVersion);
-      const versionLabel = resolvedVersion ? formatSemver(resolvedVersion) : undefined;
-
-      const stepList = offendingSteps
-        .map((step) => step.name ?? step.run?.trim() ?? "(unnamed step)")
-        .map((label) => `"${label}"`)
-        .join(", ");
-      const versionClause = versionLabel ? ` (aws-cdk ${versionLabel})` : "";
-
-      findings.push(
-        buildDiagnostic(workflow, meta, offendingSteps[0]!.runNode ?? offendingSteps[0]!.node, {
-          message: needsUpgrade
-            ? `Job "${job.id}" runs development CDK deploy commands without express mode, and the pinned aws-cdk ${versionLabel} predates --express support: ${stepList}.`
-            : `Job "${job.id}" runs development CDK deploy commands without express mode${versionClause}: ${stepList}.`,
-          why: CDK_EXPRESS_WHY,
-          suggestion: needsUpgrade ? CDK_EXPRESS_UPGRADE_SUGGESTION : CDK_EXPRESS_SUGGESTION,
-          measurementHint: CDK_EXPRESS_MEASUREMENT_HINT,
-          aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Its CDK deploy, destroy, or bootstrap command(s) (${stepList}) target a development context but omit --express. ${needsUpgrade ? `First bump the aws-cdk CLI to 2.1138.0 or later (currently ${versionLabel}), then ` : ""}add --express. Do not apply express mode to production or release deployments, and keep automatic rollback behavior intentional for development.`,
-          score: 40,
-        }),
-      );
     }
 
     return findings;

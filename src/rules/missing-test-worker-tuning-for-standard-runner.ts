@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobRunsOnStandardHostedRunner } from "./shared/workflow-jobs.ts";
+import path from "node:path";
 
 const meta = {
   id: "missing-test-worker-tuning-for-standard-runner",
@@ -61,14 +62,54 @@ function workerTuningExamples(tool: TestTool): string {
   return testToolWorkerTuningRules.find((rule) => rule.tool === tool)?.examples ?? "worker flags";
 }
 
-function getUntunedTestStep(job: WorkflowJob): { step: WorkflowStep; tool: TestTool } | undefined {
+function defaultWorkingDirectory(raw: Record<string, unknown> | undefined): string | undefined {
+  const defaults = raw?.defaults;
+  if (!defaults || typeof defaults !== "object" || !("run" in defaults)) {
+    return undefined;
+  }
+  const run = defaults.run;
+  if (!run || typeof run !== "object" || !("working-directory" in run)) {
+    return undefined;
+  }
+  return typeof run["working-directory"] === "string" ? run["working-directory"] : undefined;
+}
+
+function hasApplicableConfig(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  step: WorkflowStep,
+  tool: TestTool,
+  context: RuleContext,
+): boolean {
+  const configs = context.repository.frameworks.testWorkerTuningConfigured[tool] ?? [];
+  const cwd =
+    step.workingDirectory ??
+    defaultWorkingDirectory(job.raw) ??
+    defaultWorkingDirectory(workflow.parsed) ??
+    ".";
+  const config = /(?:^|\s)(?:--config|-c)(?:=|\s+)["']?([^\s"']+)/.exec(step.run ?? "");
+  if (config?.[1]) {
+    return configs.includes(path.posix.normalize(path.posix.join(cwd, config[1])));
+  }
+  // Root config evidence cannot prove tuning for a command in another package.
+  return path.posix.normalize(cwd) === "." && configs.length > 0;
+}
+
+function getUntunedTestStep(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  context: RuleContext,
+): { step: WorkflowStep; tool: TestTool } | undefined {
   for (const step of job.steps) {
     const tool = detectDirectTestTool(step);
     if (!tool) {
       continue;
     }
 
-    if (!hasVisibleWorkerTuning(step, tool)) {
+    if (
+      !hasVisibleWorkerTuning(step, tool) &&
+      !hasApplicableConfig(workflow, job, step, tool, context)
+    ) {
       return { step, tool };
     }
   }
@@ -79,17 +120,13 @@ function getUntunedTestStep(job: WorkflowJob): { step: WorkflowStep; tool: TestT
 export const missingTestWorkerTuningForStandardRunnerRule = {
   meta,
   check(workflow: WorkflowDocument, context: RuleContext) {
-    if (context.repository.frameworks.testWorkerTuningConfigured) {
-      return [];
-    }
-
     const findings: Diagnostic[] = [];
     for (const job of workflow.jobs) {
       if (!jobRunsOnStandardHostedRunner(job) || job.usesReusableWorkflow) {
         continue;
       }
 
-      const untuned = getUntunedTestStep(job);
+      const untuned = getUntunedTestStep(workflow, job, context);
       if (!untuned) {
         continue;
       }

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { analyzeRepository } from "../src/repo.ts";
@@ -39,6 +39,19 @@ export function createTempDirTracker() {
       await Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true })));
     },
   };
+}
+
+export async function writeRepositoryFiles(
+  repoRoot: string,
+  files: Record<string, string>,
+): Promise<void> {
+  await Promise.all(
+    Object.entries(files).map(async ([relativePath, text]) => {
+      const filePath = path.join(repoRoot, relativePath);
+      await mkdir(path.dirname(filePath), { recursive: true });
+      await writeFile(filePath, text);
+    }),
+  );
 }
 
 export function createWorkflowJob(overrides: Partial<WorkflowJob["raw"]> = {}): WorkflowJob {

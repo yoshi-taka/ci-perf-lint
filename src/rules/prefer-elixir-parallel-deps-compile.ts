@@ -2,6 +2,8 @@ import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
+import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
 import {
   detectElixirContainer,
   detectSetupBeam,
@@ -22,13 +24,24 @@ const MIX_COMMAND = /\bmix\b/;
 const NON_COMPILE_MIX_COMMAND =
   /\bmix\s+(?:local\.(?:hex|rebar)|archive\.install|deps\.(?:get|update|unlock|clean|tree|list|check)|hex\.|format|help|new)\b/;
 
+function stepCompilesWithoutParallel(run: string, envValue: unknown): boolean {
+  let partitionCount = Number(envValue);
+  for (const command of shellCommandSegments(run)) {
+    const assignment = /\bMIX_OS_DEPS_COMPILE_PARTITION_COUNT=["']?(\d+)\b/.exec(command);
+    const count = assignment ? Number(assignment[1]) : partitionCount;
+    if (/^export\s+/.test(command) || /^MIX_OS_DEPS_COMPILE_PARTITION_COUNT=\S+$/.test(command)) {
+      partitionCount = count;
+    }
+    if (MIX_COMMAND.test(command) && !NON_COMPILE_MIX_COMMAND.test(command) && !(count > 1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export const preferElixirParallelDepsCompileRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    if (workflow.source?.includes(PARTITION_ENV)) {
-      return [];
-    }
-
     const findings: ReturnType<typeof buildDiagnostic>[] = [];
 
     for (const job of workflow.jobs) {
@@ -45,7 +58,8 @@ export const preferElixirParallelDepsCompileRule = {
 
       for (const step of job.steps) {
         const run = step.run ?? "";
-        if (!MIX_COMMAND.test(run) || NON_COMPILE_MIX_COMMAND.test(run)) {
+        const env = effectiveStepEnvironment(workflow, job, step);
+        if (!stepCompilesWithoutParallel(run, env[PARTITION_ENV])) {
           continue;
         }
 

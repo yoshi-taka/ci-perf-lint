@@ -28,6 +28,8 @@ It does not fire when:
 
 A `--extra-index-url .../whl/cpu` is intentionally not treated as CPU intent. pip does not rank indexes, so it does not guarantee the CPU build is selected.
 
+CPU index/backend environment settings are read from the effective workflow, job, and step environment, including step-level `UV_TORCH_BACKEND` and `PIP_INDEX_URL`. A setting on another step does not apply to this install.
+
 ## Suggested action
 
 Install the CPU-only PyTorch build on CPU runners, for example with `--index-url https://download.pytorch.org/whl/cpu` or a matching CPU index or find-links for the pinned version. A `+cpu` version pin alone is not enough without the CPU index or find-links.

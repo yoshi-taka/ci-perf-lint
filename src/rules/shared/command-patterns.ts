@@ -41,3 +41,46 @@ export function lineColumnForIndex(text: string, index: number): { line: number;
     column: lines.at(-1)?.length ? lines.at(-1)!.length + 1 : 1,
   };
 }
+
+/** Separate simple shell commands without splitting quoted arguments or continuations. */
+export function shellCommandSegments(text: string): string[] {
+  const commands: string[] = [];
+  let command = "";
+  let quote = "";
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index]!;
+    if (char === "\\" && quote !== "'") {
+      const next = text[++index];
+      if (next !== "\n") {
+        command += char + (next ?? "");
+      }
+      continue;
+    }
+    if (quote) {
+      command += char;
+      if (char === quote) {
+        quote = "";
+      }
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      command += char;
+    } else if (char === "#" && (command === "" || /\s$/.test(command))) {
+      while (index + 1 < text.length && text[index + 1] !== "\n") {
+        index++;
+      }
+    } else if (char === "\n" || char === ";" || char === "&" || char === "|") {
+      if (command.trim()) {
+        commands.push(command.trim());
+      }
+      command = "";
+    } else {
+      command += char;
+    }
+  }
+  if (command.trim()) {
+    commands.push(command.trim());
+  }
+  return commands;
+}

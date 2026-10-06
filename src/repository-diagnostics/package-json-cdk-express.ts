@@ -4,14 +4,13 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import {
-  AWS_CDK_CLI_PACKAGE,
   CDK_EXPRESS_MEASUREMENT_HINT,
   CDK_EXPRESS_SUGGESTION,
   CDK_EXPRESS_UPGRADE_SUGGESTION,
   CDK_EXPRESS_WHY,
   cdkVersionIsBelowExpressFloor,
   formatSemver,
-  parseDependencyVersionSpec,
+  readCdkCliVersionFromScanContext,
   scriptNameLooksDevelopment,
   textDeploysCdkWithoutExpress,
 } from "../rules/shared/cdk-express.ts";
@@ -79,12 +78,7 @@ export async function collectPackageJsonCdkExpressDiagnostics(
     return [];
   }
 
-  const dependencies = {
-    ...asRecord(packageJson?.dependencies),
-    ...asRecord(packageJson?.devDependencies),
-  };
-  const declared = dependencies[AWS_CDK_CLI_PACKAGE];
-  const version = parseDependencyVersionSpec(typeof declared === "string" ? declared : undefined);
+  const version = await readCdkCliVersionFromScanContext(context);
   const needsUpgrade = cdkVersionIsBelowExpressFloor(version);
   const versionLabel = version ? formatSemver(version) : undefined;
 

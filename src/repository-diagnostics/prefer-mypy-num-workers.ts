@@ -5,6 +5,8 @@ import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { parseSemverLikeVersionSpec } from "../repository-package-helpers.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import { detectInstalledMypyVersion } from "./mypy-version.ts";
+import { shellCommandSegments } from "../rules/shared/command-patterns.ts";
+import { effectiveStepEnvironment } from "../rules/shared/workflow-env.ts";
 
 const meta = {
   id: "prefer-mypy-num-workers",
@@ -17,27 +19,39 @@ const INSTALL_COMMAND = /\b(?:pip|pip3|pipx|uv|poetry|pipenv)\s+(?:install|add|s
 
 const NON_CHECK_COMMAND = /(?:--version|--help)\b/;
 
-const PARALLEL_FLAG =
-  /(?:--num-workers(?:=|\s+)(?:auto|[1-9]\d*)|\s-n(?:=|\s+)?(?:auto|[1-9]\d*)(?:\s|$))/;
+const PARALLEL_FLAG = /(?:^|\s)(?:--num-workers(?:=|\s+)|-n(?:=|\s+)?)(auto|\d+)(?=\s|$)/g;
 
-const NUM_WORKERS_SETTING = /\bnum_workers\s*=\s*(?:auto|[1-9]\d*)\b/i;
+function parallelValue(value: unknown, supportsAuto: boolean): boolean {
+  return (supportsAuto && value === "auto") || /^[1-9]\d*$/.test(String(value));
+}
 
-const MYPY_NUM_WORKERS_ENV = /MYPY_NUM_WORKERS\s*[=:]\s*["']?(?:auto|[1-9]\d*)\b/;
-
-async function configEnablesParallel(context: RepositoryScanContext): Promise<boolean> {
+async function configEnablesParallel(
+  context: RepositoryScanContext,
+  supportsAuto: boolean,
+): Promise<boolean> {
   for (const fileName of ["mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cfg"]) {
+    if (!(await context.pathExists(context.resolve(fileName)))) {
+      continue;
+    }
     const text = await context.readTextFileOrWarn(context.resolve(fileName));
-    if (text && NUM_WORKERS_SETTING.test(text)) {
-      return true;
+    let inMypy = false;
+    let hasMypy = false;
+    for (const line of (text ?? "").split("\n")) {
+      const section = /^\s*\[([^\]]+)\]/.exec(line);
+      if (section) {
+        inMypy = section[1] === "mypy" || section[1] === "tool.mypy";
+        hasMypy ||= inMypy;
+      }
+      const value = inMypy ? /^\s*num_workers\s*=\s*["']?(auto|\d+)\b/.exec(line)?.[1] : undefined;
+      if (value !== undefined) {
+        return parallelValue(value, supportsAuto);
+      }
+    }
+    if (hasMypy) {
+      return false;
     }
   }
   return false;
-}
-
-function workflowEnablesParallel(workflows: WorkflowDocument[]): boolean {
-  return workflows.some(
-    (workflow) => workflow.source !== undefined && MYPY_NUM_WORKERS_ENV.test(workflow.source),
-  );
 }
 
 export async function collectPreferMypyNumWorkersDiagnostics(
@@ -54,14 +68,13 @@ export async function collectPreferMypyNumWorkersDiagnostics(
     return [];
   }
 
-  const { major } = parseSemverLikeVersionSpec(detected.version);
+  const { major, minor } = parseSemverLikeVersionSpec(detected.version);
   if (major === undefined || major < 2) {
     return [];
   }
 
-  if ((await configEnablesParallel(context)) || workflowEnablesParallel(workflows)) {
-    return [];
-  }
+  const supportsAuto = major > 2 || (minor ?? 0) >= 4;
+  const configured = await configEnablesParallel(context, supportsAuto);
 
   const diagnostics: Diagnostic[] = [];
 
@@ -69,12 +82,31 @@ export async function collectPreferMypyNumWorkersDiagnostics(
     for (const job of workflow.jobs) {
       for (const step of job.steps) {
         const run = step.run ?? "";
-        if (
-          !/\bmypy\b/.test(run) ||
-          INSTALL_COMMAND.test(run) ||
-          NON_CHECK_COMMAND.test(run) ||
-          PARALLEL_FLAG.test(run)
-        ) {
+        const env = effectiveStepEnvironment(workflow, job, step);
+        let workerEnv = env.MYPY_NUM_WORKERS;
+        const untuned = shellCommandSegments(run).some((command) => {
+          const inlineEnv = /\bMYPY_NUM_WORKERS=["']?(auto|\d+)\b/.exec(command)?.[1];
+          if (
+            inlineEnv !== undefined &&
+            (/^export\s+/.test(command) || /^MYPY_NUM_WORKERS=\S+$/.test(command))
+          ) {
+            workerEnv = inlineEnv;
+          }
+          if (
+            !/\bmypy\b/.test(command) ||
+            INSTALL_COMMAND.test(command) ||
+            NON_CHECK_COMMAND.test(command)
+          ) {
+            return false;
+          }
+          const flag = [...command.matchAll(PARALLEL_FLAG)].at(-1)?.[1];
+          if (flag !== undefined) {
+            return !parallelValue(flag, supportsAuto);
+          }
+          const value = inlineEnv ?? workerEnv;
+          return value !== undefined ? !parallelValue(value, supportsAuto) : !configured;
+        });
+        if (!untuned) {
           continue;
         }
 
@@ -87,8 +119,9 @@ export async function collectPreferMypyNumWorkersDiagnostics(
             },
             message: `mypy ${detected.version} is installed, but this CI command runs mypy without parallel workers.`,
             why: "mypy 2.0 supports experimental parallel type checking. With --num-workers mypy type-checks independent module groups in separate processes and has shown up to 5x speedups with 8 workers on large projects. Parallel checking is opt-in (default is 0, i.e. disabled), so upgrading alone does not capture the speedup.",
-            suggestion:
-              "Add --num-workers to the mypy command (for example, --num-workers 8 or --num-workers auto), or set num_workers = auto in mypy.ini, pyproject.toml [tool.mypy], or setup.cfg [mypy].",
+            suggestion: supportsAuto
+              ? 'Add --num-workers auto (or a fixed count such as 8) to the mypy command. Alternatively, set num_workers = auto in mypy.ini/setup.cfg, or num_workers = "auto" in pyproject.toml [tool.mypy].'
+              : "Add --num-workers with a fixed integer (for example, --num-workers 8), or set num_workers = 8 in the mypy configuration. Automatic worker selection requires mypy 2.4 or later.",
             measurementHint:
               "Compare mypy wall-clock time with and without --num-workers. Tune the worker count from 3-4 upward; more workers than physical CPU cores is not beneficial.",
             aiHandoff: `Review ${workflow.relativePath} and add --num-workers to the mypy command (or set num_workers in the mypy configuration). Verify no report generation is combined with parallel mode, then re-run the job to confirm type-check results are unchanged.`,

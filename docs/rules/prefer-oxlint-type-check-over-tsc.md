@@ -12,10 +12,10 @@ Oxlint's type-aware mode runs the TypeScript type checker (tsgolint) inside the 
 
 The rule reports a separate tsc type-check path when the repository already uses oxlint:
 
-- GitHub Actions steps whose shell command runs `tsc --noEmit`, `tsc -b`, or `tsc --build`.
+- GitHub Actions steps whose shell command explicitly runs `tsc --noEmit` (or `--noEmit true`).
 - `package.json` scripts (for example `typecheck`, `type-check`, `check:types`) that run the same commands.
 
-It only fires when oxlint is a repository dependency. Declaration/build emit that is separate from type checking (`tsc` without `--noEmit`/`--build`) is not flagged, and `vue-tsc` / `svelte-check` are intentionally out of scope because their coverage over `.vue` / `.svelte` files is not equivalent.
+It only fires when oxlint is a repository dependency. `tsc -b` / `tsc --build` can emit JavaScript and declarations, so they are not flagged without explicit `--noEmit`. `--noEmit false` is also excluded. `vue-tsc` / `svelte-check` are intentionally out of scope because their coverage over `.vue` / `.svelte` files is not equivalent.
 
 ## Prerequisites
 

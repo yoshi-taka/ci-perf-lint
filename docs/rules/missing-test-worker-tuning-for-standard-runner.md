@@ -29,6 +29,8 @@ The rule looks for:
 
 It intentionally ignores custom runners, larger runners, self-hosted runners, and wrapper scripts where CPU shape is not obvious from workflow YAML.
 
+Config evidence is specific to the test runner. Jest settings do not suppress Playwright, Vitest, or pytest findings. Root configs apply to root commands, or an explicit matching config path; they do not prove tuning for another package's working directory or a different `--config` file.
+
 ## When to ignore it
 
 Ignore this finding when:

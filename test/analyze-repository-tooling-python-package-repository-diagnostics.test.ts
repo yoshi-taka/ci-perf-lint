@@ -624,7 +624,7 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
 
       await mkdir(workflowDir, { recursive: true });
       await writeFile(path.join(fixtureRoot, "requirements-dev.txt"), "mypy==2.0.0\n");
-      await writeFile(path.join(fixtureRoot, "mypy.ini"), "[mypy]\nnum_workers = auto\n");
+      await writeFile(path.join(fixtureRoot, "mypy.ini"), "[mypy]\nnum_workers = 8\n");
       await writeFile(path.join(workflowDir, "ci.yml"), ciWorkflow("mypy src"));
 
       const report = await analyzeRepository({

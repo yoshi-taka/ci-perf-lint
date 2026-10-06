@@ -175,7 +175,8 @@ export async function collectFrameworkSignals(
   let usesLerna = false;
   let usesGradle = false;
   let gradleBuildCacheConfigured = false;
-  let testWorkerTuningConfigured = false;
+  const testWorkerTuningConfigured: RepositorySignals["frameworks"]["testWorkerTuningConfigured"] =
+    {};
   let usesAngularCli = false;
   let angularCliCacheEnabledForCi = false;
   let usesRails = false;
@@ -267,18 +268,26 @@ export async function collectFrameworkSignals(
     }
   }
 
-  testWorkerTuningConfigured = packageJsonJestTunesWorkers(packageJsonEntry.value);
-  if (!testWorkerTuningConfigured) {
-    const testWorkerConfigFiles = await loadExistingRootFiles(context, testWorkerConfigFileNames);
-    for (const { text: configText } of testWorkerConfigFiles) {
-      if (
-        JS_TEST_WORKER_SETTING.test(configText) ||
-        PLAYWRIGHT_WORKER_SETTING.test(configText) ||
-        pytestAddoptsTuneWorkers(configText)
-      ) {
-        testWorkerTuningConfigured = true;
-        break;
-      }
+  if (packageJsonJestTunesWorkers(packageJsonEntry.value)) {
+    testWorkerTuningConfigured.jest = ["package.json"];
+  }
+  const testWorkerConfigFiles = await loadExistingRootFiles(context, testWorkerConfigFileNames);
+  for (const { fileName, text: configText } of testWorkerConfigFiles) {
+    const tool = fileName.startsWith("jest.config")
+      ? "jest"
+      : /^(?:vitest|vite)\.config/.test(fileName)
+        ? "vitest"
+        : fileName.startsWith("playwright.config")
+          ? "playwright"
+          : "pytest";
+    const configured =
+      tool === "pytest"
+        ? pytestAddoptsTuneWorkers(configText)
+        : tool === "playwright"
+          ? PLAYWRIGHT_WORKER_SETTING.test(configText)
+          : JS_TEST_WORKER_SETTING.test(configText);
+    if (configured) {
+      (testWorkerTuningConfigured[tool] ??= []).push(fileName);
     }
   }
 

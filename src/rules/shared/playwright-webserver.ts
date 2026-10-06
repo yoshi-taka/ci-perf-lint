@@ -30,7 +30,7 @@ function skipComment(text: string, start: number): number | undefined {
   }
   if (text[start] === "/" && text[start + 1] === "*") {
     const end = text.indexOf("*/", start + 2);
-    return end === -1 ? text.length : end + 1;
+    return end === -1 ? text.length : end + 2;
   }
   return undefined;
 }
@@ -91,6 +91,11 @@ function readValueExpression(block: string, start: number): string | undefined {
       index = skipString(block, index);
       continue;
     }
+    const commentEnd = skipComment(block, index);
+    if (commentEnd !== undefined) {
+      index = commentEnd;
+      continue;
+    }
     if (char === "(" || char === "[" || char === "{") {
       depth += 1;
     } else if (char === ")" || char === "]" || char === "}") {
@@ -105,6 +110,40 @@ function readValueExpression(block: string, start: number): string | undefined {
   }
   const value = block.slice(start, index);
   return value.trim().length === 0 ? undefined : value;
+}
+
+// Scan keys outside comments and string values, preserving original source offsets.
+function findPropertyValue(text: string, key: string, start = 0): number | undefined {
+  for (let index = start; index < text.length; index++) {
+    const commentEnd = skipComment(text, index);
+    if (commentEnd !== undefined) {
+      index = commentEnd - 1;
+      continue;
+    }
+    const char = text[index];
+    let end = index;
+    if (char === "'" || char === '"' || char === "`") {
+      end = skipString(text, index);
+      if (text.slice(index + 1, end - 1) !== key) {
+        index = end - 1;
+        continue;
+      }
+    } else if (
+      text.startsWith(key, index) &&
+      !/[\w$]/.test(text[index - 1] ?? "") &&
+      !/[\w$]/.test(text[index + key.length] ?? "")
+    ) {
+      end = index + key.length;
+    } else {
+      continue;
+    }
+    const colon = /^\s*:\s*/.exec(text.slice(end));
+    if (colon) {
+      return end + colon[0].length;
+    }
+    index = end - 1;
+  }
+  return undefined;
 }
 
 function stripOuterQuotes(value: string): string {
@@ -145,12 +184,12 @@ function resolveCiBranch(expression: string): { text: string; offset: number } {
 }
 
 export function extractWebServerCommands(configText: string): WebServerCommand[] {
-  const webServerMatch = /\bwebServer\s*:/.exec(configText);
-  if (!webServerMatch) {
+  const webServerValue = findPropertyValue(configText, "webServer");
+  if (webServerValue === undefined) {
     return [];
   }
 
-  const openIndex = findBlockOpen(configText, webServerMatch.index + webServerMatch[0].length);
+  const openIndex = findBlockOpen(configText, webServerValue);
   if (openIndex === -1) {
     return [];
   }
@@ -161,13 +200,12 @@ export function extractWebServerCommands(configText: string): WebServerCommand[]
 
   const block = configText.slice(openIndex, closeIndex + 1);
   const commands: WebServerCommand[] = [];
-  const commandPattern = /\bcommand\s*:\s*/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = commandPattern.exec(block)) !== null) {
-    const valueStart = match.index + match[0].length;
+  let searchStart = 0;
+  let valueStart: number | undefined;
+  while ((valueStart = findPropertyValue(block, "command", searchStart)) !== undefined) {
     const expression = readValueExpression(block, valueStart);
     if (!expression) {
+      searchStart = valueStart + 1;
       continue;
     }
 
@@ -178,7 +216,7 @@ export function extractWebServerCommands(configText: string): WebServerCommand[]
       commands.push({ command, line: location.line, column: location.column });
     }
 
-    commandPattern.lastIndex = valueStart + expression.length;
+    searchStart = valueStart + expression.length;
   }
 
   return commands;

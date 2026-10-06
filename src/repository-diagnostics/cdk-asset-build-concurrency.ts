@@ -71,13 +71,13 @@ export async function collectCdkAssetBuildConcurrencyDiagnostics(
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
 
-  const assetCount = await countCdkDockerAssets(context);
-  if (assetCount < 2) {
+  const offender = findDeployStepWithoutConcurrency(workflows);
+  if (!offender) {
     return [];
   }
 
-  const offender = findDeployStepWithoutConcurrency(workflows);
-  if (!offender) {
+  const assetCount = await countCdkDockerAssets(context);
+  if (assetCount < 2) {
     return [];
   }
 

@@ -21,7 +21,7 @@ export function eslintVersionIsPromotableToConcurrency(major?: number, minor?: n
     return false;
   }
   if (major !== ESLINT_CONCURRENCY_MAJOR) {
-    return major > ESLINT_CONCURRENCY_MAJOR;
+    return false;
   }
   return (minor ?? 0) < ESLINT_CONCURRENCY_MINOR;
 }

@@ -1,11 +1,11 @@
 import type { RepositoryScanContext } from "../../repository-scan-context.ts";
 import type { RuleContext } from "../../rule-engine.ts";
-import type { WorkflowDocument, WorkflowJob } from "../../workflow.ts";
-import { parse as parseLockfile, type PackageJsonLike, type ParsedLockFile } from "lockparse";
+import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../../workflow.ts";
+import { parse as parseLockfile, type ParsedLockFile } from "lockparse";
 import { workflowLooksReleaseLike } from "./workflow-jobs.ts";
 import { getTriggerSemantics } from "./workflow-triggers.ts";
 
-export const AWS_CDK_CLI_PACKAGE = "aws-cdk";
+const AWS_CDK_CLI_PACKAGE = "aws-cdk";
 
 const AWS_CDK_LIB_PACKAGE = "aws-cdk-lib";
 
@@ -25,7 +25,7 @@ const EXPRESS_FLAG = /(?:^|\s)--express(?=\s|=|$)/;
 
 const EXACT_VERSION_SPEC = /^[=v]?\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/;
 
-export function parseDependencyVersionSpec(spec: string | undefined): SemverTuple | undefined {
+function parseDependencyVersionSpec(spec: string | undefined): SemverTuple | undefined {
   if (!spec) {
     return undefined;
   }
@@ -154,14 +154,22 @@ const LOCKFILE_FILENAMES = [
   "bun.lock",
 ] as const;
 
-const lockfileParseCache = new Map<string, Promise<ParsedLockFile | undefined>>();
+const lockfileParseCache = new WeakMap<
+  RepositoryScanContext,
+  Map<string, Promise<ParsedLockFile | undefined>>
+>();
 
 async function parseLockfileCached(
   scanContext: RepositoryScanContext,
   fileName: string,
 ): Promise<ParsedLockFile | undefined> {
   const lockfilePath = scanContext.resolve(fileName);
-  const cached = lockfileParseCache.get(lockfilePath);
+  let cache = lockfileParseCache.get(scanContext);
+  if (!cache) {
+    cache = new Map();
+    lockfileParseCache.set(scanContext, cache);
+  }
+  const cached = cache.get(lockfilePath);
   if (cached) {
     return cached;
   }
@@ -176,12 +184,24 @@ async function parseLockfileCached(
     }
     const packageJson = (await scanContext.loadPackageJson()).value;
     try {
-      return await parseLockfile(text, fileName, packageJson);
+      // lockparse links Yarn root dependencies through npm: descriptors, including v1.
+      const input =
+        fileName === "yarn.lock" && text.includes("yarn lockfile v1")
+          ? text.replace(
+              /^([^\s#][^\n]*):$/gm,
+              (_, selectors: string) =>
+                `${selectors
+                  .split(", ")
+                  .map((selector) => selector.replace(/^(["']?@?[^@\s"']+)@(?!npm:)/, "$1@npm:"))
+                  .join(", ")}:`,
+            )
+          : text;
+      return await parseLockfile(input, fileName, packageJson);
     } catch {
       return undefined;
     }
   })();
-  lockfileParseCache.set(lockfilePath, load);
+  cache.set(lockfilePath, load);
   return load;
 }
 
@@ -198,18 +218,20 @@ async function readInstalledDependencyVersion(
     if (!lockfile) {
       continue;
     }
-    let best: SemverTuple | undefined;
-    for (const dependency of lockfile.packages) {
+    const rootDependencies = [
+      ...lockfile.root.dependencies,
+      ...lockfile.root.devDependencies,
+      ...lockfile.root.optionalDependencies,
+      ...lockfile.root.peerDependencies,
+    ];
+    for (const dependency of rootDependencies) {
       if (dependency.name !== packageName) {
         continue;
       }
       const version = parseDependencyVersionSpec(dependency.version);
-      if (version && (!best || compareSemver(version, best) > 0)) {
-        best = version;
+      if (version) {
+        return version;
       }
-    }
-    if (best) {
-      return best;
     }
   }
   return undefined;
@@ -245,19 +267,38 @@ export function readCdkLibVersionFromScanContext(
   return readDeclaredDependencyVersion(scanContext, AWS_CDK_LIB_PACKAGE);
 }
 
-export async function resolveCdkCliVersion(
-  workflow: WorkflowDocument,
+async function resolveCdkCliVersion(
+  job: WorkflowJob,
   context: RuleContext,
+  targetStep: WorkflowStep,
 ): Promise<SemverTuple | undefined> {
-  for (const job of workflow.jobs) {
-    for (const step of job.steps) {
-      const version = extractCdkCliVersionFromText(step.run ?? "");
-      if (version) {
-        return version;
-      }
+  let version: SemverTuple | undefined;
+  for (const step of job.steps) {
+    version = extractCdkCliVersionFromText(step.run ?? "") ?? version;
+    if (step === targetStep) {
+      break;
     }
   }
-  return readCdkCliVersionFromScanContext(context.scanContext);
+  return version ?? readCdkCliVersionFromScanContext(context.scanContext);
+}
+
+export async function groupCdkStepsByCliVersion(
+  job: WorkflowJob,
+  context: RuleContext,
+  steps: WorkflowStep[],
+): Promise<{ version: SemverTuple | undefined; steps: WorkflowStep[] }[]> {
+  const groups = new Map<string, { version: SemverTuple | undefined; steps: WorkflowStep[] }>();
+  for (const step of steps) {
+    const version = await resolveCdkCliVersion(job, context, step);
+    const key = version ? formatSemver(version) : "unknown";
+    const group = groups.get(key);
+    if (group) {
+      group.steps.push(step);
+    } else {
+      groups.set(key, { version, steps: [step] });
+    }
+  }
+  return [...groups.values()];
 }
 
 const DEV_SCRIPT_TOKEN = /(?:^|[:_-])(?:dev|development|sandbox|preview)(?:$|[:_-])/i;

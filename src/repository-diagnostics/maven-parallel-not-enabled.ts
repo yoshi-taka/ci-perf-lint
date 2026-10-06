@@ -84,6 +84,14 @@ export async function collectMavenParallelNotEnabledDiagnostics(
     return [];
   }
 
+  const configPath = context.scanContext.resolve(".mvn", "maven.config");
+  if (await context.scanContext.pathExists(configPath)) {
+    const config = await context.scanContext.readTextFileOrWarn(configPath);
+    if (config && PARALLEL_FLAG.test(config.replace(/^\s*#.*$/gm, ""))) {
+      return [];
+    }
+  }
+
   const multiModule =
     (await rootPomHasModules(context.scanContext)) ||
     (await countPomFiles(context.scanContext)) >= 2;

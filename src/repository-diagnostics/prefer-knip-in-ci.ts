@@ -64,6 +64,16 @@ export async function collectPreferKnipInCiDiagnostics(
   if (/"knip"\s*:/.test(packageJsonEntry.text ?? "")) {
     return [];
   }
+  const scripts = packageJson.scripts;
+  if (
+    scripts &&
+    typeof scripts === "object" &&
+    Object.values(scripts).some(
+      (command) => typeof command === "string" && KNIP_COMMAND.test(command),
+    )
+  ) {
+    return [];
+  }
 
   if (context.workflows.some((workflow) => KNIP_COMMAND.test(workflow.source ?? ""))) {
     return [];

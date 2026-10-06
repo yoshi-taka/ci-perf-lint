@@ -14,7 +14,9 @@ mypy 2.0 supports experimental parallel type checking. With `--num-workers` mypy
 
 ## Suggested action
 
-Add `--num-workers` to the mypy command (for example `--num-workers 8` or `--num-workers auto`), or set `num_workers = auto` in the mypy configuration. Tune the worker count from 3-4 upward; using more workers than physical CPU cores is not beneficial.
+For mypy 2.0–2.3, use a fixed integer, such as `--num-workers 8` or `num_workers = 8`. mypy 2.4+ also supports `--num-workers auto`. In TOML, quote the automatic value: `[tool.mypy]` with `num_workers = "auto"`; INI files use `num_workers = auto`. Tune fixed counts from 3-4 upward; using more workers than physical CPU cores is not beneficial.
+
+Commands are checked individually, including a mypy invocation following an install in the same step. Worker environment values apply only to the workflow/job/step that inherits them.
 
 ## Measurement
 

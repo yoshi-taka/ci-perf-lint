@@ -115,7 +115,7 @@ function emptySignals(): RepositorySignals {
       usesLerna: false,
       usesGradle: false,
       gradleBuildCacheConfigured: false,
-      testWorkerTuningConfigured: false,
+      testWorkerTuningConfigured: {},
       usesAngularCli: false,
       angularCliCacheEnabledForCi: false,
       usesRails: false,

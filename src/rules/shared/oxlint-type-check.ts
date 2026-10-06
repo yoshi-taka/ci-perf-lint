@@ -4,16 +4,16 @@ const minOxlintMajor = 1;
 const minOxlintMinor = 51;
 
 const tscCommandPattern = /(?<![\w-])tsc\b([^\n;&|]*)/gi;
-const tscNoEmitPattern = /--noEmit\b/;
-const tscBuildPattern = /(?:^|\s)(?:-b|--build)(?=\s|$)/;
+const tscNoEmitPattern = /(?:^|\s)--noEmit(?:\s+(true|false))?(?=\s|$)/g;
 
-/** True when shell text runs `tsc` in a type-check-only mode (`--noEmit`, `-b`, `--build`). */
+/** Only explicit --noEmit proves that replacing tsc will not remove build output. */
 export function textRunsTscTypeCheck(text: string): boolean {
   tscCommandPattern.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = tscCommandPattern.exec(text))) {
     const rest = match[1] ?? "";
-    if (tscNoEmitPattern.test(rest) || tscBuildPattern.test(rest)) {
+    const flags = [...rest.matchAll(tscNoEmitPattern)];
+    if (flags.length > 0 && flags.at(-1)?.[1] !== "false") {
       return true;
     }
   }
