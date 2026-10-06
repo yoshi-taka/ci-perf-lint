@@ -176,6 +176,8 @@ const fixtureNames = {
   nextjs13MinorOk: "nextjs-13-minor-ok",
   nextjs14MinorLike: "nextjs-14-minor-like",
   nextjs14MinorOk: "nextjs-14-minor-ok",
+  nextjs16MinorLike: "nextjs-16-minor-like",
+  nextjs16MinorOk: "nextjs-16-minor-ok",
   npmCiOk: "npm-ci-ok",
   npmCiOverNpmInstallLike: "npm-ci-over-npm-install-like",
   npmInstallWithPackageLike: "npm-install-with-package-like",

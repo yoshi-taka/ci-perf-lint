@@ -117,8 +117,22 @@ const configs: NextjsMilestoneConfig[] = [
     score: 54,
     why: "Next.js 14.2 is the main 14.x CI/build milestone: it explicitly targets lower build memory usage, CSS optimizations, and production and caching improvements. Those map directly to common CI pain points such as memory-heavy builds and slow CSS processing.",
   },
+  {
+    id: "prefer-nextjs-16-minor-performance-milestone",
+    docsPath: "docs/rules/prefer-nextjs-16-minor-performance-milestone.md",
+    major: 16,
+    targetMinor: 3,
+    message: "",
+    suggestion: "",
+    measurementHint:
+      "Compare `next build` wall-clock time across repeated runs with and without a restored `.next/cache` before and after upgrading to Next.js 16.3.x.",
+    aiHandoff: "",
+    score: 52,
+    why: "Next.js 16.3 enables Turbopack's persistent filesystem cache for `next build` by default, so repeat CI builds can reuse prior work (Vercel reports up to 5.5x faster repeat builds when `.next/cache` is restored between runs). It also cuts `next dev` memory use by up to 90% and adds TypeScript 7 type checking. The 16.1 and 16.2 releases mostly improved the dev server rather than production builds.",
+  },
 ];
 
 export const preferNextjs12MinorPerformanceMilestoneRule = createNextjsMilestoneRule(configs[0]!);
 export const preferNextjs13MinorPerformanceMilestoneRule = createNextjsMilestoneRule(configs[1]!);
 export const preferNextjs14MinorPerformanceMilestoneRule = createNextjsMilestoneRule(configs[2]!);
+export const preferNextjs16MinorPerformanceMilestoneRule = createNextjsMilestoneRule(configs[3]!);

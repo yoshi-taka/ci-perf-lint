@@ -78,6 +78,7 @@ import {
   preferNextjs12MinorPerformanceMilestoneRule,
   preferNextjs13MinorPerformanceMilestoneRule,
   preferNextjs14MinorPerformanceMilestoneRule,
+  preferNextjs16MinorPerformanceMilestoneRule,
 } from "./prefer-nextjs-minor-performance-milestone.ts";
 import {
   preferStorybook6MinorPerformanceMilestoneRule,
@@ -184,6 +185,7 @@ export const allRules = [
   preferNextjs12MinorPerformanceMilestoneRule,
   preferNextjs13MinorPerformanceMilestoneRule,
   preferNextjs14MinorPerformanceMilestoneRule,
+  preferNextjs16MinorPerformanceMilestoneRule,
   preferPython311Rule,
   preferRailsPerformanceMilestoneRule,
   preferRuby3YjitRule,

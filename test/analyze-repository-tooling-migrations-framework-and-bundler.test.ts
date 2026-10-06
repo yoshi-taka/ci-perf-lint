@@ -117,6 +117,14 @@ describe("migrations: framework milestones and bundler migration", () => {
       why: ["lower build memory usage", "CSS optimizations"],
     },
     {
+      name: "Next.js 16.3 from older 16.x builds",
+      fixture: fixtures.nextjs16MinorLike,
+      ruleId: "prefer-nextjs-16-minor-performance-milestone",
+      message: "below the 16.3 build-performance milestone",
+      suggestion: "at least 16.3.x",
+      why: ["filesystem cache for `next build`"],
+    },
+    {
       name: "Storybook 6.5 from older 6.x builds",
       fixture: fixtures.storybook6MinorLike,
       ruleId: "prefer-storybook-6-minor-performance-milestone",
@@ -180,6 +188,11 @@ describe("migrations: framework milestones and bundler migration", () => {
       name: "Next.js 14 once already on 14.2",
       fixture: fixtures.nextjs14MinorOk,
       ruleId: "prefer-nextjs-14-minor-performance-milestone",
+    },
+    {
+      name: "Next.js 16 once already on 16.3",
+      fixture: fixtures.nextjs16MinorOk,
+      ruleId: "prefer-nextjs-16-minor-performance-milestone",
     },
     {
       name: "Storybook 6 once already on 6.5",
