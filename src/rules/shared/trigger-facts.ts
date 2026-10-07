@@ -52,7 +52,17 @@ export interface PullRequestTriggerFacts {
 
 function getOnRecord(workflow: WorkflowDocument): Record<string, unknown> | undefined {
   const { on } = workflow;
-  if (!on || typeof on !== "object" || Array.isArray(on)) {
+  if (typeof on === "string") {
+    return { [on]: null };
+  }
+  if (Array.isArray(on)) {
+    return Object.fromEntries(
+      on
+        .filter((event): event is string => typeof event === "string")
+        .map((event) => [event, null]),
+    );
+  }
+  if (!on || typeof on !== "object") {
     return undefined;
   }
   return on as Record<string, unknown>;

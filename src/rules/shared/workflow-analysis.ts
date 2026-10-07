@@ -10,6 +10,7 @@ import { getStepFacts } from "./step-facts.ts";
 import { getRunsOnSpec } from "./runs-on-facts.ts";
 import { detectLintTool, detectPythonTool } from "./tools.ts";
 import { detectToolPresence } from "./tool-presence-automaton.ts";
+import { collectCommandEntries } from "./any-step.ts";
 
 const dockerBuildxBakePattern = /\bdocker\s+buildx\s+bake\b|\bdocker-buildx\s+bake\b/i;
 const dockerBuildPattern = /\bdocker\s+build\b/i;
@@ -84,7 +85,7 @@ export interface WorkflowFacts {
 }
 
 const jobFactsCache = new WeakMap<WorkflowJob, JobFacts>();
-const workflowFactsCache = new WeakMap<WorkflowDocument, WorkflowFacts>();
+const workflowFactsCache = new WeakMap<AnyWorkflowDocument, WorkflowFacts>();
 
 const emptyTriggerFacts: TriggerFacts = {
   events: new Set(),
@@ -318,8 +319,22 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
 }
 
 export function getWorkflowFacts(workflow: AnyWorkflowDocument): WorkflowFacts {
+  const existing = workflowFactsCache.get(workflow);
+  if (existing) {
+    return existing;
+  }
   if (workflow.kind !== "github-actions") {
-    return emptyWorkflowFacts;
+    const blob = collectCommandEntries(workflow)
+      .map((entry) => entry.text)
+      .join("\n")
+      .toLowerCase();
+    const facts = {
+      ...emptyWorkflowFacts,
+      loweredStepTextBlob: blob,
+      toolPresence: detectToolPresence(blob).presence,
+    };
+    workflowFactsCache.set(workflow, facts);
+    return facts;
   }
 
   const wf: WorkflowDocument = workflow;

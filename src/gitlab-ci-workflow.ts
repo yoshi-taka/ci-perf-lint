@@ -181,6 +181,7 @@ function parseJob(item: YAMLMap<unknown, unknown>, jobName: string): GitlabCiJob
 
   const parallelValue = getScalarString(parallelNode);
   const parallelNum = parallelValue ? parseInt(parallelValue, 10) : undefined;
+  const script = getScalarOrStringArray(scriptNode);
 
   return {
     node: item,
@@ -188,7 +189,7 @@ function parseJob(item: YAMLMap<unknown, unknown>, jobName: string): GitlabCiJob
     nameNode: isNode(item) ? undefined : undefined,
     stage: getScalarString(stageNode),
     stageNode,
-    script: getScalarArray(scriptNode),
+    script: typeof script === "string" ? [script] : script,
     scriptNode,
     image: getScalarString(imageNode),
     imageNode,

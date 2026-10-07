@@ -1,7 +1,7 @@
 import path from "node:path";
 import { readdir } from "node:fs/promises";
 import { analyzeRepository } from "../src/repo.ts";
-import { fixtureCacheKey, saveFixtureCache } from "../test/fixture-cache.ts";
+import { fixtureCacheKey, fixtureFingerprint, saveFixtureCache } from "../test/fixture-cache.ts";
 
 const fixturesDir = path.resolve(import.meta.dir, "..", "test", "fixtures");
 const modes = ["strict", "exploratory"] as const;
@@ -22,8 +22,9 @@ async function main() {
         continue;
       }
 
+      const fingerprint = await fixtureFingerprint(dir);
       const result = await analyzeRepository({ cwd: dir, targetPath: ".", topCount: 20, mode });
-      await saveFixtureCache(key, result);
+      await saveFixtureCache(key, result, fingerprint);
       computed++;
       process.stderr.write(`cached ${path.basename(dir)} (${mode})\n`);
     }
@@ -40,4 +41,7 @@ async function loadCached(key: string): Promise<boolean> {
   return data !== null;
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

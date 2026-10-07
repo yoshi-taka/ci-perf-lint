@@ -16,7 +16,6 @@ import {
   repositoryLooksPytestHeavy,
 } from "./imports-shared.ts";
 import { meetsMinimum } from "../rules/shared/evidence.ts";
-import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 
@@ -297,15 +296,11 @@ function buildJavaScriptGateObservations(
 ): JavaScriptGateObservations {
   const { eslint, husky, frameworks, babel, typescript, jest, npm, nativePackages, prettier } =
     context.repository;
-  const workflowHasEslintSignal = context.workflows.some(
-    (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasEslintSignal") ?? false,
-  );
-  const workflowHasWebpackOrRspackOrBabel = context.workflows.some(
-    (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasWebpackOrRspackOrBabel") ?? false,
-  );
-  const workflowHasPackageManagerSignal = context.workflows.some(
-    (workflow) => getWorkflowFacts(workflow).toolPresence.get("hasNpmOrPnpmOrYarnOrBun") ?? false,
-  );
+  const workflowHasEslintSignal = context.featureIndex.toolPresence.get("hasEslintSignal") ?? false;
+  const workflowHasWebpackOrRspackOrBabel =
+    context.featureIndex.toolPresence.get("hasWebpackOrRspackOrBabel") ?? false;
+  const workflowHasPackageManagerSignal =
+    context.featureIndex.toolPresence.get("hasNpmOrPnpmOrYarnOrBun") ?? false;
 
   return {
     tooling:

@@ -271,6 +271,24 @@ export async function evaluateRulesCoarseToFine(
     return [];
   }
 
+  const byKind = new Map<AnyWorkflowDocument["kind"], AnyWorkflowDocument[]>();
+  for (const workflow of workflows) {
+    const group = byKind.get(workflow.kind);
+    if (group) {
+      group.push(workflow);
+    } else {
+      byKind.set(workflow.kind, [workflow]);
+    }
+  }
+  if (byKind.size > 1) {
+    const results = await Promise.all(
+      [...byKind.values()].map((group) =>
+        evaluateRulesCoarseToFine(group, context, warnings, findingCounts, ruleFilter),
+      ),
+    );
+    return results.flat();
+  }
+
   const docKind = workflows[0]!.kind;
   const rules = await getRulesForKind(docKind);
   const allRules = rules;

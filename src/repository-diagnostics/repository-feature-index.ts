@@ -1,5 +1,6 @@
 import type { AnalysisWarning } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
+import type { AnyWorkflowDocument } from "../ci-types.ts";
 import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { DockerBuildTarget, CollectedDockerfileData } from "./docker-build-targets.ts";
@@ -45,6 +46,7 @@ export interface ResourceAccessRecord {
 }
 
 export interface RepositoryFeatureIndex {
+  readonly toolPresence: ReadonlyMap<string, boolean>;
   readonly ecosystems: ReadonlySet<EcosystemFeature>;
   readonly workflowEcosystems: ReadonlyMap<WorkflowDocument, ReadonlySet<EcosystemFeature>>;
   readonly workflowsByEcosystem: ReadonlyMap<EcosystemFeature, readonly WorkflowDocument[]>;
@@ -88,8 +90,10 @@ function computeDockerBuildPresence(blob: string): DockerBuildPresenceFeature {
 
 export function buildRepositoryFeatureIndex(
   workflows: readonly WorkflowDocument[],
+  additionalDocuments: readonly AnyWorkflowDocument[] = [],
 ): RepositoryFeatureIndex {
   const ecosystems = new Set<EcosystemFeature>();
+  const toolPresence = new Map<string, boolean>();
   const workflowEcosystems = new Map<WorkflowDocument, Set<EcosystemFeature>>();
   const workflowsByEcosystem = new Map<EcosystemFeature, WorkflowDocument[]>();
   const workflowFeatures = new Map<WorkflowDocument, WorkflowFeatureMap>();
@@ -104,6 +108,11 @@ export function buildRepositoryFeatureIndex(
     const source = workflow.source;
     const matched = new Set<EcosystemFeature>();
     const tp = wfFacts.toolPresence;
+    for (const [key, present] of tp) {
+      if (present) {
+        toolPresence.set(key, true);
+      }
+    }
 
     for (const [ecosystem, tpKey] of Object.entries(ECOSYSTEM_FEATURES)) {
       if (tp.get(tpKey)) {
@@ -125,11 +134,28 @@ export function buildRepositoryFeatureIndex(
     });
   }
 
+  for (const doc of additionalDocuments) {
+    if (doc.kind === "github-actions") {
+      continue;
+    }
+    const presence = getWorkflowFacts(doc).toolPresence;
+    for (const [key, present] of presence) {
+      if (present) {
+        toolPresence.set(key, true);
+      }
+    }
+    for (const [ecosystem, feature] of Object.entries(ECOSYSTEM_FEATURES)) {
+      if (presence.get(feature)) {
+        ecosystems.add(ecosystem as EcosystemFeature);
+      }
+    }
+  }
+
   const workflowsMatchingSourceCache = new Map<string, readonly WorkflowDocument[]>();
   const workflowsMatchingStepTextCache = new Map<string, readonly WorkflowDocument[]>();
 
   function workflowsMatchingSource(pattern: RegExp): readonly WorkflowDocument[] {
-    const key = pattern.source;
+    const key = `${pattern.source}/${pattern.flags}`;
     const cached = workflowsMatchingSourceCache.get(key);
     if (cached) {
       return cached;
@@ -137,14 +163,14 @@ export function buildRepositoryFeatureIndex(
 
     const result = workflows.filter((w) => {
       const wf = workflowFeatures.get(w);
-      return wf?.sourceText ? pattern.test(wf.sourceText) : false;
+      return wf?.sourceText ? new RegExp(pattern.source, pattern.flags).test(wf.sourceText) : false;
     });
     workflowsMatchingSourceCache.set(key, result);
     return result;
   }
 
   function workflowsMatchingStepText(pattern: RegExp): readonly WorkflowDocument[] {
-    const key = pattern.source;
+    const key = `${pattern.source}/${pattern.flags}`;
     const cached = workflowsMatchingStepTextCache.get(key);
     if (cached) {
       return cached;
@@ -152,7 +178,7 @@ export function buildRepositoryFeatureIndex(
 
     const result = workflows.filter((w) => {
       const wf = workflowFeatures.get(w);
-      return wf ? pattern.test(wf.loweredStepTextBlob) : false;
+      return wf ? new RegExp(pattern.source, pattern.flags).test(wf.loweredStepTextBlob) : false;
     });
     workflowsMatchingStepTextCache.set(key, result);
     return result;
@@ -186,6 +212,7 @@ export function buildRepositoryFeatureIndex(
   const dockerfileDataCache = new Map<string, Promise<CollectedDockerfileData | undefined>>();
 
   return {
+    toolPresence,
     ecosystems,
     workflowEcosystems,
     workflowsByEcosystem,

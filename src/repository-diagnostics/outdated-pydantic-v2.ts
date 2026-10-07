@@ -38,6 +38,11 @@ interface DetectedSpec {
 }
 
 function candidateSpecs(rest: string): string[] {
+  // The requirement may be inside a TOML/Python string or a one-line array.
+  const requirement = rest.match(/^((?:[<>=!~^]+\s*)?\d[^"';\]]*)/);
+  if (requirement?.[1]) {
+    return [requirement[1].trim().replace(/,$/, "")];
+  }
   const quoted = [...rest.matchAll(/["']([^"']+)["']/g)].map((match) => match[1]!);
   if (quoted.length > 0) {
     return quoted;

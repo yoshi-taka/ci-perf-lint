@@ -217,6 +217,13 @@ ci-perf-lint . --show-workflows
 
 Strict mode shows higher-confidence warnings by default. Exploratory mode also includes broader suggestions.
 
+Malformed workflow files are skipped with a warning on stderr; valid workflows continue to be audited.
+JSON stdout remains parseable. Exit status is `0` for no findings, `1` for findings, and `2` for CLI/target errors;
+parse warnings alone do not make the exit status nonzero.
+
+Workflow/action-specific rules have platform-specific coverage. Command evidence from all four CI
+platforms participates in shared repository ecosystem gates and dependency-file diagnostics.
+
 ## Current Scope
 
 CI Perf Lint includes dozens of rules covering:
@@ -247,7 +254,7 @@ It is a static analyzer for CI/CD waste, designed to produce actionable, shareab
 ```sh
 bun run lint
 bun run audit:static
-bun test --parallel
+bun run test
 ```
 
 ## Summary

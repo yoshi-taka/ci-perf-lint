@@ -247,7 +247,7 @@ describe("runCli", () => {
     expect(errors).toEqual([`Unexpected extra positional argument: ${fixtures.cleanNoFindings}`]);
   });
 
-  test("returns an error when a workflow file cannot be parsed as YAML", async () => {
+  test("warns when a workflow file cannot be parsed without failing a clean valid workflow", async () => {
     const fixtureRoot = await tempDirs.create("apl-invalid-workflow-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
     await mkdir(workflowDir, { recursive: true });
@@ -257,7 +257,15 @@ describe("runCli", () => {
     );
     await writeFile(
       path.join(workflowDir, "ok.yml"),
-      ["name: ok", "on: push", "jobs:", "  test:", "    runs-on: ubuntu-latest"].join("\n"),
+      [
+        "name: ok",
+        "on: push",
+        "concurrency: ci",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    timeout-minutes: 10",
+      ].join("\n"),
     );
     await writeFile(
       path.join(workflowDir, "bad.yml"),
@@ -268,7 +276,9 @@ describe("runCli", () => {
     const exitCode = await runCli([fixtureRoot], process.cwd(), logger);
 
     expect(exitCode).toBe(0);
-    expect(errors).toHaveLength(0);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("Warning: Failed to parse workflow");
+    expect(errors[0]).toContain("bad.yml");
   });
 
   test("rejects invalid --format value", async () => {

@@ -299,11 +299,14 @@ export class RepositoryScanContext {
           continue;
         }
 
-        if (prefix === "") {
-          const firstSegment = relativePath.split("/")[0];
-          if (firstSegment !== undefined && ignoredDirectories.has(firstSegment)) {
-            continue;
-          }
+        if (
+          relativePath
+            .replace(/\\/g, "/")
+            .split("/")
+            .slice(0, -1)
+            .some((segment) => ignoredDirectories.has(segment))
+        ) {
+          continue;
         }
 
         if (include(relativePath)) {

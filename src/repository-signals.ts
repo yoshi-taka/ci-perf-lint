@@ -1,4 +1,3 @@
-import { hashContent } from "./hash.ts";
 import type { AnalysisWarning } from "./types.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import {
@@ -9,9 +8,11 @@ import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts
 import { getWorkflowFacts } from "./rules/shared/workflow-analysis.ts";
 import { isHeavyWorkflow } from "./rules/shared/workflows.ts";
 import type { WorkflowDocument } from "./workflow.ts";
+import type { AnyWorkflowDocument } from "./ci-types.ts";
+import { hashContent } from "./hash.ts";
 import { collectFrameworkSignals } from "./repository-framework-signals.ts";
 import { collectRepositoryAuxSignals } from "./repository-signals-aux.ts";
-import { LruMap, RepositoryScanContext } from "./repository-scan-context.ts";
+import { RepositoryScanContext } from "./repository-scan-context.ts";
 import {
   collectBabelSignals,
   collectElixirSignals,
@@ -29,10 +30,14 @@ import {
 } from "./repository-tooling-signals.ts";
 import { collectJvmSignals } from "./repository-jvm-signals.ts";
 
-const repositorySignalsCache = new LruMap<
-  string,
-  Promise<{ fingerprint: string; signals: RepositorySignals; warnings: AnalysisWarning[] }>
->(64);
+const repositorySignalsCache = new WeakMap<
+  RepositoryScanContext,
+  {
+    fingerprint: string;
+    signals: RepositorySignals;
+    warnings: AnalysisWarning[];
+  }
+>();
 
 const eslintEvidenceFiles = [
   ".eslintrc",
@@ -84,13 +89,7 @@ function timingsEnabled(): boolean {
   return process.env.CI_PERF_LINT_TIMINGS === "1";
 }
 
-function workflowFingerprint(workflows: WorkflowDocument[]): string {
-  return workflows
-    .map((w) => `${w.relativePath}:${w.jobs.length}:${hashContent(w.source ?? "")}`)
-    .join("|");
-}
-
-function anyWorkflowHasToolFeature(workflows: WorkflowDocument[], feature: string): boolean {
+function anyWorkflowHasToolFeature(workflows: AnyWorkflowDocument[], feature: string): boolean {
   return workflows.some((wf) => getWorkflowFacts(wf).toolPresence.get(feature) ?? false);
 }
 
@@ -110,7 +109,7 @@ async function anyPathExists(
 
 async function hasPythonSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasPythonSignal")) {
     return true;
@@ -126,7 +125,7 @@ async function hasPythonSignalEvidence(
 
 async function hasRustSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasRustSignal")) {
     return true;
@@ -137,7 +136,7 @@ async function hasRustSignalEvidence(
 
 async function hasElixirSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasElixirSignal")) {
     return true;
@@ -152,7 +151,7 @@ async function hasElixirSignalEvidence(
 
 async function hasJvmSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasFrameworkSignal")) {
     return true;
@@ -187,7 +186,7 @@ async function hasJvmSignalEvidence(
 
 async function hasNativePackageSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasNativePackageSignal")) {
     return true;
@@ -198,7 +197,7 @@ async function hasNativePackageSignalEvidence(
 
 async function hasEslintSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasEslintSignal")) {
@@ -219,7 +218,7 @@ async function hasEslintSignalEvidence(
 
 async function hasPrettierSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasPrettierSignal")) {
@@ -240,7 +239,7 @@ async function hasPrettierSignalEvidence(
 
 async function hasFrameworkSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasFrameworkSignal")) {
@@ -271,7 +270,7 @@ async function hasFrameworkSignalEvidence(
 
 async function hasTypeScriptSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasTypeScriptSignal")) {
@@ -287,7 +286,7 @@ async function hasTypeScriptSignalEvidence(
 
 async function hasJestSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasJestSignal")) {
@@ -303,7 +302,7 @@ async function hasJestSignalEvidence(
 
 async function hasTailwindSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasTailwindSignal")) {
@@ -319,7 +318,7 @@ async function hasTailwindSignalEvidence(
 
 async function hasHuskySignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasHuskySignal")) {
@@ -335,7 +334,7 @@ async function hasHuskySignalEvidence(
 
 async function hasBabelSignalEvidence(
   context: RepositoryScanContext,
-  workflows: WorkflowDocument[],
+  workflows: AnyWorkflowDocument[],
   packageJsonText: string | undefined,
 ): Promise<boolean> {
   if (anyWorkflowHasToolFeature(workflows, "hasBabelSignal")) {
@@ -389,21 +388,24 @@ export async function collectRepositorySignals(
   workflows: WorkflowDocument[],
   sharedJobSummaries: JobSummary[],
   scanContext?: RepositoryScanContext,
+  additionalDocuments: AnyWorkflowDocument[] = [],
 ): Promise<{ signals: RepositorySignals; warnings: AnalysisWarning[] }> {
-  const fingerprint = workflowFingerprint(workflows);
-  const cached = repositorySignalsCache.get(repoRoot);
-  if (cached) {
-    const result = await cached;
-    if (result.fingerprint === fingerprint) {
-      return {
-        signals: result.signals,
-        warnings: [...result.warnings],
-      };
-    }
-  }
-
   const warnings = scanContext?.warnings ?? [];
+  const evidenceWorkflows = [
+    ...workflows,
+    ...additionalDocuments.filter((doc) => doc.kind !== "github-actions"),
+  ];
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings);
+  const fingerprint = evidenceWorkflows
+    .map(
+      (workflow) =>
+        `${workflow.kind}:${workflow.relativePath}:${hashContent(workflow.source ?? "")}`,
+    )
+    .join("|");
+  const cached = repositorySignalsCache.get(context);
+  if (cached?.fingerprint === fingerprint) {
+    return { signals: cached.signals, warnings: [...cached.warnings] };
+  }
   const heavyWorkflowCount = workflows.filter((workflow) => isHeavyWorkflow(workflow)).length;
   const reusableWorkflowJobCount = workflows.reduce(
     (count, workflow) => count + workflow.jobs.filter((job) => job.usesReusableWorkflow).length,
@@ -471,19 +473,19 @@ export async function collectRepositorySignals(
     hasBabelEvidence,
     hasJvmEvidence,
   ] = await Promise.all([
-    hasPythonSignalEvidence(context, workflows),
-    hasRustSignalEvidence(context, workflows),
-    hasElixirSignalEvidence(context, workflows),
-    hasNativePackageSignalEvidence(context, workflows),
-    hasEslintSignalEvidence(context, workflows, packageJsonText),
-    hasPrettierSignalEvidence(context, workflows, packageJsonText),
-    hasFrameworkSignalEvidence(context, workflows, packageJsonText),
-    hasTypeScriptSignalEvidence(context, workflows, packageJsonText),
-    hasJestSignalEvidence(context, workflows, packageJsonText),
-    hasTailwindSignalEvidence(context, workflows, packageJsonText),
-    hasHuskySignalEvidence(context, workflows, packageJsonText),
-    hasBabelSignalEvidence(context, workflows, packageJsonText),
-    hasJvmSignalEvidence(context, workflows),
+    hasPythonSignalEvidence(context, evidenceWorkflows),
+    hasRustSignalEvidence(context, evidenceWorkflows),
+    hasElixirSignalEvidence(context, evidenceWorkflows),
+    hasNativePackageSignalEvidence(context, evidenceWorkflows),
+    hasEslintSignalEvidence(context, evidenceWorkflows, packageJsonText),
+    hasPrettierSignalEvidence(context, evidenceWorkflows, packageJsonText),
+    hasFrameworkSignalEvidence(context, evidenceWorkflows, packageJsonText),
+    hasTypeScriptSignalEvidence(context, evidenceWorkflows, packageJsonText),
+    hasJestSignalEvidence(context, evidenceWorkflows, packageJsonText),
+    hasTailwindSignalEvidence(context, evidenceWorkflows, packageJsonText),
+    hasHuskySignalEvidence(context, evidenceWorkflows, packageJsonText),
+    hasBabelSignalEvidence(context, evidenceWorkflows, packageJsonText),
+    hasJvmSignalEvidence(context, evidenceWorkflows),
   ]);
 
   const [
@@ -648,9 +650,8 @@ export async function collectRepositorySignals(
   ]);
 
   const result = {
-    fingerprint,
     signals: {
-      primaryWorkflowPath: workflows
+      primaryWorkflowPath: evidenceWorkflows
         .map((workflow) => workflow.relativePath)
         .sort((left, right) => left.localeCompare(right))[0],
       workflowCount: workflows.length,
@@ -689,7 +690,7 @@ export async function collectRepositorySignals(
     },
     warnings: [...warnings],
   };
-  repositorySignalsCache.set(repoRoot, Promise.resolve(result));
+  repositorySignalsCache.set(context, { fingerprint, ...result });
   return {
     signals: result.signals,
     warnings: [...result.warnings],

@@ -22,6 +22,7 @@ interface CliOptions {
   findingsOnly: boolean;
   showWorkflows: boolean;
   showAllLocations: boolean;
+  version: boolean;
   resolvedOptionAliases: {
     input: string;
     resolved: string;
@@ -113,6 +114,7 @@ export function parseArgs(args: string[]): CliOptions | null {
     findingsOnly: false,
     showWorkflows: false,
     showAllLocations: false,
+    version: false,
     resolvedOptionAliases: [],
   };
 
@@ -136,6 +138,10 @@ export function parseArgs(args: string[]): CliOptions | null {
 
     if (arg === "--help" || arg === "-h") {
       return null;
+    }
+    if (arg === "--version") {
+      options.version = true;
+      continue;
     }
 
     if (arg === "--format") {
@@ -231,12 +237,6 @@ function renderWorkflowSelection(repoRoot: string, workflowFiles: string[]): str
 export async function runCli(args: string[], cwd: string, logger: LoggerLike): Promise<number> {
   const cliStartedAt = performance.now();
 
-  const versionFlag = args.find((a) => a.startsWith("--") && "--version".startsWith(a));
-  if (versionFlag) {
-    logger.log(pkg.version);
-    return 0;
-  }
-
   let options: CliOptions | null;
 
   try {
@@ -248,6 +248,10 @@ export async function runCli(args: string[], cwd: string, logger: LoggerLike): P
 
   if (options === null) {
     printHelp(logger);
+    return 0;
+  }
+  if (options.version) {
+    logger.log(pkg.version);
     return 0;
   }
 
@@ -275,6 +279,12 @@ export async function runCli(args: string[], cwd: string, logger: LoggerLike): P
       workflowOnly: options.workflowOnly,
       repositoryOnly: options.repositoryOnly,
     });
+
+    for (const warning of report.analysisWarnings) {
+      if (warning.kind === "parser-error") {
+        logger.error(`Warning: ${warning.message}`);
+      }
+    }
 
     const noColor = process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "";
     const isTty = process.stdout.isTTY && !noColor;

@@ -4,7 +4,12 @@ import path from "node:path";
 import { analyzeRepository } from "../src/repo.ts";
 import { runCli } from "../src/main.ts";
 import type { WorkflowJob, WorkflowStep } from "../src/workflow.ts";
-import { fixtureCacheKey, loadFixtureCache, saveFixtureCache } from "./fixture-cache.ts";
+import {
+  fixtureCacheKey,
+  fixtureFingerprint,
+  loadFixtureCache,
+  saveFixtureCache,
+} from "./fixture-cache.ts";
 
 export function createLogger() {
   const lines: string[] = [];
@@ -100,11 +105,13 @@ function analyzeRepositoryCacheKey(options: AnalyzeRepositoryOptions): string {
   return fixtureCacheKey(options);
 }
 
-export function memoizedAnalyzeRepository(
+export async function memoizedAnalyzeRepository(
   options: AnalyzeRepositoryOptions,
 ): Promise<AnalyzeRepositoryResult> {
   const key = analyzeRepositoryCacheKey(options);
-  const cached = analyzeRepositoryCache.get(key);
+  const inputFingerprint = await fixtureFingerprint(options.cwd);
+  const memoryKey = `${key}\n${inputFingerprint}`;
+  const cached = analyzeRepositoryCache.get(memoryKey);
   if (cached) {
     return cached;
   }
@@ -116,13 +123,13 @@ export function memoizedAnalyzeRepository(
     }
 
     const result = await analyzeRepository(options);
-    saveFixtureCache(key, result).catch(() => {});
+    saveFixtureCache(key, result, inputFingerprint).catch(() => {});
     return result;
   })().catch((error) => {
-    analyzeRepositoryCache.delete(key);
+    analyzeRepositoryCache.delete(memoryKey);
     throw error;
   });
-  analyzeRepositoryCache.set(key, reportPromise);
+  analyzeRepositoryCache.set(memoryKey, reportPromise);
   return reportPromise;
 }
 

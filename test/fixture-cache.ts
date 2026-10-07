@@ -3,8 +3,10 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import type { ReportData } from "../src/types.ts";
 
-const CACHE_DIR = path.resolve(import.meta.dir, "..", ".fixture-cache");
-const FIXTURE_CACHE_SCHEMA_VERSION = 4;
+const repoRoot = path.resolve(import.meta.dir, "..");
+const CACHE_DIR = path.join(repoRoot, ".fixture-cache");
+const FIXTURE_CACHE_SCHEMA_VERSION = 5;
+const ignoredDirectories = new Set([".git", "node_modules", ".fixture-cache", "dist", "build"]);
 
 interface CacheEntry {
   key: string;
@@ -15,141 +17,60 @@ interface CacheEntry {
 interface CacheOptions {
   cwd: string;
   targetPath: string;
+  topCount?: number;
   mode?: string;
   workflowOnly?: boolean;
   repositoryOnly?: boolean;
 }
 
-const rootFingerprintCandidates = [
-  "package.json",
-  "bun.lock",
-  "package-lock.json",
-  "pnpm-lock.yaml",
-  "yarn.lock",
-  "uv.lock",
-  "poetry.lock",
-  "Cargo.lock",
-  "Cargo.toml",
-  "build.gradle",
-  "build.gradle.kts",
-  "Dockerfile",
-  ".dockerignore",
-  "pyproject.toml",
-  "settings.gradle",
-  "settings.gradle.kts",
-  "requirements.txt",
-  "requirements-dev.txt",
-  "requirements-test.txt",
-  "requirements-ci.txt",
-  "requirements/base.txt",
-  "requirements/dev.txt",
-  "requirements/test.txt",
-  "requirements/ci.txt",
-  "tsconfig.json",
-  "tsconfig.base.json",
-  "jest.config.js",
-  "jest.config.cjs",
-  "jest.config.ts",
-  "eslint.config.js",
-  "eslint.config.mjs",
-  "eslint.config.cjs",
-  "eslint.config.ts",
-  "eslint.config.mts",
-  "eslint.config.cts",
-  ".eslintrc",
-  ".eslintrc.json",
-  ".eslintrc.yml",
-  ".eslintrc.yaml",
-  ".eslintrc.js",
-  ".eslintrc.cjs",
-  "prettier.config.js",
-  "prettier.config.cjs",
-  "prettier.config.mjs",
-  "prettier.config.ts",
-  "prettier.config.cts",
-  "prettier.config.mts",
-  ".prettierrc",
-  ".prettierrc.json",
-  ".prettierrc.yml",
-  ".prettierrc.yaml",
-  ".prettierrc.js",
-  ".prettierrc.cjs",
-  "tailwind.config.js",
-  "tailwind.config.cjs",
-  "tailwind.config.mjs",
-  "tailwind.config.ts",
-  "tailwind.config.cts",
-  "tailwind.config.mts",
-  "postcss.config.js",
-  "postcss.config.cjs",
-  "postcss.config.mjs",
-  "postcss.config.ts",
-  "postcss.config.cts",
-  "postcss.config.mts",
-  "renovate.json",
-  "renovate.json5",
-  ".github/renovate.json",
-  ".github/renovate.json5",
-] as const;
-
-async function statFingerprintEntry(
-  dir: string,
-  relativePath: string,
-  output: string[],
-): Promise<void> {
-  try {
-    const stats = await stat(path.join(dir, relativePath));
-    if (!stats.isFile()) {
-      return;
-    }
-    output.push(`${relativePath}:${stats.size}:${stats.mtimeMs}`);
-  } catch {
-    return;
-  }
-}
-
-async function collectWorkflowFingerprintEntries(
-  dir: string,
-  currentRelativeDir: string,
-  output: string[],
-): Promise<void> {
-  const absoluteDir = path.join(dir, currentRelativeDir);
-  let entries;
-  try {
-    entries = await readdir(absoluteDir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-
-  const sortedEntries = [...entries].sort((left, right) => left.name.localeCompare(right.name));
-  for (const entry of sortedEntries) {
-    const relativePath = path.posix.join(currentRelativeDir, entry.name);
-    if (entry.isDirectory()) {
-      await collectWorkflowFingerprintEntries(dir, relativePath, output);
-      continue;
-    }
-    if (!entry.isFile()) {
-      continue;
-    }
-    if (!/\.ya?ml$/i.test(entry.name)) {
-      continue;
-    }
-    await statFingerprintEntry(dir, relativePath, output);
-  }
-}
-
-async function fixtureFingerprint(dir: string): Promise<string> {
-  const fingerprintEntries: string[] = [];
-
-  await collectWorkflowFingerprintEntries(dir, ".github/workflows", fingerprintEntries);
-  await Promise.all(
-    rootFingerprintCandidates.map((relativePath) =>
-      statFingerprintEntry(dir, relativePath, fingerprintEntries),
-    ),
+async function fingerprintTree(dir: string, relativeDir: string, entries: string[]): Promise<void> {
+  const children = await readdir(path.join(dir, relativeDir), { withFileTypes: true }).catch(
+    () => [],
   );
+  await Promise.all(
+    children.map(async (child) => {
+      const relativePath = path.posix.join(relativeDir, child.name);
+      if (child.isDirectory()) {
+        if (!ignoredDirectories.has(child.name)) {
+          await fingerprintTree(dir, relativePath, entries);
+        }
+      } else if (child.isFile()) {
+        const filePath = path.join(dir, relativePath);
+        const info = await stat(filePath);
+        const identity =
+          info.size <= 1024 * 1024
+            ? createHash("sha256")
+                .update(await readFile(filePath))
+                .digest("hex")
+            : `${info.size}:${info.mtimeMs}`;
+        entries.push(`${relativePath}:${identity}`);
+      }
+    }),
+  );
+}
 
-  fingerprintEntries.sort();
-  return createHash("sha256").update(fingerprintEntries.join("|")).digest("hex");
+let sourceFingerprint: Promise<string> | undefined;
+function fingerprintSource(): Promise<string> {
+  sourceFingerprint ??= (async () => {
+    const entries: string[] = [];
+    await fingerprintTree(repoRoot, "src", entries);
+    for (const file of ["package.json", "bun.lock"]) {
+      entries.push(
+        `${file}:${createHash("sha256")
+          .update(await readFile(path.join(repoRoot, file)))
+          .digest("hex")}`,
+      );
+    }
+    return createHash("sha256").update(entries.sort().join("|")).digest("hex");
+  })();
+  return sourceFingerprint;
+}
+
+export async function fixtureFingerprint(dir: string): Promise<string> {
+  const entries: string[] = [];
+  await fingerprintTree(dir, "", entries);
+  entries.push(await fingerprintSource());
+  return createHash("sha256").update(entries.sort().join("|")).digest("hex");
 }
 
 export function fixtureCacheKey(options: CacheOptions): string {
@@ -160,43 +81,57 @@ export function fixtureCacheKey(options: CacheOptions): string {
     options.mode ?? "strict",
     options.workflowOnly ?? false,
     options.repositoryOnly ?? false,
+    options.topCount ?? 20,
+    process.env.AGENT ?? "",
+    process.env.CI_PERF_LINT_DISABLE_OXLINT ?? "",
+    process.env.CI_PERF_LINT_SHARED_DIAGNOSTICS ?? "",
   ]);
 }
 
 function parseCwdFromKey(key: string): string {
-  return JSON.parse(key)[0] as string;
-}
-
-function hashKey(key: string): string {
-  return createHash("sha256").update(key).digest("hex").slice(0, 16);
+  const values: unknown = JSON.parse(key);
+  if (
+    !Array.isArray(values) ||
+    values[0] !== FIXTURE_CACHE_SCHEMA_VERSION ||
+    typeof values[1] !== "string"
+  ) {
+    throw new Error("Invalid fixture cache key");
+  }
+  return values[1];
 }
 
 function cacheFilePath(key: string): string {
-  return path.join(CACHE_DIR, `${hashKey(key)}.json`);
+  return path.join(
+    CACHE_DIR,
+    `${createHash("sha256").update(key).digest("hex").slice(0, 16)}.json`,
+  );
 }
 
 export async function loadFixtureCache(key: string): Promise<ReportData | null> {
   try {
-    const raw = await readFile(cacheFilePath(key), "utf8");
-    const entry = JSON.parse(raw) as CacheEntry;
-    if (entry.key !== key) {
+    const entry = JSON.parse(await readFile(cacheFilePath(key), "utf8")) as CacheEntry;
+    if (
+      entry.key !== key ||
+      entry.fingerprint !== (await fixtureFingerprint(parseCwdFromKey(key)))
+    ) {
       return null;
     }
-
-    const fp = await fixtureFingerprint(parseCwdFromKey(key));
-    if (entry.fingerprint !== fp) {
-      return null;
-    }
-
     return entry.data;
   } catch {
     return null;
   }
 }
 
-export async function saveFixtureCache(key: string, data: ReportData): Promise<void> {
+export async function saveFixtureCache(
+  key: string,
+  data: ReportData,
+  inputFingerprint?: string,
+): Promise<void> {
   await mkdir(CACHE_DIR, { recursive: true });
-  const fp = await fixtureFingerprint(parseCwdFromKey(key));
-  const entry: CacheEntry = { key, fingerprint: fp, data };
+  const entry: CacheEntry = {
+    key,
+    fingerprint: inputFingerprint ?? (await fixtureFingerprint(parseCwdFromKey(key))),
+    data,
+  };
   await writeFile(cacheFilePath(key), JSON.stringify(entry));
 }

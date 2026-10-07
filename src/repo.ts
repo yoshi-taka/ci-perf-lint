@@ -20,7 +20,7 @@ import type {
   WorkflowSummary,
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
-import type { AnyWorkflowDocument, CiKind } from "./ci-types.ts";
+import { ciKindForPath, type AnyWorkflowDocument } from "./ci-types.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
 import type { EmbeddedOxlintScanPlan } from "./repository-diagnostics/embedded-oxlint-config.ts";
 import { prewarmEmbeddedOxlint } from "./repository-diagnostics/embedded-oxlint.ts";
@@ -66,11 +66,6 @@ import {
 import { applySeverityPromotion } from "./severity-promotion.ts";
 import { findingIncludedInScope } from "./repo-finding-utils.ts";
 
-const buildkitePattern = /(?:^|\/)\.buildkite\//i;
-const buildkiteAltPattern = /(?:^|\/)buildkite\//i;
-const pipelinePattern = /pipeline\.(ya?ml|json)$/i;
-const gitlabCiPattern = /\.gitlab-ci\.(ya?ml)$/i;
-const circleCiPattern = /\/\.circleci\/config\.(ya?ml)$/i;
 type ParsedWorkflowDocument = AnyWorkflowDocument;
 
 const HUGE_REPO_FILE_THRESHOLD = 80_000;
@@ -151,34 +146,25 @@ async function parseWorkflowFile(
   workflowPath: string,
   repoRoot: string,
 ): Promise<ParsedWorkflowDocument> {
-  const cached = parsedWorkflowCache.get(workflowPath);
-  if (cached) {
+  const source = await readTextFile(workflowPath);
+  const cacheKey = `${repoRoot}\0${workflowPath}`;
+  const cached = parsedWorkflowCache.get(cacheKey);
+  if (cached?.source === source) {
     return cached.parsedWorkflow;
   }
 
-  const source = await readTextFile(workflowPath);
-
   // eslint-disable-next-line typescript-eslint/require-await
   const parsedWorkflow = (async () => {
-    const isBuildkite =
-      buildkitePattern.test(workflowPath) ||
-      buildkiteAltPattern.test(workflowPath) ||
-      pipelinePattern.test(workflowPath);
-    if (isBuildkite) {
-      return parsePipeline(workflowPath, repoRoot, source);
+    switch (ciKindForPath(workflowPath)) {
+      case "buildkite":
+        return parsePipeline(workflowPath, repoRoot, source);
+      case "gitlab-ci":
+        return parseGitlabCi(workflowPath, repoRoot, source);
+      case "circleci":
+        return parseCircleCi(workflowPath, repoRoot, source);
+      default:
+        return parseWorkflow(workflowPath, repoRoot, source);
     }
-
-    const isGitlabCi = gitlabCiPattern.test(path.basename(workflowPath));
-    if (isGitlabCi) {
-      return parseGitlabCi(workflowPath, repoRoot, source);
-    }
-
-    const isCircleCi = circleCiPattern.test(workflowPath);
-    if (isCircleCi) {
-      return parseCircleCi(workflowPath, repoRoot, source);
-    }
-
-    return parseWorkflow(workflowPath, repoRoot, source);
   })();
 
   // TOAST: compress source after parsing, decompress lazily on first access
@@ -188,14 +174,14 @@ async function parseWorkflowFile(
       return doc;
     })
     .catch((error) => {
-      const current = parsedWorkflowCache.get(workflowPath);
+      const current = parsedWorkflowCache.get(cacheKey);
       if (current?.parsedWorkflow === wrapped) {
-        parsedWorkflowCache.delete(workflowPath);
+        parsedWorkflowCache.delete(cacheKey);
       }
       throw error;
     });
 
-  parsedWorkflowCache.set(workflowPath, { source, parsedWorkflow: wrapped });
+  parsedWorkflowCache.set(cacheKey, { source, parsedWorkflow: wrapped });
   return wrapped;
 }
 
@@ -294,6 +280,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     githubWorkflows,
     jobSummaries,
     scanContext,
+    parsedWorkflows,
   );
   timer.mark("collect-repository-signals");
   analysisWarnings.push(...repositoryAnalysis.warnings);
@@ -343,7 +330,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
 
   const precedentIndex = buildRepositoryPrecedentIndex(githubWorkflows);
   const predicateIndex = buildRepositoryPredicateIndex(githubWorkflows);
-  const featureIndex = buildRepositoryFeatureIndex(githubWorkflows);
+  const featureIndex = buildRepositoryFeatureIndex(githubWorkflows, parsedWorkflows);
   const corpusIndex = buildRepositoryCorpusIndex(githubWorkflows);
   const fileIndex = buildRepositoryFileIndex(scanContext);
   const ruleContext = {
@@ -511,7 +498,6 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     name: workflow.name,
     findings: findingsByWorkflow.get(workflow.relativePath) ?? [],
   }));
-  wfList.length = 0;
 
   const aggregatedFindings = aggregateFindingsWithMembers(findings);
   const topAggregatedFindings = aggregatedFindings.aggregatedFindings.slice(0, topCount);

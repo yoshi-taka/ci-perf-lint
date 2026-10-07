@@ -169,9 +169,21 @@ describe("metamorphic relations", () => {
       workflowOnly: true,
     });
 
-    expect(reformattedReport.findings.map(normalizeFinding)).toEqual(
-      baseReport.findings.map(normalizeFinding),
+    const semanticFinding = (finding: Diagnostic) => ({
+      ...normalizeFinding(finding),
+      location: { path: finding.location.path },
+    });
+    expect(reformattedReport.findings.map(semanticFinding)).toEqual(
+      baseReport.findings.map(semanticFinding),
     );
+    expect(
+      baseReport.findings.find((finding) => finding.ruleId === "missing-timeout-minutes")?.location
+        .line,
+    ).toBe(4);
+    expect(
+      reformattedReport.findings.find((finding) => finding.ruleId === "missing-timeout-minutes")
+        ?.location.line,
+    ).toBe(6);
   });
 
   test("aggregated findings stay equivalent when input finding order changes", () => {

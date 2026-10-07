@@ -560,7 +560,15 @@ describe("renderReport", () => {
     await writeFile(path.join(fixtureRoot, "package.json"), '{"name": "broken"\n');
     await writeFile(
       path.join(workflowDir, "ci.yml"),
-      ["name: CI", "on: push", "jobs:", "  test:", "    runs-on: ubuntu-latest"].join("\n"),
+      [
+        "name: CI",
+        "on: push",
+        "concurrency: ci",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    timeout-minutes: 10",
+      ].join("\n"),
     );
 
     const report = await memoizedAnalyzeRepository({
