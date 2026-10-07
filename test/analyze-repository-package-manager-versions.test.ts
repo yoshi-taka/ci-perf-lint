@@ -20,7 +20,7 @@ describe("pnpm performance version milestone", () => {
         (finding) => finding.location.path === "package.json" && finding.location.line === 3,
       ),
     ).toBe(true);
-    expect(findings.some((finding) => finding.message.includes("12.9.1, 11"))).toBe(true);
+    expect(findings.some((finding) => finding.message.includes("12.9.1, 12.9.1"))).toBe(true);
     expect(report.analysisWarnings.some((warning) => warning.kind === "rule-error")).toBe(false);
   });
 
@@ -81,4 +81,67 @@ describe("pnpm performance version milestone", () => {
     });
     expect((await scan(cwd)).findings.some((finding) => finding.ruleId === ruleId)).toBe(false);
   });
+
+  test.each([
+    [undefined, { name: "pnpm", version: "11.28.5" }, true],
+    [undefined, { name: "pnpm", version: "12.9.1" }, true],
+    [undefined, { name: "pnpm", version: "12.10.0" }, false],
+    ["pnpm@12.10.0", { name: "pnpm", version: "11.28.5" }, true],
+    ["pnpm@11.28.5", { name: "pnpm", version: "12.10.0" }, false],
+    ["pnpm@11.28.5", { name: "pnpm", version: ">=12.10.0 <13" }, false],
+    [undefined, { name: "yarn", version: "4.0.0" }, false],
+    ["pnpm@12.10.0", { name: "yarn", version: "4.0.0" }, false],
+  ] as const)("respects devEngines precedence: %j / %j", async (legacy, manager, flagged) => {
+    const cwd = await tempDirs.create("apl-pnpm-devengines-");
+    const packageJson = JSON.stringify(
+      { packageManager: legacy, devEngines: { packageManager: manager } },
+      null,
+      2,
+    );
+    await writeRepositoryFiles(cwd, {
+      "package.json": packageJson,
+      ".gitlab-ci.yml": "test:\n  script: pnpm install --frozen-lockfile\n",
+    });
+    const findings = (await scan(cwd, "strict")).findings.filter(
+      (finding) => finding.ruleId === ruleId,
+    );
+    expect(findings).toHaveLength(flagged ? 1 : 0);
+    if (flagged) {
+      expect(findings[0]?.message).toContain("devEngines.packageManager");
+      expect(findings[0]?.aiHandoff).toContain("devEngines.packageManager");
+      expect(findings[0]?.location).toEqual({
+        path: "package.json",
+        line: legacy ? 3 : 2,
+        column: 3,
+      });
+    }
+  });
+
+  test.each([
+    [null, 5],
+    [[], 5],
+    ["pnpm@11.28.5", 5],
+    [{ name: "pnpm" }, 7],
+    [{ name: "pnpm", version: "" }, 8],
+    [{ name: "pnpm", version: 11 }, 8],
+  ] as const)(
+    "falls back to the legacy pin for an unusable devEngines declaration: %j",
+    async (manager, line) => {
+      const cwd = await tempDirs.create("apl-pnpm-devengines-fallback-");
+      await writeRepositoryFiles(cwd, {
+        "package.json": JSON.stringify(
+          { devEngines: { packageManager: manager }, packageManager: "pnpm@11.28.5" },
+          null,
+          2,
+        ),
+        ".gitlab-ci.yml": "test:\n  script: pnpm install --frozen-lockfile\n",
+      });
+      const findings = (await scan(cwd, "strict")).findings.filter(
+        (finding) => finding.ruleId === ruleId,
+      );
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.message).toContain("package.json packageManager pins pnpm@11.28.5");
+      expect(findings[0]?.location).toEqual({ path: "package.json", line, column: 3 });
+    },
+  );
 });

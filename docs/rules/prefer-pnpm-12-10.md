@@ -15,18 +15,24 @@ Sources: [pnpm 12](https://pnpm.io/blog/releases/12.0),
 
 ## What it flags
 
-- Root `package.json` `packageManager` pins to pnpm below 12.10.
+- Root `package.json` `packageManager` or `devEngines.packageManager` pins to pnpm below 12.10.
 - GitHub Actions `pnpm/action-setup` version inputs below 12.10, grouped per job.
 
 Unspecified versions, tags, expressions, prereleases, and complex ranges are skipped.
 Major-only `12` and `12.x` are skipped because they can resolve to 12.10 or later.
 This is a `warning`, included in strict mode. Upgrades from older majors can need compatibility review.
 
+A `devEngines.packageManager` object with `name: "pnpm"` and a nonempty string
+`version` takes precedence over the legacy `packageManager` pin. Unknown versions
+or complex ranges in that field are skipped rather than falling back to an overridden pin.
+
 ## Suggested action
 
 Pin a stable pnpm **12.10.0 or later** in package metadata and CI setup together.
 An action reference such as `pnpm/action-setup@v4` is the action's version, not pnpm's.
-If the action reads `packageManager` automatically, update that field.
+Update the effective package metadata pin and keep any legacy pin consistent.
+If the action reads `packageManager` automatically, update that field; action versions
+that also support `devEngines.packageManager` can read that declaration instead.
 
 pnpm 11 commands, settings, and lockfile format are largely preserved. Check:
 
