@@ -195,14 +195,14 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 
 ## CodSpeed Benchmarks
 
-- Config: `codspeed.yml` at repo root, defines 3 targets (opencode TS, oxc Rust, pytorch Python)
-- Workflow: `.github/workflows/codspeed.yml` — runs on push to main and PRs
-- Targets are shallow-cloned fresh each run; benchmark measures `bun run dist/cli.js --findings-only` wall time
-- Add/remove targets in `codspeed.yml`; CI path is the CodSpeed action
+- Targets: `bench/analyze-repository.bench.ts` defines opencode TS, oxc Rust, and pytorch Python cases
+- Workflow: `.github/workflows/codspeed.yml` — runs on PRs, main pushes, version tags, and dispatch
+- Targets are shallow-cloned fresh each run; Node executes bundled Tinybench/CodSpeed API benchmarks
+- Change target clones in the workflow and benchmark cases together; any failed task makes the runner fail
 
 ### Known Issues
 
-- CodSpeed benchmark fails on tag push (~16s). Exact cause unclear — possibly tinybench v6 ESM-only vs `--target node` incompatibility, or CodSpeed plugin version mismatch. Partial fix: `bench/run.ts` catches per-task errors so one failure doesn't kill the whole run. Re-evaluate at next release.
+- Individual benchmark failures are logged while other benches continue. The final exit status is nonzero if any task failed or did not complete.
 
 ## Publishing
 

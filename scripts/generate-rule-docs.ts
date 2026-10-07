@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { allRules } from "../src/rules/index.ts";
 
@@ -7,33 +7,20 @@ const repoRoot = path.resolve(import.meta.dir, "..");
 const readmePath = path.join(repoRoot, "docs/rules/README.md");
 const readme = readFileSync(readmePath, "utf-8");
 
-function extractRuleIdsFromDiagnosticFile(filePath: string): string[] {
-  const content = readFileSync(filePath, "utf-8");
-  if (!content.includes('docsPath: "docs/rules/')) {
-    return [];
-  }
-  const ids: string[] = [];
-  const pattern = /id:\s*"([^"]+)"/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(content)) !== null) {
-    const id = match[1];
-    if (id) {
-      ids.push(id);
-    }
-  }
-  return ids;
+// Explainers also cover variants emitted by multi-rule collectors and shared metadata.
+const docsDir = path.join(repoRoot, "docs/rules");
+const allIds = [
+  ...new Set([
+    ...readdirSync(docsDir)
+      .filter((file) => file.endsWith(".md") && file !== "README.md")
+      .map((file) => file.slice(0, -3)),
+    ...allRules.map((rule) => rule.meta.id),
+  ]),
+].sort();
+for (const rule of allRules) {
+  if (!existsSync(path.join(repoRoot, rule.meta.docsPath)))
+    throw new Error(`Missing explainer for ${rule.meta.id}`);
 }
-
-const workflowIds = allRules.map((r) => r.meta.id);
-
-const diagnosticsDir = path.join(repoRoot, "src/repository-diagnostics");
-const diagFiles = readdirSync(diagnosticsDir).filter((f) => f.endsWith(".ts"));
-const diagIds: string[] = [];
-for (const file of diagFiles) {
-  diagIds.push(...extractRuleIdsFromDiagnosticFile(path.join(diagnosticsDir, file)));
-}
-
-const allIds = Array.from(new Set([...workflowIds, ...diagIds])).sort();
 
 const registryLines = allIds.map((id) => `- \`${id}\``).join("\n");
 
@@ -49,5 +36,12 @@ if (startIndex === -1 || endIndex === -1) {
 
 const newReadme = `${readme.slice(0, startIndex + startMarker.length)}\n\n${registryLines}${readme.slice(endIndex)}`;
 
-writeFileSync(readmePath, newReadme);
-console.log(`Updated ${readmePath} with ${allIds.length} rules`);
+if (process.argv.includes("--check")) {
+  if (newReadme !== readme) {
+    console.error("Rule index is stale; run bun run generate-rule-docs");
+    process.exitCode = 1;
+  }
+} else {
+  writeFileSync(readmePath, newReadme);
+  console.log(`Updated ${readmePath} with ${allIds.length} rules`);
+}

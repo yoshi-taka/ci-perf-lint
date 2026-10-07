@@ -65,6 +65,7 @@ export function spawnOxlintProcess(
       }
     });
     proc.on("close", () => resolve(Buffer.concat(chunks).toString()));
+    proc.on("error", () => resolve(Buffer.concat(chunks).toString()));
   });
   const stderrPromise = new Promise<string>((resolve) => {
     const chunks: Buffer[] = [];
@@ -76,6 +77,7 @@ export function spawnOxlintProcess(
       }
     });
     proc.on("close", () => resolve(Buffer.concat(chunks).toString()));
+    proc.on("error", (error) => resolve(`${Buffer.concat(chunks).toString()}${error.message}`));
   });
   const stateSignaled = { value: false };
   const exitedPromise = new Promise<number>((resolve) => {
@@ -85,6 +87,10 @@ export function spawnOxlintProcess(
         stateSignaled.value = true;
       }
       resolve(code ?? 1);
+    });
+    proc.on("error", () => {
+      clearTimeout(killTimer);
+      resolve(1);
     });
   });
 

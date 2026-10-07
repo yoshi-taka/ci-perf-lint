@@ -68,15 +68,15 @@ git push origin v<version>
 |---|------|------|------|
 | 1 | Checkout | tag commit を checkout | |
 | 2 | Setup Node | Node 24 + npm registry | |
-| 3 | Setup Bun | Bun 1.3.13 | |
-| 4 | Check version | `npm view` で重複チェック | 既にあれば `exit 0` で正常終了、publish しない |
-| 5 | Install | `bun install --frozen-lockfile` | lockfile 未コミットだと失敗 |
-| 6 | Build | `bun run build` | `dist/cli.js` を生成 |
-| 7 | Sync wrapper | `packages/ci-perf-lint` の version + dep を root の version で上書き | `"*"` → `"<version>"` |
-| 8 | Resolve meta | version / dist-tag を決定 | stable → `latest`, prerelease → `alpha` |
-| 9 | Publish scoped | `npm publish @yoshi-taka/ci-perf-lint` | |
-| 10 | Publish unscoped | `npm publish ci-perf-lint` | packages/ci-perf-lint/ |
-| 11 | GitHub Release | `softprops/action-gh-release` で Release 作成 | prerelease tag の場合は skip (step ごと) |
+| 3 | Setup Bun | Bun 1.4.2 | |
+| 4 | Install | `bun install --frozen-lockfile` | lockfile 未コミットだと失敗 |
+| 5 | Build | `bun run build` | `dist/cli.js` を生成 |
+| 6 | Sync wrapper | tag と root version の一致を確認し、wrapper の version + dep を同期 | `"*"` → `"<version>"` |
+| 7 | Resolve meta | version / dist-tag を決定 | stable → `latest`, prerelease → `alpha` |
+| 8 | Check versions | scoped / wrapper を個別に `npm view` で確認 | 公開済み package をスキップ。片方だけ公開済みなら残りを公開 |
+| 9 | Publish scoped | `npm publish @yoshi-taka/ci-perf-lint` | 未公開の場合のみ |
+| 10 | Publish unscoped | `npm publish ci-perf-lint` | 未公開の場合のみ、packages/ci-perf-lint/ |
+| 11 | GitHub Release | `softprops/action-gh-release` で Release 作成 | prerelease tag の場合は skip |
 
 ### 注意
 
@@ -107,7 +107,7 @@ tag push との差分:
 
 | 項目 | tag push | workflow_dispatch |
 |------|----------|-------------------|
-| version 重複チェック | あり | なし |
+| version 重複チェック | あり（2 package 個別） | あり（bump 後の2 package 個別） |
 | Verify (lint+test+build+smoke) | なし | **あり** |
 | version bump | 手動（事前に commit） | `bump_version=true` で自動実行 |
 | GitHub Release 作成 | あり（stable のみ） | なし |
@@ -129,6 +129,6 @@ tag push との差分:
 
 - **`git push --tags` 禁止**: すべてのローカル tag が送信され、古い version の publish workflow が複数同時に発火する。必ず `git push origin v<特定のversion>` で 1 つずつ push する。
 - **workspace 非対応**: `packages/ci-perf-lint` は root の `workspaces` に含まれていない。依存解決は CI の Sync ステップに委ねている。
-- **CI 上の Bun version**: `1.3.13` 固定。ローカルと異なる場合は `publish.yml` の `bun-version` を更新すること。
+- **CI 上の Bun version**: `1.4.2` 固定。ローカルと異なる場合は `publish.yml` の `bun-version` を更新すること。
 - **publish → docs deploy**: publish workflow の完了後、別の CI workflow でドキュメントサイト（Astro）が自動デプロイされる。
-- **publish 失敗時**: npm publish が失敗した場合、version はすでに package.json に書かれている。再実行するには `npm unpublish` するか version を進める必要がある。
+- **publish 失敗時**: tag workflow は同じ version のまま再実行できる。公開済み package をスキップし、未公開の package を公開する。registry の通信・認証エラーは「未公開」とみなさず停止する。dispatch で再実行する場合は意図せず再 bump しないよう入力を確認する。
