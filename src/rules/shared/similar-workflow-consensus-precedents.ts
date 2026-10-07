@@ -25,28 +25,6 @@ function rjp(
   return repositoryJobPrecedents(entries, workflowPath, jobId, lookup);
 }
 
-function withRepositoryConcurrencyPrecedent(
-  context: RuleContext,
-  workflowPath: string,
-): DiagnosticTransform {
-  return (diagnostic: Diagnostic) => {
-    const precedents = rwp(
-      context.repository.repoPrecedents.concurrency,
-      context.repository.repoPrecedents.lookups.concurrency,
-      workflowPath,
-    );
-    return appendPrecedent(
-      diagnostic,
-      precedents.length > 0
-        ? `This repository already uses concurrency in ${renderPrecedentList(precedents)}.`
-        : undefined,
-      precedents.length > 0
-        ? "Reuse one of the repository's existing concurrency patterns where it fits this workflow."
-        : undefined,
-    );
-  };
-}
-
 export function withRepositoryTimeoutPrecedent(
   context: RuleContext,
   workflowPath: string,

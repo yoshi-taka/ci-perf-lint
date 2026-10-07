@@ -220,25 +220,19 @@ export async function collectRepositoryDiagnostics(
   const resourceTimingStartedAt = performance.now();
 
   const collectorResults = await Promise.allSettled(
-    scheduledCollectors.map((collector) => {
+    scheduledCollectors.map(async (collector) => {
       const startedAt = performance.now();
-      const result = runRepositoryDiagnosticCollector(
+      const result = await runRepositoryDiagnosticCollector(
         collector as CollectorLike,
         resourceContext,
         proofs,
       );
-      if (result instanceof Promise) {
-        if (timingsEnabled()) {
-          return result.then((value) => {
-            process.stderr.write(
-              `[timing] diagnostics collector ${collector.id}=${(performance.now() - startedAt).toFixed(1)}ms findings=${value.length}\n`,
-            );
-            return value;
-          });
-        }
-        return result;
+      if (timingsEnabled()) {
+        process.stderr.write(
+          `[timing] diagnostics collector ${collector.id}=${(performance.now() - startedAt).toFixed(1)}ms findings=${result.length}\n`,
+        );
       }
-      return Promise.resolve(result);
+      return result;
     }),
   );
 
@@ -278,7 +272,7 @@ export async function collectRepositoryDiagnostics(
 
   if (dumpStateEnabled()) {
     const activeGates = Object.entries(gateState)
-      .filter(([_, v]) => v)
+      .filter(([, v]) => v)
       .map(([k]) => k.replace(/^has/, ""));
     const collectorResultsDump = scheduledCollectors.map((c, i) => {
       const r = collectorResults[i];

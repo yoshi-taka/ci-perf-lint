@@ -8,7 +8,6 @@ import type { RepositoryPredicateIndex } from "../rules/shared/repository-predic
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import type { RepositoryCorpusIndex } from "../rules/shared/repository-corpus-index.ts";
 import type { GateExpr } from "./gate-expr.ts";
-import { evaluateGateExpr } from "./gate-expr.ts";
 import type { ResourceGetter } from "./semantic-resource.ts";
 
 const GATE_DEFINITIONS = {
@@ -127,30 +126,6 @@ export interface RepositoryDiagnosticCollector<
   gates?: Gs;
   gateExpr?: GateExpr<GateKey>;
   collect: (context: CollectorContext<G, Gs>) => Diagnostic[] | Promise<Diagnostic[]>;
-}
-
-function checkLegacyGate(
-  collector: { gate?: GateKey; gates?: readonly GateKey[] },
-  gateState: RepositoryDiagnosticGateState,
-): boolean {
-  const checkGate = (g: GateKey): boolean => gateState[g];
-  if (collector.gates) {
-    return collector.gates.every(checkGate);
-  }
-  if (collector.gate) {
-    return checkGate(collector.gate);
-  }
-  return true;
-}
-
-function collectorRequiresAllGates(
-  collector: { gate?: GateKey; gates?: readonly GateKey[]; gateExpr?: GateExpr<GateKey> },
-  gateState: RepositoryDiagnosticGateState,
-): boolean {
-  if (collector.gateExpr) {
-    return evaluateGateExpr(collector.gateExpr, gateState);
-  }
-  return checkLegacyGate(collector, gateState);
 }
 
 function gateResultFromRecord(key: GateKey, results: GateResultRecord): GateResult {

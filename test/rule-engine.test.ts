@@ -708,7 +708,7 @@ describe("evaluateRulesCoarseToFine", () => {
     await Promise.all(docs.map((d) => d.cleanup()));
   });
 
-  test("uses precheck to prioritize workflows (scoring/sorting/slicing)", async () => {
+  test("uses precheck to prioritize workflows without excluding candidates", async () => {
     const lowScoreYaml = [
       "name: CI",
       "on:",

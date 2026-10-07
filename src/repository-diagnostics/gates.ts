@@ -264,7 +264,16 @@ async function repositoryHasJavaScriptPackageScriptEvidence(
   const matches = await Promise.all(
     candidates.map((fileName) => scanContext.pathExists(scanContext.resolve(fileName))),
   );
-  return matches.some(Boolean);
+  const packageJson = (await scanContext.loadPackageJson()).value;
+  const scripts = packageJson?.scripts;
+  return (
+    matches.some(Boolean) ||
+    Boolean(
+      scripts &&
+      typeof scripts === "object" &&
+      Object.values(scripts).some((value) => typeof value === "string"),
+    )
+  );
 }
 
 function repositoryLikelyUsesJavaScriptLinting(

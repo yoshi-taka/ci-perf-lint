@@ -5,7 +5,6 @@ import path from "node:path";
 import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 import { collectCdkBucketDeploymentMemoryDiagnostics } from "../src/repository-diagnostics/cdk-bucket-deployment-memory.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
-import type { WorkflowDocument } from "../src/workflow.ts";
 
 describe("cdk-bucket-deployment fallback (no rg)", () => {
   test("detects BucketDeployment via walkFiles when rg unavailable", async () => {

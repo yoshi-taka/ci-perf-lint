@@ -86,18 +86,3 @@ export function groupStepsByJob(steps: SemanticStep[]): Map<string, SemanticStep
   }
   return groups;
 }
-
-function countCommandTypes(steps: SemanticStep[]): Record<CommandType, number> {
-  const counts: Record<CommandType, number> = {
-    install: 0,
-    lint: 0,
-    test: 0,
-    build: 0,
-    setup: 0,
-    other: 0,
-  };
-  for (const step of steps) {
-    counts[step.commandType]++;
-  }
-  return counts;
-}

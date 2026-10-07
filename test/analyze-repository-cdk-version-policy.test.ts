@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fixtures } from "./fixtures.ts";
 import { getFixtureReport } from "./repository-diagnostics-test-helpers.ts";

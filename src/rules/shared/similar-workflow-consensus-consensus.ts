@@ -7,26 +7,6 @@ import {
   withWorkflowConsensus,
 } from "./similar-workflow-consensus-shared.ts";
 
-function withSimilarWorkflowConcurrencyConsensus(
-  context: RuleContext,
-  workflowPath: string,
-  adjustment: SimilarWorkflowConsensusAdjustment,
-): DiagnosticTransform {
-  return (diagnostic: Diagnostic) =>
-    withWorkflowConsensus(
-      diagnostic,
-      context.repository.similarWorkflows.index.concurrency.get(workflowPath),
-      adjustment,
-      {
-        peerText: "Similar workflows already using concurrency include",
-        why: (evidence, peerText) =>
-          `In this repository, ${evidence.peerCount} similar workflows already use concurrency.${peerText}`,
-        aiHandoff:
-          "Match the established concurrency pattern already used in similar workflows where it fits this workflow's trigger semantics.",
-      },
-    );
-}
-
 export function withSimilarWorkflowTimeoutConsensus(
   context: RuleContext,
   workflowPath: string,

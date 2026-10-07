@@ -8,6 +8,8 @@ This rule looks for:
 - followed within 3 steps by `cargo test`
 - where both commands use the same profile, target, features, package scope, and target selection
 - where `cargo test` does not use `--no-run`
+- where working directory, visible environment and step condition match
+- equals/space flag forms are compared; unknown flags, shell prefixes and dynamic commands are excluded rather than assumed equivalent
 
 Why it matters:
 

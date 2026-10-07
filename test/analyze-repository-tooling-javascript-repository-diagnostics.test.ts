@@ -161,16 +161,16 @@ describe("analyzeRepository repo-aware and tooling rules: javascript repository 
 
     test.each(cases)("$name", async ({ fixture, expectFinding }) => {
       const report = await getFixtureReport(fixture, baseOptions);
-      const finding = report.findings.find((c) => c.ruleId === "npm-ci-over-npm-install");
+      const finding = report.findings.find((c) => c.ruleId === "prefer-npm-ci");
       if (expectFinding) {
         expect(finding).toBeDefined();
-        expect(finding!.scope).toBe("repository");
+        expect(finding!.source?.kind).toBe("workflow");
         expect(finding!.severity).toBe("warning");
         expect(finding!.confidence).toBe("high");
         expect(finding!.docsPath).toBe("docs/rules/npm-ci-over-npm-install.md");
         expect(finding!.location.path).toBe(".github/workflows/ci.yml");
         expect(finding!.message).toContain("npm install");
-        expect(finding!.message).toContain("npm ci");
+        expect(finding!.suggestion).toContain("npm ci");
       } else {
         expect(finding).toBeUndefined();
       }

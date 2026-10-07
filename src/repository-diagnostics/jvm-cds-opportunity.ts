@@ -23,11 +23,11 @@ const JVM_TEST_PATTERNS: RegExp[] = [
 ];
 
 const CDS_PATTERNS: RegExp[] = [
-  /-Xshare:/,
-  /-XX:SharedArchiveFile/,
-  /-XX:ArchiveClassesAtExit/,
-  /-XX:DumpLoadedClassList/,
-  /AppCDS/,
+  /-Xshare:/i,
+  /-XX:SharedArchiveFile/i,
+  /-XX:ArchiveClassesAtExit/i,
+  /-XX:DumpLoadedClassList/i,
+  /AppCDS/i,
 ];
 
 const NATIVE_IMAGE_PATTERNS: RegExp[] = [
@@ -38,9 +38,9 @@ const NATIVE_IMAGE_PATTERNS: RegExp[] = [
 ];
 
 const BOOSTER_PATTERNS: { pattern: RegExp; label: string; score: number }[] = [
-  { pattern: /forkCount/, label: "surefire-fork-count", score: 3 },
-  { pattern: /reuseForks\s*=\s*false/, label: "surefire-reuse-forks", score: 3 },
-  { pattern: /maxParallelForks/, label: "gradle-parallel-forks", score: 3 },
+  { pattern: /forkCount/i, label: "surefire-fork-count", score: 3 },
+  { pattern: /reuseForks\s*=\s*false/i, label: "surefire-reuse-forks", score: 3 },
+  { pattern: /maxParallelForks/i, label: "gradle-parallel-forks", score: 3 },
   { pattern: /\b(?:integration|e2e|smoke|end-to-end)\b/i, label: "integration-tests", score: 2 },
   { pattern: /\bsurefire\b|\bfailsafe\b/i, label: "surefire-failsafe", score: 2 },
 ];

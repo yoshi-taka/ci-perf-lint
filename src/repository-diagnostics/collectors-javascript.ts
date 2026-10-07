@@ -6,7 +6,6 @@ import {
 } from "./imports.ts";
 import { collectLargeBarrelFileDiagnostics } from "./large-barrel.ts";
 import { collectLargeJestSnapshotDiagnostics } from "./jest-snapshot.ts";
-import { collectNpmCiOverNpmInstallDiagnostics } from "./npm-ci-over-npm-install.ts";
 import { collectPackageJsonNodeRunDiagnostics } from "./package-json-node-run.ts";
 import { collectPackageJsonPnpmVersionDiagnostics } from "./package-json-pnpm-version.ts";
 import { collectPreferEslintConcurrencyDiagnostics } from "./package-json-eslint-concurrency.ts";
@@ -100,11 +99,6 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectLargeBarrelFileDiagnostics(repoRoot, repository, warnings, scanContext),
-  },
-  {
-    id: "npm-ci-over-npm-install",
-    gate: gateKeys.javascriptPackageScripts,
-    collect: (context) => collectNpmCiOverNpmInstallDiagnostics(context),
   },
   {
     id: "playwright-config-uses-npm-run",

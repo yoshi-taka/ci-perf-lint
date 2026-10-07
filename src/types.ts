@@ -222,7 +222,6 @@ export interface RuleMeta {
   featurePredicate?: FeatureMaskPredicate;
   skipIf?: Predicate;
   precheck?: (workflow: { source?: string }) => number;
-  precheckBudget?: number;
   impliedChecks?: readonly string[];
   implications?: readonly RuleImplication[];
   scheduling?: RuleScheduling;

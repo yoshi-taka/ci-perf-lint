@@ -220,10 +220,9 @@ describe("analyzeRepository repo-aware and tooling rules: repeated install diagn
     expect(hasFinding("reusable-ok", "repeated-install-in-same-job")).toBe(false);
   });
 
-  test("flags repeated install via different managers separately", () => {
+  test("does not flag different pip dependency sets as duplicate installs", () => {
     const f = findings("mixed-install", "repeated-install-in-same-job");
-    expect(f).toHaveLength(1);
-    expect(f[0]!.message).toContain("pip install 3 times");
+    expect(f).toHaveLength(0);
   });
 
   test("does not flag bun install with lockfile-only as repeated install", () => {

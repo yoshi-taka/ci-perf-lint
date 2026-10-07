@@ -3,7 +3,6 @@ import {
   pipe,
   taggedPipe,
   identityDiagnosticTransform,
-  getDiagnosticTransformMetadata,
   hasAppliedTransform,
   markTransformApplied,
   getAppliedTransformLabels,

@@ -1,5 +1,4 @@
-const npmRunMatcher =
-  /^\s*npm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)((?:\s+--[^\s]+)*)((?:\s+--(?:\s+.*)?)?)\s*$/;
+const npmRunMatcher = /^\s*npm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)(\s+--(?:\s+.*)?)?\s*$/;
 
 export function detectSimpleNpmRunFromText(
   text: string,
@@ -13,11 +12,64 @@ export function detectSimpleNpmRunFromText(
   if (!script) {
     return undefined;
   }
-  const passthrough = match[3]?.trim() ?? "";
+  const passthrough = match[2]?.trim() ?? "";
   return {
     script,
     replacement: passthrough ? `node --run ${script} ${passthrough}` : `node --run ${script}`,
   };
+}
+
+/** Static words only: unknown expansion or shell control must not prove equivalence. */
+export function staticShellWords(text: string): string[] | undefined {
+  const words: string[] = [];
+  let word = "";
+  let quote = "";
+  let started = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]!;
+    if (/[$`]/.test(char)) {
+      return undefined;
+    }
+    if (char === "\\" && quote !== "'") {
+      const next = text[++i];
+      if (next === undefined) {
+        return undefined;
+      }
+      if (next !== "\n") {
+        word += next;
+        started = true;
+      }
+    } else if (quote) {
+      if (char === quote) {
+        quote = "";
+      } else {
+        word += char;
+      }
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      started = true;
+    } else if (/[;&|<>()\n]/.test(char)) {
+      return undefined;
+    } else if (char === "#" && !started) {
+      break;
+    } else if (/\s/.test(char)) {
+      if (started) {
+        words.push(word);
+      }
+      word = "";
+      started = false;
+    } else {
+      word += char;
+      started = true;
+    }
+  }
+  if (quote) {
+    return undefined;
+  }
+  if (started) {
+    words.push(word);
+  }
+  return words;
 }
 
 export const MAKE_LIKE_RE = /^\s*(?:make|gmake)\b/;

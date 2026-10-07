@@ -10,11 +10,12 @@ Why this rule exists:
 
 Current MVP heuristic:
 
-- the same install manager (npm, pip, go, etc.) appears in two or more steps within the same job
+- the same static install command, dependency arguments, working directory and visible environment appear in two or more steps within a job
 - reusable workflow jobs are ignored
 - scope-modifying flags (e.g. pnpm `--ignore-workspace`, `--filter`, npm `--workspace`) are considered part of the install identity; installs with different flags are not flagged as duplicates
 - npm `--global`/`-g` installs are differentiated by the package name(s) being installed — only truly identical package installs are flagged
 - frozen/immutable installs (`npm ci`, `--frozen-lockfile`) are treated as a different scope from plain installs — `yarn install --frozen-lockfile` followed by `yarn install` is not flagged because the first verifies integrity while the second can update the lockfile
+- different pip packages or requirements files are not duplicates; arbitrary Gradle/Maven/sbt tasks are not install invocations
 
 Typical remediation:
 

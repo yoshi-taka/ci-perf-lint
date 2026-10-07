@@ -10,7 +10,6 @@ import {
   everyNode,
   formatWitnessChain,
   formatWitnesses,
-  type EvidenceNode,
 } from "../src/rules/shared/evidence-propagation.ts";
 
 describe("EvidenceNode construction", () => {

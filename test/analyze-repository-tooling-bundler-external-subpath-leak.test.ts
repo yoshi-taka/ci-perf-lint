@@ -42,33 +42,24 @@ describe("analyzeRepository repo-aware rules: bundler-external-subpath-leak", ()
   });
 
   describe("esbuild CLI external config", () => {
-    test("warns when esbuild --external flags are root-only and subpath imports exist", async () => {
+    test("does not warn when esbuild package externals implicitly cover subpaths", async () => {
       const report = await getFixtureReport(
         fixtures.bundlerExternalSubpathLeakEsbuildLike,
         baseOptions,
       );
       const findings = report.findings.filter((c) => c.ruleId === "bundler-external-subpath-leak");
-      expect(findings.length).toBeGreaterThan(0);
-      for (const f of findings) {
-        expect(f.scope).toBe("repository");
-        expect(f.severity).toBe("warning");
-      }
+      expect(findings).toHaveLength(0);
     });
   });
 
   describe("tsup config external config", () => {
-    test("warns when tsup config has root-only externals and subpath imports exist", async () => {
+    test("does not warn when tsup uses esbuild package external semantics", async () => {
       const report = await getFixtureReport(
         fixtures.bundlerExternalSubpathLeakTsupLike,
         baseOptions,
       );
       const findings = report.findings.filter((c) => c.ruleId === "bundler-external-subpath-leak");
-      expect(findings.length).toBe(2);
-      for (const f of findings) {
-        expect(f.scope).toBe("repository");
-        expect(f.severity).toBe("warning");
-        expect(f.location.path).toBe("tsup.config.ts");
-      }
+      expect(findings).toHaveLength(0);
     });
   });
 
@@ -84,7 +75,7 @@ describe("analyzeRepository repo-aware rules: bundler-external-subpath-leak", ()
   });
 
   describe("Wildcard external config (should not warn)", () => {
-    test("does not warn when external includes wildcard patterns covering subpaths", async () => {
+    test("does not warn when external includes explicit imported subpaths", async () => {
       const report = await getFixtureReport(
         fixtures.bundlerExternalSubpathLeakWildcardOk,
         baseOptions,
@@ -95,7 +86,7 @@ describe("analyzeRepository repo-aware rules: bundler-external-subpath-leak", ()
   });
 
   describe("node_modules exports transitive check", () => {
-    test("warns when installed package declares subpath exports and external is root-only", async () => {
+    test("does not infer bundled subpath imports from a package exports declaration alone", async () => {
       const report = await getFixtureReport(
         fixtures.bundlerExternalSubpathLeakNodeModulesLike,
         baseOptions,
@@ -103,17 +94,7 @@ describe("analyzeRepository repo-aware rules: bundler-external-subpath-leak", ()
 
       const findings = report.findings.filter((c) => c.ruleId === "bundler-external-subpath-leak");
 
-      expect(findings.length).toBe(1);
-
-      const f = findings[0]!;
-      expect(f.message).toContain("@reduxjs/toolkit");
-      expect(f.message).toContain("subpath exports");
-      expect(f.scope).toBe("repository");
-      expect(f.severity).toBe("warning");
-      expect(f.location.path).toBe("vite.config.js");
-      expect(f.why).toContain("transitive bundling");
-      expect(f.suggestion).toContain("RegExp");
-      expect(f.score).toBe(55);
+      expect(findings).toHaveLength(0);
     });
 
     test("does not warn when external uses RegExp covering subpaths", async () => {

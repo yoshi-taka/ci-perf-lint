@@ -8,7 +8,7 @@ Without explicit parallelism configuration, nobody on the team is thinking about
 
 ## What it flags
 
-Workflows that run `terraform plan`, `apply`, or `destroy` without configuring `--parallelism` or `TF_CLI_ARGS`.
+Commands that run `terraform plan`, `apply`, or `destroy` without `-parallelism`/`--parallelism` (equals or space form), or applicable `TF_CLI_ARGS`/`TF_CLI_ARGS_<command>` env. Settings in unrelated jobs do not suppress findings.
 
 ## Suggested action
 

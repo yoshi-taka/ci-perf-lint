@@ -6,7 +6,6 @@ import type {
   RenderOptions,
   ReportData,
   WorkflowSummary,
-  RuleAbstention,
 } from "./types.ts";
 
 const maxRenderedAffectedLocations = 5;

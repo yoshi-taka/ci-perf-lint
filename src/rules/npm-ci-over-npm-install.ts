@@ -2,6 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { shellCommandSegments, staticShellWords } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "prefer-npm-ci",
@@ -9,11 +10,6 @@ const meta = {
   confidence: "high",
   docsPath: "docs/rules/npm-ci-over-npm-install.md",
 } satisfies RuleMeta;
-
-const npmInstallPattern = /\bnpm\s+(?:install|i)\b/i;
-const npmCiPattern = /\bnpm\s+ci\b/i;
-const packageLockOnlyPattern = /\b--package-lock-only\b/i;
-const dryRunPattern = /\b--dry-run\b/i;
 
 /**
  * Is this step a plain "npm install" (no specific packages) that
@@ -26,27 +22,19 @@ const dryRunPattern = /\b--dry-run\b/i;
  * - npm install <package>...        (adding dependencies, not just installing)
  */
 function isPlainNpmInstall(run: string): boolean {
-  if (!npmInstallPattern.test(run)) {
-    return false;
-  }
-  if (npmCiPattern.test(run)) {
-    return false;
-  }
-  if (packageLockOnlyPattern.test(run) || dryRunPattern.test(run)) {
-    return false;
-  }
-
-  // Extract the part after "install" or "i" and check for non-flag tokens
-  const match = run.match(/\b(?:install|i)\s*(.*)/i);
-  if (!match?.[1]) {
-    return true; // bare "npm install" → should be "npm ci"
-  }
-
-  const rest = match[1];
-  const tokens = rest.trim().split(/\s+/);
-  // If every remaining token starts with -, it's just flags → should be "npm ci"
-  // If any token doesn't start with -, it's a package name → NOT flagged
-  return tokens.every((t) => t.startsWith("-"));
+  return shellCommandSegments(run).some((command) => {
+    const words = staticShellWords(command);
+    if (words?.[0] !== "npm" || !["install", "i"].includes(words[1] ?? "")) {
+      return false;
+    }
+    return words
+      .slice(2)
+      .every((word) =>
+        /^(?:--(?:ignore-scripts|no-audit|no-fund|prefer-offline|offline|legacy-peer-deps)|--(?:omit|include)=[\w,]+)$/.test(
+          word,
+        ),
+      );
+  });
 }
 
 export const npmCiOverNpmInstallRule = {

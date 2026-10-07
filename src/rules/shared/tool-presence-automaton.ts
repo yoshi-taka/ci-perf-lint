@@ -41,7 +41,7 @@ const TOOL_PRESENCE_SPECS: ToolPresenceSpec[] = [
   },
   {
     key: "hasTerraform",
-    regex: /\bterraform\s+init\b/,
+    regex: /\bterraform(?:\s+-chdir(?:=|\s+)\S+)?\s+(?:init|plan|apply|destroy)\b/,
     keywords: ["terraform"],
   },
   {

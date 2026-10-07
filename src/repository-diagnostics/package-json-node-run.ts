@@ -3,6 +3,10 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import {
+  detectSimpleNpmRunFromText,
+  shellCommandSegments,
+} from "../rules/shared/command-patterns.ts";
 
 const preferNodeRunOverNpmRunMeta = {
   id: "prefer-node-run-over-npm-run",
@@ -37,20 +41,11 @@ function collectNpmRunScriptReferences(scriptCommand: string): {
   replacement: string;
 }[] {
   const references: { script: string; replacement: string }[] = [];
-  const matcher =
-    /(?:^|[;&|]\s*)npm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)((?:\s+--[^\s]+)*)((?:\s+--(?:\s+[^&|;]*)?)?)(?=$|\s*[;&|])/g;
-
-  for (const match of scriptCommand.matchAll(matcher)) {
-    const script = match[1];
-    if (!script) {
-      continue;
+  for (const command of shellCommandSegments(scriptCommand)) {
+    const reference = detectSimpleNpmRunFromText(command);
+    if (reference) {
+      references.push(reference);
     }
-
-    const passthrough = match[3]?.trim() ?? "";
-    references.push({
-      script,
-      replacement: passthrough ? `node --run ${script} ${passthrough}` : `node --run ${script}`,
-    });
   }
 
   return references;

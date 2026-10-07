@@ -1,7 +1,8 @@
 import type { Severity, Diagnostic, RuleMeta } from "../types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
-import { getLoweredWorkflowStepText } from "../rules/shared/workflow-step-text.ts";
+import { collectTerraformCommands } from "./terraform-commands.ts";
+import { getLocation } from "../workflow.ts";
 import { getTerraformFileIndex } from "./terraform-files.ts";
 
 const meta = {
@@ -11,43 +12,22 @@ const meta = {
   docsPath: "docs/rules/terraform-parallelism-unconfigured.md",
 } satisfies RuleMeta;
 
-const TF_COMMANDS = /\bterraform\s+(?:plan|apply|destroy)\b/;
+const PARALLELISM = /(?:^|\s)--?parallelism(?:\s*=\s*|\s+)\d+(?=\s|$)/;
 
 export async function collectTerraformParallelismDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
-  let hasTerraformWorkflow = false;
-  let exampleWorkflow: (typeof context.predicateIndex.allSteps)[number]["workflow"] | undefined;
-  let hasParallelismConfig = false;
-
-  for (const { step, workflow } of context.predicateIndex.allSteps) {
-    if (hasTerraformWorkflow && hasParallelismConfig) {
-      break;
+  const untuned = collectTerraformCommands(context.workflows).filter((command) => {
+    if (!["plan", "apply", "destroy"].includes(command.verb)) {
+      return false;
     }
-    const loweredText = getLoweredWorkflowStepText(step);
-    const matchIndex = loweredText.search(TF_COMMANDS);
-    if (matchIndex === -1) {
-      continue;
-    }
-    hasTerraformWorkflow = true;
-    exampleWorkflow ??= workflow;
-    const afterCommand = loweredText.slice(matchIndex);
-    if (/--parallelism\s*=\s*\d+/.test(afterCommand)) {
-      hasParallelismConfig = true;
-    }
-  }
-
-  if (!hasParallelismConfig && exampleWorkflow) {
-    hasParallelismConfig = /TF_CLI_ARGS[\s\S]{0,100}parallelism/i.test(
-      exampleWorkflow.source ?? "",
-    );
-  }
-
-  if (!hasTerraformWorkflow || !exampleWorkflow) {
-    return [];
-  }
-
-  if (hasParallelismConfig) {
+    const env = [command.env.TF_CLI_ARGS, command.env[`TF_CLI_ARGS_${command.verb}`]]
+      .filter((value): value is string => typeof value === "string")
+      .join(" ");
+    return !PARALLELISM.test(command.args.join(" ")) && !PARALLELISM.test(env);
+  });
+  const example = untuned[0];
+  if (!example) {
     return [];
   }
 
@@ -58,13 +38,8 @@ export async function collectTerraformParallelismDiagnostics(
   return [
     buildRepositoryDiagnostic(context.repository, meta, {
       severity,
-      location: {
-        path: exampleWorkflow.relativePath,
-        line: 1,
-        column: 1,
-      },
-      message:
-        "No --parallelism or TF_CLI_ARGS with parallelism found in any workflow that runs terraform plan/apply/destroy.",
+      location: getLocation(example.workflow, example.step.runNode ?? example.step.node),
+      message: `${untuned.length} Terraform plan/apply/destroy command(s) lack -parallelism/--parallelism or an applicable TF_CLI_ARGS setting.`,
       why: "Terraform defaults to parallelism=10, which is slow for large configurations. If no workflow has ever set --parallelism, nobody on the team is thinking about it. Tuning it to match runner capacity and resource dependency graph is one of the highest-leverage terraform CI optimizations.",
       suggestion:
         "Add --parallelism=N to terraform plan/apply/destroy commands or set TF_CLI_ARGS=-parallelism=N at the workflow or job level. Start with 30-50 on standard GitHub runners and adjust based on resource contention and API rate limits.",

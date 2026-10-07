@@ -1,6 +1,6 @@
-# `npm-ci-over-npm-install`
+# `prefer-npm-ci` (`npm-ci-over-npm-install` explainer)
 
-Detects workflows that use `npm install` instead of `npm ci` when `package-lock.json` exists in the repository.
+Detects ordinary workflow dependency installs through `npm install`/`npm i`. The canonical ID is `prefer-npm-ci`; a single workflow rule owns detection and uses the install step's location. Switching requires a committed, current `package-lock.json`.
 
 Why this rule exists:
 
@@ -10,13 +10,12 @@ Why this rule exists:
 
 Current MVP heuristic:
 
-- `package-lock.json` exists at the repository root
-- a workflow step runs `npm install` without options that change its behavior (e.g. `--save`, `--global`, `--workspace`)
+- a workflow step runs an ordinary `npm install`/`npm i`, optionally with recognized CI install flags
 - the step is not a lockfile-only or dry-run invocation
 
 Conservative bias:
 
-- only flags bare `npm install` without additional flags
+- flags bare installs and known compatible options such as `--ignore-scripts` or `--omit=dev`
 - ignores `npm install --package-lock-only`, `npm install --dry-run`, and similar non-install variants
 - does not flag `npm install` with workspace, global, or save-related flags that indicate intentional non-CI usage
 

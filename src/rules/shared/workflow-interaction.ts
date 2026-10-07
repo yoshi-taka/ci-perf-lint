@@ -213,8 +213,8 @@ export function detectConcurrencyDomains(
   }
 
   return [...domainMap.entries()]
-    .filter(([_, d]) => d.members.length > 1)
-    .map(([_, d]) => ({
+    .filter(([, d]) => d.members.length > 1)
+    .map(([, d]) => ({
       groupText: d.groupText,
       memberWorkflows: [...d.members].sort(),
       hasCancelInProgress: d.cancel,

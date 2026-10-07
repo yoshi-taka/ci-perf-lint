@@ -29,30 +29,6 @@ const clusterGRules = new Set([
   "docker-build-load-true-unnecessary",
 ]);
 
-function expectedClusterGRules(p: Params): Set<string> {
-  const expected = new Set<string>();
-
-  if (!p.usesDockerBuild) {
-    return expected;
-  }
-
-  if (p.usesBuildx) {
-    if (!p.hasCacheFrom && !p.hasCacheTo) {
-      expected.add("docker-build-without-layer-cache");
-    }
-    if (p.hasLoadTrue && !p.usesBuildKitOutputs) {
-      expected.add("docker-build-load-true-unnecessary");
-    }
-  } else {
-    if (!p.hasCacheFrom && !p.hasCacheTo) {
-      expected.add("docker-build-without-layer-cache");
-      expected.add("docker-build-cache-disabled-in-ci");
-    }
-  }
-
-  return expected;
-}
-
 function makeLabel(p: Params): string {
   const b = (v: boolean, t: string, f: string) => (v ? t : f);
   return `${b(p.usesDockerBuild, "D", "d")}${b(p.usesBuildx, "X", "x")}${b(p.hasCacheFrom, "F", "f")}${b(p.hasCacheTo, "T", "t")}${b(p.hasLoadTrue, "L", "l")}${b(p.usesBuildKitOutputs, "K", "k")}`;

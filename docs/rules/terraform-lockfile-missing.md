@@ -2,7 +2,7 @@
 
 ## What it flags
 
-Repositories that run `terraform` in CI but have no `.terraform.lock.hcl` file committed.
+Terraform root modules initialized in CI without their own `.terraform.lock.hcl`. Step/job/workflow working-directory defaults, static `cd`, and `terraform -chdir` are considered. A lockfile in another module does not suppress the finding.
 
 ## Why it matters
 
@@ -27,4 +27,4 @@ Without a lock file, Terraform resolves provider versions at `terraform init` ti
 ## Caveats
 
 - The lock file must include hashes for the CI runner platform. Run `terraform providers lock -platform=linux_amd64` if developing on macOS/Windows.
-- Large monorepos with many terraform directories may prefer per-directory lock file tracking.
+- Each initialized root module needs its own lockfile; dynamic directories cannot be resolved by this heuristic.

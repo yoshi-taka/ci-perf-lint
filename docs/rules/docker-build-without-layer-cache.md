@@ -1,6 +1,8 @@
 # docker-build-without-layer-cache
 
-Detects `docker/build-push-action` and `depot/build-push-action` steps that do not configure `cache-from` and `cache-to`.
+Detects `docker/build-push-action` steps that do not configure `cache-from` and `cache-to`.
+
+Depot actions are excluded: their normal builds automatically persist the project's layer cache, without GHA cache exports.
 
 Without layer caching, every CI run rebuilds all Docker layers from scratch, even when the Dockerfile and source files are unchanged. This adds minutes per build for no benefit.
 
@@ -21,7 +23,7 @@ Other supported backends include `type=registry`, `type=s3`, `type=azblob`, and 
 - Docker layer caching is one of the highest-impact performance optimizations available for CI.
 - On a typical multi-layer image, build time can drop by 50-80% after enabling cache.
 - `type=gha` requires no additional infrastructure, API keys, or cloud resources.
-- The only legitimate reason to skip layer caching is an explicit `no-cache: true` (which this rule respects).
+- Explicit `no-cache: true` is respected. Persistent remote or self-hosted builders may also provide caching outside the visible workflow.
 
 ## What to check
 

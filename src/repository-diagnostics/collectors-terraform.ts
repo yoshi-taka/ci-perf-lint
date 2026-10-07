@@ -35,14 +35,7 @@ export const terraformDiagnosticCollectors = [
   {
     id: "terraform-lockfile-missing",
     gate: gateKeys.terraformHeavy,
-    collect: ({ repoRoot, repository, warnings, scanContext, featureIndex }) =>
-      collectTerraformLockfileDiagnostics(
-        repoRoot,
-        repository,
-        warnings,
-        scanContext,
-        featureIndex,
-      ),
+    collect: (context) => collectTerraformLockfileDiagnostics(context),
   },
   {
     id: "terraform-parallelism-unconfigured",

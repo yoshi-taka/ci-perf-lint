@@ -18,7 +18,6 @@ import {
   findUnreachable,
   generateDecisionTable,
   evaluate,
-  type Predicate,
   type EvalContext,
 } from "../src/rules/shared/predicate.ts";
 import type { WorkflowDocument } from "../src/workflow.ts";
@@ -237,11 +236,11 @@ describe("Contradiction detection", () => {
 });
 
 describe("Implication detection", () => {
-  test("A implies A or B", () => {
+  test("independent clauses do not imply one another", () => {
     const pred = or(workflowFact("isHeavyWorkflow", true), and(toolPresent("hasNpmRun")));
     const dnf = toDNF(pred);
     const implications = findImplications(dnf);
-    // each clause should be self-implied
+    expect(implications).toHaveLength(0);
   });
 
   test("overlap between compatible clauses", () => {

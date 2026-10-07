@@ -4,6 +4,7 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobRunsOnStandardHostedRunner } from "./shared/workflow-jobs.ts";
 import path from "node:path";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "missing-test-worker-tuning-for-standard-runner",
@@ -22,33 +23,32 @@ const testToolWorkerTuningRules: readonly {
 }[] = [
   {
     tool: "jest",
-    detectionMatcher: /(?:^|\s)(?:npx\s+)?jest(?:\s|$)/i,
+    detectionMatcher: /^(?:(?:npx|bunx|pnpm exec|yarn exec)\s+)?jest(?:\s|$)/i,
     tuningMatcher: /--maxWorkers(?:=|\s)\S+|--runInBand\b/i,
     examples: "`--maxWorkers` or `--runInBand`",
   },
   {
     tool: "vitest",
-    detectionMatcher: /(?:^|\s)(?:npx\s+)?vitest(?:\s|$)/i,
+    detectionMatcher: /^(?:(?:npx|bunx|pnpm exec|yarn exec)\s+)?vitest(?:\s|$)/i,
     tuningMatcher: /--maxWorkers(?:=|\s)\S+|--minWorkers(?:=|\s)\S+|--pool(?:=|\s)\S+/i,
     examples: "`--maxWorkers` or `--minWorkers`",
   },
   {
     tool: "playwright",
-    detectionMatcher: /(?:^|\s)(?:npx\s+)?playwright(?:\s+test|\s|$)|@playwright\/test/i,
-    tuningMatcher: /\b--workers(?:=|\s)\S+/i,
+    detectionMatcher: /^(?:(?:npx|bunx|pnpm exec|yarn exec)\s+)?playwright\s+test\b/i,
+    tuningMatcher: /(?:^|\s)--workers(?:=|\s)\S+/i,
     examples: "`--workers`",
   },
   {
     tool: "pytest",
-    detectionMatcher: /(?:^|\s)(?:(?:python|python3)\s+-m\s+)?pytest(?:\s|$)/i,
+    detectionMatcher: /^(?:(?:python|python3)\s+-m\s+|uv run\s+)?pytest(?:\s|$)/i,
     tuningMatcher: /\s-n\s*(?:auto|\d+)\b|\s--numprocesses(?:=|\s)(?:auto|\d+)/i,
     examples: "`-n auto` or `--numprocesses`",
   },
 ];
 
-function detectDirectTestTool(step: WorkflowStep): TestTool | undefined {
-  const text = `${step.name ?? ""} ${step.run ?? ""}`.trim();
-  return testToolWorkerTuningRules.find((rule) => rule.detectionMatcher.test(text))?.tool;
+function detectDirectTestTool(command: string): TestTool | undefined {
+  return testToolWorkerTuningRules.find((rule) => rule.detectionMatcher.test(command))?.tool;
 }
 
 function hasVisibleWorkerTuning(step: WorkflowStep, tool: TestTool): boolean {
@@ -101,16 +101,18 @@ function getUntunedTestStep(
   context: RuleContext,
 ): { step: WorkflowStep; tool: TestTool } | undefined {
   for (const step of job.steps) {
-    const tool = detectDirectTestTool(step);
-    if (!tool) {
-      continue;
-    }
-
-    if (
-      !hasVisibleWorkerTuning(step, tool) &&
-      !hasApplicableConfig(workflow, job, step, tool, context)
-    ) {
-      return { step, tool };
+    for (const command of shellCommandSegments(step.run ?? "")) {
+      const tool = detectDirectTestTool(command);
+      if (!tool) {
+        continue;
+      }
+      const commandStep = { ...step, run: command };
+      if (
+        !hasVisibleWorkerTuning(commandStep, tool) &&
+        !hasApplicableConfig(workflow, job, commandStep, tool, context)
+      ) {
+        return { step, tool };
+      }
     }
   }
 

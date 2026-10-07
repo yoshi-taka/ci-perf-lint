@@ -326,12 +326,12 @@ export async function evaluateRulesCoarseToFine(
     const ruleId = rule.meta.id;
     evaluatedRuleIds.add(ruleId);
 
-    const { maxFindings, precheckBudget = 20 } = rule.meta;
+    const { maxFindings } = rule.meta;
     const precheck = rule.meta.precheck;
 
     let candidates: ScoredWorkflow[];
     if (precheck) {
-      candidates = selectTopK(workflows, precheck, precheckBudget);
+      candidates = prioritizeWorkflows(workflows, precheck);
     } else {
       candidates = new Array<ScoredWorkflow>(workflows.length);
       for (let i = 0; i < workflows.length; i++) {
@@ -467,66 +467,12 @@ export async function evaluateRulesCoarseToFine(
   return deduplicateRefiner().refine(combined, {});
 }
 
-function selectTopK(
+function prioritizeWorkflows(
   workflows: AnyWorkflowDocument[],
   precheck: (workflow: { source?: string }) => number,
-  budget: number,
 ): ScoredWorkflow[] {
-  const n = workflows.length;
-  if (n === 0 || budget <= 0) {
-    return [];
-  }
-
-  if (budget >= n) {
-    const result = new Array<ScoredWorkflow>(n);
-    for (let i = 0; i < n; i++) {
-      const w = workflows[i]!;
-      const score = precheck(w);
-      result[i] = { workflow: w, score };
-    }
-    return result;
-  }
-
-  const top = new Array<{ workflow: AnyWorkflowDocument; score: number }>(budget);
-  let filled = 0;
-
-  for (let i = 0; i < n; i++) {
-    const w = workflows[i]!;
-    const score = precheck(w);
-    if (score <= 0) {
-      continue;
-    }
-
-    if (filled < budget) {
-      top[filled++] = { workflow: w, score };
-      if (filled === budget) {
-        top.sort((a, b) => b.score - a.score);
-      }
-    } else if (score > top[budget - 1]!.score) {
-      let lo = 0;
-      let hi = budget;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (top[mid]!.score >= score) {
-          lo = mid + 1;
-        } else {
-          hi = mid;
-        }
-      }
-      for (let j = budget - 1; j > lo; j--) {
-        top[j] = top[j - 1]!;
-      }
-      top[lo] = { workflow: w, score };
-    }
-  }
-
-  if (filled < budget) {
-    const result = new Array<ScoredWorkflow>(filled);
-    for (let i = 0; i < filled; i++) {
-      result[i] = top[i]!;
-    }
-    return result;
-  }
-
-  return top;
+  // Prechecks are ordering hints, not sound exclusion predicates. Audit every workflow.
+  return workflows
+    .map((workflow) => ({ workflow, score: precheck(workflow) }))
+    .sort((a, b) => b.score - a.score);
 }

@@ -50,55 +50,6 @@ const STRENGTH_RANK: Record<EvidenceStrength, number> = {
   weak: 1,
 };
 
-function strengthJoin(a: EvidenceStrength, b: EvidenceStrength): EvidenceStrength {
-  return STRENGTH_RANK[a] >= STRENGTH_RANK[b] ? a : b;
-}
-
-function strengthMeet(a: EvidenceStrength, b: EvidenceStrength): EvidenceStrength {
-  return STRENGTH_RANK[a] <= STRENGTH_RANK[b] ? a : b;
-}
-
-function and(a: GradedEvidence<boolean>, b: GradedEvidence<boolean>): GradedEvidence<boolean> {
-  return {
-    value: a.value && b.value,
-    strength: strengthMeet(a.strength, b.strength),
-    signals: [...a.signals, ...b.signals],
-  };
-}
-
-function or(a: GradedEvidence<boolean>, b: GradedEvidence<boolean>): GradedEvidence<boolean> {
-  return {
-    value: a.value || b.value,
-    strength: strengthJoin(a.strength, b.strength),
-    signals: [...a.signals, ...b.signals],
-  };
-}
-
-function not(ev: GradedEvidence<boolean>): GradedEvidence<boolean> {
-  return { value: !ev.value, strength: ev.strength, signals: ev.signals };
-}
-
-function any(evidence: GradedEvidence<boolean>[]): GradedEvidence<boolean> {
-  if (evidence.length === 0) {
-    return weak(false);
-  }
-  return evidence.reduce(or);
-}
-
-function all(evidence: GradedEvidence<boolean>[]): GradedEvidence<boolean> {
-  if (evidence.length === 0) {
-    return weak(true);
-  }
-  return evidence.reduce(and);
-}
-
-function combine(strengths: readonly EvidenceStrength[]): EvidenceStrength {
-  if (strengths.length === 0) {
-    return "weak";
-  }
-  return strengths.reduce(strengthJoin);
-}
-
 export function meetsMinimum(
   evidence: GradedEvidence<boolean>,
   minimum: EvidenceStrength,

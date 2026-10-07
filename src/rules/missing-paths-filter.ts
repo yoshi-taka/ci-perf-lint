@@ -9,7 +9,7 @@ import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
-import { and, workflowFact, or, not } from "./shared/predicate.ts";
+import { workflowFact, or } from "./shared/predicate.ts";
 
 const meta = {
   id: "missing-paths-filter",

@@ -1,33 +1,25 @@
 # `prefer-frozen-lockfile`
 
-Detects workflows that use npm/pnpm/yarn/bun without a frozen lockfile flag, allowing dependency resolution to run in CI.
+## Why it matters
 
-Why this rule exists:
+Frozen installs keep dependency resolution aligned with the committed lockfile.
+Explicit flags are unnecessary when the package manager already enables equivalent CI behavior.
 
-- Using `--frozen-lockfile` (or equivalent) ensures CI installs exactly what is in the committed lockfile
-- Without it, dependency resolution runs and may update or drift from the lockfile
-- Frozen installs are faster and more reproducible across environments
+## What it flags
 
-Current MVP heuristic:
+- Bun installs without `bun ci` or an enabled `--frozen-lockfile`.
+- pnpm installs without an enabled frozen flag or an applicable CI default. pnpm defaults to frozen in CI when its lockfile is present.
+- Yarn Classic installs without `--frozen-lockfile`, and modern Yarn installs whose immutable behavior is disabled. Modern Yarn defaults to immutable in CI; unknown versions are not assumed to be Classic.
+- Flags are recognized anywhere after `install`/`i`, including `=true`, `=false` and negated forms. Visible CI and package-manager settings are considered.
 
-- A workflow step runs `npm install`, `pnpm install`, `yarn install`, or `bun install`
-- The step does not use the frozen lockfile flag for that manager:
-  - npm: `npm ci`
-  - pnpm: `pnpm ci` or `pnpm install --frozen-lockfile`
-  - yarn: `yarn install --frozen-lockfile` (classic) or `yarn install --immutable` (berry)
-  - bun: `bun ci` or `bun install --frozen-lockfile`
+The separate `prefer-npm-ci` rule covers npm. `pnpm ci` is not the recommended pnpm command.
 
-Conservative bias:
+## Suggested action
 
-- does not flag `npm ci` (already frozen by default)
-- does not flag `pnpm ci` (already frozen by default)
-- does not flag `bun ci` (already frozen by default)
-- ignores install commands that add packages (e.g., `yarn add foo`)
+Commit a current lockfile and use `pnpm install --frozen-lockfile`, `yarn install --immutable` (modern), `yarn install --frozen-lockfile` (Classic), or `bun ci`.
+Preserve intentional dependency-update workflows.
 
-Typical remediation:
+## Verification
 
-- use `npm ci` instead of `npm install`
-- use `pnpm ci` instead of `pnpm install`
-- use `yarn install --immutable` (modern yarn) or `yarn install --frozen-lockfile` (yarn classic)
-- use `bun ci` instead of `bun install`
-- measure install step duration before and after adding frozen lockfile flag
+Compare total install duration and verify that an out-of-date lockfile fails installation.
+See [pnpm defaults](https://pnpm.io/cli/install) and [Yarn defaults](https://yarnpkg.com/cli/install).

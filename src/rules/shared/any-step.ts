@@ -5,6 +5,7 @@ import type { PipelineDocument, PipelineStep } from "../../buildkite-workflow.ts
 import type { CircleCiDocument } from "../../circleci-workflow.ts";
 import type { GitlabCiDocument } from "../../gitlab-ci-workflow.ts";
 import type { AnyWorkflowDocument } from "../../ci-types.ts";
+import { workflowWorkingDirectory } from "./workflow-command-context.ts";
 
 export type AnyStep = WorkflowStep | PipelineStep;
 
@@ -131,7 +132,7 @@ const commandEntryCollectors: Record<string, CIDocumentNormalizer<CIDocument>> =
             node: step.runNode,
             jobName: job.id,
             stepName: step.name ?? job.id,
-            workingDirectory: step.workingDirectory,
+            workingDirectory: workflowWorkingDirectory(d, job, step),
           });
         }
       }

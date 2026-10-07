@@ -3,6 +3,8 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { CIDocument } from "./shared/any-step.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { detectInstallCommandFromText } from "./shared/tools.ts";
+import { staticShellWords } from "./shared/command-patterns.ts";
+import { workflowStepEnv } from "./shared/workflow-command-context.ts";
 import {
   extractSemanticSteps,
   groupStepsByJob,
@@ -94,12 +96,38 @@ export const repeatedInstallInSameJobRule = {
         }
 
         const manager = detectInstallCommandFromText(step.text);
-        if (!manager) {
+        if (!manager || ["maven", "gradle", "sbt"].includes(manager)) {
           continue;
         }
 
+        const words = staticShellWords(step.text.trim());
+        if (!words || words[0] !== manager) {
+          continue;
+        }
+        const isInstall =
+          ["install", "ci", "sync"].includes(words[1] ?? "") ||
+          (manager === "go" && words[1] === "mod" && words[2] === "download");
+        if (!isInstall) {
+          continue;
+        }
         const scopeKey = getInstallScopeKey(manager, step.text);
-        const compositeKey = scopeKey ? `${manager}:${scopeKey}` : manager;
+        const targetKey =
+          manager === "npm" && scopeKey.startsWith("global")
+            ? scopeKey
+            : JSON.stringify(words.slice(2));
+        let envKey = "";
+        if (doc.kind === "github-actions") {
+          const job = doc.jobs.find((candidate) => candidate.id === jobName);
+          const original = job?.steps.find((candidate) => candidate.runNode === step.node);
+          if (job && original) {
+            envKey = JSON.stringify(
+              Object.entries(workflowStepEnv(doc, job, original)).sort(([a], [b]) =>
+                a.localeCompare(b),
+              ),
+            );
+          }
+        }
+        const compositeKey = `${manager}:${scopeKey}:${targetKey}:${step.workingDirectory ?? "."}:${envKey}`;
 
         const entries = seen.get(compositeKey) ?? [];
         entries.push({ step, index: i });

@@ -15,11 +15,9 @@ const meta = {
       : 0,
 } satisfies RuleMeta;
 
-function stepUsesDockerOrDepotBuildPushAction(step: WorkflowStep): boolean {
+function stepUsesDockerBuildPushAction(step: WorkflowStep): boolean {
   const uses = step.uses?.toLowerCase() ?? "";
-  return (
-    uses.startsWith("docker/build-push-action@") || uses.startsWith("depot/build-push-action@")
-  );
+  return uses.startsWith("docker/build-push-action@");
 }
 
 function stepHasLayerCache(step: WorkflowStep): boolean {
@@ -47,7 +45,7 @@ export const dockerBuildWithoutLayerCacheRule = {
 
       const step = job.steps.find(
         (candidate) =>
-          stepUsesDockerOrDepotBuildPushAction(candidate) &&
+          stepUsesDockerBuildPushAction(candidate) &&
           !stepDisablesDockerBuildCache(candidate) &&
           !stepHasLayerCache(candidate),
       );
