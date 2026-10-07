@@ -7,6 +7,7 @@ import { getPublishPlan } from "../scripts/publish-package-status.ts";
 import { failedBenchmarkTasks } from "../bench/benchmark-results.ts";
 import { allRules } from "../src/rules/index.ts";
 import { spawnOxlintProcess } from "../src/repository-diagnostics/embedded-oxlint-spawn.ts";
+import { analyzeRepository } from "../src/repo.ts";
 
 describe("external process failures", () => {
   test("settles every stream and status when an executable is missing", async () => {
@@ -55,6 +56,36 @@ describe("publish idempotency", () => {
 });
 
 describe("benchmark and documentation guards", () => {
+  test("repository workflows pass strict self-audit", async () => {
+    const root = path.resolve(import.meta.dir, "..");
+    const report = await analyzeRepository({
+      cwd: root,
+      targetPath: ".",
+      workflowOnly: true,
+      mode: "strict",
+      topCount: 100,
+    });
+    expect(report.workflowCount).toBeGreaterThan(0);
+    expect(report.findings).toEqual([]);
+    expect(
+      report.analysisWarnings.some(
+        (warning) => warning.kind === "parser-error" || warning.kind === "rule-error",
+      ),
+    ).toBe(false);
+  });
+
+  test("CodSpeed retains version-tag and manual benchmark triggers", async () => {
+    const text = await readFile(
+      path.join(import.meta.dir, "../.github/workflows/codspeed.yml"),
+      "utf8",
+    );
+    const doc = parseDocument(text).toJS() as {
+      on: { push: { tags: string[] }; workflow_dispatch?: unknown };
+    };
+    expect(doc.on.push.tags).toContain("v*");
+    expect(Object.hasOwn(doc.on, "workflow_dispatch")).toBe(true);
+  });
+
   test("detects task failures even when Tinybench.run resolves", async () => {
     const bench = new Bench({ iterations: 1, time: 0, warmup: false });
     bench
