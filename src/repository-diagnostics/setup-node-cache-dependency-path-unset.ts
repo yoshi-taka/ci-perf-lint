@@ -5,6 +5,9 @@ import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { getNode, getScalarString } from "../workflow.ts";
+import { workflowWorkingDirectory } from "../rules/shared/workflow-command-context.ts";
+import { detectInstallCommandFromText } from "../rules/shared/tools.ts";
+import { shellCommandSegments, staticShellWords } from "../rules/shared/command-patterns.ts";
 
 const meta = {
   id: "setup-node-cache-dependency-path-unset",
@@ -15,6 +18,7 @@ const meta = {
 
 const lockFileNames = new Set([
   "package-lock.json",
+  "npm-shrinkwrap.json",
   "yarn.lock",
   "pnpm-lock.yaml",
   "bun.lockb",
@@ -73,14 +77,6 @@ export async function collectSetupNodeCacheDependencyPathUnsetDiagnostics(
   const { repository, scanContext, predicateIndex } = context;
 
   const { hasOutside, lockFileTypes } = await findLockFilesOutsideRoot(scanContext);
-  if (!hasOutside) {
-    return [];
-  }
-
-  const lockFileGlob =
-    lockFileTypes.size === 1
-      ? `**/${[...lockFileTypes][0]}`
-      : `**/{${[...lockFileTypes].join(",")}}`;
 
   const diagnostics: Diagnostic[] = [];
   const nodeSteps = predicateIndex.bySetupActionKind.get("node");
@@ -95,6 +91,83 @@ export async function collectSetupNodeCacheDependencyPathUnsetDiagnostics(
     if (!isNodeStepWithoutCacheDependencyPath(step)) {
       continue;
     }
+    const manager = getScalarString(getNode(step.withNode!, "cache"));
+    const matchingNames =
+      manager === "npm"
+        ? ["package-lock.json", "npm-shrinkwrap.json"]
+        : manager === "yarn"
+          ? ["yarn.lock"]
+          : manager === "pnpm"
+            ? ["pnpm-lock.yaml"]
+            : [];
+    if (matchingNames.length === 0) {
+      continue;
+    }
+    const checkout = job.steps.find((candidate) => candidate.uses?.startsWith("actions/checkout@"));
+    const checkoutPath = checkout?.with?.path;
+    if (
+      checkoutPath !== undefined &&
+      (typeof checkoutPath !== "string" || checkoutPath.includes("${{"))
+    ) {
+      continue;
+    }
+    const rootCheckout = checkoutPath === undefined || checkoutPath === ".";
+    const rootLock = (
+      await Promise.all(
+        matchingNames.map((name) => scanContext.pathExists(scanContext.resolve(name))),
+      )
+    ).some(Boolean);
+    const nestedInstallLocks = await Promise.all(
+      job.steps
+        .filter((candidate) => detectInstallCommandFromText(candidate.run ?? "") === manager)
+        .map(async (candidate) => {
+          let cwd = workflowWorkingDirectory(workflow, job, candidate);
+          for (const command of shellCommandSegments(candidate.run ?? "")) {
+            const words = staticShellWords(command);
+            if (words?.[0] === "cd" && words[1]) {
+              cwd = path.posix.join(cwd, words[1]);
+              continue;
+            }
+            if (
+              detectInstallCommandFromText(command) !== manager ||
+              cwd === "." ||
+              cwd.includes("${{") ||
+              path.isAbsolute(cwd) ||
+              cwd.startsWith("..")
+            ) {
+              continue;
+            }
+            if (
+              (
+                await Promise.all(
+                  matchingNames.map((name) =>
+                    scanContext.pathExists(scanContext.resolve(cwd, name)),
+                  ),
+                )
+              ).some(Boolean)
+            ) {
+              return true;
+            }
+          }
+          return false;
+        }),
+    );
+    if (rootCheckout && rootLock && !nestedInstallLocks.some(Boolean)) {
+      continue;
+    }
+    if (!hasOutside && !(rootLock && !rootCheckout)) {
+      continue;
+    }
+    if (!rootLock && !matchingNames.some((name) => lockFileTypes.has(name))) {
+      continue;
+    }
+    const matchingLockNames = matchingNames.filter((name) => lockFileTypes.has(name));
+    const lockFileGlob =
+      !rootCheckout && typeof checkoutPath === "string"
+        ? path.posix.join(checkoutPath, matchingLockNames[0] ?? matchingNames[0]!)
+        : matchingLockNames.length === 1
+          ? `**/${matchingLockNames[0]}`
+          : `**/{${matchingLockNames.join(",")}}`;
     diagnostics.push(
       buildRepositoryDiagnostic(repository, meta, {
         location: {
@@ -106,7 +179,7 @@ export async function collectSetupNodeCacheDependencyPathUnsetDiagnostics(
             ? (workflow.lineCounter?.linePos(step.usesNode.range[0]).col ?? 1)
             : 1,
         },
-        message: `Job "${job.id}" uses actions/setup-node with cache enabled but without cache-dependency-path in ${workflow.relativePath}, even though lock files exist outside the repository root.`,
+        message: `Job "${job.id}" uses actions/setup-node with cache enabled but without cache-dependency-path in ${workflow.relativePath}, ${rootCheckout ? "even though relevant lock files exist outside the repository root" : "even though checkout places the lock file outside the workspace root"}.`,
         why: "In monorepos or multi-package repositories, setup-node cannot reliably locate lock files that live outside the root directory. Without cache-dependency-path, the caching step may miss the correct dependency manifest and produce cache misses or invalid caches.",
         suggestion: `Add cache-dependency-path to the setup-node step, e.g. \`cache-dependency-path: "${lockFileGlob}"\` or point it to the actual lock file paths.`,
         measurementHint:

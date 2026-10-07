@@ -2,10 +2,8 @@ import path from "node:path";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
-import {
-  packageJsonDependencyVersionSpec,
-  parseSemverLikeVersionSpec,
-} from "../repository-package-helpers.ts";
+import { effectiveDependencyVersionSpec } from "../repository-dependency-versions.ts";
+import { parseSemverLikeVersionSpec } from "../repository-package-helpers.ts";
 import { lineColumnForIndex } from "../rules/shared/command-patterns.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
@@ -29,7 +27,7 @@ export async function collectConsiderMsw3UpgradeDiagnostics(
     return [];
   }
 
-  const versionSpec = packageJsonDependencyVersionSpec(packageJson, "msw");
+  const versionSpec = await effectiveDependencyVersionSpec(context, "msw");
   if (!versionSpec) {
     return [];
   }

@@ -1,5 +1,7 @@
 # prefer-typescript-7-native-compiler
 
+TypeScript version evidence uses the root lockfile dependency where available, and ignores unrelated aliases and unresolved package protocols.
+
 ## Why it matters
 
 TypeScript 7 is a native Go port of the compiler (Project Corsa). It keeps the type-checking logic of TypeScript 6.0 while replacing the Node.js-based `tsc` with a native binary that uses shared-memory parallelism.

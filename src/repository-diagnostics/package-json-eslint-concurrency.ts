@@ -2,6 +2,7 @@ import path from "node:path";
 import type { AnalysisWarning, Diagnostic, RuleMeta, SourceLocation } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
+import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import { lineColumnForIndex } from "../rules/shared/command-patterns.ts";
 import {
@@ -52,7 +53,11 @@ export async function collectPreferEslintConcurrencyDiagnostics(
   const packageJsonText = packageJsonEntry.text ?? "";
   const relativePath = normalizeRelativePath(repoRoot, packageJsonEntry.path);
 
-  if (eslintVersionSpec && eslintVersionIsPromotableToConcurrency(eslintMajor, eslintMinor)) {
+  if (
+    eslintVersionSpec &&
+    eslintVersionIsPromotableToConcurrency(eslintMajor, eslintMinor) &&
+    versionSpecIsBelow(eslintVersionSpec, [9, 34, 0]) === true
+  ) {
     return [
       buildRepositoryDiagnostic(repository, meta, {
         location: { path: relativePath, ...findKeyLocation(packageJsonText, "eslint") },

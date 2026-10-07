@@ -1,7 +1,7 @@
 import type { RepositoryScanContext } from "../../repository-scan-context.ts";
 import type { RuleContext } from "../../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../../workflow.ts";
-import { parse as parseLockfile, type ParsedLockFile } from "lockparse";
+import { readLockedDependencyVersion } from "../../repository-dependency-versions.ts";
 import { workflowLooksReleaseLike } from "./workflow-jobs.ts";
 import { getTriggerSemantics } from "./workflow-triggers.ts";
 import { shellCommandSegments } from "./command-patterns.ts";
@@ -148,64 +148,6 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-const LOCKFILE_FILENAMES = [
-  "package-lock.json",
-  "pnpm-lock.yaml",
-  "yarn.lock",
-  "bun.lock",
-] as const;
-
-const lockfileParseCache = new WeakMap<
-  RepositoryScanContext,
-  Map<string, Promise<ParsedLockFile | undefined>>
->();
-
-async function parseLockfileCached(
-  scanContext: RepositoryScanContext,
-  fileName: string,
-): Promise<ParsedLockFile | undefined> {
-  const lockfilePath = scanContext.resolve(fileName);
-  let cache = lockfileParseCache.get(scanContext);
-  if (!cache) {
-    cache = new Map();
-    lockfileParseCache.set(scanContext, cache);
-  }
-  const cached = cache.get(lockfilePath);
-  if (cached) {
-    return cached;
-  }
-
-  const load = (async () => {
-    if (!(await scanContext.pathExists(lockfilePath))) {
-      return undefined;
-    }
-    const text = await scanContext.readTextFileOrWarn(lockfilePath);
-    if (!text) {
-      return undefined;
-    }
-    const packageJson = (await scanContext.loadPackageJson()).value;
-    try {
-      // lockparse links Yarn root dependencies through npm: descriptors, including v1.
-      const input =
-        fileName === "yarn.lock" && text.includes("yarn lockfile v1")
-          ? text.replace(
-              /^([^\s#][^\n]*):$/gm,
-              (_, selectors: string) =>
-                `${selectors
-                  .split(", ")
-                  .map((selector) => selector.replace(/^(["']?@?[^@\s"']+)@(?!npm:)/, "$1@npm:"))
-                  .join(", ")}:`,
-            )
-          : text;
-      return await parseLockfile(input, fileName, packageJson);
-    } catch {
-      return undefined;
-    }
-  })();
-  cache.set(lockfilePath, load);
-  return load;
-}
-
 async function readInstalledDependencyVersion(
   scanContext: RepositoryScanContext | undefined,
   packageName: string,
@@ -214,28 +156,7 @@ async function readInstalledDependencyVersion(
     return undefined;
   }
 
-  for (const fileName of LOCKFILE_FILENAMES) {
-    const lockfile = await parseLockfileCached(scanContext, fileName);
-    if (!lockfile) {
-      continue;
-    }
-    const rootDependencies = [
-      ...lockfile.root.dependencies,
-      ...lockfile.root.devDependencies,
-      ...lockfile.root.optionalDependencies,
-      ...lockfile.root.peerDependencies,
-    ];
-    for (const dependency of rootDependencies) {
-      if (dependency.name !== packageName) {
-        continue;
-      }
-      const version = parseDependencyVersionSpec(dependency.version);
-      if (version) {
-        return version;
-      }
-    }
-  }
-  return undefined;
+  return parseDependencyVersionSpec(await readLockedDependencyVersion(scanContext, packageName));
 }
 
 async function readDeclaredDependencyVersion(

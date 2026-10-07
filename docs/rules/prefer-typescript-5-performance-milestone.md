@@ -1,5 +1,7 @@
 # prefer-typescript-5-performance-milestone
 
+Root lockfile versions take precedence over declared lower bounds. A range that crosses the next minor milestone does not prove an older installed version.
+
 ## What it flags
 
 Flags a repository that depends on TypeScript 5.x but is still below the next notable 5.x performance milestone.

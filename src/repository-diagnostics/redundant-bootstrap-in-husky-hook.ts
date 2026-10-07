@@ -68,15 +68,29 @@ export function collectRedundantBootstrapInHuskyHookDiagnostics(
     return [];
   }
 
-  const normalizedHookPath =
-    path.relative(repoRoot, hookPaths[0]!).replace(/\\/g, "/") || hookPaths[0]!;
+  const firstHookPath = hookPaths[0]!;
+  const normalizedHookPath = (
+    path.isAbsolute(firstHookPath) ? path.relative(repoRoot, firstHookPath) : firstHookPath
+  ).replace(/\\/g, "/");
+  const firstHook = relevantHooks.find((hook) => hook.path === firstHookPath)!;
+  const line = Math.max(
+    1,
+    firstHook.content
+      .slice(
+        0,
+        firstHook.content.search(
+          /husky\.sh|\b(?:npx|pnpx|pnpm\s+dlx|bunx|yarn\s+dlx|uvx|uv\s+tool\s+run)\b/i,
+        ),
+      )
+      .split("\n").length,
+  );
 
   const xrunnerNote =
     versionKnown && !shouldFlagXRunner ? " (x-runner is expected for Husky < 9.1.2)" : "";
 
   return [
     buildRepositoryDiagnostic(repository, meta, {
-      location: { path: normalizedHookPath, line: 1, column: 1 },
+      location: { path: normalizedHookPath, line, column: 1 },
       message: `The repository has Husky hook files (${hookPaths.join(", ")}) that use ${
         usesDeprecatedBootstrap && usesXRunner
           ? "deprecated bootstrap and x-runner wrapping"

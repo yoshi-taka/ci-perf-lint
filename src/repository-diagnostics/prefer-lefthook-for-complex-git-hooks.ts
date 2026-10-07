@@ -61,7 +61,7 @@ export function collectPreferLefthookForComplexGitHooksDiagnostics(
 
   return [
     buildRepositoryDiagnostic(repository, meta, {
-      location: { path: ".husky", line: 1, column: 1 },
+      location: { path: husky.hookFileCount > 0 ? ".husky" : "package.json", line: 1, column: 1 },
       message:
         "Repository git-hook setup looks moderately complex and may be easier to manage with Lefthook.",
       why: `This repository appears to combine ${husky.hookFileCount} hook file(s), ${husky.totalHookCommandCount} hook command block(s), and ${husky.lintStagedPatternCount} lint-staged pattern(s). For multi-step git-hook orchestration, Lefthook can be easier to maintain and can reduce ad hoc shell glue.`,

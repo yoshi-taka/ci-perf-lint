@@ -9,9 +9,9 @@ Why this rule exists:
 
 Current heuristic:
 
-- the workflow contains at least two non-matrix, non-reusable-workflow jobs
-- those jobs share the same normalized bootstrap fingerprint: same presence of checkout, install manager, cache step, lint, test, build
-- the fingerprint is a compact string key (e.g., `CI_npmT___K_`)
+- the workflow contains at least two independent, non-matrix, non-reusable-workflow jobs with dependency installs; conditional and downstream jobs are excluded
+- the fingerprint includes runner/container/services/environment, checkout ref/options, runtime/setup versions, install commands, working directories, step env and cache settings
+- different OS/runtime/npm client versions, checkout refs or independent package roots are not interchangeable bootstrap setups
 
 Typical remediation:
 

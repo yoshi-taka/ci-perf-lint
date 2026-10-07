@@ -1,6 +1,6 @@
 {
   "name": "@yoshi-taka/ci-perf-lint",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Static analysis tool for CI workflow performance",
   "bin": {
     "ci-perf-lint": "./dist/cli.js"

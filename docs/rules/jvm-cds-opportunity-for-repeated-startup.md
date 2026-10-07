@@ -21,10 +21,14 @@ Class Data Sharing (CDS/AppCDS) lets the JVM archive resolved class metadata so 
 
 **Workflow evidence (2+ occurrences across workflows):**
 
-- `mvn test`, `mvn verify`, or other Maven lifecycle commands
+- `mvn test`, `mvn verify`, or other test-related Maven lifecycle commands
 - `gradle test`, `./gradlew test`
 - `java -jar ...`
 - `spring-boot:run` in CI
+
+Evidence is limited to non-release JVM steps: either repeated test commands or repeated direct `java -jar`/`java -cp` launches. Ordinary builds alone do not prove repeated short-lived test JVMs. Matrix boosts come from the JVM job, and diagnostics point at a relevant JVM command. CDS flags in `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS`, `GRADLE_OPTS` and `MAVEN_OPTS` are recognized.
+
+Nested build roots referenced by workflow working directories or inline `cd` participate in JVM detection.
 
 ## Non-Triggers
 

@@ -33,8 +33,10 @@ for all package management.
 
 ## Exceptions
 
-The rule does not fire when the same workflow also calls `npm publish`, since
-a newer npm version may be relevant for publish behavior.
+The rule does not fire when the same job also uses npm for client work, including
+`npm publish`, registry checks, global tool installation or package scripts.
+This preserves npm-version compatibility tests even when the repository's own dependencies
+are installed with Yarn. Another job's npm use does not suppress an unrelated wasted upgrade.
 
 ## Suggested Action
 

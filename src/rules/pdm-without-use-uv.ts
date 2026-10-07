@@ -42,11 +42,11 @@ export const pdmWithoutUseUvRule = {
       findings.push(
         buildDiagnostic(workflow, meta, pdmStep.runNode ?? pdmStep.node, {
           message: `Job "${job.id}" runs pdm commands without "use_uv = true" configured.`,
-          why: "PDM can use uv for dependency resolution and installation by setting use_uv = true in [tool.pdm] in pyproject.toml. This speeds up lock operations and package installation with no workflow changes.",
+          why: "PDM can use uv for dependency resolution and installation through its use_uv configuration, speeding up lock operations and package installation.",
           suggestion:
-            'Run "pdm config use_uv true" or add "use_uv = true" to the [tool.pdm] section of pyproject.toml.',
+            'Install uv and run "pdm config --local use_uv true", which writes use_uv = true to pdm.toml.',
           measurementHint: "Compare pdm lock and install times before and after enabling use_uv.",
-          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and enable uv backend for PDM by running "pdm config use_uv true" or adding use_uv = true to [tool.pdm] in pyproject.toml.`,
+          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and PDM uv-backend compatibility, then install uv and run "pdm config --local use_uv true" to enable the backend in pdm.toml.`,
           score: 46,
         }),
       );

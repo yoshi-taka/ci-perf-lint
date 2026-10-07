@@ -1,6 +1,7 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 
 interface StorybookMilestoneConfig {
   id: string;
@@ -31,7 +32,8 @@ function createStorybookMilestoneCollector(config: StorybookMilestoneConfig) {
       !storybookVersionSpec ||
       storybookMajor !== config.major ||
       storybookMinor === undefined ||
-      storybookMinor >= config.targetMinor
+      storybookMinor >= config.targetMinor ||
+      versionSpecIsBelow(storybookVersionSpec, [config.major, config.targetMinor, 0]) !== true
     ) {
       return [];
     }

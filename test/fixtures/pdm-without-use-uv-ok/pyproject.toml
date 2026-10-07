@@ -7,4 +7,3 @@ requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
 [tool.pdm]
-use_uv = true

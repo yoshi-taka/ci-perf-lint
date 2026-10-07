@@ -6,6 +6,8 @@ Flags repositories whose `.husky/*` hook files still use deprecated Husky bootst
 
 This is a repo-aware rule. It reads `.husky/*` files directly.
 
+Locations are relative to the analyzed repository and identify the relevant hook line, regardless of the CLI's working directory. Version evidence prefers the root lockfile dependency.
+
 ## Why it matters
 
 Deprecated Husky bootstrap and x-runner command paths add avoidable startup work to every hook invocation.

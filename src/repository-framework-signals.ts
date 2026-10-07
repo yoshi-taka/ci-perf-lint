@@ -6,6 +6,7 @@ import {
   parseSemverLikeVersionSpec,
 } from "./repository-package-helpers.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
+import { effectiveDependencyVersionSpec } from "./repository-dependency-versions.ts";
 
 const nextConfigFileNames = [
   "next.config.js",
@@ -139,7 +140,10 @@ async function loadExistingRootFiles(
   return loads.filter((entry): entry is { fileName: string; text: string } => Boolean(entry));
 }
 
-function storybookDependencyVersionSpec(packageJson: Record<string, unknown>): string | undefined {
+async function storybookDependencyVersionSpec(
+  context: RepositoryScanContext,
+  packageJson: Record<string, unknown>,
+): Promise<string | undefined> {
   const preferredNames = [
     "storybook",
     "@storybook/react",
@@ -156,7 +160,7 @@ function storybookDependencyVersionSpec(packageJson: Record<string, unknown>): s
   for (const dependencyName of preferredNames) {
     const versionSpec = packageJsonDependencyVersionSpec(packageJson, dependencyName);
     if (versionSpec) {
-      return versionSpec;
+      return effectiveDependencyVersionSpec(context, dependencyName);
     }
   }
 
@@ -171,7 +175,7 @@ function storybookDependencyVersionSpec(packageJson: Record<string, unknown>): s
         typeof versionSpec === "string" &&
         versionSpec.trim().length > 0
       ) {
-        return versionSpec;
+        return effectiveDependencyVersionSpec(context, dependencyName);
       }
     }
   }
@@ -223,8 +227,8 @@ export async function collectFrameworkSignals(
   if (packageJsonEntry.text && packageJsonEntry.value) {
     const packageJsonText = packageJsonEntry.text;
     const packageJson = packageJsonEntry.value;
-    nextjsVersionSpec = packageJsonDependencyVersionSpec(packageJson, "next");
-    storybookVersionSpec = storybookDependencyVersionSpec(packageJson);
+    nextjsVersionSpec = await effectiveDependencyVersionSpec(context, "next");
+    storybookVersionSpec = await storybookDependencyVersionSpec(context, packageJson);
     usesNextjs ||= packageJsonHasDependency(packageJson, "next");
     usesStorybook ||= Boolean(storybookVersionSpec);
     usesVite ||= packageJsonHasDependency(packageJson, "vite");
@@ -357,7 +361,9 @@ export async function collectFrameworkSignals(
 
   if (!rubyVersionSpec) {
     const rubyVersionPath = context.resolve(".ruby-version");
-    const rubyVersionText = await context.readTextFileOrWarn(rubyVersionPath);
+    const rubyVersionText = (await context.pathExists(rubyVersionPath))
+      ? await context.readTextFileOrWarn(rubyVersionPath)
+      : undefined;
     if (rubyVersionText) {
       const m = rubyVersionText.match(/(\d+\.\d+(?:\.\d+)?)/);
       if (m) {

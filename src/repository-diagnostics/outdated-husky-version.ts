@@ -1,6 +1,7 @@
 import type { Diagnostic, SourceLocation } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 import {
   outdatedHuskyVersionMeta as meta,
   isAtOrBelowHusky911,
@@ -15,7 +16,11 @@ export function collectOutdatedHuskyVersionDiagnostics(
   repository: RepositorySignals,
 ): Diagnostic[] {
   const { versionSpec, major, minor, patch, versionLocation, hookFileCount } = repository.husky;
-  if (!versionSpec || !isAtOrBelowHusky911(major, minor, patch)) {
+  if (
+    !versionSpec ||
+    !isAtOrBelowHusky911(major, minor, patch) ||
+    versionSpecIsBelow(versionSpec, [9, 1, 2]) !== true
+  ) {
     return [];
   }
 

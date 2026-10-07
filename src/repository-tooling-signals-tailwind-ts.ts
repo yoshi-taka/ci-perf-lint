@@ -1,7 +1,7 @@
 import type { RepositorySignals } from "./repository-signals-types.ts";
+import { effectiveDependencyVersionSpec } from "./repository-dependency-versions.ts";
 import {
   dependencySectionsOf,
-  packageJsonDependencyVersionSpec,
   packageJsonHasDependency,
   parseSemverLikeVersionSpec,
   parseTypeScriptVersionSpec,
@@ -78,8 +78,8 @@ export async function collectTailwindSignals(
   if (packageJsonEntry.text && packageJsonEntry.value) {
     const packageJsonText = packageJsonEntry.text;
     const packageJson = packageJsonEntry.value;
-    versionSpec = packageJsonDependencyVersionSpec(packageJson, "tailwindcss");
-    usesTailwind ||= Boolean(versionSpec);
+    versionSpec = await effectiveDependencyVersionSpec(context, "tailwindcss");
+    usesTailwind ||= packageJsonHasDependency(packageJson, "tailwindcss");
     usesPostcssPlugin ||= packageJsonHasDependency(packageJson, "@tailwindcss/postcss");
     usesVitePlugin ||= packageJsonHasDependency(packageJson, "@tailwindcss/vite");
     usesCliPackage ||= packageJsonHasDependency(packageJson, "@tailwindcss/cli");
@@ -150,14 +150,15 @@ export async function collectTypeScriptSignals(
       continue;
     }
 
-    const versionSpec = (section as Record<string, unknown>).typescript;
-    if (typeof versionSpec !== "string" || versionSpec.trim().length === 0) {
+    const declared = (section as Record<string, unknown>).typescript;
+    if (typeof declared !== "string" || declared.trim().length === 0) {
       continue;
     }
 
+    const versionSpec = await effectiveDependencyVersionSpec(context, "typescript");
     return {
       versionSpec,
-      ...parseTypeScriptVersionSpec(versionSpec),
+      ...(versionSpec ? parseTypeScriptVersionSpec(versionSpec) : {}),
       isPublishingTypeDefinitions:
         typeof packageJson.types === "string" || typeof packageJson.typings === "string",
     };

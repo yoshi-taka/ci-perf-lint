@@ -3,9 +3,10 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
-  packageJsonDependencyVersionSpec,
-  parseSemverLikeVersionSpec,
-} from "../repository-package-helpers.ts";
+  effectiveDependencyVersionSpec,
+  versionSpecIsBelow,
+} from "../repository-dependency-versions.ts";
+import { parseSemverLikeVersionSpec } from "../repository-package-helpers.ts";
 import { lineColumnForIndex } from "../rules/shared/command-patterns.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
@@ -73,7 +74,7 @@ export async function collectPreferVitestPerformanceMilestoneDiagnostics(
     return [];
   }
 
-  const versionSpec = packageJsonDependencyVersionSpec(packageJson, "vitest");
+  const versionSpec = await effectiveDependencyVersionSpec(context, "vitest");
   if (!versionSpec) {
     return [];
   }
@@ -84,7 +85,7 @@ export async function collectPreferVitestPerformanceMilestoneDiagnostics(
   }
 
   const milestone = getNextVitestPerformanceMilestone(major);
-  if (!milestone) {
+  if (!milestone || versionSpecIsBelow(versionSpec, [Number(milestone.target), 0, 0]) !== true) {
     return [];
   }
 

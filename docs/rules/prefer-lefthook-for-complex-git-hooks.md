@@ -23,6 +23,8 @@ The rule looks for repository-level signals such as:
 
 It does not fire for a simple single-hook, single-command setup.
 
+Complex lint-staged configuration can open the collector without `.husky` files. Such findings point at `package.json` rather than a nonexistent `.husky` directory.
+
 ## When to ignore it
 
 Ignore this finding when:

@@ -288,6 +288,7 @@ export interface RepositorySignals {
     elixirVersion?: string;
   };
   jvm: {
+    buildRoots?: string[];
     usesJvm: boolean;
     usesJava: boolean;
     usesKotlin: boolean;

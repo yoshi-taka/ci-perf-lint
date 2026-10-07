@@ -1,4 +1,5 @@
 import type { RepositorySignals } from "./repository-signals-types.ts";
+import { effectiveDependencyVersionSpec } from "./repository-dependency-versions.ts";
 import {
   dependencySectionsOf,
   packageJsonDependencyVersionSpec,
@@ -369,6 +370,8 @@ export async function collectEslintSignals(
   const unsupportedPluginNames = normalizedPluginNames.filter(
     (pluginName) => !supportedOxlintPluginNames.has(pluginName),
   );
+  eslintVersionSpec = await effectiveDependencyVersionSpec(context, "eslint");
+  oxlintVersionSpec = await effectiveDependencyVersionSpec(context, "oxlint");
   const oxlintParsed = oxlintVersionSpec ? parseSemverLikeVersionSpec(oxlintVersionSpec) : {};
   const eslintParsed = eslintVersionSpec ? parseSemverLikeVersionSpec(eslintVersionSpec) : {};
 

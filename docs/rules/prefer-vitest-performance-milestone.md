@@ -11,6 +11,8 @@ Suggests moving a Vitest project to the next notable speed milestone, one step a
 
 Projects already on 5.x are not flagged.
 
+The root lockfile dependency takes precedence over a manifest lower bound. Aliases to other packages (including Vite Plus Test) are not interpreted as Vitest versions.
+
 ## Version performance notes
 
 Only the releases that materially moved performance are listed.

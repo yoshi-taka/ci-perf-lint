@@ -2,6 +2,7 @@ import path from "node:path";
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
+import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 const meta = {
@@ -78,7 +79,7 @@ export async function collectTypeScriptMilestoneDiagnostics(
   }
 
   const nextMinor = getNextPerformanceMilestone(minor);
-  if (!nextMinor) {
+  if (!nextMinor || versionSpecIsBelow(versionSpec, [5, nextMinor, 0]) !== true) {
     return [];
   }
 

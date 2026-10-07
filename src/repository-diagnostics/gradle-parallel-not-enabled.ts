@@ -15,12 +15,16 @@ const GRADLE_BUILD_FILE = /^build\.gradle(?:\.kts)?$/;
 
 const GRADLE_LIFECYCLE = /\b(?:gradle|gradlew)\b.*\b(?:build|check|test|assemble|publish)\b/i;
 
-const PARALLEL_FLAG = /--parallel\b/;
+const PARALLEL_FLAG = /--(?:no-)?parallel\b/;
 
 async function hasParallelInProperties(
   scanContext: RepositoryScanContext,
+  root = ".",
 ): Promise<"enabled" | "disabled" | "absent"> {
-  const text = await scanContext.readTextFileOrWarn(scanContext.resolve("gradle.properties"));
+  const filePath = scanContext.resolve(root, "gradle.properties");
+  const text = (await scanContext.pathExists(filePath))
+    ? await scanContext.readTextFileOrWarn(filePath)
+    : undefined;
   if (!text) {
     return "absent";
   }
@@ -38,9 +42,9 @@ async function hasParallelInProperties(
   return "absent";
 }
 
-async function countBuildFiles(scanContext: RepositoryScanContext): Promise<number> {
+async function countBuildFiles(scanContext: RepositoryScanContext, root = "."): Promise<number> {
   try {
-    const entries = await scanContext.readDirectoryEntries(scanContext.repoRoot);
+    const entries = await scanContext.readDirectoryEntries(scanContext.resolve(root));
     let count = 0;
     const subdirs: string[] = [];
     for (const e of entries) {
@@ -58,7 +62,7 @@ async function countBuildFiles(scanContext: RepositoryScanContext): Promise<numb
     }
     for (const dir of subdirs) {
       const subEntries = await scanContext
-        .readDirectoryEntries(path.join(scanContext.repoRoot, dir))
+        .readDirectoryEntries(scanContext.resolve(root, dir))
         .catch(() => undefined);
       if (subEntries) {
         for (const e of subEntries) {
@@ -99,39 +103,32 @@ export async function collectGradleParallelNotEnabledDiagnostics(
     return [];
   }
 
-  const parallelState = await hasParallelInProperties(context.scanContext);
-  if (parallelState === "enabled") {
-    return [];
-  }
-  if (parallelState === "disabled") {
-    return [];
-  }
-
   if (hasParallelFlag) {
     return [];
   }
-
-  const buildFileCount = await countBuildFiles(context.scanContext);
-  if (buildFileCount < 2) {
-    return [];
+  const diagnostics: Diagnostic[] = [];
+  for (const root of context.repository.jvm.buildRoots ?? ["."]) {
+    const parallelState = await hasParallelInProperties(context.scanContext, root);
+    if (parallelState !== "absent" || (await countBuildFiles(context.scanContext, root)) < 2) {
+      continue;
+    }
+    diagnostics.push(
+      buildRepositoryDiagnostic(context.repository, meta, {
+        location: {
+          path: path.posix.join(root, "gradle.properties"),
+          line: 1,
+          column: 1,
+        },
+        message: "Gradle parallel build is not enabled for a likely multi-project build.",
+        why: "Gradle can execute independent modules in parallel, reducing CI wall-clock time. This repository has multiple build.gradle files but org.gradle.parallel is not configured.",
+        suggestion:
+          "Add org.gradle.parallel=true to gradle.properties. If any modules share mutable state, verify parallel safety before enabling.",
+        measurementHint:
+          "Compare total CI build duration before and after enabling parallel. The speedup depends on module count and task independence.",
+        aiHandoff: `Add org.gradle.parallel=true to ${path.posix.join(root, "gradle.properties")}. This allows Gradle to execute independent modules concurrently. If the project uses shared mutable state across modules, test thoroughly before rolling out.`,
+        score: 55,
+      }),
+    );
   }
-
-  return [
-    buildRepositoryDiagnostic(context.repository, meta, {
-      location: {
-        path: "gradle.properties",
-        line: 1,
-        column: 1,
-      },
-      message: "Gradle parallel build is not enabled for a likely multi-project build.",
-      why: "Gradle can execute independent modules in parallel, reducing CI wall-clock time. This repository has multiple build.gradle files but org.gradle.parallel is not configured.",
-      suggestion:
-        "Add org.gradle.parallel=true to gradle.properties. If any modules share mutable state, verify parallel safety before enabling.",
-      measurementHint:
-        "Compare total CI build duration before and after enabling parallel. The speedup depends on module count and task independence.",
-      aiHandoff:
-        "Add org.gradle.parallel=true to gradle.properties at the repository root. This allows Gradle to execute independent modules concurrently. If the project uses shared mutable state across modules, test thoroughly before rolling out.",
-      score: 55,
-    }),
-  ];
+  return diagnostics;
 }

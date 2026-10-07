@@ -1,8 +1,11 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
+import { isScalar } from "yaml";
 import type { RepositorySignals } from "../repository-signals-types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { effectiveStepEnvironment } from "../rules/shared/workflow-env.ts";
+import { shellCommandSegments, staticShellWords } from "../rules/shared/command-patterns.ts";
 
 const meta = {
   id: "pytest-xdist-installed-but-not-used",
@@ -11,36 +14,28 @@ const meta = {
   docsPath: "docs/rules/pytest-xdist-installed-but-not-used.md",
 } satisfies RuleMeta;
 
-const DIRECT_PYTEST = /\b(?:python\d?\s+-m\s+)?pytest\b/;
+const XDIST_FLAG = /(?:^|\s)(?:-n(?:\s|\d|auto|logical|$)|--numprocesses(?:\s|=|$))/;
 
-const INSTALL_COMMAND = /\b(?:pip|pip3|pipx)\s+install\b/;
-
-const XDIST_FLAG = /(?:\s|^)(?:-n|--numprocesses)(?:\s|$)/;
-
-const SERIAL_MARKER = /\s+-m\s+(integration|e2e|smoke|db|database|migration|alembic|django)\b/;
-
-const DEBUG_FLAG = /(?:\s|^)(?:--pdb|--trace|--forked|-s\b|--capture=no)(?:\s|$)/;
-
-const SINGLE_FILE = /\bpytest\s+\S*test_\S*\.py\b/;
-
-const WRAPPER = /\b(?:tox|nox|make\s+test|npm\s+test|just\s+test)\b/;
+async function optionalText(context: RepositoryScanContext, file: string) {
+  const filePath = context.resolve(file);
+  return (await context.pathExists(filePath)) ? context.readTextFileOrWarn(filePath) : undefined;
+}
 
 async function hasPytestXdistInDeps(context: RepositoryScanContext): Promise<boolean> {
-  const pyprojectPath = context.resolve("pyproject.toml");
-  const pyprojectText = await context.readTextFileOrWarn(pyprojectPath);
+  const pyprojectText = await optionalText(context, "pyproject.toml");
   if (pyprojectText && /\bpytest-xdist\b/.test(pyprojectText)) {
     return true;
   }
 
   for (const file of ["requirements.txt", "requirements-dev.txt", "requirements-test.txt"]) {
-    const text = await context.readTextFileOrWarn(context.resolve(file));
+    const text = await optionalText(context, file);
     if (text && /^pytest-xdist\b/m.test(text)) {
       return true;
     }
   }
 
   for (const file of ["Pipfile.lock", "poetry.lock", "uv.lock"]) {
-    const text = await context.readTextFileOrWarn(context.resolve(file));
+    const text = await optionalText(context, file);
     if (text && /\bpytest-xdist\b/.test(text)) {
       return true;
     }
@@ -51,20 +46,20 @@ async function hasPytestXdistInDeps(context: RepositoryScanContext): Promise<boo
 
 async function configEnablesXdist(context: RepositoryScanContext): Promise<boolean> {
   for (const file of ["pytest.ini", "setup.cfg", "tox.ini"]) {
-    const text = await context.readTextFileOrWarn(context.resolve(file));
+    const text = await optionalText(context, file);
     if (!text) {
       continue;
     }
     const m = text.match(/^addopts\s*=\s*(.+)$/m);
-    if (m?.[1] && (/\b-n\b/.test(m[1]) || /\b--numprocesses\b/.test(m[1]))) {
+    if (m?.[1] && XDIST_FLAG.test(m[1])) {
       return true;
     }
   }
 
-  const pyprojectText = await context.readTextFileOrWarn(context.resolve("pyproject.toml"));
+  const pyprojectText = await optionalText(context, "pyproject.toml");
   if (pyprojectText) {
     const m = pyprojectText.match(/addopts\s*=\s*["']([^"']*)["']/);
-    if (m?.[1] && (/\b-n\b/.test(m[1]) || /\b--numprocesses\b/.test(m[1]))) {
+    if (m?.[1] && XDIST_FLAG.test(m[1])) {
       return true;
     }
   }
@@ -91,17 +86,86 @@ async function suiteLooksLarge(context: RepositoryScanContext): Promise<boolean>
 
 function findPytestCommands(
   workflows: WorkflowDocument[],
-): { workflow: WorkflowDocument; command: string }[] {
-  const results: { workflow: WorkflowDocument; command: string }[] = [];
+): { workflow: WorkflowDocument; step: WorkflowStep; command: string; lineOffset: number }[] {
+  const results: {
+    workflow: WorkflowDocument;
+    step: WorkflowStep;
+    command: string;
+    lineOffset: number;
+  }[] = [];
 
   for (const workflow of workflows) {
     for (const job of workflow.jobs) {
       for (const step of job.steps) {
+        const env = effectiveStepEnvironment(workflow, job, step);
         const run = step.run ?? "";
-        if (!DIRECT_PYTEST.test(run) || WRAPPER.test(run) || INSTALL_COMMAND.test(run)) {
-          continue;
+        let searchStart = 0;
+        for (const segment of shellCommandSegments(run)) {
+          const index = run.indexOf(segment, searchStart);
+          if (index >= 0) {
+            searchStart = index + segment.length;
+          }
+          // Unknown expansions cannot prove that xdist is disabled. Preserve single quotes.
+          const expanded = segment.replace(
+            /'[^']*'|\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)/g,
+            (token, braced: string | undefined, plain: string | undefined) => {
+              if (token.startsWith("'")) {
+                return token;
+              }
+              const value = env[braced ?? plain ?? ""];
+              if (typeof value !== "string" || /[$`\n]/.test(value)) {
+                return token;
+              }
+              return value;
+            },
+          );
+          const words = staticShellWords(expanded);
+          if (!words) {
+            continue;
+          }
+          const executable = words.findIndex((word) => !/^[A-Za-z_]\w*=/.test(word));
+          const pytestIndex = words.indexOf("pytest");
+          if (pytestIndex < 0 || executable < 0) {
+            continue;
+          }
+          const first = words[executable]!;
+          if (
+            pytestIndex !== executable &&
+            !(
+              /^(?:python\d*(?:\.\d+)?|uv|poetry|pdm)$/.test(first) &&
+              words
+                .slice(executable, pytestIndex)
+                .includes(first.startsWith("python") ? "-m" : "run")
+            )
+          ) {
+            continue;
+          }
+          const args = words.slice(pytestIndex + 1);
+          if (XDIST_FLAG.test(args.join(" "))) {
+            continue;
+          }
+          if (args.some((arg) => /^(?:--pdb|--trace|--forked|-s|--capture=no)$/.test(arg))) {
+            continue;
+          }
+          if (
+            args.some(
+              (arg, i) =>
+                args[i - 1] === "-m" &&
+                /\b(?:integration|e2e|smoke|db|database|migration|alembic|django)\b/.test(arg),
+            )
+          ) {
+            continue;
+          }
+          if (args.filter((arg) => /\.py(?:::|$)/.test(arg)).length === 1) {
+            continue;
+          }
+          results.push({
+            workflow,
+            step,
+            command: segment,
+            lineOffset: run.slice(0, Math.max(0, index)).split("\n").length - 1,
+          });
         }
-        results.push({ workflow, command: run });
       }
     }
   }
@@ -130,32 +194,29 @@ export async function collectPytestXdistInstalledButNotUsedDiagnostics(
 
   const diagnostics: Diagnostic[] = [];
 
-  for (const { workflow, command } of findPytestCommands(workflows)) {
-    if (XDIST_FLAG.test(command)) {
-      continue;
-    }
-    if (DEBUG_FLAG.test(command)) {
-      continue;
-    }
-    if (SERIAL_MARKER.test(command)) {
-      continue;
-    }
-    if (SINGLE_FILE.test(command)) {
-      continue;
-    }
+  for (const { workflow, step, command, lineOffset } of findPytestCommands(workflows)) {
     if (!large) {
       continue;
     }
+    const blockOffset =
+      isScalar(step.runNode) &&
+      (step.runNode.type === "BLOCK_LITERAL" || step.runNode.type === "BLOCK_FOLDED")
+        ? 1
+        : 0;
 
     diagnostics.push(
       buildRepositoryDiagnostic(repository, meta, {
         location: {
           path: workflow.relativePath,
-          line: 1,
+          line:
+            (step.runNode?.range
+              ? (workflow.lineCounter?.linePos(step.runNode.range[0]).line ?? 1)
+              : 1) +
+            lineOffset +
+            blockOffset,
           column: 1,
         },
-        message:
-          "pytest-xdist is installed, but this CI command runs pytest without parallel workers.",
+        message: `pytest-xdist is installed, but this CI command runs pytest without parallel workers: ${command}`,
         why: "For a large test suite, pytest-xdist can reduce wall-clock time by distributing tests across CPU cores. Since the project already includes pytest-xdist as a dependency, parallel execution was likely intended but not enabled in CI.",
         suggestion:
           "Add -n auto to the pytest command, or configure addopts = -n auto in pytest.ini, setup.cfg, tox.ini, or pyproject.toml.",

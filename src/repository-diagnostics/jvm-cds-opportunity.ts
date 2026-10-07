@@ -1,6 +1,8 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
+import { effectiveStepEnvironment } from "../rules/shared/workflow-env.ts";
+import { jobHasMatrix } from "../rules/shared/workflow-jobs.ts";
 
 const meta = {
   id: "jvm-cds-opportunity-for-repeated-startup",
@@ -48,7 +50,12 @@ const BOOSTER_PATTERNS: { pattern: RegExp; label: string; score: number }[] = [
 export function collectJvmCdsOpportunityDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Diagnostic[] {
-  const { predicateIndex, workflows, repository } = context;
+  const { predicateIndex, repository } = context;
+  const relevantSteps = predicateIndex.allSteps.filter(
+    ({ step, workflow }) =>
+      JVM_COMMAND_PATTERNS.some((pattern) => pattern.test(step.run ?? "")) &&
+      !/\b(?:release|publish|deploy|rollback|promote|nightly|tag)\b/i.test(workflow.name ?? ""),
+  );
 
   let hasCds = false;
   let hasNativeImage = false;
@@ -60,13 +67,17 @@ export function collectJvmCdsOpportunityDiagnostics(
   let hasMatrixBuild = false;
   let hasSpringBoot = false;
 
-  for (const resolved of predicateIndex.allSteps) {
+  for (const resolved of relevantSteps) {
     const run = (resolved.step.run ?? "").toLowerCase();
     const stepName = (resolved.step.name ?? "").toLowerCase();
     const jobId = resolved.job.id.toLowerCase();
     const combined = `${stepName} ${run} ${jobId}`;
 
-    if (CDS_PATTERNS.some((p) => p.test(run))) {
+    const env = effectiveStepEnvironment(resolved.workflow, resolved.job, resolved.step);
+    const runtimeFlags = ["JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "GRADLE_OPTS", "MAVEN_OPTS"]
+      .map((key) => (typeof env[key] === "string" ? env[key] : ""))
+      .join(" ");
+    if (CDS_PATTERNS.some((p) => p.test(`${run} ${runtimeFlags}`))) {
       hasCds = true;
     }
 
@@ -77,6 +88,7 @@ export function collectJvmCdsOpportunityDiagnostics(
 
     if (JVM_COMMAND_PATTERNS.some((p) => p.test(run))) {
       jvmStepCount++;
+      hasMatrixBuild ||= jobHasMatrix(resolved.job);
       if (JVM_TEST_PATTERNS.some((p) => p.test(combined))) {
         jvmTestStepCount++;
       }
@@ -102,25 +114,15 @@ export function collectJvmCdsOpportunityDiagnostics(
     return [];
   }
 
-  if (jvmStepCount < 2) {
+  if (
+    jvmStepCount < 2 ||
+    (jvmTestStepCount < 2 &&
+      !relevantSteps.every(({ step }) => /\bjava\s+(?:-jar|-cp)\b/.test(step.run ?? "")))
+  ) {
     return [];
   }
 
   if (hasNativeImage && nativeImageStepCount >= jvmStepCount) {
-    return [];
-  }
-
-  for (const workflow of workflows) {
-    const source = workflow.source?.toLowerCase() ?? "";
-    if (/\bmatrix\b/.test(source)) {
-      hasMatrixBuild = true;
-    }
-  }
-
-  const nonReleaseWorkflows = workflows.filter(
-    (w) => !/\b(release|publish|deploy|rollback|promote|nightly|tag)\b/i.test(w.name ?? ""),
-  );
-  if (nonReleaseWorkflows.length === 0 && workflows.length > 0) {
     return [];
   }
 
@@ -152,10 +154,14 @@ export function collectJvmCdsOpportunityDiagnostics(
 
   score = Math.min(Math.max(score, 30), 85);
 
+  const first = relevantSteps[0]!;
+  const position = first.step.runNode?.range
+    ? first.workflow.lineCounter?.linePos(first.step.runNode.range[0])
+    : undefined;
   const location = {
-    path: repository.primaryWorkflowPath ?? ".github/workflows/ci.yml",
-    line: 1,
-    column: 1,
+    path: first.workflow.relativePath,
+    line: position?.line ?? 1,
+    column: position?.col ?? 1,
   };
 
   return [

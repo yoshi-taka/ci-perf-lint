@@ -1,6 +1,7 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 
 const meta = {
   id: "prefer-jest-30-for-jest-29",
@@ -50,7 +51,13 @@ function jest29Finding(repository: RepositorySignals): Diagnostic | undefined {
 
 function jest30xFinding(repository: RepositorySignals): Diagnostic | undefined {
   const { versionSpec, major, minor } = repository.jest;
-  if (!versionSpec || major !== 30 || minor === undefined || minor >= 5) {
+  if (
+    !versionSpec ||
+    major !== 30 ||
+    minor === undefined ||
+    minor >= 5 ||
+    versionSpecIsBelow(versionSpec, [30, 5, 0]) !== true
+  ) {
     return undefined;
   }
 

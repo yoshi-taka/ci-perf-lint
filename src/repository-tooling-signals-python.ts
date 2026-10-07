@@ -1,6 +1,8 @@
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import { dependencySectionsOf } from "./repository-package-helpers.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
+import type { AnyWorkflowDocument } from "./ci-types.ts";
+import { collectCommandEntries } from "./rules/shared/any-step.ts";
 import {
   extractPythonVersionLiteral,
   pythonVersionIsBelow311,
@@ -176,17 +178,29 @@ export async function collectHatchSignals(
 
 export async function collectPdmSignals(
   context: RepositoryScanContext,
+  workflows: readonly AnyWorkflowDocument[] = [],
 ): Promise<RepositorySignals["pdm"]> {
-  let usesPdm = false;
+  let usesPdm =
+    (await context.pathExists(context.resolve("pdm.lock"))) ||
+    (await context.pathExists(context.resolve("pdm.toml"))) ||
+    workflows.some((workflow) =>
+      collectCommandEntries(workflow).some((entry) =>
+        /(?:^|\s)pdm\s+(?:install|sync|lock|add|run|update)\b/.test(entry.text),
+      ),
+    );
   let usesUv = false;
 
   const signalFiles = await loadExistingTextFiles(context, pdmConfigFileNames);
-  for (const { text: signalText } of signalFiles) {
-    usesPdm ||= /\[tool\.pdm\]|^\[pdm\]/im.test(signalText);
-    if (usesPdm) {
-      usesUv ||= /use_uv\s*=\s*true/i.test(signalText);
+  for (const { fileName, text: signalText } of signalFiles) {
+    if (fileName === "pdm.toml") {
+      usesUv ||= /^\s*use_uv\s*=\s*true\s*(?:#.*)?$/im.test(signalText.split(/^\s*\[/m)[0] ?? "");
     }
   }
+  usesUv ||= workflows.some((workflow) =>
+    collectCommandEntries(workflow).some((entry) =>
+      /\bpdm\s+config\s+(?:--local\s+)?use_uv\s+true\b/.test(entry.text),
+    ),
+  );
 
   return { usesPdm, usesUv };
 }

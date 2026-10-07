@@ -2,6 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 
 function stepText(step: WorkflowStep): string {
   return `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`;
@@ -40,7 +41,8 @@ function createNextjsMilestoneRule(config: NextjsMilestoneConfig) {
         !nextjsVersionSpec ||
         nextjsMajor !== config.major ||
         nextjsMinor === undefined ||
-        nextjsMinor >= config.targetMinor
+        nextjsMinor >= config.targetMinor ||
+        versionSpecIsBelow(nextjsVersionSpec, [config.major, config.targetMinor, 0]) !== true
       ) {
         return [];
       }

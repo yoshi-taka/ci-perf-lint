@@ -61,12 +61,12 @@ export async function collectPdmWithoutUseUvDiagnostics(
     buildRepositoryDiagnostic(repository, meta, {
       location,
       message: 'Repository uses PDM without "use_uv = true" configured.',
-      why: "PDM can use uv for dependency resolution and installation by setting use_uv = true in [tool.pdm] in pyproject.toml. This speeds up lock operations and package installation with no workflow changes.",
+      why: "PDM can use uv for dependency resolution and installation through its use_uv configuration. This speeds up lock operations and package installation. PDM's build backend alone does not imply use of the PDM package manager.",
       suggestion:
-        'Run "pdm config use_uv true" or add "use_uv = true" to the [tool.pdm] section of pyproject.toml.',
+        'Install uv and run "pdm config --local use_uv true", which writes use_uv = true to pdm.toml.',
       measurementHint: "Compare pdm lock and install times before and after enabling use_uv.",
       aiHandoff:
-        'Review the project\'s PDM config and enable uv backend by running "pdm config use_uv true" or adding use_uv = true to [tool.pdm] in pyproject.toml.',
+        'Review PDM uv-backend compatibility, install uv, and run "pdm config --local use_uv true" to enable the backend in pdm.toml.',
       score: 46,
     }),
   ];

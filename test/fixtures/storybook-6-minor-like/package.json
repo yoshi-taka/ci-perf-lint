@@ -5,7 +5,7 @@
     "build-storybook": "build-storybook"
   },
   "devDependencies": {
-    "@storybook/react": "^6.4.22",
+    "@storybook/react": "6.4.22",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }

@@ -2,6 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 
 function stepText(step: WorkflowStep): string {
   return `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`;
@@ -41,7 +42,8 @@ function createStorybookMilestoneRule(config: StorybookMilestoneConfig) {
         !storybookVersionSpec ||
         storybookMajor !== config.major ||
         storybookMinor === undefined ||
-        storybookMinor >= config.targetMinor
+        storybookMinor >= config.targetMinor ||
+        versionSpecIsBelow(storybookVersionSpec, [config.major, config.targetMinor, 0]) !== true
       ) {
         return [];
       }

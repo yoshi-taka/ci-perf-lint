@@ -16,13 +16,15 @@ Reports when **all** of the following are true:
 - pytest config does not enable xdist via `addopts`
 - Test suite appears non-trivial (30+ test files in a test directory)
 
+Commands are evaluated separately, including `python -m pytest` and `uv`/Poetry/PDM run wrappers. Static workflow/job/step env values are merged with step precedence before checking flags; unknown expansion prevents a claim that parallel workers are absent. Locations identify the actual run command, rather than the workflow's first line.
+
 ## Exclusions
 
 Does **not** report when:
 
 - `-n` / `--numprocesses` is present in the command
 - pytest config already sets `addopts = -n auto`
-- Command targets a single test file
+- Command targets a single test file or test node, including example `_tests.py` files
 - Command uses serial-only flags (`--pdb`, `--trace`, `--forked`, `-s`, `--capture=no`)
 - Command targets integration/e2e/smoke markers (`-m integration`, etc.)
 - Command runs via a wrapper (tox, nox, make test, npm test, just test)

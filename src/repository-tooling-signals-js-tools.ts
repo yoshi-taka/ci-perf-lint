@@ -3,11 +3,11 @@ import { readdir } from "node:fs/promises";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import {
   dependencySectionsOf,
-  packageJsonDependencyVersionSpec,
   packageJsonHasDependency,
   parseSemverLikeVersionSpec,
 } from "./repository-package-helpers.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
+import { effectiveDependencyVersionSpec } from "./repository-dependency-versions.ts";
 
 function normalizeRelativePath(repoRoot: string, filePath: string): string {
   return path.relative(repoRoot, filePath).replace(/\\/g, "/") || path.basename(filePath);
@@ -84,13 +84,12 @@ export async function collectJestSignals(
     return {};
   }
 
-  const packageJson = packageJsonEntry.value;
   const versionSpec =
-    packageJsonDependencyVersionSpec(packageJson, "jest") ??
-    packageJsonDependencyVersionSpec(packageJson, "@jest/core");
-  const jsdomVersionSpec = packageJsonDependencyVersionSpec(packageJson, "jsdom");
-  const jsdomEnvironmentVersionSpec = packageJsonDependencyVersionSpec(
-    packageJson,
+    (await effectiveDependencyVersionSpec(context, "jest")) ??
+    (await effectiveDependencyVersionSpec(context, "@jest/core"));
+  const jsdomVersionSpec = await effectiveDependencyVersionSpec(context, "jsdom");
+  const jsdomEnvironmentVersionSpec = await effectiveDependencyVersionSpec(
+    context,
     "jest-environment-jsdom",
   );
   const parsedJestVersion = versionSpec ? parseSemverLikeVersionSpec(versionSpec) : {};
@@ -191,8 +190,8 @@ export async function collectHuskySignals(
       continue;
     }
 
-    const versionSpec = (section as Record<string, unknown>).husky;
-    if (typeof versionSpec !== "string" || versionSpec.trim().length === 0) {
+    const declared = (section as Record<string, unknown>).husky;
+    if (typeof declared !== "string" || declared.trim().length === 0) {
       continue;
     }
 
@@ -200,6 +199,7 @@ export async function collectHuskySignals(
       ? findPackageJsonDependencyLocation(packageJsonEntry.text, "husky")
       : { line: 1, column: 1 };
 
+    const versionSpec = await effectiveDependencyVersionSpec(context, "husky");
     return {
       usesHusky,
       usesLintStaged,
@@ -210,7 +210,7 @@ export async function collectHuskySignals(
       lintStagedPatternCount,
       lintStagedCommandCount,
       versionSpec,
-      ...parseSemverLikeVersionSpec(versionSpec),
+      ...(versionSpec ? parseSemverLikeVersionSpec(versionSpec) : {}),
       versionLocation: {
         path: packageJsonRelativePath,
         line: versionLocation.line,

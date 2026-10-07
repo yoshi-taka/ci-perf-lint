@@ -2,6 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 
 // Sources:
 // - https://jestjs.io/ja/docs/upgrading-to-jest30
@@ -52,7 +53,11 @@ export const preferJest30ForJest29Rule = {
       major === 29 &&
       typescriptMeetsJest30Minimum(context) &&
       jsdomMeetsJest30Compatibility(context);
-    const fromJest30x = major === 30 && minor !== undefined && minor < 5;
+    const fromJest30x =
+      major === 30 &&
+      minor !== undefined &&
+      minor < 5 &&
+      versionSpecIsBelow(versionSpec, [30, 5, 0]) === true;
     if (!fromJest29 && !fromJest30x) {
       return [];
     }

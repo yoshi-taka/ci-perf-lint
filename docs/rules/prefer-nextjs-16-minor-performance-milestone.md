@@ -1,5 +1,7 @@
 # prefer-nextjs-16-minor-performance-milestone
 
+Workflow findings use root dependency version evidence. Unresolved ranges crossing 16.3 are not treated as old installed versions.
+
 ## What it flags
 
 Flags workflows that visibly run `next build` when the repository depends on Next.js `16.0`, `16.1`, or `16.2`.

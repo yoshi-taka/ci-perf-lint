@@ -1,4 +1,72 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdir } from "node:fs/promises";
+import { collectFrameworkSignals } from "../src/repository-framework-signals.ts";
+import { RepositoryScanContext } from "../src/repository-scan-context.ts";
+import type { AnalysisWarning } from "../src/types.ts";
+import { createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
+
+const tempDirs = createTempDirTracker();
+afterEach(async () => tempDirs.cleanup());
+
+describe("optional Ruby version signals", () => {
+  test("does not warn when .ruby-version is absent from a non-Ruby repository", async () => {
+    const repoRoot = await tempDirs.create("apl-no-ruby-version-");
+    await writeRepositoryFiles(repoRoot, { "package.json": '{"name":"node-project"}' });
+    const warnings: AnalysisWarning[] = [];
+    const context = new RepositoryScanContext(repoRoot, warnings);
+
+    const signals = await collectFrameworkSignals(context);
+
+    expect(signals.rubyVersionSpec).toBeUndefined();
+    expect(signals.usesRails).toBe(false);
+    expect(warnings.some((warning) => warning.source === context.resolve(".ruby-version"))).toBe(
+      false,
+    );
+  });
+
+  test("reads a present .ruby-version", async () => {
+    const repoRoot = await tempDirs.create("apl-ruby-version-");
+    await writeRepositoryFiles(repoRoot, { ".ruby-version": "ruby-3.3.0\n" });
+    const warnings: AnalysisWarning[] = [];
+
+    const signals = await collectFrameworkSignals(new RepositoryScanContext(repoRoot, warnings));
+
+    expect(signals.rubyVersionSpec).toBe("3.3.0");
+    expect(signals.rubyMajor).toBe(3);
+    expect(signals.rubyMinor).toBe(3);
+    expect(warnings.some((warning) => warning.kind === "scan-warning")).toBe(false);
+  });
+
+  test("preserves Gemfile Ruby version precedence", async () => {
+    const repoRoot = await tempDirs.create("apl-gemfile-ruby-version-");
+    await writeRepositoryFiles(repoRoot, {
+      Gemfile: 'ruby "3.2.0"\ngem "rails", "~> 7.0"\n',
+      ".ruby-version": "3.3.0\n",
+    });
+
+    const signals = await collectFrameworkSignals(new RepositoryScanContext(repoRoot, []));
+
+    expect(signals.rubyVersionSpec).toBe("3.2.0");
+    expect(signals.usesRails).toBe(true);
+  });
+
+  test("still warns when an existing .ruby-version cannot be read as a file", async () => {
+    const repoRoot = await tempDirs.create("apl-invalid-ruby-version-");
+    const warnings: AnalysisWarning[] = [];
+    const context = new RepositoryScanContext(repoRoot, warnings);
+    await mkdir(context.resolve(".ruby-version"));
+
+    const signals = await collectFrameworkSignals(context);
+
+    expect(signals.rubyVersionSpec).toBeUndefined();
+    expect(
+      warnings.some(
+        (warning) =>
+          warning.kind === "scan-warning" && warning.source === context.resolve(".ruby-version"),
+      ),
+    ).toBe(true);
+  });
+});
 
 function makeSignals(overrides: {
   workflowCount?: number;

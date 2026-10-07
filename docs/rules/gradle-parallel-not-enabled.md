@@ -16,6 +16,8 @@ Reports when:
 - `org.gradle.parallel=true` is not set in `gradle.properties`
 - No `--parallel` flag is used in CI Gradle commands
 
+Visible Gradle roots under workflow working directories or inline `cd` are included. Each root's own `gradle.properties` and module build files are checked, so a nested project's parallel setting is not mistaken for an absent root-level setting.
+
 ## Exclusions
 
 Does not report when:

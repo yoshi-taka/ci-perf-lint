@@ -153,7 +153,10 @@ async function hasJvmSignalEvidence(
   context: RepositoryScanContext,
   workflows: AnyWorkflowDocument[],
 ): Promise<boolean> {
-  if (anyWorkflowHasToolFeature(workflows, "hasFrameworkSignal")) {
+  if (
+    anyWorkflowHasToolFeature(workflows, "hasFrameworkSignal") ||
+    workflows.some((workflow) => /\b(?:gradlew?|mvnw?|setup-java)\b/.test(workflow.source ?? ""))
+  ) {
     return true;
   }
 
@@ -546,10 +549,16 @@ export async function collectRepositorySignals(
         python: [],
       },
     ),
-    collectSignalIf(hasPythonEvidence, "pdm", context, collectPdmSignals, {
-      usesPdm: false,
-      usesUv: false,
-    }),
+    collectSignalIf(
+      hasPythonEvidence,
+      "pdm",
+      context,
+      (ctx) => collectPdmSignals(ctx, evidenceWorkflows),
+      {
+        usesPdm: false,
+        usesUv: false,
+      },
+    ),
     collectSignalIf(hasFrameworkEvidence, "frameworks", context, collectFrameworkSignals, {
       usesNextjs: false,
       usesStorybook: false,
@@ -637,16 +646,22 @@ export async function collectRepositorySignals(
       hasMixExs: false,
       hasToolVersions: false,
     }),
-    collectSignalIf(hasJvmEvidence, "jvm", context, collectJvmSignals, {
-      usesJvm: false,
-      usesJava: false,
-      usesKotlin: false,
-      usesScala: false,
-      usesGroovy: false,
-      usesSpringBoot: false,
-      usesMaven: false,
-      usesGradle: false,
-    }),
+    collectSignalIf(
+      hasJvmEvidence,
+      "jvm",
+      context,
+      (ctx) => collectJvmSignals(ctx, evidenceWorkflows),
+      {
+        usesJvm: false,
+        usesJava: false,
+        usesKotlin: false,
+        usesScala: false,
+        usesGroovy: false,
+        usesSpringBoot: false,
+        usesMaven: false,
+        usesGradle: false,
+      },
+    ),
   ]);
 
   const result = {
@@ -677,7 +692,10 @@ export async function collectRepositorySignals(
       nativePackages: nativePackageSignals,
       npm: auxSignals.npm,
       pdm: pdmSignals,
-      frameworks: frameworkSignals,
+      frameworks: {
+        ...frameworkSignals,
+        usesGradle: frameworkSignals.usesGradle || jvmSignals.usesGradle,
+      },
       typescript: typescriptSignals,
       jest: jestSignals,
       tailwind: tailwindSignals,

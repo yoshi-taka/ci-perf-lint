@@ -1,5 +1,9 @@
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
+import path from "node:path";
+import type { AnyWorkflowDocument } from "./ci-types.ts";
+import { collectCommandEntries } from "./rules/shared/any-step.ts";
+import { shellCommandSegments, staticShellWords } from "./rules/shared/command-patterns.ts";
 
 async function hasSrcSubdir(context: RepositoryScanContext, subdir: string): Promise<boolean> {
   try {
@@ -15,6 +19,7 @@ async function hasSrcSubdir(context: RepositoryScanContext, subdir: string): Pro
 
 export async function collectJvmSignals(
   context: RepositoryScanContext,
+  workflows: readonly AnyWorkflowDocument[] = [],
 ): Promise<RepositorySignals["jvm"]> {
   const rootEntries = await context.readDirectoryEntries(context.repoRoot);
   const rootNames = new Set(rootEntries.map((e) => e.name));
@@ -45,8 +50,59 @@ export async function collectJvmSignals(
   const hasBuildGradle = hasEntry("build.gradle") || hasEntry("build.gradle.kts");
   const hasSettingsGradle = hasEntry("settings.gradle") || hasEntry("settings.gradle.kts");
 
-  const usesGradle = hasGradlew || hasBuildGradle || hasSettingsGradle;
-  const usesMaven = hasPomXml || hasMvnw;
+  let usesGradle = hasGradlew || hasBuildGradle || hasSettingsGradle;
+  let usesMaven = hasPomXml || hasMvnw;
+  const buildRoots = new Set<string>();
+  if (usesGradle || usesMaven) {
+    buildRoots.add(".");
+  }
+  for (const workflow of workflows) {
+    for (const entry of collectCommandEntries(workflow)) {
+      let cwd = entry.workingDirectory ?? ".";
+      for (const segment of shellCommandSegments(entry.text)) {
+        const words = staticShellWords(segment);
+        if (!words) {
+          continue;
+        }
+        if (words[0] === "cd" && words[1]) {
+          cwd = path.posix.join(cwd, words[1]);
+          continue;
+        }
+        const tool = words[0] ?? "";
+        if (!/^(?:.*\/)?(?:gradlew?|mvnw?)$/.test(tool)) {
+          continue;
+        }
+        const relativeRoot = path.posix.normalize(path.posix.join(cwd, path.posix.dirname(tool)));
+        if (
+          path.isAbsolute(relativeRoot) ||
+          relativeRoot === ".." ||
+          relativeRoot.startsWith("../")
+        ) {
+          continue;
+        }
+        const names = tool.includes("gradle")
+          ? [
+              "build.gradle",
+              "build.gradle.kts",
+              "settings.gradle",
+              "settings.gradle.kts",
+              "gradlew",
+            ]
+          : ["pom.xml", "mvnw"];
+        const present = (
+          await Promise.all(
+            names.map((name) => context.pathExists(context.resolve(relativeRoot, name))),
+          )
+        ).some(Boolean);
+        if (!present) {
+          continue;
+        }
+        buildRoots.add(relativeRoot);
+        usesGradle ||= tool.includes("gradle");
+        usesMaven ||= tool.includes("mvn");
+      }
+    }
+  }
 
   let usesSpringBoot = false;
 
@@ -100,5 +156,6 @@ export async function collectJvmSignals(
     usesSpringBoot,
     usesMaven,
     usesGradle,
+    buildRoots: [...buildRoots].sort(),
   };
 }

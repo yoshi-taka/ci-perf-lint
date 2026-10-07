@@ -1,5 +1,7 @@
 # recommend-webpack-4-latest-patch
 
+Version evidence prefers the root lockfile dependency. A manifest range must stay entirely below 4.47 to prove an older version when no lockfile version is available.
+
 ## What This Rule Detects
 
 This rule detects repositories that declare webpack 4.x below 4.47.

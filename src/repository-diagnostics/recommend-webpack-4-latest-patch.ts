@@ -2,9 +2,10 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
-  packageJsonDependencyVersionSpec,
-  parseSemverLikeVersionSpec,
-} from "../repository-package-helpers.ts";
+  effectiveDependencyVersionSpec,
+  versionSpecIsBelow,
+} from "../repository-dependency-versions.ts";
+import { parseSemverLikeVersionSpec } from "../repository-package-helpers.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 const WEBPACK_4_TARGET_MINOR = 47;
@@ -30,7 +31,7 @@ export async function collectRecommendWebpack4LatestPatchDiagnostics(
     return [];
   }
 
-  const webpackVersionSpec = packageJsonDependencyVersionSpec(packageJson, "webpack");
+  const webpackVersionSpec = await effectiveDependencyVersionSpec(context, "webpack");
   if (!webpackVersionSpec) {
     return [];
   }
@@ -41,7 +42,10 @@ export async function collectRecommendWebpack4LatestPatchDiagnostics(
   }
 
   const currentMinor = parsed.minor ?? 0;
-  if (currentMinor >= WEBPACK_4_TARGET_MINOR) {
+  if (
+    currentMinor >= WEBPACK_4_TARGET_MINOR ||
+    versionSpecIsBelow(webpackVersionSpec, [4, WEBPACK_4_TARGET_MINOR, 0]) !== true
+  ) {
     return [];
   }
 

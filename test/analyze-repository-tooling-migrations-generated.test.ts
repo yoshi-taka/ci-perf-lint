@@ -118,7 +118,7 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
       JSON.stringify({
         name: "jest-30-5-like",
         scripts: { test: "jest" },
-        devDependencies: { jest: "^30.4.0" },
+        devDependencies: { jest: "30.4.0" },
       }),
     );
     await writeFile(

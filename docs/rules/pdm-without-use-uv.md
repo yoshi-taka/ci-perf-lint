@@ -14,7 +14,7 @@ PDM's default backend uses pip's resolver and installer, which can be slower tha
 
 The rule looks for:
 
-- a repository with PDM configuration (`[tool.pdm]` in `pyproject.toml` or `[pdm]` in `pdm.toml`)
+- actual PDM package-manager evidence: `pdm.lock`, `pdm.toml`, or PDM install/lock/run commands in CI
 - absence of `use_uv = true` in the PDM config
 - (workflow rule only) a CI job that runs `pdm` commands
 
@@ -23,6 +23,9 @@ The rule intentionally skips:
 - repositories that already have `use_uv = true` configured
 - jobs that do not run pdm commands
 - repositories without visible PDM usage
+- projects that only use `pdm-backend` / `[tool.pdm]` build metadata while uv manages dependencies
+
+Install uv, then run `pdm config --local use_uv true`. This writes `use_uv = true` to the root of `pdm.toml`; putting that key in `[tool.pdm]` in `pyproject.toml` does not configure the PDM resolver. Visible CI commands enabling `use_uv` are also recognized.
 
 ## When to ignore it
 
@@ -40,5 +43,5 @@ Ignore this finding when:
 
 ## Sources
 
-- https://pdm-project.org/latest/dev/experimental/#use-uv-as-the-backend
+- https://pdm-project.org/en/latest/usage/uv/
 - https://docs.astral.sh/uv/guides/integration/

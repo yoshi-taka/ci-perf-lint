@@ -110,25 +110,6 @@
     "score": 49
   },
   {
-    "ruleId": "prefer-eslint-concurrency",
-    "severity": "warning",
-    "confidence": "medium",
-    "scope": "repository",
-    "docsPath": "docs/rules/prefer-eslint-concurrency.md",
-    "workflow": ".github/workflows/ci.yml",
-    "location": {
-      "path": "package.json",
-      "line": 9,
-      "column": 5
-    },
-    "message": "Repository pins eslint ^9.0.0, below the release that added multithread linting.",
-    "why": "ESLint v9.34.0 added multithread linting and the --concurrency CLI flag. On large projects with multiple CPU cores, ESLint reports a speedup of roughly 1.30x to 3.01x once files are linted across worker threads, and the driver also spent years fixing config-loader caching regressions. Staying on an older ESLint leaves CI lint jobs single-threaded and slower.",
-    "suggestion": "Move the ESLint dependency to the latest 9.x release (at least 9.34), then enable multithread linting by passing --concurrency=auto in lint commands or package scripts.",
-    "measurementHint": "Compare ESLint wall-clock time before and after the upgrade and the --concurrency change, and re-measure on the actual CI runner because virtualized or limited CPU cores can reduce the gain.",
-    "aiHandoff": "Review package.json and raise the eslint dependency to the latest 9.x release (at least 9.34). Flat config is already required on ESLint 9, so no config-format migration is needed. Then update lint scripts to pass --concurrency=auto and verify the project still lints the same files.",
-    "score": 48
-  },
-  {
     "ruleId": "missing-dependency-cache",
     "severity": "suggestion",
     "confidence": "medium",

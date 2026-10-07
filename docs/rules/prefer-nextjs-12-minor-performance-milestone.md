@@ -1,5 +1,7 @@
 # prefer-nextjs-12-minor-performance-milestone
 
+Both workflow and repository findings use root dependency version evidence. Unresolved ranges crossing the milestone are not treated as old installed versions.
+
 ## What it flags
 
 Flags workflows that visibly run `next build` when the repository depends on Next.js `12.0`, `12.1`, or `12.2`.

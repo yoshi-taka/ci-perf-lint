@@ -1,5 +1,7 @@
 # prefer-storybook-7-minor-performance-milestone
 
+Both workflow and repository findings use root dependency version evidence. Unresolved ranges crossing the milestone are not treated as old installed versions.
+
 ## What it flags
 
 Flags workflows that visibly run `build-storybook` or `storybook build` when the repository depends on Storybook `7.0`, `7.1`, `7.2`, `7.3`, `7.4`, or `7.5`.

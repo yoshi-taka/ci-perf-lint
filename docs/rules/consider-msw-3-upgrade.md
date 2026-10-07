@@ -1,5 +1,7 @@
 # consider-msw-3-upgrade
 
+MSW version evidence uses the root lockfile dependency where available, and ignores unrelated aliases and unresolved package protocols.
+
 Suggests reviewing an MSW 2.x to 3.0 upgrade for repositories still on MSW 2.x.
 
 ## What it detects

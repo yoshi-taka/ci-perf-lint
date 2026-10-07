@@ -1,5 +1,7 @@
 # recommend-webpack-5-latest-patch
 
+Version evidence prefers the root lockfile dependency. A manifest range must stay entirely below 5.53 to prove an older version when no lockfile version is available.
+
 ## What This Rule Detects
 
 This rule detects repositories that declare webpack 5.x below 5.53.

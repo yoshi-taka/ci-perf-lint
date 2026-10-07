@@ -7,6 +7,7 @@ import {
   jobPublishesScorecardResults,
 } from "./shared/workflow-jobs.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "unnecessary-checkout-when-only-using-artifacts",
@@ -87,7 +88,19 @@ function jobHasRepoFileOperations(job: WorkflowJob): boolean {
   });
 }
 
-function jobLooksLikeArtifactOnly(job: WorkflowJob): boolean {
+function jobHasRepositoryTooling(workflow: WorkflowDocument, job: WorkflowJob): boolean {
+  return job.steps.some(
+    (step) =>
+      Boolean(step.with?.["node-version-file"]) ||
+      Boolean(step.with?.["python-version-file"]) ||
+      (step.run !== undefined && workflowWorkingDirectory(workflow, job, step) !== ".") ||
+      /(?:^|[\s;&|])(?:npm\s+(?:run(?:-script)?|test)|(?:yarn|pnpm|bun)\s+(?!(?:--version|--help|global|dlx|add)\b)[A-Za-z][\w:-]*|npx\s+npq\s+install)\b/.test(
+        step.run ?? "",
+      ),
+  );
+}
+
+function jobLooksLikeArtifactOnly(workflow: WorkflowDocument, job: WorkflowJob): boolean {
   return (
     jobUsesArtifactAction(job) &&
     !jobUsesLocalAction(job) &&
@@ -98,7 +111,8 @@ function jobLooksLikeArtifactOnly(job: WorkflowJob): boolean {
     !jobRunsGitApply(job) &&
     !hasHistoryDependentCommand(job) &&
     !hasOpaqueRepoScriptExecution(job) &&
-    !jobHasRepoFileOperations(job)
+    !jobHasRepoFileOperations(job) &&
+    !jobHasRepositoryTooling(workflow, job)
   );
 }
 
@@ -117,7 +131,7 @@ export const unnecessaryCheckoutWhenOnlyUsingArtifactsRule = {
         continue;
       }
 
-      if (!jobLooksLikeArtifactOnly(job)) {
+      if (!jobLooksLikeArtifactOnly(workflow, job)) {
         continue;
       }
 

@@ -14,6 +14,9 @@ This rule skips reporting when the job:
 - Runs build or install commands (`npm ci`, `pnpm install`, `cargo build`, etc.)
 - Contains git operations that need the working tree (`git apply`, `git log`, `git diff`, etc.)
 - Executes repository scripts (`./scripts/...`, `node scripts/...`, etc.)
+- Reads repository version files such as `node-version-file: .nvmrc`
+- Executes package scripts (`npm run`, `yarn unit`, `yarn integration`, etc.) or a wrapped dependency install such as `npx npq install`
+- Runs commands with a repository working-directory override
 - Uses known actions that need the working tree (`peter-evans/create-pull-request@`, `chromaui/action@`, `goreleaser/goreleaser-action@`, etc.)
 
 ## Examples

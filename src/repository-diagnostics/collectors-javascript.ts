@@ -297,7 +297,11 @@ export const javascriptDiagnosticCollectors = [
   },
   {
     id: "prefer-lefthook-for-complex-git-hooks",
-    gate: gateKeys.husky,
+    gateExpr: {
+      kind: "or",
+      left: { kind: "atom", gate: gateKeys.husky },
+      right: { kind: "atom", gate: gateKeys.javascriptTooling },
+    },
     collect: ({ repoRoot, repository }) =>
       collectPreferLefthookForComplexGitHooksDiagnostics(repoRoot, repository),
   },

@@ -16,7 +16,7 @@ Upgrading alone is not enough. ESLint v9 as a whole is roughly on par with v8 fo
 
 Direct invocations are detected across GitHub Actions, Buildkite, CircleCI, and GitLab CI. Steps that only call an indirect script such as `npm run lint` are not flagged by the workflow rule; the script itself is covered by the repository diagnostic.
 
-The rule is conservative when the ESLint version cannot be read from `package.json`: it stays silent instead of suggesting a flag that older ESLint does not understand.
+Version evidence prefers the root dependency in the lockfile. An unresolved `^9.26.0` can allow ESLint 9.34+ and does not prove that an upgrade is necessary. When support for concurrency is unknown, the rule stays silent instead of recommending an unsupported flag.
 
 ## Suggested action
 

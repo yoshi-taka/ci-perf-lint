@@ -20,6 +20,9 @@ Conservative bias:
 - only flags steps that already opt into caching (cache is set)
 - only activates when lock files are found outside the root, indicating a likely monorepo or multi-package layout
 - does not flag when `cache-dependency-path` is already present
+- matches lockfile types to the configured cache manager
+- a root workspace lockfile is sufficient when the checkout and dependency installation are at the root; unrelated nested lockfiles do not require a wider cache key
+- independent nested install directories (including inline `cd`) and custom checkout paths are checked separately
 
 Typical remediation:
 

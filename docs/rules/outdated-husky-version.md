@@ -4,7 +4,7 @@
 
 Flags repositories that use Husky `< 9.1.2` and also have workflows that look relevant to local hook workloads such as lint, format, test, or TypeScript checks.
 
-This is a repo-aware rule. It reads Husky from `package.json`.
+This is a repo-aware rule. It reads Husky from `package.json` and resolves the root dependency from the lockfile when available. A caret lower bound that crosses 9.1.2 does not prove an old installed version.
 
 ## Why it matters
 

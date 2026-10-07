@@ -1,9 +1,51 @@
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowDocument } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import type { WorkflowSemantics } from "./shared/workflow-semantics.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { buildWorkflowSemantics } from "./shared/workflow-semantics.ts";
+import { workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
+import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
+import { detectInstallCommandFromText } from "./shared/tools.ts";
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`)
+      .join(",")}}`;
+  }
+  return value === undefined ? "null" : JSON.stringify(value);
+}
+
+function bootstrapIdentity(workflow: WorkflowDocument, job: WorkflowJob): string {
+  const setup = job.steps
+    .filter(
+      (step) =>
+        /^(?:actions\/(?:checkout|setup-|cache)|pnpm\/action-setup|astral-sh\/setup-uv|gradle\/actions\/setup-gradle)/i.test(
+          step.uses ?? "",
+        ) ||
+        Boolean(detectInstallCommandFromText(step.run ?? "")) ||
+        /\b(?:corepack|npm\s+(?:i|install)\s+(?:-g|--global))\b/.test(step.run ?? ""),
+    )
+    .map((step) => ({
+      uses: step.uses,
+      with: step.with,
+      run: step.run,
+      cwd: workflowWorkingDirectory(workflow, job, step),
+      env: effectiveStepEnvironment(workflow, job, step),
+    }));
+  return canonical({
+    runner: job.raw["runs-on"],
+    container: job.raw.container,
+    services: job.raw.services,
+    environment: job.raw.environment,
+    setup,
+  });
+}
 
 const meta = {
   id: "repeated-bootstrap-setup",
@@ -31,7 +73,7 @@ export const repeatedBootstrapSetupRule = {
     const groups = new Map<string, BootstrapGroup>();
 
     for (const job of workflow.jobs) {
-      if (job.usesReusableWorkflow || job.hasIf) {
+      if (job.usesReusableWorkflow || job.hasIf || job.raw.needs) {
         continue;
       }
 
@@ -40,11 +82,11 @@ export const repeatedBootstrapSetupRule = {
         continue;
       }
 
-      if (!jobMeta.hasCheckout && !jobMeta.hasInstall) {
+      if (!jobMeta.hasInstall) {
         continue;
       }
 
-      const bootstrapFp = `${jobMeta.hasCheckout ? "C" : "_"}${jobMeta.hasInstall ? `I${jobMeta.installManager ?? "?"}` : "_"}${jobMeta.hasCache ? "K" : "_"}`;
+      const bootstrapFp = bootstrapIdentity(workflow, job);
 
       const group = groups.get(bootstrapFp) ?? {
         bootstrapFp,

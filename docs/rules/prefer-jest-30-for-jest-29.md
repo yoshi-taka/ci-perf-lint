@@ -1,5 +1,7 @@
 # prefer-jest-30-for-jest-29
 
+Root lockfile versions take precedence over declared lower bounds for Jest, TypeScript and JSDOM. An unresolved `^30.0.0` does not prove Jest is below 30.5.
+
 Jest 29 repositories should consider Jest 30, and Jest 30.x repositories below 30.5 should move to the 30.5 performance release.
 
 ## What it detects
