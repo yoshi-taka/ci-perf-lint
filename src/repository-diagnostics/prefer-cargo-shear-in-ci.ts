@@ -1,4 +1,3 @@
-import path from "node:path";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";

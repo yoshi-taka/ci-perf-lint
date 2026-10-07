@@ -18,6 +18,48 @@ const job = (command: string, extra = "", stepExtra = "") =>
   `  check:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n${extra}    steps:\n      - uses: actions/setup-python@v5\n      - run: ${command}\n${stepExtra}`;
 
 describe("test-worker config scope", () => {
+  test.each([
+    ["jest.config.js", "npx jest", "// maxWorkers: 2"],
+    ["jest.config.js", "npx jest", "/* maxWorkers: 2 */"],
+    ["vitest.config.ts", "npx vitest run", "/* poolOptions: {} */"],
+    ["playwright.config.ts", "npx playwright test", "// workers: 2"],
+    ["playwright.config.ts", "npx playwright test", "/* workers: 2 */"],
+    ["pytest.ini", "pytest", "# addopts = -n auto"],
+    ["pyproject.toml", "pytest", '# addopts = "-n auto"'],
+  ])("ignores commented tuning in %s: %s %s", async (file, command, comment) => {
+    const report = await scan(
+      {
+        "package.json": JSON.stringify({ devDependencies: { jest: "30.5.1" } }),
+        [file]:
+          file.endsWith(".ini") || file.endsWith(".toml")
+            ? comment
+            : `export default {\n${comment}\n};`,
+      },
+      job(command),
+    );
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(true);
+  });
+
+  test("keeps active worker tuning after strings and block comments", async () => {
+    const report = await scan(
+      {
+        "package.json": JSON.stringify({ devDependencies: { jest: "30.5.1" } }),
+        "jest.config.js":
+          'export default { testEnvironment: "https://example.com", /* settings */ maxWorkers: 2 };',
+      },
+      job("npx jest"),
+    );
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(false);
+  });
+
   test.each(["npx playwright test", "pytest", "npx vitest run"])(
     "Jest config does not suppress %s",
     async (command) => {

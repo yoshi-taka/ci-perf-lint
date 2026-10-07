@@ -3,6 +3,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
+import { shellCommandSegments } from "../rules/shared/command-patterns.ts";
 
 const meta = {
   id: "maven-parallel-not-enabled",
@@ -66,21 +67,12 @@ export async function collectMavenParallelNotEnabledDiagnostics(
     return [];
   }
 
-  let hasMavenLifecycle = false;
-  let hasParallelFlag = false;
-  for (const { step } of context.predicateIndex.allSteps) {
-    const run = step.run ?? "";
-    const isLifecycle = MAVEN_LIFECYCLE.test(run);
-    if (isLifecycle) {
-      hasMavenLifecycle = true;
-      if (PARALLEL_FLAG.test(run)) {
-        hasParallelFlag = true;
-        break;
-      }
-    }
-  }
-
-  if (!hasMavenLifecycle || hasParallelFlag) {
+  const hasUntunedLifecycle = context.predicateIndex.allSteps.some(({ step }) =>
+    shellCommandSegments(step.run ?? "").some(
+      (command) => MAVEN_LIFECYCLE.test(command) && !PARALLEL_FLAG.test(command),
+    ),
+  );
+  if (!hasUntunedLifecycle) {
     return [];
   }
 

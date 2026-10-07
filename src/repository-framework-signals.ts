@@ -70,6 +70,38 @@ const JS_TEST_WORKER_SETTING = /\bmaxWorkers\b|\bminWorkers\b|\bpoolOptions\b/;
 const PLAYWRIGHT_WORKER_SETTING = /\bworkers\s*[:=]/;
 const PYTEST_WORKER_ADDOPTS = /(?:^|\s)(?:-n\b|--numprocesses\b)/;
 
+function activeWorkerConfigText(text: string, python: boolean): string {
+  let output = "";
+  let quote = "";
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index]!;
+    if (quote) {
+      output += char;
+      if (char === "\\") {
+        output += text[++index] ?? "";
+      } else if (char === quote) {
+        quote = "";
+      }
+    } else if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      output += char;
+    } else if ((python && char === "#") || (!python && char === "/" && text[index + 1] === "/")) {
+      while (index < text.length && text[index] !== "\n") {
+        index++;
+      }
+      output += "\n";
+    } else if (!python && char === "/" && text[index + 1] === "*") {
+      const end = text.indexOf("*/", index + 2);
+      const next = end === -1 ? text.length : end + 2;
+      output += text.slice(index, next).replace(/[^\n]/g, " ");
+      index = next - 1;
+    } else {
+      output += char;
+    }
+  }
+  return output;
+}
+
 function pytestAddoptsTuneWorkers(text: string): boolean {
   const iniMatch = text.match(/^addopts\s*=\s*(.+)$/m);
   if (iniMatch?.[1] && PYTEST_WORKER_ADDOPTS.test(iniMatch[1])) {
@@ -280,12 +312,13 @@ export async function collectFrameworkSignals(
         : fileName.startsWith("playwright.config")
           ? "playwright"
           : "pytest";
+    const activeText = activeWorkerConfigText(configText, tool === "pytest");
     const configured =
       tool === "pytest"
-        ? pytestAddoptsTuneWorkers(configText)
+        ? pytestAddoptsTuneWorkers(activeText)
         : tool === "playwright"
-          ? PLAYWRIGHT_WORKER_SETTING.test(configText)
-          : JS_TEST_WORKER_SETTING.test(configText);
+          ? PLAYWRIGHT_WORKER_SETTING.test(activeText)
+          : JS_TEST_WORKER_SETTING.test(activeText);
     if (configured) {
       (testWorkerTuningConfigured[tool] ??= []).push(fileName);
     }

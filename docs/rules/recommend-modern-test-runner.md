@@ -5,7 +5,7 @@ Suggests evaluating a modern JavaScript test runner for repositories still on a 
 ## What it detects
 
 - a legacy test runner in `package.json`: `jest` / `@jest/core` / `jest-cli`, `mocha`, `ava`, `jasmine` / `jasmine-core`, or `tape`
-- no modern runner already present (`vitest` or `@vitest/*`)
+- no modern runner already present (`vitest` or supported `@vitest/*` dependencies, or visible `vitest`, `bun test`, or `node --test` commands in package scripts or CI)
 
 It is a `suggestion`, and it does not assume a single target.
 

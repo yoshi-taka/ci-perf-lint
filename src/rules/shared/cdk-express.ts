@@ -4,6 +4,7 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../../workflow
 import { parse as parseLockfile, type ParsedLockFile } from "lockparse";
 import { workflowLooksReleaseLike } from "./workflow-jobs.ts";
 import { getTriggerSemantics } from "./workflow-triggers.ts";
+import { shellCommandSegments } from "./command-patterns.ts";
 
 const AWS_CDK_CLI_PACKAGE = "aws-cdk";
 
@@ -267,35 +268,35 @@ export function readCdkLibVersionFromScanContext(
   return readDeclaredDependencyVersion(scanContext, AWS_CDK_LIB_PACKAGE);
 }
 
-async function resolveCdkCliVersion(
-  job: WorkflowJob,
-  context: RuleContext,
-  targetStep: WorkflowStep,
-): Promise<SemverTuple | undefined> {
-  let version: SemverTuple | undefined;
-  for (const step of job.steps) {
-    version = extractCdkCliVersionFromText(step.run ?? "") ?? version;
-    if (step === targetStep) {
-      break;
-    }
-  }
-  return version ?? readCdkCliVersionFromScanContext(context.scanContext);
-}
-
 export async function groupCdkStepsByCliVersion(
   job: WorkflowJob,
   context: RuleContext,
   steps: WorkflowStep[],
+  matchesCommand: (text: string) => boolean,
 ): Promise<{ version: SemverTuple | undefined; steps: WorkflowStep[] }[]> {
   const groups = new Map<string, { version: SemverTuple | undefined; steps: WorkflowStep[] }>();
-  for (const step of steps) {
-    const version = await resolveCdkCliVersion(job, context, step);
-    const key = version ? formatSemver(version) : "unknown";
-    const group = groups.get(key);
-    if (group) {
-      group.steps.push(step);
-    } else {
-      groups.set(key, { version, steps: [step] });
+  const candidates = new Set(steps);
+  let version: SemverTuple | undefined;
+  let readDeclaredVersion = false;
+  for (const step of job.steps) {
+    for (const command of shellCommandSegments(step.run ?? "")) {
+      version = extractCdkCliVersionFromText(command) ?? version;
+      if (!candidates.has(step) || !matchesCommand(command)) {
+        continue;
+      }
+      if (!version && !readDeclaredVersion) {
+        version = await readCdkCliVersionFromScanContext(context.scanContext);
+        readDeclaredVersion = true;
+      }
+      const key = version ? formatSemver(version) : "unknown";
+      const group = groups.get(key);
+      // Keep the source anchor while reporting only the command using this CLI version.
+      const commandStep = { ...step, run: command };
+      if (group) {
+        group.steps.push(commandStep);
+      } else {
+        groups.set(key, { version, steps: [commandStep] });
+      }
     }
   }
   return [...groups.values()];

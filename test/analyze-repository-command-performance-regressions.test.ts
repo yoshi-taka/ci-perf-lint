@@ -111,6 +111,54 @@ describe("command performance regressions", () => {
   });
 
   test.each([
+    "mvn -T 1C compile && mvn verify",
+    "mvn verify; mvn -T 1C compile",
+    "|\n          mvn -T 1C compile\n          mvn verify",
+    "|\n          # mvn -T 1C compile\n          mvn verify",
+  ])("reports the untuned Maven command in %s", async (command) => {
+    const report = await scan(
+      { "pom.xml": "<project><modules><module>a</module></modules></project>" },
+      command,
+    );
+    expect(report.findings.some((finding) => finding.ruleId === "maven-parallel-not-enabled")).toBe(
+      true,
+    );
+  });
+
+  test("a tuned Maven job does not suppress an untuned job", async () => {
+    const report = await scan({
+      "pom.xml": "<project><modules><module>a</module></modules></project>",
+      ".github/workflows/ci.yml": `on: push
+jobs:
+  tuned:
+    runs-on: ubuntu-latest
+    steps:
+      - run: mvn -T 1C compile
+  untuned:
+    runs-on: ubuntu-latest
+    steps:
+      - run: mvn verify
+`,
+    });
+    expect(report.findings.some((finding) => finding.ruleId === "maven-parallel-not-enabled")).toBe(
+      true,
+    );
+  });
+
+  test.each([
+    "mvn -T 1C compile && mvn --threads=2 verify",
+    "mvn --version\n          # mvn verify",
+  ])("does not report tuned or inactive Maven lifecycle commands: %s", async (command) => {
+    const report = await scan(
+      { "pom.xml": "<project><modules><module>a</module></modules></project>" },
+      `|\n          ${command}`,
+    );
+    expect(report.findings.some((finding) => finding.ruleId === "maven-parallel-not-enabled")).toBe(
+      false,
+    );
+  });
+
+  test.each([
     "// command: 'npm run old',",
     "/* command: 'npm run old', */",
     "note: \"command: 'npm run old'\",",

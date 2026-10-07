@@ -11,6 +11,7 @@ import {
   groupCdkStepsByCliVersion,
   textDeploysCdkWithoutMethodDirect,
 } from "./shared/cdk-express.ts";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "prefer-cdk-method-direct-in-development",
@@ -33,7 +34,7 @@ export const preferCdkMethodDirectInDevelopmentRule = {
       }
 
       const candidates = job.steps.filter((step) =>
-        textDeploysCdkWithoutMethodDirect(step.run ?? ""),
+        shellCommandSegments(step.run ?? "").some(textDeploysCdkWithoutMethodDirect),
       );
       if (candidates.length === 0) {
         continue;
@@ -47,7 +48,12 @@ export const preferCdkMethodDirectInDevelopmentRule = {
       for (const {
         version: resolvedVersion,
         steps: offendingSteps,
-      } of await groupCdkStepsByCliVersion(job, context, candidates)) {
+      } of await groupCdkStepsByCliVersion(
+        job,
+        context,
+        candidates,
+        textDeploysCdkWithoutMethodDirect,
+      )) {
         if (!cdkCliVersionSupportsMethodDirect(resolvedVersion)) {
           continue;
         }

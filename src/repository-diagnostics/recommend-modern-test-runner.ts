@@ -4,6 +4,8 @@ import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { packageJsonHasDependency } from "../repository-package-helpers.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
+import { collectCommandEntries } from "../rules/shared/any-step.ts";
+import { shellCommandSegments } from "../rules/shared/command-patterns.ts";
 
 const meta = {
   id: "recommend-modern-test-runner",
@@ -32,6 +34,17 @@ const MODERN_RUNNER_DEPENDENCIES = [
 ] as const;
 
 const BUN_FILES = ["bun.lock", "bun.lockb", "bunfig.toml"] as const;
+
+function runsModernTestRunner(text: string): boolean {
+  return shellCommandSegments(text).some((command) => {
+    const executable = command.replace(/^(?:env\s+)?(?:\w+=\S+\s+)*/, "");
+    return (
+      /^(?:\S*\/)?bun(?:\s+--\S+)*\s+test(?=\s|$)/.test(executable) ||
+      (/^(?:\S*\/)?node\s/.test(executable) && /(?:^|\s)--test(?=\s|=|$)/.test(executable)) ||
+      /^(?:(?:npx|pnpm\s+exec|bunx)\s+)?vitest(?=\s|$)/.test(executable)
+    );
+  });
+}
 
 function declaredPackageManager(packageJson: Record<string, unknown>): string | undefined {
   const value = packageJson.packageManager;
@@ -68,6 +81,20 @@ export async function collectRecommendModernTestRunnerDiagnostics(
   }
 
   if (MODERN_RUNNER_DEPENDENCIES.some((dep) => packageJsonHasDependency(packageJson, dep))) {
+    return [];
+  }
+
+  const scripts = packageJson.scripts;
+  if (
+    (scripts &&
+      typeof scripts === "object" &&
+      Object.values(scripts).some(
+        (command) => typeof command === "string" && runsModernTestRunner(command),
+      )) ||
+    context.workflows.some((workflow) =>
+      collectCommandEntries(workflow).some((entry) => runsModernTestRunner(entry.text)),
+    )
+  ) {
     return [];
   }
 

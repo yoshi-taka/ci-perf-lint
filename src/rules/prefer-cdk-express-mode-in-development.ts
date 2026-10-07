@@ -15,6 +15,7 @@ import {
   groupCdkStepsByCliVersion,
   textDeploysCdkWithoutExpress,
 } from "./shared/cdk-express.ts";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "prefer-cdk-express-mode-in-development",
@@ -34,7 +35,9 @@ export const preferCdkExpressModeInDevelopmentRule = {
         continue;
       }
 
-      const candidates = job.steps.filter((step) => textDeploysCdkWithoutExpress(step.run ?? ""));
+      const candidates = job.steps.filter((step) =>
+        shellCommandSegments(step.run ?? "").some(textDeploysCdkWithoutExpress),
+      );
       if (candidates.length === 0) {
         continue;
       }
@@ -47,7 +50,12 @@ export const preferCdkExpressModeInDevelopmentRule = {
       for (const {
         version: resolvedVersion,
         steps: offendingSteps,
-      } of await groupCdkStepsByCliVersion(job, context, candidates)) {
+      } of await groupCdkStepsByCliVersion(
+        job,
+        context,
+        candidates,
+        textDeploysCdkWithoutExpress,
+      )) {
         const needsUpgrade = cdkVersionIsBelowExpressFloor(resolvedVersion);
         const versionLabel = resolvedVersion ? formatSemver(resolvedVersion) : undefined;
 

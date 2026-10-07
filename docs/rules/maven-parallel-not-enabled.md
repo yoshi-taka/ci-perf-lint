@@ -13,13 +13,13 @@ Reports when:
 - The repository uses Maven (`pom.xml` or `mvnw`)
 - CI executes a Maven lifecycle goal (`compile`, `test`, `package`, `verify`, `install`, `deploy`, `integration-test`)
 - The build looks multi-module: the root `pom.xml` declares `<modules>`, or more than one `pom.xml` is present
-- No `-T` / `--threads` flag is used in the CI Maven command or root `.mvn/maven.config`
+- At least one CI Maven lifecycle command lacks `-T` / `--threads`, and root `.mvn/maven.config` does not configure parallel execution
 
 ## Exclusions
 
 Does not report when:
 
-- `-T` or `--threads` is already passed in CI or configured in `.mvn/maven.config` (commented flags do not count)
+- Every CI Maven lifecycle command passes `-T` or `--threads`, or parallel execution is configured in `.mvn/maven.config` (commented flags do not count). A tuned command does not suppress a separate untuned command or job.
 - Only a single `pom.xml` is found and the root POM has no `<modules>`
 - No Maven lifecycle goal runs in CI
 

@@ -4,6 +4,7 @@ import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { sourceContains } from "./shared/predicate.ts";
 import { predicateToPrecheck } from "./shared/predicate-score.ts";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
 import {
   cdkCliVersionIsBelowHotswapFloor,
   formatSemver,
@@ -33,7 +34,9 @@ export const preferAwsCdkCli21125ForHotswapRule = {
         continue;
       }
 
-      const candidates = job.steps.filter((step) => textUsesCdkHotswap(step.run ?? ""));
+      const candidates = job.steps.filter((step) =>
+        shellCommandSegments(step.run ?? "").some(textUsesCdkHotswap),
+      );
       if (candidates.length === 0) {
         continue;
       }
@@ -41,7 +44,7 @@ export const preferAwsCdkCli21125ForHotswapRule = {
       for (const {
         version: resolvedVersion,
         steps: hotswapSteps,
-      } of await groupCdkStepsByCliVersion(job, context, candidates)) {
+      } of await groupCdkStepsByCliVersion(job, context, candidates, textUsesCdkHotswap)) {
         if (!cdkCliVersionIsBelowHotswapFloor(resolvedVersion)) {
           continue;
         }
