@@ -7,6 +7,14 @@
 - npm に同じ version が未存在であること（CI が重複チェックするが事前確認推奨）
 - GitHub への push 権限があること
 
+## Git 操作は非対話で実行する
+
+- リリース作業では Vim 等のエディタを起動しない。commit / tag のメッセージは必ず `-m` で指定する。
+- Git コマンドには `GIT_EDITOR=false` を付ける。想定外にエディタが必要になった場合は対話待ちせず失敗させる。
+- タグは `git tag -a v<version> -m "Release v<version>"` で作成する。メッセージなしの `git tag v<version>` は使わない。
+- `tag.gpgSign=true` の環境では、単純な `git tag v<version>` も署名付きタグ扱いになり、`-m` がないとエディタが起動する。
+- Git 設定は変更せず、既存の署名設定を維持する。認証・署名で失敗した場合は原因を確認してから再実行する。
+
 ---
 
 ## Method 1: tag push (安定版 / prerelease 共通)
@@ -35,7 +43,7 @@
 
 ```sh
 git add package.json packages/ci-perf-lint/package.json
-git commit -m "chore: bump version to <version>"
+GIT_EDITOR=false git commit -m "chore: bump version to <version>"
 ```
 
 #### 4. main に push
@@ -49,7 +57,7 @@ git push origin main
 #### 5. tag を打つ
 
 ```sh
-git tag v<version>
+GIT_EDITOR=false git tag -a v<version> -m "Release v<version>"
 ```
 
 #### 6. tag を push する
@@ -118,8 +126,8 @@ tag push との差分:
 
 | dist_tag | コマンド | 例 |
 |----------|---------|-----|
-| `alpha` | `npm version prerelease --preid=alpha` | `1.0.0` → `1.0.1-alpha.0` |
-| `latest` | `npm version patch` | `1.0.0` → `1.0.1` |
+| `alpha` | `npm version prerelease --preid=alpha --no-git-tag-version` | `1.0.0` → `1.0.1-alpha.0` |
+| `latest` | `npm version patch --no-git-tag-version` | `1.0.0` → `1.0.1` |
 
 **minor / major bump には対応していない。** `1.0.0` → `1.1.0` のような bump が必要な場合は必ず tag push を使うこと。
 

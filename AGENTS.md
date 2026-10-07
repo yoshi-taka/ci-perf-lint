@@ -208,7 +208,8 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 
 See `docs/publishing.md`. TL;DR:
 
-- **Tag push**: `git tag v<ver> && git push origin v<ver>` — fully automated publish + release
+- **Tag push**: `GIT_EDITOR=false git tag -a v<ver> -m "Release v<ver>" && git push origin v<ver>` — fully automated publish + release
+- **Non-interactive release Git operations**: always pass `-m` for commit/tag and use `GIT_EDITOR=false`. Never open Vim or another editor during release; fail instead of waiting for interactive input. Preserve existing signing settings.
 - **NEVER use `git push --tags` or `git push origin main --tags`**. They push every local tag, including stale development tags, which triggers publish workflows for already-published versions. Always push exactly one tag: `git push origin v<ver>`.
 - **workflow_dispatch**: manual from GitHub Actions UI, supports `bump_version` and `dist_tag`
 - **Lockfile**: commit `package.json` dependency changes together with `bun.lock`. CI and the pre-push `lockfile-sync` hook run `bun install --frozen-lockfile`.
