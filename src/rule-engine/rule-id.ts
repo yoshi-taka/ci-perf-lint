@@ -86,6 +86,7 @@ export const RULE_REGISTRY = {
   "prefer-oxlint-type-check-over-tsc": { kind: "workflow" },
   "prefer-oxfmt-over-prettier": { kind: "workflow" },
   "prefer-python-3-11": { kind: "workflow" },
+  "prefer-pnpm-12-10": { kind: "workflow" },
   "prefer-rails-performance-milestone": { kind: "workflow" },
   "prefer-ruff-format-over-black": { kind: "workflow" },
   "prefer-ruff-import-sorting-over-isort": { kind: "workflow" },

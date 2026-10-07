@@ -75,6 +75,7 @@ import { preferEslintConcurrencyRule } from "./prefer-eslint-concurrency.ts";
 import { preferOxlintOverEslintRule } from "./prefer-oxlint-over-eslint.ts";
 import { preferOxlintTypeCheckOverTscRule } from "./prefer-oxlint-type-check-over-tsc.ts";
 import { preferOxfmtOverPrettierRule } from "./prefer-oxfmt-over-prettier.ts";
+import { preferPnpm1210Rule } from "./prefer-pnpm-12-10.ts";
 import {
   preferNextjs12MinorPerformanceMilestoneRule,
   preferNextjs13MinorPerformanceMilestoneRule,
@@ -184,6 +185,7 @@ export const allRules = [
   preferOxlintOverEslintRule,
   preferOxlintTypeCheckOverTscRule,
   preferOxfmtOverPrettierRule,
+  preferPnpm1210Rule,
   preferNextjs12MinorPerformanceMilestoneRule,
   preferNextjs13MinorPerformanceMilestoneRule,
   preferNextjs14MinorPerformanceMilestoneRule,

@@ -19,6 +19,8 @@ const fixtureNames = {
   barrelFileLike: "barrel-file-like",
   barrelFileSkipOxlintLike: "barrel-file-skip-oxlint-like",
   preferOxlintTypeCheckOverTscLike: "prefer-oxlint-type-check-over-tsc-like",
+  pnpmVersionLike: "pnpm-version-like",
+  pnpmVersionOk: "pnpm-version-ok",
   preferOxlintTypeCheckOverTscOk: "prefer-oxlint-type-check-over-tsc-ok",
   preferOxlintTypeCheckOverTscNoOxlint: "prefer-oxlint-type-check-over-tsc-no-oxlint",
   blobNoneAgenticDocsEditLike: "blob-none-agentic-docs-edit-like",
