@@ -23,7 +23,7 @@ export async function collectPreferTypeScript7NativeCompilerDiagnostics(
   const packageJsonText = packageJsonEntry.text ?? "";
 
   const { versionSpec, major } = repository.typescript;
-  if (!versionSpec || major === undefined || major < 4 || major >= 7) {
+  if (!versionSpec || major === undefined || major < 5 || major >= 7) {
     return [];
   }
 

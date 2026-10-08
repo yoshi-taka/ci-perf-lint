@@ -17,9 +17,9 @@ The speed comes from native execution and parallelism, not from changed checking
 
 ## What it flags
 
-Flags a repository whose `package.json` depends on TypeScript 4.x, 5.x, or 6.x. The rule reads the TypeScript version from repository signals derived from `package.json`.
+Flags a repository whose `package.json` depends on TypeScript 5.x or 6.x. The rule reads the TypeScript version from repository signals derived from `package.json`.
 
-Repositories already on TypeScript 7.x, or with no detectable `typescript` dependency, are not flagged.
+Repositories on TypeScript 4.x or earlier, already on TypeScript 7.x or later, or with no detectable `typescript` dependency, are not flagged.
 
 This rule is independent from `prefer-typescript-5-performance-milestone`, which recommends short-term 5.x milestones. A repository on TypeScript 5.x can receive both findings: one for the next 5.x step and one for the larger 7.x jump.
 
@@ -41,7 +41,7 @@ This rule is independent from `prefer-typescript-5-performance-milestone`, which
 
 - Gate: JavaScript-heavy repository diagnostics.
 - Reads the `typescript` dependency version from `package.json`.
-- Emits one finding when the parsed major version is 4, 5, or 6.
+- Emits one finding when the parsed major version is 5 or 6.
 
 ## Sources
 
