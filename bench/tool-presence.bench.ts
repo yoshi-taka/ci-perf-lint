@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Bench } from "tinybench";
+import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import { AhoCorasickAutomaton } from "../src/rules/shared/aho-corasick.ts";
 
 const fixturesDir = path.resolve(import.meta.dirname, "../test/fixtures");
@@ -114,11 +115,9 @@ function acOnly(blob: string): Set<number> {
 
 const fixtures = loadTextFixtures();
 
-const bench = new Bench({
-  iterations: 50,
-  time: 0,
-  warmup: false,
-});
+const bench = withCodSpeed(
+  new Bench({ iterations: 50, time: 0, warmup: false }),
+);
 
 for (const [label, blob] of fixtures) {
   const byteLen = new TextEncoder().encode(blob).length;

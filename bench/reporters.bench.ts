@@ -1,5 +1,6 @@
 import path from "node:path";
 import { Bench } from "tinybench";
+import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import { analyzeRepository } from "../src/repo.ts";
 import { renderReport } from "../src/reporters-render.ts";
 import type { ReportData } from "../src/types.ts";
@@ -14,11 +15,9 @@ const reportData: ReportData = await analyzeRepository({
   workflowOnly: true,
 });
 
-const bench = new Bench({
-  iterations: 25,
-  time: 0,
-  warmup: false,
-});
+const bench = withCodSpeed(
+  new Bench({ iterations: 25, time: 0, warmup: false }),
+);
 
 bench
   .add("renderReport > handoff format", () => {

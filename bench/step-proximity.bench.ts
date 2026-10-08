@@ -1,4 +1,5 @@
 import { Bench } from "tinybench";
+import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import {
   buildStepSequence,
   computePairProximity,
@@ -36,7 +37,7 @@ const wf = makeWorkflow(4, 8);
 const seq = buildStepSequence(wf);
 const pairs = allPairs(seq);
 
-const bench = new Bench({ iterations: 50, time: 0, warmup: false });
+const bench = withCodSpeed(new Bench({ iterations: 50, time: 0, warmup: false }));
 
 bench
   .add("computePairProximity > 4×8 steps, all pairs (496 pairs)", () => {

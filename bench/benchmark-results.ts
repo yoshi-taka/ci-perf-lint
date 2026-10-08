@@ -1,5 +1,15 @@
 import type { Bench } from "tinybench";
 
-export function failedBenchmarkTasks(bench: Pick<Bench, "tasks">): string[] {
-  return bench.tasks.filter(task => task.result.state !== "completed").map(task => task.name);
+/** CodSpeed analysis calls captured functions directly; a resolved run leaves Tinybench stats untouched. */
+export function failedBenchmarkTasks(
+  bench: Pick<Bench, "tasks">,
+  completedAnalysisRun = false,
+): string[] {
+  return bench.tasks
+    .filter(
+      (task) =>
+        task.result.state !== "completed" &&
+        !(completedAnalysisRun && task.result.state === "not-started"),
+    )
+    .map((task) => task.name);
 }

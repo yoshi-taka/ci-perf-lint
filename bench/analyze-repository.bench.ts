@@ -1,14 +1,13 @@
 import path from "node:path";
 import { Bench } from "tinybench";
+import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import { analyzeRepository } from "../src/repo.ts";
 
 const fixturesDir = path.resolve(import.meta.dirname, "../test/fixtures");
 
-const bench = new Bench({
-  iterations: 1,
-  time: 0,
-  warmup: false,
-});
+const bench = withCodSpeed(
+  new Bench({ iterations: 1, time: 0, warmup: false }),
+);
 
 bench
   .add("analyzeRepository > sample-repo (workflow-only)", async () => {

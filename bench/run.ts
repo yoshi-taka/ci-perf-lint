@@ -1,4 +1,3 @@
-import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import { failedBenchmarkTasks } from "./benchmark-results.ts";
 import { bench as parseWorkflowBench } from "./parse-workflow.bench.ts";
 import { bench as ruleEngineBench } from "./rule-engine.bench.ts";
@@ -19,10 +18,14 @@ async function main() {
 
   for (const bench of benches) {
     try {
-      const wrapped = withCodSpeed(bench);
-      await wrapped.run();
-      console.table(wrapped.table());
-      const failed = failedBenchmarkTasks(wrapped);
+      await bench.run();
+      const analysisCompleted =
+        process.env.CODSPEED_ENV !== undefined &&
+        ["simulation", "instrumentation", "memory"].includes(
+          process.env.CODSPEED_RUNNER_MODE ?? "",
+        );
+      if (!analysisCompleted) console.table(bench.table());
+      const failed = failedBenchmarkTasks(bench, analysisCompleted);
       if (failed.length > 0) {
         console.error(`[bench] Failed tasks: ${failed.join(", ")}`);
         process.exitCode = 1;

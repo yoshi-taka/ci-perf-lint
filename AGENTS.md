@@ -203,6 +203,7 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 ### Known Issues
 
 - Individual benchmark failures are logged while other benches continue. The final exit status is nonzero if any task failed or did not complete.
+- Register `withCodSpeed(new Bench(...))` before adding tasks. CodSpeed simulation executes captured callbacks directly and leaves Tinybench statistics `not-started`; a successfully awaited analysis run must not be failed for that state. The isolated simulation regression in `test/codspeed-benchmarks.test.ts` checks registration and failure propagation.
 
 ## Publishing
 

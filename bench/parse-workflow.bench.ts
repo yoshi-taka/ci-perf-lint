@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Bench } from "tinybench";
+import { withCodSpeed } from "@codspeed/tinybench-plugin";
 import { parseWorkflow } from "../src/workflow.ts";
 
 const fixturesDir = path.resolve(import.meta.dirname, "../test/fixtures");
@@ -23,11 +24,9 @@ const largeWorkflowPath = path.join(
 );
 const largeWorkflowSource = readFileSync(largeWorkflowPath, "utf8");
 
-const bench = new Bench({
-  iterations: 25,
-  time: 0,
-  warmup: false,
-});
+const bench = withCodSpeed(
+  new Bench({ iterations: 25, time: 0, warmup: false }),
+);
 
 bench
   .add("parseWorkflow > small workflow (sample-repo ci.yml)", () => {
