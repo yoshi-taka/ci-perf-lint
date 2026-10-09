@@ -60,6 +60,7 @@ import { outdatedDatadogLambdaExtensionRule } from "./outdated-datadog-lambda-ex
 import { outdatedSetupActionWithoutCacheRule } from "./outdated-setup-action-without-cache.ts";
 import { preferUv012Rule } from "./prefer-uv-0-12.ts";
 import { preferUvPipOverPipRule } from "./prefer-uv-pip-over-pip.ts";
+import { preferWorkflowDispatchRunDetailsRule } from "./prefer-workflow-dispatch-run-details.ts";
 import { preferBuildxBuildOverDockerBuildRule } from "./prefer-buildx-build-over-docker-build.ts";
 import { preferAwsCdkCli21125ForHotswapRule } from "./prefer-aws-cdk-cli-2-1125-for-hotswap.ts";
 import { preferCdkExpressModeInDevelopmentRule } from "./prefer-cdk-express-mode-in-development.ts";
@@ -209,6 +210,7 @@ export const allRules = [
   preferSetupUvForLightweightPythonToolingRule,
   preferUv012Rule,
   preferUvPipOverPipRule,
+  preferWorkflowDispatchRunDetailsRule,
   preferZstdCompressionForPushedDockerImagesRule,
   railsDbSchemaLoadOverMigrateRule,
   rubySetupRubyMissingBundlerCacheRule,

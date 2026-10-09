@@ -101,6 +101,7 @@ export const RULE_REGISTRY = {
   "prefer-tailwind-v4-upgrade-tool": { kind: "workflow" },
   "prefer-uv-0-12": { kind: "workflow" },
   "prefer-uv-pip-over-pip": { kind: "workflow" },
+  "prefer-workflow-dispatch-run-details": { kind: "workflow" },
   "prefer-zstd-compression-for-pushed-docker-images": { kind: "workflow" },
   "rails-db-schema-load-over-migrate": { kind: "workflow" },
   "prefer-ruby-3-yjit": { kind: "workflow" },

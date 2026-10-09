@@ -185,6 +185,7 @@ Current rule registry:
 - `prefer-uv-0-12`
 - `prefer-uv-pip-over-pip`
 - `prefer-vitest-performance-milestone`
+- `prefer-workflow-dispatch-run-details`
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`
 - `pytest-norecursedirs-override`

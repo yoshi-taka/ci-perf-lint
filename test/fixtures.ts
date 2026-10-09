@@ -48,6 +48,8 @@ const fixtureNames = {
   circleciFullCloneOk: "circleci-full-clone-ok",
   circleciFullCloneOkUsesHistory: "circleci-full-clone-ok-uses-history",
   depotCiLike: "depot-ci-like",
+  dispatchRunDiscoveryLike: "dispatch-run-discovery-like",
+  dispatchRunDiscoveryOk: "dispatch-run-discovery-ok",
   cargoBuildBeforeTestLike: "cargo-build-before-test-like",
   cargoBuildBeforeTestOk: "cargo-build-before-test-ok",
   cdkBucketDeploymentMemoryLike: "cdk-bucket-deployment-memory-like",

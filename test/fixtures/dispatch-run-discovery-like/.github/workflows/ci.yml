@@ -1,0 +1,17 @@
+name: Dispatch and discover
+on: workflow_dispatch
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch then find the run
+        run: |
+          gh api "repos/$repo/actions/workflows/$workflow/dispatches" \
+            -f ref=main -f "inputs[correlation_id]=$correlation_id"
+          for attempt in $(seq 1 24); do
+            sleep 5
+            run_id="$(gh api "repos/$repo/actions/workflows/$workflow/runs?event=workflow_dispatch" \
+              --jq ".workflow_runs[] | select(.name | contains(\"$correlation_id\")) | .id")"
+            if [ -n "$run_id" ]; then break; fi
+          done
+          gh run watch "$run_id" --repo "$repo" --exit-status
