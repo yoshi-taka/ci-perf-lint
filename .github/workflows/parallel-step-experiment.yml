@@ -1,0 +1,58 @@
+name: Parallel step fail-fast experiment
+
+on:
+  push:
+    branches: [experiment/parallel-step-fail-fast]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parallel-failure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Record start
+        run: date +%s > "$RUNNER_TEMP/parallel-start"
+      - parallel:
+          - name: Fail after two seconds
+            run: |
+              sleep 2
+              echo "Failure at $(date -u +%FT%TZ)"
+              exit 1
+          - name: Work for sixty seconds
+            run: |
+              trap 'echo "Received TERM at $(date -u +%FT%TZ)"; exit 143' TERM
+              echo "Long work started at $(date -u +%FT%TZ)"
+              for i in $(seq 1 60); do sleep 1; done
+              touch "$RUNNER_TEMP/parallel-completed"
+              echo "Long work completed at $(date -u +%FT%TZ)"
+      - name: Report observed behavior
+        if: always()
+        run: |
+          elapsed=$(( $(date +%s) - $(cat "$RUNNER_TEMP/parallel-start") ))
+          completed=no
+          if test -f "$RUNNER_TEMP/parallel-completed"; then completed=yes; fi
+          echo "Elapsed: ${elapsed}s; long step completed: $completed"
+          echo "Elapsed: ${elapsed}s; long step completed: $completed" >> "$GITHUB_STEP_SUMMARY"
+
+  shell-failure-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Shell background control
+        run: |
+          start=$(date +%s)
+          (sleep 2; exit 1) &
+          failing=$!
+          (sleep 60; echo 'Long shell work completed') &
+          long=$!
+          set +e
+          wait "$failing"
+          failed_status=$?
+          wait "$long"
+          long_status=$?
+          elapsed=$(( $(date +%s) - start ))
+          echo "Elapsed: ${elapsed}s; failing status: $failed_status; long status: $long_status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$failed_status"
