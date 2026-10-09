@@ -17,4 +17,7 @@ Typical remediation:
 
 - confirm whether the jobs truly need isolated setup
 - consolidate overlapping setup via a shared artifact
+- alternatively, use GitHub Actions [`parallel` steps](https://docs.github.com/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsparallel) for independent tasks that can share an execution environment and workspace
+- parallel steps share one runner's CPU, memory, and files; retain separate jobs when resource or workspace isolation matters, and review permissions and required checks before combining jobs
+- measure workflow duration, runner minutes, and peak memory: sharing setup can reduce runner time without shortening the workflow
 - split only the jobs that need genuinely different bootstrap steps

@@ -136,10 +136,10 @@ export const repeatedBootstrapSetupRule = {
         message: `${totalJobs} jobs share the same bootstrap setup: ${sortedJobIds.join(", ")}${stepDesc}.`,
         why: "Each job repeats checkout, dependency installation, and cache restore independently. When jobs share the same bootstrap pattern, the setup cost is multiplied without adding proportional value.",
         suggestion:
-          "Consider running all work types in one job with parallel steps, or consolidating the bootstrap setup by passing a dependency artifact between jobs.",
+          "Consider sharing a dependency artifact between jobs. If independent tasks can share the same execution environment and workspace, GitHub Actions `parallel` steps can also share one bootstrap setup, but compete for the same runner CPU and memory; keep separate jobs when resource isolation matters.",
         measurementHint:
-          "Compare total workflow duration and runner minutes after consolidating the repeated bootstrap setup across one pair of jobs.",
-        aiHandoff: `Review ${workflow.relativePath} jobs ${sortedJobIds.join(", ")} for shared bootstrap setup and consolidate if the jobs can share an artifact.`,
+          "Compare total workflow duration, runner minutes, and peak memory after consolidating one pair of jobs. Sharing setup can reduce runner time without reducing workflow duration.",
+        aiHandoff: `Review ${workflow.relativePath} jobs ${sortedJobIds.join(", ")} for shared bootstrap setup. Consider a shared dependency artifact or native parallel steps if execution environments are compatible. Before combining jobs, check shared-file writes, CPU/memory contention, permissions, and required checks. Measure workflow duration and runner minutes before retaining the change.`,
         score: 56,
       });
     });
