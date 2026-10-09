@@ -6,6 +6,7 @@ import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { getNode, getScalarString } from "../workflow.ts";
 import { workflowWorkingDirectory } from "../rules/shared/workflow-command-context.ts";
+import { jobAllowsActionsCacheRestore } from "../rules/shared/workflow-caches.ts";
 import { detectInstallCommandFromText } from "../rules/shared/tools.ts";
 import { shellCommandSegments, staticShellWords } from "../rules/shared/command-patterns.ts";
 
@@ -85,7 +86,7 @@ export async function collectSetupNodeCacheDependencyPathUnsetDiagnostics(
   }
 
   for (const { workflow, job, step } of nodeSteps) {
-    if (job.usesReusableWorkflow) {
+    if (job.usesReusableWorkflow || !jobAllowsActionsCacheRestore(workflow, job)) {
       continue;
     }
     if (!isNodeStepWithoutCacheDependencyPath(step)) {

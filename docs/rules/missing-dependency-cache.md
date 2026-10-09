@@ -1,5 +1,7 @@
 # `missing-dependency-cache`
 
+Actions cache policy is respected: job-level `cache-mode` overrides workflow-level policy. `read` permits restore; `none`, `write-only`, and dynamic/unknown modes suppress cache-enablement advice. Disabled restore is not counted as working cache coverage. Existing event defaults remain unchanged; this rule does not recommend loosening cache access.
+
 Detects setup steps that prepare a language runtime but do not visibly enable dependency caching.
 
 Why this rule exists:

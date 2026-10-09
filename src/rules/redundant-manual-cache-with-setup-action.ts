@@ -7,6 +7,8 @@ import {
 } from "./shared/workflow-setup-actions.ts";
 import {
   manualCacheStepMatchesDependencyFamily,
+  jobAllowsActionsCacheRestore,
+  jobAllowsActionsCacheSave,
   setupActionHasBuiltInCacheForFamily,
 } from "./shared/workflow-caches.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -26,6 +28,9 @@ export const redundantManualCacheWithSetupActionRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
+      if (!jobAllowsActionsCacheRestore(workflow, job)) {
+        continue;
+      }
       for (const step of job.steps) {
         const action = getSetupActionKind(step);
         if (!action) {
@@ -35,8 +40,11 @@ export const redundantManualCacheWithSetupActionRule = {
         const overlappingFamilies = getDependencyFamiliesUsedBySetupAction(action).filter(
           (family) =>
             setupActionHasBuiltInCacheForFamily(step, family) &&
-            job.steps.some((candidate) =>
-              manualCacheStepMatchesDependencyFamily(candidate, family),
+            job.steps.some(
+              (candidate) =>
+                manualCacheStepMatchesDependencyFamily(candidate, family) &&
+                (!candidate.uses?.toLowerCase().startsWith("actions/cache/save@") ||
+                  jobAllowsActionsCacheSave(workflow, job)),
             ),
         );
         if (overlappingFamilies.length === 0) {

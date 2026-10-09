@@ -3,7 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getLoweredWorkflowStepText } from "./shared/workflow-step-text.ts";
-import { isManualCacheStep } from "./shared/workflow-caches.ts";
+import { isManualCacheStep, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 
 const meta = {
   id: "cache-terraform-providers",
@@ -52,7 +52,7 @@ export const cacheTerraformProvidersRule = {
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const findings: Diagnostic[] = [];
     for (const job of workflow.jobs) {
-      if (!jobHasTerraformInit(job)) {
+      if (!jobAllowsActionsCacheRestore(workflow, job) || !jobHasTerraformInit(job)) {
         continue;
       }
 

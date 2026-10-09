@@ -2,7 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { workflowHasCachePath } from "./shared/workflow-caches.ts";
+import { workflowHasCachePath, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 import { getWorkflowStepText } from "./shared/workflow-step-text.ts";
 import { selectSignal } from "./shared/signal-selector.ts";
 
@@ -29,7 +29,7 @@ export const missingNextBuildCacheRule = {
     }
 
     return workflow.jobs
-      .filter((job) => jobRunsNextBuild(job))
+      .filter((job) => jobAllowsActionsCacheRestore(workflow, job) && jobRunsNextBuild(job))
       .map((job) =>
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs Next.js builds without a visible .next/cache strategy.`,

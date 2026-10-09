@@ -2,7 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { isManualCacheStep } from "./shared/workflow-caches.ts";
+import { isManualCacheStep, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 
 const meta = {
   id: "ruby-setup-ruby-missing-bundler-cache",
@@ -74,7 +74,7 @@ export const rubySetupRubyMissingBundlerCacheRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
-      if (job.usesReusableWorkflow) {
+      if (job.usesReusableWorkflow || !jobAllowsActionsCacheRestore(workflow, job)) {
         continue;
       }
 

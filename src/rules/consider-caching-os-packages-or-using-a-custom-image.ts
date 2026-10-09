@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { isHeavyJob, jobRunsOnHostedUbuntu, jobUsesContainer } from "./shared/workflow-jobs.ts";
+import { jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 
 const meta = {
   id: "consider-caching-os-packages-or-using-a-custom-image",
@@ -91,7 +92,12 @@ export const considerCachingOsPackagesOrUsingACustomImageRule = {
         continue;
       }
 
-      if (!jobRunsOnHostedUbuntu(job) || jobUsesContainer(job) || hasVisibleOsPackageCache(job)) {
+      if (
+        !jobAllowsActionsCacheRestore(workflow, job) ||
+        !jobRunsOnHostedUbuntu(job) ||
+        jobUsesContainer(job) ||
+        hasVisibleOsPackageCache(job)
+      ) {
         continue;
       }
 

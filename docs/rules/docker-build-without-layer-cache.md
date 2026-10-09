@@ -4,6 +4,8 @@ Detects `docker/build-push-action` steps that do not configure `cache-from` and 
 
 Depot actions are excluded: their normal builds automatically persist the project's layer cache, without GHA cache exports.
 
+The GHA-cache recommendation respects effective job/workflow `cache-mode`. Restore-disabled or unknown policies suppress this advice. Under `read`, a visible `cache-from: type=gha` is sufficient without requiring a prohibited cache export.
+
 Without layer caching, every CI run rebuilds all Docker layers from scratch, even when the Dockerfile and source files are unchanged. This adds minutes per build for no benefit.
 
 The simplest and most effective cache backend for GitHub Actions is the built-in `type=gha`, which stores cache in the action's own cache storage:

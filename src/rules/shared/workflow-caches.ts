@@ -1,4 +1,9 @@
-import type { WorkflowDocument, WorkflowStep } from "../../workflow.ts";
+import {
+  getNode,
+  type WorkflowDocument,
+  type WorkflowJob,
+  type WorkflowStep,
+} from "../../workflow.ts";
 import type { DependencyFamily } from "./tools.ts";
 import { getStepFacts } from "./step-facts.ts";
 import {
@@ -22,6 +27,31 @@ const manualCachePathMatchers = {
   bundler: /vendor\/bundle|\.bundle|rubygems|gems/,
   nuget: /\.nuget\/packages/,
 } satisfies Record<DependencyFamily, RegExp>;
+
+function effectiveActionsCacheMode(workflow: WorkflowDocument, job: WorkflowJob): unknown {
+  const jobMode = getNode(job.node, "cache-mode");
+  if (jobMode) {
+    return jobMode.toJSON();
+  }
+  return workflow.root
+    ? getNode(workflow.root, "cache-mode")?.toJSON()
+    : workflow.parsed?.["cache-mode"];
+}
+
+/** Both event-dependent defaults allow restore. Unknown explicit modes abstain. */
+export function jobAllowsActionsCacheRestore(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+): boolean {
+  const mode = effectiveActionsCacheMode(workflow, job);
+  return mode === undefined || mode === "read" || mode === "write";
+}
+
+/** Preserve existing save analysis for unspecified modes; evaluate explicit restrictions only. */
+export function jobAllowsActionsCacheSave(workflow: WorkflowDocument, job: WorkflowJob): boolean {
+  const mode = effectiveActionsCacheMode(workflow, job);
+  return mode === undefined || mode === "write" || mode === "write-only";
+}
 
 function getStringList(value: unknown): string[] {
   if (typeof value === "string") {
@@ -65,15 +95,17 @@ export function manualCacheStepMatchesDependencyFamily(
 }
 
 export function workflowHasCachePath(workflow: WorkflowDocument, pathRegex: RegExp): boolean {
-  return workflow.jobs.some((job) =>
-    job.steps.some((step) => {
-      if (!isManualCacheStep(step)) {
-        return false;
-      }
+  return workflow.jobs.some(
+    (job) =>
+      jobAllowsActionsCacheRestore(workflow, job) &&
+      job.steps.some((step) => {
+        if (!isManualCacheStep(step)) {
+          return false;
+        }
 
-      const pathText = getCachePathText(step);
-      return pathRegex.test(pathText);
-    }),
+        const pathText = getCachePathText(step);
+        return pathRegex.test(pathText);
+      }),
   );
 }
 

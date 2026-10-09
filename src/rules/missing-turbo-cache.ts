@@ -2,7 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { isManualCacheStep } from "./shared/workflow-caches.ts";
+import { isManualCacheStep, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 
 const meta = {
   id: "missing-turbo-cache",
@@ -22,21 +22,23 @@ function jobRunsTurboTasks(job: WorkflowJob): boolean {
 }
 
 function workflowHasTurboLocalCache(workflow: WorkflowDocument): boolean {
-  return workflow.jobs.some((job) =>
-    job.steps.some((step) => {
-      if (!isManualCacheStep(step)) {
-        return false;
-      }
+  return workflow.jobs.some(
+    (job) =>
+      jobAllowsActionsCacheRestore(workflow, job) &&
+      job.steps.some((step) => {
+        if (!isManualCacheStep(step)) {
+          return false;
+        }
 
-      const pathValue = step.with?.path;
-      const pathText = Array.isArray(pathValue)
-        ? pathValue.filter((entry): entry is string => typeof entry === "string").join("\n")
-        : typeof pathValue === "string"
-          ? pathValue
-          : "";
+        const pathValue = step.with?.path;
+        const pathText = Array.isArray(pathValue)
+          ? pathValue.filter((entry): entry is string => typeof entry === "string").join("\n")
+          : typeof pathValue === "string"
+            ? pathValue
+            : "";
 
-      return /\.turbo\b|node_modules\/\.cache\/turbo\b/i.test(pathText);
-    }),
+        return /\.turbo\b|node_modules\/\.cache\/turbo\b/i.test(pathText);
+      }),
   );
 }
 
@@ -60,7 +62,7 @@ export const missingTurboCacheRule = {
     }
 
     return workflow.jobs
-      .filter((job) => jobRunsTurboTasks(job))
+      .filter((job) => jobAllowsActionsCacheRestore(workflow, job) && jobRunsTurboTasks(job))
       .map((job) =>
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs Turbo tasks without visible local or remote cache wiring.`,

@@ -15,6 +15,7 @@ import {
 } from "./shared/workflow-setup-actions.ts";
 import {
   isManualCacheStep,
+  jobAllowsActionsCacheRestore,
   setupActionHasBuiltInCacheForFamily,
 } from "./shared/workflow-caches.ts";
 import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
@@ -91,7 +92,7 @@ export const missingDependencyCacheRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
-      if (workflowLooksReleaseLike(workflow, job)) {
+      if (!jobAllowsActionsCacheRestore(workflow, job) || workflowLooksReleaseLike(workflow, job)) {
         continue;
       }
 

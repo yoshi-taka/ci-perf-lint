@@ -3,7 +3,10 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
-import { hasDependencyCacheConfig } from "./shared/workflow-caches.ts";
+import {
+  hasDependencyCacheConfig,
+  jobAllowsActionsCacheRestore,
+} from "./shared/workflow-caches.ts";
 import { isOutdatedSetupAction } from "./shared/workflow-setup-actions.ts";
 import { withRepositorySetupCachePrecedent } from "./shared/similar-workflow-consensus.ts";
 
@@ -20,6 +23,9 @@ export const outdatedSetupActionWithoutCacheRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
+      if (!jobAllowsActionsCacheRestore(workflow, job)) {
+        continue;
+      }
       for (const step of job.steps) {
         if (!step.uses || !isOutdatedSetupAction(step.uses) || hasDependencyCacheConfig(step)) {
           continue;

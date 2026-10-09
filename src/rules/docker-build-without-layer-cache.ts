@@ -3,6 +3,10 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { stepDisablesDockerBuildCache } from "./shared/docker.ts";
+import {
+  jobAllowsActionsCacheRestore,
+  jobAllowsActionsCacheSave,
+} from "./shared/workflow-caches.ts";
 
 const meta = {
   id: "docker-build-without-layer-cache",
@@ -39,7 +43,7 @@ export const dockerBuildWithoutLayerCacheRule = {
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const findings: Diagnostic[] = [];
     for (const job of workflow.jobs) {
-      if (job.usesReusableWorkflow) {
+      if (job.usesReusableWorkflow || !jobAllowsActionsCacheRestore(workflow, job)) {
         continue;
       }
 
@@ -47,7 +51,11 @@ export const dockerBuildWithoutLayerCacheRule = {
         (candidate) =>
           stepUsesDockerBuildPushAction(candidate) &&
           !stepDisablesDockerBuildCache(candidate) &&
-          !stepHasLayerCache(candidate),
+          !stepHasLayerCache(candidate) &&
+          // A read-only GHA backend can reuse layers without exporting them.
+          (jobAllowsActionsCacheSave(workflow, job) ||
+            typeof candidate.with?.["cache-from"] !== "string" ||
+            !/(?:^|[,\n])\s*type=gha(?:[,\n]|$)/.test(candidate.with["cache-from"])),
       );
       if (!step) {
         continue;

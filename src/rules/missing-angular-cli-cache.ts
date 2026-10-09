@@ -2,7 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { workflowHasCachePath } from "./shared/workflow-caches.ts";
+import { workflowHasCachePath, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 import { getWorkflowStepText } from "./shared/workflow-step-text.ts";
 
 const meta = {
@@ -46,7 +46,10 @@ export const missingAngularCliCacheRule = {
         continue;
       }
 
-      if (!workflowHasCachePath(workflow, angularCachePathRe)) {
+      if (
+        jobAllowsActionsCacheRestore(workflow, job) &&
+        !workflowHasCachePath(workflow, angularCachePathRe)
+      ) {
         findings.push(
           buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
             message: `Job "${job.id}" runs Angular CLI tasks without visible persistence for .angular/cache.`,

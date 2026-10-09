@@ -1,5 +1,7 @@
 # `redundant-manual-cache-with-setup-action`
 
+Respects job/workflow `cache-mode`: restore-disabled and unknown policies suppress overlap advice. Under `read`, a manual save-only step is not counted as duplicate work; manual restore can still overlap built-in restore.
+
 Detects jobs that configure a setup action's built-in dependency cache and also define a matching manual `actions/cache` layer for the same dependency family.
 
 Why this rule exists:
