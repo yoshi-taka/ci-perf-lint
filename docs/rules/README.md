@@ -140,6 +140,7 @@ Current rule registry:
 - `prefer-direct-upload-for-compressed-artifacts`
 - `prefer-direct-visx-imports`
 - `prefer-dorny-paths-filter-for-scoped-jobs`
+- `prefer-download-artifact-v8-for-archives`
 - `prefer-elixir-parallel-deps-compile`
 - `prefer-eslint-concurrency`
 - `prefer-eslint-plugin-import-x`

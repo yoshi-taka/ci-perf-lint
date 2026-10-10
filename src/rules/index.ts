@@ -68,6 +68,7 @@ import { preferCdkMethodDirectInDevelopmentRule } from "./prefer-cdk-method-dire
 import { dbIoReduceRule } from "./db-io-reduce.ts";
 import { preferDirectUploadForCompressedArtifactsRule } from "./prefer-direct-upload-for-compressed-artifacts.ts";
 import { preferDornyPathsFilterForScopedJobsRule } from "./prefer-dorny-paths-filter-for-scoped-jobs.ts";
+import { preferDownloadArtifactV8ForArchivesRule } from "./prefer-download-artifact-v8-for-archives.ts";
 import { preferElixirParallelDepsCompileRule } from "./prefer-elixir-parallel-deps-compile.ts";
 import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-complex-git-hooks.ts";
 import { preferJest30ForJest29Rule } from "./prefer-jest-30-for-jest-29.ts";
@@ -181,6 +182,7 @@ export const allRules = [
   preferCdkMethodDirectInDevelopmentRule,
   dbIoReduceRule,
   preferDirectUploadForCompressedArtifactsRule,
+  preferDownloadArtifactV8ForArchivesRule,
   preferElixirParallelDepsCompileRule,
   preferEslintConcurrencyRule,
   preferOxlintOverEslintRule,

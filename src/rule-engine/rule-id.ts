@@ -70,6 +70,7 @@ export const RULE_REGISTRY = {
   "prefer-cdk-method-direct-in-development": { kind: "workflow" },
   "prefer-cdk-version-reporting-disabled": { kind: "repository" },
   "prefer-direct-upload-for-compressed-artifacts": { kind: "workflow" },
+  "prefer-download-artifact-v8-for-archives": { kind: "workflow" },
   "prefer-dorny-paths-filter-for-scoped-jobs": { kind: "workflow" },
   "prefer-elixir-parallel-deps-compile": { kind: "workflow" },
   "prefer-eslint-concurrency": { kind: "workflow" },
