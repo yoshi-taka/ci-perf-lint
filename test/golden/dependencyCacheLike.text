@@ -22,43 +22,49 @@
    Suggested action: Confirm whether these jobs need isolated checkout/setup paths; if the work overlaps, consolidate it, split only the truly different checks, or pass reusable artifacts between jobs.
    Measurement hint: Compare total workflow duration, runner minutes, checkout time, and setup/install time after consolidating one duplicated checkout-heavy path.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/duplicate-checkout-in-same-workflow
-5. missing-dependency-cache (.github/workflows/cache.yml:20:15)
+5. prefer-setup-java-v6 (.github/workflows/cache.yml:34:15)
+   Job "java_missing" uses setup-java before the v6 setup-performance milestone: actions/setup-java@v5.
+   Why it matters: setup-java v6 adds parallel dependency/wrapper cache restoration, a lazy-loaded Temurin tool-cache fast path, cheaper warm Maven configuration, moving extracted JDKs instead of copying them, and resolved-JDK caching that can avoid vendor API calls on warm jobs. The gains depend on distribution, cache state, and inputs; they are not merely a Node runtime or ESM version bump.
+   Suggested action: Upgrade actions/setup-java to v6 or a later compatible release while preserving java-version, distribution, architecture, package type, cache configuration, and Maven/GPG settings. Check Node 24 runner support; migrate removed Adopt/Adopt OpenJ9 distributions to supported alternatives if used. Measure cold and warm setup time rather than assuming a fixed speedup.
+   Measurement hint: Compare setup-java duration, JDK download/configuration time, and dependency/wrapper cache restore time on cold and warm runs. Verify the selected Java version, Maven toolchains, credentials, and signing behavior.
+   Rule docs: https://ci-perf-lint.veritycost.com/rules/prefer-setup-java-v6
+6. missing-dependency-cache (.github/workflows/cache.yml:20:15)
    actions/setup-python@v6 is used without visible dependency caching for pip in job "python_missing".
    Why it matters: Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths. This repository already uses dependency caching in `.github/workflows/cache.yml:go_default_cache`, `.github/workflows/cache.yml:node_auto_cache`, `.github/workflows/cache.yml:python_manual_cache`. That makes the missing cache look more like one repository-local drift point than a deliberate no-cache policy. In this repository, 3 similar jobs already use dependency caching. Similar jobs already using dependency cache include `.github/workflows/cache.yml:node_auto_cache`, `.github/workflows/cache.yml:python_manual_cache`, `.github/workflows/cache.yml:ruby_builtin_cache`.
    Suggested action: If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.
    Measurement hint: Compare total job duration, not just install duration, before and after enabling cache.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-dependency-cache
-6. missing-dependency-cache (.github/workflows/cache.yml:34:15)
+7. missing-dependency-cache (.github/workflows/cache.yml:34:15)
    actions/setup-java@v5 is used without visible dependency caching for maven in job "java_missing".
    Why it matters: Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths. This repository already uses dependency caching in `.github/workflows/cache.yml:go_default_cache`, `.github/workflows/cache.yml:node_auto_cache`, `.github/workflows/cache.yml:python_manual_cache`.
    Suggested action: If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.
    Measurement hint: Compare total job duration, not just install duration, before and after enabling cache.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-dependency-cache
-7. missing-dependency-cache (.github/workflows/cache.yml:44:15)
+8. missing-dependency-cache (.github/workflows/cache.yml:44:15)
    actions/setup-dotnet@v5 is used without visible dependency caching for nuget in job "dotnet_missing".
    Why it matters: Dependency install cost may be paid on every run, but cache restore and save overhead on GitHub Actions can outweigh the benefit on some CI paths. This repository already uses dependency caching in `.github/workflows/cache.yml:go_default_cache`, `.github/workflows/cache.yml:node_auto_cache`, `.github/workflows/cache.yml:python_manual_cache`.
    Suggested action: If this install path is expensive enough to justify it, try the setup action cache or one explicit dependency cache strategy for this job and keep it only if total job time improves.
    Measurement hint: Compare total job duration, not just install duration, before and after enabling cache.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-dependency-cache
-8. missing-timeout-minutes (.github/workflows/cache.yml:7:3)
+9. missing-timeout-minutes (.github/workflows/cache.yml:7:3)
    Job "node_auto_cache" does not define job-level timeout-minutes.
    Why it matters: Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.
    Suggested action: Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.
    Measurement hint: Force or simulate a hung run and confirm the job is terminated at the configured timeout.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-timeout-minutes
-9. missing-timeout-minutes (.github/workflows/cache.yml:16:3)
+10. missing-timeout-minutes (.github/workflows/cache.yml:16:3)
    Job "python_missing" does not define job-level timeout-minutes.
    Why it matters: Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.
    Suggested action: Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.
    Measurement hint: Force or simulate a hung run and confirm the job is terminated at the configured timeout.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-timeout-minutes
-10. missing-timeout-minutes (.github/workflows/cache.yml:47:3)
+11. missing-timeout-minutes (.github/workflows/cache.yml:47:3)
    Job "python_manual_cache" does not define job-level timeout-minutes.
    Why it matters: Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.
    Suggested action: Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.
    Measurement hint: Force or simulate a hung run and confirm the job is terminated at the configured timeout.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-timeout-minutes
-11. missing-timeout-minutes (.github/workflows/cache.yml:58:3)
+12. missing-timeout-minutes (.github/workflows/cache.yml:58:3)
    Job "ruby_builtin_cache" does not define job-level timeout-minutes.
    Why it matters: Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.
    Suggested action: Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.

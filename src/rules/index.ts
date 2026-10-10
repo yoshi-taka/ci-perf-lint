@@ -65,6 +65,7 @@ import { preferBuildxBuildOverDockerBuildRule } from "./prefer-buildx-build-over
 import { preferAwsCdkCli21125ForHotswapRule } from "./prefer-aws-cdk-cli-2-1125-for-hotswap.ts";
 import { preferCdkExpressModeInDevelopmentRule } from "./prefer-cdk-express-mode-in-development.ts";
 import { preferCdkMethodDirectInDevelopmentRule } from "./prefer-cdk-method-direct-in-development.ts";
+import { preferCcacheAction1220OnWindowsRule } from "./prefer-ccache-action-1-2-20-on-windows.ts";
 import { dbIoReduceRule } from "./db-io-reduce.ts";
 import { preferDirectUploadForCompressedArtifactsRule } from "./prefer-direct-upload-for-compressed-artifacts.ts";
 import { preferDornyPathsFilterForScopedJobsRule } from "./prefer-dorny-paths-filter-for-scoped-jobs.ts";
@@ -100,12 +101,14 @@ import { preferSparseCheckoutForScopedWorkflowRule } from "./prefer-sparse-check
 import { preferStandardArmRunnerForApiCliRule } from "./prefer-standard-arm-runner-for-api-cli.ts";
 import { preferStandardArmRunnerForPortableToolingRule } from "./prefer-standard-arm-runner-for-portable-tooling.ts";
 import { preferSetupBunForLightweightNodeToolingRule } from "./prefer-setup-bun-for-lightweight-node-tooling.ts";
+import { preferSetupJavaV6Rule } from "./prefer-setup-java-v6.ts";
 import { preferSetupUvForLightweightPythonToolingRule } from "./prefer-setup-uv-for-lightweight-python-tooling.ts";
 import { preferZstdCompressionForPushedDockerImagesRule } from "./prefer-zstd-compression-for-pushed-docker-images.ts";
 import { railsDbSchemaLoadOverMigrateRule } from "./rails-db-schema-load-over-migrate.ts";
 import { preferPython311Rule } from "./prefer-python-3-11.ts";
 import { preferRailsPerformanceMilestoneRule } from "./prefer-rails-performance-milestone.ts";
 import { preferRuby3YjitRule } from "./prefer-ruby-3-yjit.ts";
+import { preferRustCache292Rule } from "./prefer-rust-cache-2-9-2.ts";
 import { preferRuffImportSortingOverIsortRule } from "./prefer-ruff-import-sorting-over-isort.ts";
 import { rubySetupRubyMissingBundlerCacheRule } from "./ruby-setup-ruby-missing-bundler-cache.ts";
 import { redundantNpxOrBootstrapRule } from "./redundant-npx-or-bootstrap.ts";
@@ -179,6 +182,7 @@ export const allRules = [
   preferJest30ForJest29Rule,
   preferBuildxBuildOverDockerBuildRule,
   preferAwsCdkCli21125ForHotswapRule,
+  preferCcacheAction1220OnWindowsRule,
   preferCdkExpressModeInDevelopmentRule,
   preferCdkMethodDirectInDevelopmentRule,
   dbIoReduceRule,
@@ -198,6 +202,7 @@ export const allRules = [
   preferPython311Rule,
   preferRailsPerformanceMilestoneRule,
   preferRuby3YjitRule,
+  preferRustCache292Rule,
   preferStorybook6MinorPerformanceMilestoneRule,
   preferStorybook7MinorPerformanceMilestoneRule,
   preferStorybookTestFlagRule,
@@ -211,6 +216,7 @@ export const allRules = [
   preferStandardArmRunnerForApiCliRule,
   preferStandardArmRunnerForPortableToolingRule,
   preferSetupBunForLightweightNodeToolingRule,
+  preferSetupJavaV6Rule,
   preferSetupUvForLightweightPythonToolingRule,
   preferUv012Rule,
   preferUvPipOverPipRule,

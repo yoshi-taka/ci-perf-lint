@@ -113,6 +113,7 @@ Current rule registry:
 - `prefer-buildx-bake-for-multiple-images`
 - `prefer-buildx-build-over-docker-build`
 - `prefer-cargo-shear-in-ci`
+- `prefer-ccache-action-1-2-20-on-windows`
 - `prefer-cdk-asset-build-concurrency`
 - `prefer-cdk-express-mode-in-development`
 - `prefer-cdk-method-direct-in-development`
@@ -172,7 +173,9 @@ Current rule registry:
 - `prefer-ruby-3-yjit`
 - `prefer-ruff-format-over-black`
 - `prefer-ruff-import-sorting-over-isort`
+- `prefer-rust-cache-2-9-2`
 - `prefer-setup-bun-for-lightweight-node-tooling`
+- `prefer-setup-java-v6`
 - `prefer-setup-uv-for-lightweight-python-tooling`
 - `prefer-sparse-checkout-for-scoped-workflow`
 - `prefer-standard-arm-runner-for-api-cli`

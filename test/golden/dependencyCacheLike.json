@@ -72,6 +72,24 @@
     "score": 57
   },
   {
+    "ruleId": "prefer-setup-java-v6",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/prefer-setup-java-v6.md",
+    "workflow": ".github/workflows/cache.yml",
+    "location": {
+      "path": ".github/workflows/cache.yml",
+      "line": 34,
+      "column": 15
+    },
+    "message": "Job \"java_missing\" uses setup-java before the v6 setup-performance milestone: actions/setup-java@v5.",
+    "why": "setup-java v6 adds parallel dependency/wrapper cache restoration, a lazy-loaded Temurin tool-cache fast path, cheaper warm Maven configuration, moving extracted JDKs instead of copying them, and resolved-JDK caching that can avoid vendor API calls on warm jobs. The gains depend on distribution, cache state, and inputs; they are not merely a Node runtime or ESM version bump.",
+    "suggestion": "Upgrade actions/setup-java to v6 or a later compatible release while preserving java-version, distribution, architecture, package type, cache configuration, and Maven/GPG settings. Check Node 24 runner support; migrate removed Adopt/Adopt OpenJ9 distributions to supported alternatives if used. Measure cold and warm setup time rather than assuming a fixed speedup.",
+    "measurementHint": "Compare setup-java duration, JDK download/configuration time, and dependency/wrapper cache restore time on cold and warm runs. Verify the selected Java version, Maven toolchains, credentials, and signing behavior.",
+    "aiHandoff": "Review .github/workflows/cache.yml job \"java_missing\" and upgrade its old setup-java refs to v6 or later. Preserve the JDK version/distribution matrix and cache inputs, review Maven credentials/toolchains/GPG compatibility and runner support, then compare cold and warm setup timings.",
+    "score": 50
+  },
+  {
     "ruleId": "missing-dependency-cache",
     "severity": "suggestion",
     "confidence": "medium",

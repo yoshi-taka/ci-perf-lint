@@ -48,6 +48,18 @@
 - Suggested action: Confirm whether these jobs need isolated checkout/setup paths; if the work overlaps, consolidate it, split only the truly different checks, or pass reusable artifacts between jobs.
 - Measurement hint: Compare total workflow duration, runner minutes, checkout time, and setup/install time after consolidating one duplicated checkout-heavy path.
 
+## prefer-setup-java-v6
+
+- Workflow: `.github/workflows/cache.yml`
+- Location: `.github/workflows/cache.yml:34:15`
+- Severity: `warning`
+- Confidence: `medium`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/prefer-setup-java-v6`
+- Message: Job "java_missing" uses setup-java before the v6 setup-performance milestone: actions/setup-java@v5.
+- Why it matters: setup-java v6 adds parallel dependency/wrapper cache restoration, a lazy-loaded Temurin tool-cache fast path, cheaper warm Maven configuration, moving extracted JDKs instead of copying them, and resolved-JDK caching that can avoid vendor API calls on warm jobs. The gains depend on distribution, cache state, and inputs; they are not merely a Node runtime or ESM version bump.
+- Suggested action: Upgrade actions/setup-java to v6 or a later compatible release while preserving java-version, distribution, architecture, package type, cache configuration, and Maven/GPG settings. Check Node 24 runner support; migrate removed Adopt/Adopt OpenJ9 distributions to supported alternatives if used. Measure cold and warm setup time rather than assuming a fixed speedup.
+- Measurement hint: Compare setup-java duration, JDK download/configuration time, and dependency/wrapper cache restore time on cold and warm runs. Verify the selected Java version, Maven toolchains, credentials, and signing behavior.
+
 ## missing-dependency-cache
 
 - Workflow: `.github/workflows/cache.yml`
