@@ -165,6 +165,7 @@ Current rule registry:
 - `prefer-oxlint-over-eslint`
 - `prefer-oxlint-type-check-over-tsc`
 - `prefer-pnpm-12-10`
+- `prefer-pnpm-setup-for-store-only-cache`
 - `prefer-pydantic-v2`
 - `prefer-python-3-11`
 - `prefer-rails-performance-milestone`
