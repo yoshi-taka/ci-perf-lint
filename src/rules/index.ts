@@ -101,8 +101,11 @@ import { preferSparseCheckoutForScopedWorkflowRule } from "./prefer-sparse-check
 import { preferStandardArmRunnerForApiCliRule } from "./prefer-standard-arm-runner-for-api-cli.ts";
 import { preferStandardArmRunnerForPortableToolingRule } from "./prefer-standard-arm-runner-for-portable-tooling.ts";
 import { preferSetupBunForLightweightNodeToolingRule } from "./prefer-setup-bun-for-lightweight-node-tooling.ts";
+import { preferSetupGradle62ForEnhancedCacheRule } from "./prefer-setup-gradle-6-2-for-enhanced-cache.ts";
 import { preferSetupJavaV6Rule } from "./prefer-setup-java-v6.ts";
+import { preferSetupMinicondaV4Rule } from "./prefer-setup-miniconda-v4.ts";
 import { preferSetupUvForLightweightPythonToolingRule } from "./prefer-setup-uv-for-lightweight-python-tooling.ts";
+import { preferSetupUvV9ForVersionResolutionRule } from "./prefer-setup-uv-v9-for-version-resolution.ts";
 import { preferZstdCompressionForPushedDockerImagesRule } from "./prefer-zstd-compression-for-pushed-docker-images.ts";
 import { railsDbSchemaLoadOverMigrateRule } from "./rails-db-schema-load-over-migrate.ts";
 import { preferPython311Rule } from "./prefer-python-3-11.ts";
@@ -216,8 +219,11 @@ export const allRules = [
   preferStandardArmRunnerForApiCliRule,
   preferStandardArmRunnerForPortableToolingRule,
   preferSetupBunForLightweightNodeToolingRule,
+  preferSetupGradle62ForEnhancedCacheRule,
   preferSetupJavaV6Rule,
+  preferSetupMinicondaV4Rule,
   preferSetupUvForLightweightPythonToolingRule,
+  preferSetupUvV9ForVersionResolutionRule,
   preferUv012Rule,
   preferUvPipOverPipRule,
   preferWorkflowDispatchRunDetailsRule,

@@ -175,8 +175,11 @@ Current rule registry:
 - `prefer-ruff-import-sorting-over-isort`
 - `prefer-rust-cache-2-9-2`
 - `prefer-setup-bun-for-lightweight-node-tooling`
+- `prefer-setup-gradle-6-2-for-enhanced-cache`
 - `prefer-setup-java-v6`
+- `prefer-setup-miniconda-v4`
 - `prefer-setup-uv-for-lightweight-python-tooling`
+- `prefer-setup-uv-v9-for-version-resolution`
 - `prefer-sparse-checkout-for-scoped-workflow`
 - `prefer-standard-arm-runner-for-api-cli`
 - `prefer-standard-arm-runner-for-portable-tooling`

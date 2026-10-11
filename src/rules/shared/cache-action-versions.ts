@@ -20,7 +20,9 @@ export function cacheActionVersionIsBelow(
   const pattern =
     minimum[1] === 0 && minimum[2] === 0
       ? /^v(\d+)(?:\.(\d+)(?:\.(\d+))?)?$/
-      : /^v(\d+)\.(\d+)\.(\d+)$/;
+      : minimum[2] === 0
+        ? /^v(\d+)\.(\d+)(?:\.(\d+))?$/
+        : /^v(\d+)\.(\d+)\.(\d+)$/;
   const version =
     pattern.exec(ref) ?? (/^[a-f\d]{40}$/i.test(ref) ? pattern.exec(annotatedRef ?? "") : null);
   if (!version) {
