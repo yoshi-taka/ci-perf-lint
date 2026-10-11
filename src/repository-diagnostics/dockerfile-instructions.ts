@@ -19,7 +19,6 @@ export {
   instructionLooksUvProjectSyncWithoutFrozenLockfile,
   instructionLooksYarnInstallWithoutImmutableLockfile,
 } from "./dockerfile-instruction-heuristics.ts";
-import { instructionLooksBroadCompiledBuildWithoutBindMount } from "./dockerfile-instruction-heuristics.ts";
 
 const commentStripPattern = /\s+#.*$/;
 const tokenSplitPattern = /"[^"]*"|'[^']*'|\S+/g;
@@ -41,7 +40,6 @@ const remoteUrlPattern = /^(?:https?|git):\/\//i;
 const archivePattern = /\.(?:tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|zip)$/i;
 const floatingTagPattern = /:latest$/i;
 const runInstructionPattern = /^run\b/i;
-const fromStartPattern = /^\s*from\b/i;
 const newlineSplitPattern = /\r?\n/;
 
 export function lineLooksWideCopy(line: string): boolean {
@@ -74,12 +72,6 @@ interface DockerfileCopyInstruction {
 
 interface DockerfileFromInstruction {
   image: string;
-}
-
-interface DockerfileBroadCopyBeforeCompiledBuild {
-  copyInstruction: CollectedDockerfileInstruction;
-  buildInstruction: CollectedDockerfileInstruction;
-  language: "Go" | "Rust";
 }
 
 function collectDockerfileInstructionsWithFallback(
@@ -447,42 +439,6 @@ export function runInstructionModifiesPath(instruction: string, destination: str
     String.raw`\b(?:chmod|chown|rm|mv|cp|touch|find|sed)\b[\s\S]*(?:^|\s)${escapedTarget}(?:\s|/|$)`,
     "i",
   ).test(normalized);
-}
-
-export function findBroadSourceCopyBeforeCompiledBuild(
-  instructions: CollectedDockerfileInstruction[],
-): DockerfileBroadCopyBeforeCompiledBuild | undefined {
-  let broadSourceCopy: CollectedDockerfileInstruction | undefined;
-
-  for (const instruction of instructions) {
-    if (fromStartPattern.test(instruction.text)) {
-      broadSourceCopy = undefined;
-      continue;
-    }
-
-    const buildLanguage = instructionLooksBroadCompiledBuildWithoutBindMount(instruction.text);
-    if (buildLanguage && broadSourceCopy) {
-      return {
-        copyInstruction: broadSourceCopy,
-        buildInstruction: instruction,
-        language: buildLanguage,
-      };
-    }
-
-    const copyInstruction = parseDockerfileCopyInstruction(instruction);
-    const copiesFromStage = (instruction.flags ?? []).some(
-      (flag) => flag.name.toLowerCase() === "from",
-    );
-    if (
-      copyInstruction &&
-      !copiesFromStage &&
-      copyInstruction.sources.some((source) => dockerfileSourceLooksWholeContext(source))
-    ) {
-      broadSourceCopy = instruction;
-    }
-  }
-
-  return undefined;
 }
 
 function dockerignorePatternCoversRoot(pattern: string, rootName: string): boolean {

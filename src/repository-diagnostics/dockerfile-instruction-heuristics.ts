@@ -1,6 +1,5 @@
 const commentStripPattern = /\s+#.*$/;
 const runMountCachePattern = /^run\b[\s\S]*--mount=type=cache\b/i;
-const runBindMountPattern = /^run\b[\s\S]*--mount=(?:type=bind\b|[^\s]*target=\.?(?:,|\s|$))/i;
 const npmInstallMatchPattern = /\bnpm\s+(?:install|i|add|-i)(?:\s+[^;&|]+)?/gi;
 const globalFlagPattern = /\s(?:-g|--global)(?:\s|$)/i;
 const pnpmInstallRunPattern = /^run\b[\s\S]*\bpnpm\s+(?:install|i)(?:\s|$)/i;
@@ -20,7 +19,6 @@ const pathFlagPattern = /\s--path(?:=|\s+)/i;
 const cargoBuildReleaseRunPattern = /^run\b[\s\S]*\bcargo\s+build\b[\s\S]*\s--release(?:\s|$)/i;
 const goModDownloadRunPattern = /^run\b[\s\S]*\bgo\s+mod\s+download(?:\s|$)/i;
 const goBuildRunPattern = /^run\b[\s\S]*\bgo\s+build(?:\s|$)/i;
-const cargoBuildRunPattern = /^run\b[\s\S]*\bcargo\s+build\b/i;
 const mvnGoOfflineRunPattern =
   /^run\b[\s\S]*\b(?:mvn|mvnw|[.][/\\]mvnw)\b[\s\S]*\bdependency:go-offline\b/i;
 const mvnBuildRunPattern =
@@ -129,27 +127,6 @@ export function instructionLooksGoModDownloadWithoutCacheMount(instruction: stri
 export function instructionLooksGoBuildWithoutCacheMount(instruction: string): boolean {
   const normalized = stripDockerfileComment(instruction);
   return goBuildRunPattern.test(normalized) && !runMountCachePattern.test(normalized);
-}
-
-function instructionLooksCompiledBuildWithoutBindMount(
-  instruction: string,
-): "Go" | "Rust" | undefined {
-  const normalized = stripDockerfileComment(instruction);
-  if (goBuildRunPattern.test(normalized) && !runBindMountPattern.test(normalized)) {
-    return "Go";
-  }
-
-  if (cargoBuildRunPattern.test(normalized) && !runBindMountPattern.test(normalized)) {
-    return "Rust";
-  }
-
-  return undefined;
-}
-
-export function instructionLooksBroadCompiledBuildWithoutBindMount(
-  instruction: string,
-): "Go" | "Rust" | undefined {
-  return instructionLooksCompiledBuildWithoutBindMount(instruction);
 }
 
 export function instructionLooksMavenGoOfflineWithoutCacheMount(instruction: string): boolean {

@@ -1,7 +1,7 @@
 import type { Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { CollectedDockerfileInstruction } from "./dockerfile-instructions.ts";
-import { findBroadSourceCopyBeforeCompiledBuild } from "./dockerfile-instructions.ts";
+import { findSourceBindCandidate } from "./docker-source-bind-evidence.ts";
 import { dockerfileCompiledBuildCopiesSourceLayerDocsPath } from "./docker-image-rule-catalog.ts";
 import type { DockerInstallContextProbes } from "./docker-install-context-probes.ts";
 
@@ -12,11 +12,16 @@ export function collectCompiledBuildSourceLayerDiagnostics(
   instructions: CollectedDockerfileInstruction[],
   probes: DockerInstallContextProbes,
 ): Diagnostic[] {
-  if (!probes.hasCargoManifest && !probes.hasGoMod) {
+  if (
+    !probes.hasCargoManifest &&
+    !probes.hasGoMod &&
+    !probes.hasMavenPom &&
+    !probes.hasGradleBuild
+  ) {
     return [];
   }
 
-  const compiledBuildSourceCopy = findBroadSourceCopyBeforeCompiledBuild(instructions);
+  const compiledBuildSourceCopy = findSourceBindCandidate(instructions, probes);
   if (!compiledBuildSourceCopy) {
     return [];
   }
@@ -31,17 +36,17 @@ export function collectCompiledBuildSourceLayerDiagnostics(
       workflow: repository.primaryWorkflowPath ?? workflowPath,
       location: {
         path: dockerfileRelativePath,
-        line: compiledBuildSourceCopy.copyInstruction.startLine,
+        line: compiledBuildSourceCopy.copy.instruction.startLine,
         column: 1,
       },
-      message: `Dockerfile ${dockerfileRelativePath} copies the broad build context before a ${compiledBuildSourceCopy.language} compile step at line ${compiledBuildSourceCopy.buildInstruction.startLine}.`,
-      why: "For compiled Docker builds, source files are often only needed temporarily to produce a binary or artifact. Copying the whole source tree creates a source layer that changes frequently and invalidates later layers.",
+      message: `Dockerfile ${dockerfileRelativePath} copies ${compiledBuildSourceCopy.source} into ${compiledBuildSourceCopy.destination} before a ${compiledBuildSourceCopy.compilation.language} build at line ${compiledBuildSourceCopy.build.instruction.startLine}, while later stages copy only its artifacts.`,
+      why: "Temporary build inputs do not need their own persisted source layer. A bind mount can reduce intermediate snapshot and cache export costs. Source changes still invalidate the build RUN, and a binary-only final image may be unchanged.",
       suggestion:
-        "Consider using a BuildKit bind mount on the compile RUN instruction, such as `RUN --mount=type=bind,target=. ...`, and copy only the compiled artifact into the final stage.",
+        "Consider replacing the source COPY with a read-only BuildKit bind mount on the build RUN. Keep all outputs outside that mount and preserve build manifests, wrappers, generated assets, and artifact copies. For Maven/Gradle, mount only the source subtree rather than the whole project.",
       measurementHint:
-        "Compare Docker layer changes, image size, and rebuild time after replacing broad source COPY for the compile step with a BuildKit bind mount.",
-      aiHandoff: `Review ${dockerfileRelativePath} and consider replacing the broad source \`COPY\` before the ${compiledBuildSourceCopy.language} compile step with a BuildKit bind mount on the compile \`RUN\`, then copy only the resulting artifact into the final image.`,
-      score: 70,
+        "Compare intermediate build-cache size, export bytes and duration, and cold/warm rebuild time. Verify read-only source compatibility, generated/embedded assets, and artifact equivalence; do not assume fewer invalidations or a smaller final image.",
+      aiHandoff: `Review ${dockerfileRelativePath}, COPY at line ${compiledBuildSourceCopy.copy.instruction.startLine} and build at line ${compiledBuildSourceCopy.build.instruction.startLine}. Consider --mount=type=bind,source=${compiledBuildSourceCopy.source},target=${compiledBuildSourceCopy.destination}. Keep outputs outside the mount, preserve metadata/ownership and generated inputs, and test that compilation and Java build plugins do not write into the source subtree. Preserve existing final-stage artifact copies.`,
+      score: 55,
     },
   ];
 }
