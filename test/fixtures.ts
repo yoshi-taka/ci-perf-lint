@@ -116,6 +116,8 @@ const fixtureNames = {
   dockerPnpmUnfrozenLike: "docker-pnpm-unfrozen-like",
   dockerRubyCacheOk: "docker-ruby-cache-ok",
   dockerRubyUncachedLike: "docker-ruby-uncached-like",
+  dockerRuntimeBuildEnvironmentLike: "docker-runtime-build-environment-like",
+  dockerRuntimeBuildEnvironmentOk: "docker-runtime-build-environment-ok",
   dockerRustCacheOk: "docker-rust-cache-ok",
   dockerRustUncachedLike: "docker-rust-uncached-like",
   dockerUvFrozenOk: "docker-uv-frozen-ok",

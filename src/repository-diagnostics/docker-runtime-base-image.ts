@@ -3,6 +3,7 @@ import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { type CollectedDockerfileData, normalizeRelativePath } from "./docker-build-targets.ts";
 import { parseDockerfileFromInstruction } from "./dockerfile-instructions.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { findDockerBuildRuntimeEvidence } from "./docker-build-runtime-evidence.ts";
 
 const meta = {
   id: "dockerfile-runtime-image-uses-heavy-base",
@@ -90,6 +91,9 @@ export async function collectDockerRuntimeBaseImageDiagnostics(
     }
     const data = await featureIndex.getDockerfileData(target.dockerfilePath, scanContext);
     if (!data) {
+      continue;
+    }
+    if (findDockerBuildRuntimeEvidence(data.instructions)) {
       continue;
     }
     const from = data.instructions[data.finalFromInstructionIndex];

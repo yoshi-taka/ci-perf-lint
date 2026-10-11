@@ -14,6 +14,8 @@ The final Dockerfile stage has a visible `CMD` or `ENTRYPOINT` and uses a known 
 
 This is a `warning`, included in strict mode, with medium confidence: runtime compatibility and actual image size require verification. Java JDK images are covered by `jvm-production-image-uses-jdk-runtime`.
 
+When a visible Go/Rust compile output is directly executed in the same stage ancestry, `dockerfile-runtime-inherits-build-environment` supplies the more specific warning instead.
+
 ## Suggested action
 
 Choose a lighter base appropriate to the application:
