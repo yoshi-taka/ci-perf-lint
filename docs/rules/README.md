@@ -45,6 +45,7 @@ Current rule registry:
 - `docker-build-load-true-unnecessary`
 - `docker-build-without-layer-cache`
 - `docker-cache-copy-path-mismatch`
+- `docker-gha-cache-scope-collision`
 - `dockerfile-add-without-clear-need`
 - `dockerfile-apk-add-without-no-cache-or-cache-mount`
 - `dockerfile-apt-install-without-cleanup-or-cache-mount`

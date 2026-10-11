@@ -1,0 +1,15 @@
+on: push
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          context: api
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: worker
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max

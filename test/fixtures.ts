@@ -52,6 +52,8 @@ const fixtureNames = {
   dispatchRunDiscoveryOk: "dispatch-run-discovery-ok",
   cargoBuildBeforeTestLike: "cargo-build-before-test-like",
   cargoBuildBeforeTestOk: "cargo-build-before-test-ok",
+  dockerGhaCacheScopeLike: "docker-gha-cache-scope-like",
+  dockerGhaCacheScopeOk: "docker-gha-cache-scope-ok",
   cdkBucketDeploymentMemoryLike: "cdk-bucket-deployment-memory-like",
   cdkBucketDeploymentMemoryOk: "cdk-bucket-deployment-memory-ok",
   preferCdkExpressModeInDevelopmentLike: "prefer-cdk-express-mode-in-development-like",

@@ -24,6 +24,7 @@ import { cudaTorchInstallOnCpuRunnerRule } from "./cuda-torch-install-on-cpu-run
 import { dockerBuildCacheDisabledInCiRule } from "./docker-build-cache-disabled-in-ci.ts";
 import { dockerBuildLoadTrueUnnecessaryRule } from "./docker-build-load-true-unnecessary.ts";
 import { dockerBuildWithoutLayerCacheRule } from "./docker-build-without-layer-cache.ts";
+import { dockerGhaCacheScopeCollisionRule } from "./docker-gha-cache-scope-collision.ts";
 import { dockerBakeFileUnusedInCiRule } from "./docker-bake-file-unused-in-ci.ts";
 import { duplicateCheckoutInSameWorkflowRule } from "./duplicate-checkout-in-same-workflow.ts";
 import { duplicateInstallOrLintRule } from "./duplicate-install-or-lint.ts";
@@ -153,6 +154,7 @@ export const allRules = [
   dockerBuildCacheDisabledInCiRule,
   dockerBuildLoadTrueUnnecessaryRule,
   dockerBuildWithoutLayerCacheRule,
+  dockerGhaCacheScopeCollisionRule,
   dockerBakeFileUnusedInCiRule,
   missingConcurrencyRule,
   missingPathsFilterRule,

@@ -31,6 +31,7 @@ export const RULE_REGISTRY = {
   "docker-build-cache-disabled-in-ci": { kind: "workflow" },
   "docker-build-load-true-unnecessary": { kind: "workflow" },
   "docker-build-without-layer-cache": { kind: "workflow" },
+  "docker-gha-cache-scope-collision": { kind: "workflow" },
   "duplicate-checkout-in-same-workflow": { kind: "workflow" },
   "duplicate-install-or-lint": { kind: "workflow" },
   "elixir-otp-version-performance": { kind: "workflow" },
