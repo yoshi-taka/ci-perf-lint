@@ -65,6 +65,7 @@ Current rule registry:
 - `dockerfile-maven-build-without-cache-mount`
 - `dockerfile-maven-go-offline-without-cache-mount`
 - `dockerfile-pnpm-install-without-frozen-lockfile`
+- `dockerfile-runtime-image-uses-heavy-base`
 - `dockerfile-uses-npm-install-with-lockfile`
 - `dockerfile-uv-sync-without-frozen-lockfile`
 - `dockerfile-yarn-install-without-immutable-lockfile`
