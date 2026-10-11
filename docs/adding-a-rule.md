@@ -304,6 +304,16 @@ Use this pattern (see `prefer-node-run-over-npm-run.ts` for a complete reference
 
 ## Verification
 
+When adding or changing a rule, validate it against real repository workflows or
+files in addition to local fixtures. Use immutable revisions when checking older
+versions. Review findings against the actual evidence for false positives and
+missed cases; where possible, compare affected and unaffected or upgraded cases.
+If no applicable real positive case is found, explicitly report that limitation.
+Static validation does not establish a measured performance improvement.
+
+Report the repositories, revisions and results. If a written validation record is
+needed, follow the existing layout and place it under `docs/internal/`.
+
 Run a focused test first when possible, then broaden.
 
 Common commands:

@@ -62,6 +62,7 @@ import { preferUv012Rule } from "./prefer-uv-0-12.ts";
 import { preferUvPipOverPipRule } from "./prefer-uv-pip-over-pip.ts";
 import { preferWorkflowDispatchRunDetailsRule } from "./prefer-workflow-dispatch-run-details.ts";
 import { preferBuildxBuildOverDockerBuildRule } from "./prefer-buildx-build-over-docker-build.ts";
+import { preferCacheAptPkgsAction131Rule } from "./prefer-cache-apt-pkgs-action-1-3-1.ts";
 import { preferAwsCdkCli21125ForHotswapRule } from "./prefer-aws-cdk-cli-2-1125-for-hotswap.ts";
 import { preferCdkExpressModeInDevelopmentRule } from "./prefer-cdk-express-mode-in-development.ts";
 import { preferCdkMethodDirectInDevelopmentRule } from "./prefer-cdk-method-direct-in-development.ts";
@@ -71,6 +72,7 @@ import { preferDirectUploadForCompressedArtifactsRule } from "./prefer-direct-up
 import { preferDornyPathsFilterForScopedJobsRule } from "./prefer-dorny-paths-filter-for-scoped-jobs.ts";
 import { preferDownloadArtifactV8ForArchivesRule } from "./prefer-download-artifact-v8-for-archives.ts";
 import { preferElixirParallelDepsCompileRule } from "./prefer-elixir-parallel-deps-compile.ts";
+import { preferInstallAction238ForNextestRule } from "./prefer-install-action-2-38-for-nextest.ts";
 import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-complex-git-hooks.ts";
 import { preferJest30ForJest29Rule } from "./prefer-jest-30-for-jest-29.ts";
 import { preferRuffFormatOverBlackRule } from "./prefer-ruff-format-over-black.ts";
@@ -80,6 +82,7 @@ import { preferOxlintTypeCheckOverTscRule } from "./prefer-oxlint-type-check-ove
 import { preferOxfmtOverPrettierRule } from "./prefer-oxfmt-over-prettier.ts";
 import { preferPnpm1210Rule } from "./prefer-pnpm-12-10.ts";
 import { preferPnpmSetupForStoreOnlyCacheRule } from "./prefer-pnpm-setup-for-store-only-cache.ts";
+import { preferPulumiActions42Rule } from "./prefer-pulumi-actions-4-2.ts";
 import {
   preferNextjs12MinorPerformanceMilestoneRule,
   preferNextjs13MinorPerformanceMilestoneRule,
@@ -112,6 +115,8 @@ import { preferPython311Rule } from "./prefer-python-3-11.ts";
 import { preferRailsPerformanceMilestoneRule } from "./prefer-rails-performance-milestone.ts";
 import { preferRuby3YjitRule } from "./prefer-ruby-3-yjit.ts";
 import { preferRustCache292Rule } from "./prefer-rust-cache-2-9-2.ts";
+import { preferSccacheAction006Rule } from "./prefer-sccache-action-0-0-6.ts";
+import { preferTestReporter23ForXmlRule } from "./prefer-test-reporter-2-3-for-xml.ts";
 import { preferRuffImportSortingOverIsortRule } from "./prefer-ruff-import-sorting-over-isort.ts";
 import { rubySetupRubyMissingBundlerCacheRule } from "./ruby-setup-ruby-missing-bundler-cache.ts";
 import { redundantNpxOrBootstrapRule } from "./redundant-npx-or-bootstrap.ts";
@@ -185,6 +190,7 @@ export const allRules = [
   preferJest30ForJest29Rule,
   preferBuildxBuildOverDockerBuildRule,
   preferAwsCdkCli21125ForHotswapRule,
+  preferCacheAptPkgsAction131Rule,
   preferCcacheAction1220OnWindowsRule,
   preferCdkExpressModeInDevelopmentRule,
   preferCdkMethodDirectInDevelopmentRule,
@@ -193,11 +199,13 @@ export const allRules = [
   preferDownloadArtifactV8ForArchivesRule,
   preferElixirParallelDepsCompileRule,
   preferEslintConcurrencyRule,
+  preferInstallAction238ForNextestRule,
   preferOxlintOverEslintRule,
   preferOxlintTypeCheckOverTscRule,
   preferOxfmtOverPrettierRule,
   preferPnpm1210Rule,
   preferPnpmSetupForStoreOnlyCacheRule,
+  preferPulumiActions42Rule,
   preferNextjs12MinorPerformanceMilestoneRule,
   preferNextjs13MinorPerformanceMilestoneRule,
   preferNextjs14MinorPerformanceMilestoneRule,
@@ -206,10 +214,12 @@ export const allRules = [
   preferRailsPerformanceMilestoneRule,
   preferRuby3YjitRule,
   preferRustCache292Rule,
+  preferSccacheAction006Rule,
   preferStorybook6MinorPerformanceMilestoneRule,
   preferStorybook7MinorPerformanceMilestoneRule,
   preferStorybookTestFlagRule,
   preferTailwindV4UpgradeToolRule,
+  preferTestReporter23ForXmlRule,
   preferNativeArmRunnerOverQemuRule,
   preferFrozenLockfileRule,
   preferNodeRunOverNpmRunRule,

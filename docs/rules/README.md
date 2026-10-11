@@ -112,6 +112,7 @@ Current rule registry:
 - `prefer-aws-cdk-lib-offline-validation`
 - `prefer-buildx-bake-for-multiple-images`
 - `prefer-buildx-build-over-docker-build`
+- `prefer-cache-apt-pkgs-action-1-3-1`
 - `prefer-cargo-shear-in-ci`
 - `prefer-ccache-action-1-2-20-on-windows`
 - `prefer-cdk-asset-build-concurrency`
@@ -147,6 +148,7 @@ Current rule registry:
 - `prefer-eslint-plugin-import-x`
 - `prefer-explicit-import-extensions`
 - `prefer-frozen-lockfile`
+- `prefer-install-action-2-38-for-nextest`
 - `prefer-jest-30-for-jest-29`
 - `prefer-knip-in-ci`
 - `prefer-lefthook-for-complex-git-hooks`
@@ -167,6 +169,7 @@ Current rule registry:
 - `prefer-oxlint-type-check-over-tsc`
 - `prefer-pnpm-12-10`
 - `prefer-pnpm-setup-for-store-only-cache`
+- `prefer-pulumi-actions-4-2`
 - `prefer-pydantic-v2`
 - `prefer-python-3-11`
 - `prefer-rails-performance-milestone`
@@ -174,6 +177,7 @@ Current rule registry:
 - `prefer-ruff-format-over-black`
 - `prefer-ruff-import-sorting-over-isort`
 - `prefer-rust-cache-2-9-2`
+- `prefer-sccache-action-0-0-6`
 - `prefer-setup-bun-for-lightweight-node-tooling`
 - `prefer-setup-gradle-6-2-for-enhanced-cache`
 - `prefer-setup-java-v6`
@@ -187,6 +191,7 @@ Current rule registry:
 - `prefer-storybook-7-minor-performance-milestone`
 - `prefer-storybook-test-flag`
 - `prefer-tailwind-v4-upgrade-tool`
+- `prefer-test-reporter-2-3-for-xml`
 - `prefer-turborepo-over-npm-workspaces`
 - `prefer-typescript-5-performance-milestone`
 - `prefer-typescript-7-native-compiler`

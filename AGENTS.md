@@ -66,6 +66,7 @@ Shared output types live in `src/types.ts`.
 
 ## Docs To Check
 
+- 検証記録などの内部向けドキュメントは、既存の配置を確認して `docs/internal/` に置く。`docs/` 直下やルートの `internal/` に新設しない。
 - AI readability plan: `docs/ai-readability-priorities.md`
 - Rule addition guide: `docs/adding-a-rule.md`
 - Current refactoring order: `docs/refactoring-priorities.md`

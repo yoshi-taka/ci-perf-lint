@@ -12,7 +12,7 @@ export function cacheActionVersionIsBelow(
   }
   const ref = step.uses.slice(action.length + 1);
   const comment = isScalar(step.usesNode) ? step.usesNode.comment?.trim() : undefined;
-  const annotation = comment?.replace(/^ratchet:/, "");
+  const annotation = comment?.replace(/^(?:ratchet:|pin\s+)/, "");
   const annotatedRef = annotation?.toLowerCase().startsWith(`${action.toLowerCase()}@`)
     ? annotation.slice(action.length + 1)
     : annotation;
