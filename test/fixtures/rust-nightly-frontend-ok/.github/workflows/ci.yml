@@ -1,0 +1,10 @@
+name: Rust
+on: push
+env:
+  RUSTFLAGS: -Dwarnings -Zthreads=0
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo test --workspace

@@ -54,6 +54,8 @@ const fixtureNames = {
   cargoBuildBeforeTestOk: "cargo-build-before-test-ok",
   dockerGhaCacheScopeLike: "docker-gha-cache-scope-like",
   dockerGhaCacheScopeOk: "docker-gha-cache-scope-ok",
+  rustNightlyFrontendLike: "rust-nightly-frontend-like",
+  rustNightlyFrontendOk: "rust-nightly-frontend-ok",
   cdkBucketDeploymentMemoryLike: "cdk-bucket-deployment-memory-like",
   cdkBucketDeploymentMemoryOk: "cdk-bucket-deployment-memory-ok",
   preferCdkExpressModeInDevelopmentLike: "prefer-cdk-express-mode-in-development-like",

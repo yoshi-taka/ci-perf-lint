@@ -19,6 +19,7 @@ import { circleciCheckoutUsesFullCloneRule } from "./circleci-checkout-uses-full
 import { collapseMultipleGoBuildsInJobRule } from "./collapse-multiple-go-builds-in-job.ts";
 import { considerCachingOsPackagesOrUsingACustomImageRule } from "./consider-caching-os-packages-or-using-a-custom-image.ts";
 import { considerFilterBlobNoneForReleaseMetadataRule } from "./consider-filter-blob-none-for-release-metadata.ts";
+import { considerRustNightlyParallelFrontendRule } from "./consider-rust-nightly-parallel-frontend.ts";
 import { considerSlimOverAlpineForCiRule } from "./consider-slim-over-alpine-for-ci.ts";
 import { cudaTorchInstallOnCpuRunnerRule } from "./cuda-torch-install-on-cpu-runner.ts";
 import { dockerBuildCacheDisabledInCiRule } from "./docker-build-cache-disabled-in-ci.ts";
@@ -149,6 +150,7 @@ export const allRules = [
   collapseMultipleGoBuildsInJobRule,
   considerCachingOsPackagesOrUsingACustomImageRule,
   considerFilterBlobNoneForReleaseMetadataRule,
+  considerRustNightlyParallelFrontendRule,
   considerSlimOverAlpineForCiRule,
   cudaTorchInstallOnCpuRunnerRule,
   dockerBuildCacheDisabledInCiRule,

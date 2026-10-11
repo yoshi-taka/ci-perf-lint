@@ -32,6 +32,7 @@ Current rule registry:
 - `consider-filter-blob-none-for-release-metadata`
 - `consider-msw-3-upgrade`
 - `consider-mypy-2-upgrade`
+- `consider-rust-nightly-parallel-frontend`
 - `consider-slim-over-alpine-for-ci`
 - `cuda-torch-install-on-cpu-runner`
 - `cypress-github-action-uses-npm-run`
