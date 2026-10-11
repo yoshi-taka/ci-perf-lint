@@ -2,6 +2,8 @@ import path from "node:path";
 import { parseDocument } from "yaml";
 import type { AnalysisWarning } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
+import type { AnyWorkflowDocument } from "../ci-types.ts";
+import { collectPersistentCacheDockerTargets } from "./docker-persistent-cache-targets.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
   collectDockerfileInstructions,
@@ -13,6 +15,7 @@ export interface DockerBuildTarget {
   jobId: string;
   contextPath: string;
   dockerfilePath: string;
+  cacheMountPersistence?: "depot" | "blacksmith" | "buildkite-docker-state";
 }
 
 export interface CollectedDockerfileData {
@@ -384,10 +387,13 @@ export async function collectDockerBuildTargets(
   workflows: WorkflowDocument[],
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
+  additionalDocuments: readonly AnyWorkflowDocument[] = [],
 ): Promise<DockerBuildTarget[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
   const cache = getContextCache(dockerBuildTargetsCache, context);
-  const cacheKey = workflows.map((workflow) => workflow.relativePath).join("\n");
+  const cacheKey = [...workflows, ...additionalDocuments]
+    .map((workflow) => workflow.relativePath)
+    .join("\n");
   const existingLoad = cache.get(cacheKey);
   if (existingLoad) {
     return existingLoad;
@@ -405,11 +411,20 @@ export async function collectDockerBuildTargets(
       .filter((result) => result.status === "fulfilled")
       .map((result) => result.value)
       .flat();
+    allTargets.push(
+      ...collectPersistentCacheDockerTargets(repoRoot, [
+        ...workflows,
+        ...additionalDocuments.filter((doc) => doc.kind !== "github-actions"),
+      ]),
+    );
 
     const uniqueTargets = new Map<string, DockerBuildTarget>();
     for (const target of allTargets) {
       const key = `${target.contextPath}::${target.dockerfilePath}`;
-      if (!uniqueTargets.has(key)) {
+      if (
+        !uniqueTargets.has(key) ||
+        (!uniqueTargets.get(key)?.cacheMountPersistence && target.cacheMountPersistence)
+      ) {
         uniqueTargets.set(key, target);
       }
     }

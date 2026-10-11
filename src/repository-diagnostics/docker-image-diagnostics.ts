@@ -86,7 +86,11 @@ export async function collectNodeDockerfileInstallDiagnostics(
   const diagnostics: Diagnostic[] = [];
   const seenDockerfiles = new Set<string>();
 
-  for (const target of targets) {
+  const orderedTargets = [
+    ...targets.filter((target) => target.cacheMountPersistence),
+    ...targets.filter((target) => !target.cacheMountPersistence),
+  ];
+  for (const target of orderedTargets) {
     if (seenDockerfiles.has(target.dockerfilePath)) {
       continue;
     }
@@ -159,15 +163,17 @@ export async function collectNodeDockerfileInstallDiagnostics(
         probes,
       ),
     );
-    diagnostics.push(
-      ...collectDockerInstallCacheMountDiagnostics(
-        repository,
-        target.workflow,
-        dockerfileRelativePath,
-        instructions,
-        probes,
-      ),
-    );
+    if (target.cacheMountPersistence) {
+      diagnostics.push(
+        ...collectDockerInstallCacheMountDiagnostics(
+          repository,
+          target.workflow,
+          dockerfileRelativePath,
+          instructions,
+          probes,
+        ),
+      );
+    }
   }
 
   return diagnostics;

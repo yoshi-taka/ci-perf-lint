@@ -1,10 +1,12 @@
 # dockerfile-bundle-install-without-cache-mount
 
+Warnings require a CI-discovered build with a [recognized persistent builder path](../docker-cache-mount-persistence.md): Depot, configured Blacksmith, or repository-visible Buildkite local Docker state persistence. Unknown/disposable builders are not flagged for missing cache mounts.
+
 Detects Ruby Dockerfiles that run `bundle install` without a visible BuildKit cache mount on the same instruction.
 
 This rule looks for:
 
-- a Docker build discovered from GitHub Actions
+- a qualifying persistent Docker build discovered from GitHub Actions or Buildkite
 - `Gemfile` in the build context
 - `RUN bundle install`
 - no `--mount=type=cache` on that Dockerfile instruction

@@ -24,7 +24,7 @@ import {
 import type { DockerInstallContextProbes } from "./docker-install-context-probes.ts";
 
 function buildRepositoryDockerDiagnostic(
-  repository: RepositorySignals,
+  _repository: RepositorySignals,
   workflowPath: string,
   dockerfileRelativePath: string,
   instruction: CollectedDockerfileInstruction,
@@ -35,7 +35,7 @@ function buildRepositoryDockerDiagnostic(
     severity: "warning",
     confidence: "medium",
     scope: "repository",
-    workflow: repository.primaryWorkflowPath ?? workflowPath,
+    workflow: workflowPath,
     location: {
       path: dockerfileRelativePath,
       line: instruction.startLine,

@@ -70,8 +70,8 @@ export interface RepositoryFeatureIndex {
   ): Promise<CollectedDockerfileData | undefined>;
 }
 
-const DOCKER_BUILD_PUSH_ACTION_RE = /docker\/build-push-action@/i;
-const DOCKER_CLI_BUILD_RE = /\bdocker\s+(?:buildx\s+build|build)\b/i;
+const DOCKER_BUILD_PUSH_ACTION_RE = /(?:docker|depot|useblacksmith)\/build-push-action@/i;
+const DOCKER_CLI_BUILD_RE = /\b(?:docker\s+(?:buildx\s+build|build)|depot\s+build)\b/i;
 const DOCKER_COMPOSE_BUILD_RE = /\bdocker\s+compose\b[\s\S]*\bbuild\b/i;
 const TERRAFORM_INIT_RE = /\bterraform\s+init\b/i;
 const SPARSE_CHECKOUT_RE = /sparse-checkout/i;
@@ -237,7 +237,13 @@ export function buildRepositoryFeatureIndex(
     ): Promise<DockerBuildTarget[]> {
       dockerBuildTargetsPromise ??= recordAccess("docker-build-targets", async () => {
         const { collectDockerBuildTargets } = await import("./docker-build-targets.ts");
-        return collectDockerBuildTargets(repoRoot, [...workflows], warnings, scanContext);
+        return collectDockerBuildTargets(
+          repoRoot,
+          [...workflows],
+          warnings,
+          scanContext,
+          additionalDocuments,
+        );
       });
       return dockerBuildTargetsPromise;
     },
