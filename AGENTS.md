@@ -169,7 +169,9 @@ Fixture names generally use:
 
 ## Verification
 
-Run lint + knip + tests after completing work, not incrementally during work.
+検証は変更範囲に合わせる。ドキュメントのみの変更は内容・リンク・差分確認のみ。lint・static audit・全テストは回さない。
+
+For code changes, run lint + knip + tests after completing work, not incrementally during work.
 
 ```sh
 bun run lint
