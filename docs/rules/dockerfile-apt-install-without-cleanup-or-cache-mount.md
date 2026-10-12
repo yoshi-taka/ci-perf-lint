@@ -6,11 +6,13 @@ apt lists retained in an output image increase layer storage and transfer work. 
 
 ## What it flags
 
-Direct `apt` / `apt-get update` or `install` commands without cleanup after the last package operation in the same `RUN`, or a cache mount covering `/var/lib/apt/lists`.
+Direct `apt` / `apt-get` / `aptitude update` or `install` commands without cleanup after the last package operation in the same `RUN`, or a cache/tmpfs mount covering `/var/lib/apt/lists`.
 
-`/var/lib/apt` and broader parent cache mounts cover lists. **A `/var/cache/apt` mount alone does not**: downloaded package archives and lists occupy different paths. Mount option order and `target`/`dst`/`destination` aliases are supported.
+`/var/lib/apt` and broader parent cache/tmpfs mounts cover lists. Tmpfs keeps metadata out of the image without preserving it across builds. **A `/var/cache/apt` mount alone does not**: downloaded package archives and lists occupy different paths. Mount option order and `target`/`dst`/`destination` aliases are supported. Mounting only a subdirectory such as `/var/lib/apt/lists/partial` does not cover all lists.
 
 Cleanup before package work, cleanup followed by another install/update, later-layer cleanup, unrelated mounts and quoted cleanup text do not suppress the finding. One finding per Dockerfile lists affected instructions.
+
+`apt-get clean` removes downloaded archives, not package lists, and therefore does not suppress the finding. Removing an unrelated package manager's cache does not count as lists cleanup either.
 
 The selected build stage and its rootfs ancestry are inspected. Independent artifact-only builders and unused stages are excluded; explicit metadata-directory copies are considered. Literal action targets, CLI `--target`, and Compose build targets are recognized. Unknown targets are not assumed to mean the last stage.
 

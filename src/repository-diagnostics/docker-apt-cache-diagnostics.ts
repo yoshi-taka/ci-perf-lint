@@ -24,13 +24,13 @@ export function collectAptCacheDiagnostics(
 ): Diagnostic[] {
   const lines: number[] = [];
   for (const instruction of instructions) {
-    if (cacheIsMounted(listsPath, instruction)) {
+    if (cacheIsMounted(listsPath, instruction, ["cache", "tmpfs"])) {
       continue;
     }
     let pending = false;
     for (const tokens of dockerRunCommands(instruction)) {
       const { name, args } = directCommand(tokens);
-      if (/^apt(?:-get)?$/.test(name)) {
+      if (/^(?:apt(?:-get)?|aptitude)$/.test(name)) {
         if (
           args.some((arg) =>
             /^(?:--help|--version|--simulate|--just-print|--dry-run|--recon|--no-act|-s|-h|-c|--config-file)(?:=|$)/.test(

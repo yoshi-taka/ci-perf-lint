@@ -1,7 +1,6 @@
 import { DockerfileParser } from "dockerfile-ast";
 import type { Flag, JSONArgument } from "dockerfile-ast";
 export {
-  instructionLooksAptInstallWithoutNoInstallRecommends,
   instructionLooksApkAddWithoutNoCacheOrCacheMount,
   instructionLooksBundleInstallWithoutCacheMount,
   instructionLooksBunInstallWithoutFrozenLockfile,

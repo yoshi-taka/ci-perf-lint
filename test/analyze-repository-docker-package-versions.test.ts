@@ -220,3 +220,124 @@ describe("Dockerfile package version constraints", () => {
     }
   });
 });
+
+describe("Dockerfile apt recommended packages", () => {
+  test.each([
+    { name: "options before install", run: "apt-get -y install curl", flagged: true },
+    {
+      name: "explicit suppression",
+      run: "apt-get install --no-install-recommends curl",
+      flagged: false,
+    },
+    {
+      name: "suppression before install",
+      run: "apt-get --no-install-recommends install curl",
+      flagged: false,
+    },
+    { name: "apt alias", run: "apt -qq install curl", flagged: true },
+    {
+      name: "configuration option",
+      run: "apt-get -o APT::Install-Recommends=false install curl",
+      flagged: false,
+    },
+    {
+      name: "attached configuration option",
+      run: "apt-get -oAPT::Install-Recommends=0 install curl",
+      flagged: false,
+    },
+    {
+      name: "long configuration option",
+      run: "apt-get install --option=APT::Install-Recommends=no curl",
+      flagged: false,
+    },
+    {
+      name: "later setting enables recommendations",
+      run: "apt-get --no-install-recommends -o APT::Install-Recommends=true install curl",
+      flagged: true,
+    },
+    {
+      name: "later flag disables recommendations",
+      run: "apt-get -o APT::Install-Recommends=true install --no-install-recommends curl",
+      flagged: false,
+    },
+    {
+      name: "one suppressed install does not cover another",
+      run: "apt-get install --no-install-recommends curl && apt-get install git",
+      flagged: true,
+    },
+    {
+      name: "later suppressed install does not cover earlier install",
+      run: "apt-get install curl && apt-get install --no-install-recommends git",
+      flagged: true,
+    },
+    { name: "quoted command is not executed", run: "echo 'apt-get install curl'", flagged: false },
+    {
+      name: "quoted flag does not suppress install",
+      run: "echo '--no-install-recommends' && apt-get install curl",
+      flagged: true,
+    },
+    {
+      name: "comment does not suppress install",
+      run: "apt-get install curl # --no-install-recommends",
+      flagged: true,
+    },
+    { name: "different executable", run: "./apt-get install curl", flagged: false },
+    { name: "non-install action", run: "apt-get update", flagged: false },
+    { name: "simulation", run: "apt-get -s install curl", flagged: false },
+    {
+      name: "simple wrapper",
+      run: "env DEBIAN_FRONTEND=noninteractive /usr/bin/apt-get install curl",
+      flagged: true,
+    },
+    { name: "JSON install", run: '["apt-get", "-y", "install", "curl"]', flagged: true },
+    {
+      name: "JSON suppressed install",
+      run: '["apt-get", "install", "--no-install-recommends", "curl"]',
+      flagged: false,
+    },
+    {
+      name: "ONBUILD install",
+      instruction: "ONBUILD RUN",
+      run: "apt-get -y install curl",
+      flagged: true,
+    },
+    {
+      name: "ONBUILD suppressed install",
+      instruction: "ONBUILD RUN",
+      run: "apt-get -o APT::Install-Recommends=false install curl",
+      flagged: false,
+    },
+    {
+      name: "ONBUILD JSON install",
+      instruction: "ONBUILD RUN",
+      run: '["apt-get", "install", "curl"]',
+      flagged: true,
+    },
+  ])("$name", async (scenario) => {
+    const fixtureRoot = await tempDirs.create("apl-docker-apt-recommends-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "docker.yml"),
+      "name: docker\non: push\njobs:\n  image:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: docker/build-push-action@v6\n        with:\n          context: .\n",
+    );
+    await writeFile(
+      path.join(fixtureRoot, "Dockerfile"),
+      `FROM debian:bookworm-slim\n${"instruction" in scenario ? scenario.instruction : "RUN"} ${scenario.run}\n`,
+    );
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      mode: "strict",
+      topCount: 100,
+    });
+    const findings = report.findings.filter(
+      (finding) => finding.ruleId === "dockerfile-apt-install-without-no-install-recommends",
+    );
+    expect(findings).toHaveLength(scenario.flagged ? 1 : 0);
+    if (scenario.flagged) {
+      expect(findings[0]?.severity).toBe("warning");
+      expect(findings[0]?.location).toEqual({ path: "Dockerfile", line: 2, column: 1 });
+    }
+  });
+});

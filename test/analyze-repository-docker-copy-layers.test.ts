@@ -184,6 +184,22 @@ describe("extraction-only copied archive layers", () => {
   test.each([
     ["tar gzip", archive],
     ["plain tar flags", archive.replace("tar -xzf", "tar -xf")],
+    ["tar flags without dash", archive.replace("tar -xzf", "tar xzf")],
+    ["separate tar operation and file flags", archive.replace("tar -xzf", "tar -x -z -f")],
+    [
+      "attached short file and directory options",
+      archive.replace(
+        "tar -xzf /tmp/bundle.tar.gz -C /app",
+        "tar -x -z -f/tmp/bundle.tar.gz -C/app",
+      ),
+    ],
+    [
+      "get extraction alias",
+      archive.replace(
+        "tar -xzf /tmp/bundle.tar.gz -C /app",
+        "tar --get --file=/tmp/bundle.tar.gz --directory=/app",
+      ),
+    ],
     [
       "long flags",
       archive.replace(
@@ -247,6 +263,26 @@ describe("extraction-only copied archive layers", () => {
     ["stdout extraction", archive.replace("tar -xzf", "tar --to-stdout -xzf")],
     ["rootfs extraction is not inferred", archive.replace("-C /app", "-C /")],
     ["wrong cleanup path", archive.replace("rm /tmp/bundle.tar.gz", "rm /tmp/other.tar.gz")],
+    [
+      "same basename at a different extraction path",
+      archive.replace("tar -xzf /tmp/bundle.tar.gz", "tar -xzf /other/bundle.tar.gz"),
+    ],
+    [
+      "attached file option must reference the copied archive",
+      archive.replace("tar -xzf /tmp/bundle.tar.gz", "tar -x -f/other/bundle.tar.gz"),
+    ],
+    [
+      "attached directory option still excludes rootfs extraction",
+      archive.replace("-C /app", "-C/"),
+    ],
+    [
+      "stage boundary does not carry a copied archive into an unrelated base",
+      archive.replace("RUN tar", "FROM alpine:3.22 AS output\nRUN tar"),
+    ],
+    [
+      "copy without extraction",
+      archive.replace("tar -xzf /tmp/bundle.tar.gz -C /app && rm /tmp/bundle.tar.gz", "echo ready"),
+    ],
     [
       "cleanup removes other files too",
       archive.replace("rm /tmp/bundle.tar.gz", "rm /tmp/bundle.tar.gz /etc/important"),

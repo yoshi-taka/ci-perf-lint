@@ -53,6 +53,7 @@ export function applyAssignments(tokens: string[], environment: Map<string, stri
 export function cacheIsMounted(
   cache: string,
   instruction: CollectedDockerfileInstruction,
+  mountTypes: readonly ("cache" | "tmpfs")[] = ["cache"],
 ): boolean {
   if (!cache.startsWith("/") || /[$`]/.test(cache)) {
     return false;
@@ -68,7 +69,11 @@ export function cacheIsMounted(
       }),
     );
     const target = options.get("target") ?? options.get("dst") ?? options.get("destination");
-    if (options.get("type") !== "cache" || !target?.startsWith("/") || /[$`]/.test(target)) {
+    if (
+      !mountTypes.some((type) => type === options.get("type")) ||
+      !target?.startsWith("/") ||
+      /[$`]/.test(target)
+    ) {
       return false;
     }
     const normalized = path.posix.normalize(target).replace(/\/$/, "");

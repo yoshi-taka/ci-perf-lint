@@ -8,6 +8,8 @@ Copying an archive into a layer, then extracting and deleting it in a later RUN,
 
 A single local archive COPY followed by direct tar/unzip extraction, with either explicit input deletion in the extraction RUN/next substantive RUN, or proof that an independent builder exports only extracted artifacts. Supported filename families include tar, compressed tar and ZIP.
 
+Tar extraction recognizes `-x`, `--extract` and `--get`, combined short flags such as `-xzf` or `xzf`, and separate or attached file/directory options (`-f /tmp/input.tar`, `-f/tmp/input.tar`, `-C /app`, `-C/app`). The resolved extraction input must match the copied archive's full path; matching basenames alone are not sufficient. An unrelated new stage does not inherit the copied input.
+
 Input evidence is an existing local context file or a visible prior generation step in the same GitHub Actions/Depot job. Recognized generation includes literal tar/zip outputs and `npm pack --pack-destination` followed by a literal rename from that directory's `*.tgz`. Generated inputs are only inferred before the first visible build; conditional steps, script cwd changes, unknown output paths, later generation and visible removal invalidate that evidence. Archives supplied externally must be present when analyzing the prepared context.
 
 The scanner resolves COPY destinations and WORKDIR, including archive renaming, literal ENV paths, standard Linux image defaults and directories visibly created by mkdir/WORKDIR. It inspects stages required by the selected output, through FROM, resolved local COPY and stage-mount dependencies. Unused stages and unknown targets are excluded.

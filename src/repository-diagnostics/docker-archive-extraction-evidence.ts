@@ -28,10 +28,14 @@ function extraction(tokens: string[], entry: DockerStageEntry) {
         file = args[++index];
       } else if (arg.startsWith("--file=")) {
         file = arg.slice(7);
+      } else if (arg.startsWith("-f") && arg.length > 2) {
+        file = arg.slice(2);
       } else if (arg === "-C" || arg === "--directory") {
         directory = resolveDockerStagePath(args[++index] ?? "", directory, entry.environment);
       } else if (arg.startsWith("--directory=")) {
         directory = resolveDockerStagePath(arg.slice(12), directory, entry.environment);
+      } else if (arg.startsWith("-C") && arg.length > 2) {
+        directory = resolveDockerStagePath(arg.slice(2), directory, entry.environment);
       } else if (/^-?[xzjJavpf]+$/.test(arg)) {
         extract ||= arg.includes("x");
         if (arg.includes("f")) {

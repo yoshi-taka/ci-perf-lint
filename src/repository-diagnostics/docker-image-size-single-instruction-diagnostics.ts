@@ -5,7 +5,6 @@ import {
   collectDockerfileStageAliases,
   dockerfileFromUsesFloatingTag,
   dockerfileSourceLooksLocalAddWithoutClearNeed,
-  instructionLooksAptInstallWithoutNoInstallRecommends,
   instructionLooksApkAddWithoutNoCacheOrCacheMount,
   parseDockerfileAddInstruction,
   parseDockerfileFromInstruction,
@@ -16,6 +15,7 @@ import {
   dockerfileAptInstallWithoutNoInstallRecommendsDocsPath,
   dockerfileBaseImageUsesFloatingTagDocsPath,
 } from "./docker-image-rule-catalog.ts";
+import { instructionInstallsAptWithRecommends } from "./docker-apt-recommends-helpers.ts";
 
 export function collectSingleInstructionImageSizeDiagnostics(
   repository: RepositorySignals,
@@ -63,9 +63,7 @@ export function collectSingleInstructionImageSizeDiagnostics(
     });
   }
 
-  const aptNoRecommendsInstruction = instructions.find((instruction) =>
-    instructionLooksAptInstallWithoutNoInstallRecommends(instruction.text),
-  );
+  const aptNoRecommendsInstruction = instructions.find(instructionInstallsAptWithRecommends);
   if (aptNoRecommendsInstruction) {
     diagnostics.push({
       ruleId: "dockerfile-apt-install-without-no-install-recommends",
