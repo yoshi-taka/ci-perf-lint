@@ -33,6 +33,74 @@ async function analyze(
 }
 
 describe("output image metadata diagnostics", () => {
+  test.each([
+    ["pinned package still needs cache control", "RUN apk add flex=2.6.4-r1", true],
+    ["explicit no-cache", "RUN apk add --no-cache curl", false],
+    ["global no-cache", "RUN apk --no-cache add curl", false],
+    ["options before add", "RUN apk -U add curl", true],
+    ["default cache mount", "RUN --mount=type=cache,target=/var/cache/apk apk add -U curl", false],
+    ["tmpfs mount", "RUN --mount=type=tmpfs,target=/var/cache/apk apk add curl", false],
+    ["parent mount", "RUN --mount=type=cache,dst=/var/cache apk add curl", false],
+    ["mount option order", "RUN --mount=destination=/var/cache/apk,type=cache apk add curl", false],
+    [
+      "partial cache mount",
+      "RUN --mount=type=cache,target=/var/cache/apk/partial apk add curl",
+      true,
+    ],
+    [
+      "path prefix is not coverage",
+      "RUN --mount=type=cache,target=/var/cache/apk-other apk add curl",
+      true,
+    ],
+    ["wrong tmpfs mount", "RUN --mount=type=tmpfs,target=/tmp apk add curl", true],
+    ["secret mount", "RUN --mount=type=secret,target=/var/cache/apk apk add curl", true],
+    [
+      "wrong mount with no-cache",
+      "RUN --mount=type=cache,target=/tmp apk add --no-cache curl",
+      false,
+    ],
+    [
+      "custom cache mount",
+      "RUN --mount=type=cache,target=/cache apk --cache-dir /cache add curl",
+      false,
+    ],
+    [
+      "custom cache overrides mounted default",
+      "RUN --mount=type=cache,target=/var/cache/apk apk add --cache-dir=/cache curl",
+      true,
+    ],
+    [
+      "repository value is not the action",
+      "RUN apk --repository https://example.com/alpine add curl",
+      true,
+    ],
+    ["quoted command", "RUN echo 'apk add curl'", false],
+    ["quoted flag on another command", "RUN echo '--no-cache' && apk add curl", true],
+    [
+      "one controlled install does not cover another",
+      "RUN apk add --no-cache curl && apk add git",
+      true,
+    ],
+    ["comment does not disable cache", "RUN apk add curl # --no-cache", true],
+    ["different executable", "RUN ./apk add curl", false],
+    ["simulation", "RUN apk -s add curl", false],
+    ["other action", "RUN apk del curl", false],
+    ["JSON add", 'RUN ["apk", "add", "curl"]', true],
+    ["JSON no-cache", 'RUN ["apk", "--no-cache", "add", "curl"]', false],
+    ["ONBUILD add", "ONBUILD RUN apk add curl", true],
+    ["ONBUILD no-cache", "ONBUILD RUN apk add --no-cache curl", false],
+    ["ONBUILD tmpfs", "ONBUILD RUN --mount=type=tmpfs,target=/var/cache/apk apk add curl", false],
+  ] as const)("apk: %s", async (_name, instruction, flagged) => {
+    const report = await analyze(`FROM alpine:3.22\n${instruction}`);
+    const findings = report.findings.filter(
+      (finding) => finding.ruleId === "dockerfile-apk-add-without-no-cache-or-cache-mount",
+    );
+    expect(findings).toHaveLength(flagged ? 1 : 0);
+    if (flagged) {
+      expect(findings[0]?.location).toEqual({ path: "Dockerfile", line: 2, column: 1 });
+    }
+  });
+
   // Scenario coverage informed by hadolint v2.12.0 DL3009/DL3032/DL3036/
   // DL3040/DL3046 specs. Expectations follow this tool's documented scope:
   // DNF's cache differs from yum's, and zypper needs --all for metadata.
@@ -155,6 +223,16 @@ describe("output image metadata diagnostics", () => {
     ["zypper default cleans packages only", "zypper in -y curl && zypper clean", true],
     ["zypper short default cleans packages only", "zypper in -y curl && zypper cc", true],
     ["packages only", "dnf install -y curl && dnf clean packages", true],
+    ["yum bare clean is incomplete", "yum install -y curl && yum clean", true],
+    ["yum clean cache is incomplete", "yum install -y curl && yum clean cache", true],
+    ["dnf bare clean is incomplete", "dnf install -y curl && dnf clean", true],
+    ["dnf clean cache is incomplete", "dnf install -y curl && dnf clean cache", true],
+    ["unrelated apt lists cleanup", "yum install -y curl && rm -rf /var/lib/apt/lists/*", true],
+    [
+      "unrelated removal before valid cleanup",
+      "rm -rf /foo/bar && yum install -y curl && rm -rf /var/cache/yum/*",
+      false,
+    ],
     ["wrong manager", "microdnf install -y curl && dnf clean all", true],
     ["reverse manager mismatch", "dnf install -y curl && microdnf clean all", true],
     ["before install", "yum clean all && yum install -y curl", true],
@@ -179,6 +257,47 @@ describe("output image metadata diagnostics", () => {
       true,
     ],
     ["zypper mount", "--mount=type=cache,target=/var/cache/zypp zypper in -y curl", false],
+    ["yum tmpfs", "--mount=type=tmpfs,target=/var/cache/yum yum install -y curl", false],
+    ["microdnf tmpfs", "--mount=type=tmpfs,target=/var/cache/yum microdnf install -y curl", false],
+    ["zypper tmpfs", "--mount=type=tmpfs,target=/var/cache/zypp zypper install -y curl", false],
+    ["dnf parent tmpfs", "--mount=type=tmpfs,target=/var/cache dnf install -y curl", false],
+    [
+      "DNF5-only tmpfs is incomplete",
+      "--mount=type=tmpfs,target=/var/cache/libdnf5 dnf install -y curl",
+      true,
+    ],
+    [
+      "tmpfs subdirectory is incomplete",
+      "--mount=type=tmpfs,target=/var/cache/zypp/packages zypper in curl",
+      true,
+    ],
+    ["tmpfs wrong manager", "--mount=type=tmpfs,target=/var/cache/yum dnf install curl", true],
+    [
+      "secret mount is not cache coverage",
+      "--mount=type=secret,target=/var/cache/yum yum install curl",
+      true,
+    ],
+    [
+      "cache and tmpfs cover both dnf implementations",
+      "--mount=type=cache,target=/var/cache/dnf --mount=type=tmpfs,target=/var/cache/libdnf5 dnf install curl",
+      false,
+    ],
+    [
+      "mount plus cleanup covers both dnf implementations",
+      "--mount=type=cache,target=/var/cache/dnf dnf install curl && rm -rf /var/cache/libdnf5",
+      false,
+    ],
+    [
+      "separate removals cover both dnf implementations",
+      "dnf install curl && rm -rf /var/cache/dnf && rm -rf /var/cache/libdnf5",
+      false,
+    ],
+    ["partial dnf cleanup is incomplete", "dnf install curl && rm -rf /var/cache/dnf", true],
+    [
+      "separate cleanup before install is ineffective",
+      "rm -rf /var/cache/dnf && rm -rf /var/cache/libdnf5 && dnf install curl",
+      true,
+    ],
     ["unrelated mount", "--mount=type=cache,target=/tmp microdnf install -y curl", true],
     [
       "custom same-manager cleanup",
@@ -215,6 +334,18 @@ describe("output image metadata diagnostics", () => {
       expect(findings[0]?.confidence).toBe("medium");
     }
   });
+
+  test.each(["upgrade", "up", "upgrade-minimal", "up-min", "reinstall", "rei"])(
+    "dnf package operation requires same-layer cache control: %s",
+    async (action) => {
+      const unclean = await analyze(`FROM fedora:40\nRUN dnf -y ${action} curl`);
+      const findings = unclean.findings.filter((finding) => finding.ruleId === rpmId);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.location).toEqual({ path: "Dockerfile", line: 2, column: 1 });
+      const clean = await analyze(`FROM fedora:40\nRUN dnf -y ${action} curl && dnf clean all`);
+      expect(clean.findings.filter((finding) => finding.ruleId === rpmId)).toEqual([]);
+    },
+  );
 
   test.each([
     ["high UID", "useradd -u 123456 app", true],

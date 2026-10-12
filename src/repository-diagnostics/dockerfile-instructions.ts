@@ -1,7 +1,6 @@
 import { DockerfileParser } from "dockerfile-ast";
 import type { Flag, JSONArgument } from "dockerfile-ast";
 export {
-  instructionLooksApkAddWithoutNoCacheOrCacheMount,
   instructionLooksBundleInstallWithoutCacheMount,
   instructionLooksBunInstallWithoutFrozenLockfile,
   instructionLooksCargoBuildReleaseWithoutCacheMount,
@@ -34,8 +33,8 @@ const allowedArtifactPattern = /^(dist|build|public)(?:\/|$)/i;
 const singleSegmentPattern = /^[^/]+$/;
 const smallFilePattern =
   /(?:^|\/)(go\.mod|go\.sum|package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lock|uv\.lock|Cargo\.toml|Cargo\.lock|pom\.xml|Gemfile|Gemfile\.lock)$/i;
-const remoteUrlPattern = /^(?:https?|git):\/\//i;
-const archivePattern = /\.(?:tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|zip)$/i;
+const remoteUrlPattern = /^(?:(?:https?|git|ssh):\/\/|git@[^/:]+:)/i;
+const archivePattern = /\.(?:tar|gz|bz2|xz|zst|tgz|tbz2?|txz|tzst)$/i;
 const floatingTagPattern = /:latest$/i;
 const runInstructionPattern = /^run\b/i;
 const newlineSplitPattern = /\r?\n/;
@@ -236,6 +235,12 @@ export function parseDockerfileCopyInstruction(
 export function parseDockerfileAddInstruction(
   instruction: CollectedDockerfileInstruction,
 ): DockerfileCopyInstruction | undefined {
+  if (/^ONBUILD\s+ADD\b/i.test(instruction.text.trim())) {
+    const add = collectDockerfileInstructions([
+      instruction.text.trim().replace(/^ONBUILD\s+/i, ""),
+    ])[0];
+    return add ? parseDockerfileAddInstruction(add) : undefined;
+  }
   const keyword =
     instruction.keyword ?? stripDockerfileComment(instruction.text).match(keywordPattern)?.[0];
   if (keyword?.toLowerCase() !== "add") {
@@ -366,7 +371,7 @@ export function dockerfileSourceLooksWholeContext(source: string): boolean {
 
 export function dockerfileSourceLooksLocalAddWithoutClearNeed(source: string): boolean {
   const normalized = normalizeDockerfilePathToken(source);
-  if (remoteUrlPattern.test(normalized)) {
+  if (remoteUrlPattern.test(normalized) || /[$`]/.test(normalized)) {
     return false;
   }
 

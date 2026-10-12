@@ -6,16 +6,18 @@ yum, dnf, microdnf and zypper can retain repository metadata and package caches 
 
 ## What it flags
 
-Direct `install`/`in` commands in the selected output stage or its rootfs ancestry, without either:
+Direct `install`/`in` commands, plus dnf `upgrade`/`up`, `upgrade-minimal`/`up-min` and `reinstall`/`rei`, in the selected output stage or its rootfs ancestry, without either:
 
 - matching, complete native cleanup after the last install in the same `RUN`; or
-- BuildKit cache mounts covering the cache paths.
+- BuildKit cache or tmpfs mounts covering the cache paths.
 
 One finding per Dockerfile lists affected instructions. Artifact-only transfers from independent builders do not carry their package metadata. Explicit cache-directory copies are considered.
 
 Recognized native cleanup: `yum clean all`, `dnf clean all`, `microdnf clean all`, `zypper clean --all` / `zypper cc -a`. **Plain `zypper clean` only cleans downloaded packages**, leaving repository metadata. `dnf clean packages` is also incomplete.
 
 Default path evidence is `/var/cache/yum` for yum/microdnf and `/var/cache/zypp` for zypper. The `dnf` executable can refer to DNF4 or DNF5; without version evidence, coverage of both `/var/cache/dnf` and `/var/cache/libdnf5` is required. A parent `/var/cache` mount covers both. Literal `--setopt=cachedir=...`, `--setopt=system_cachedir=...` and zypper `--cache-dir` overrides are recognized and cleanup must use the same cache path. DNF5 root uses `system_cachedir`: overriding only `cachedir` does not establish coverage for both implementations.
+
+Tmpfs keeps cache writes out of the image without preserving them across builds. Cache/tmpfs mounts may be combined, and a mounted cache path can be combined with same-layer cleanup of the remaining paths. Separate `rm` commands after package work can collectively remove all cache directories. Removing only one unmounted dnf path, mounting a subdirectory, or using secret/unrelated mounts is insufficient.
 
 Unknown custom configs, install roots, unresolved cache paths, dry runs and uncertain shell control flow are excluded. Base-image config files are not inspected. An unrelated mount, earlier cleanup, later-RUN cleanup or quoted command text does not establish cleanup. Disabling downloaded-package retention alone does not eliminate metadata caches.
 

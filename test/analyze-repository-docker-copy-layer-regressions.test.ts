@@ -258,3 +258,52 @@ describe("proof-backed temporary archive inputs", () => {
     ).toEqual([]);
   });
 });
+
+describe("local ADD source classification", () => {
+  test.each([
+    ["ordinary local file", "ADD file.txt /app/", true],
+    ["local directory", "ADD app/ /app/", true],
+    ["plain tar", "ADD file.tar /app/", false],
+    ["gzip candidate", "ADD file.gz /app/", false],
+    ["bzip2 candidate", "ADD file.bz2 /app/", false],
+    ["xz candidate", "ADD file.xz /app/", false],
+    ["zstd tar", "ADD file.tar.zst /app/", false],
+    ["tgz alias", 'ADD "file.tgz" /app/', false],
+    ["tbz alias", "ADD file.tbz /app/", false],
+    ["tbz2 alias", "ADD file.tbz2 /app/", false],
+    ["txz alias", "ADD file.txz /app/", false],
+    ["tzst alias", "ADD file.tzst /app/", false],
+    ["ZIP is not auto-extracted", "ADD file.zip /app/", true],
+    ["quoted ZIP", 'ADD "file.zip" /app/', true],
+    ["archive suffix must end the source", "ADD file.tar.gz.txt /app/", true],
+    ["HTTP download", "ADD http://example.com/file.txt /app/", false],
+    ["quoted HTTPS download", 'ADD "https://example.com/file.zip" /app/', false],
+    ["Git URL", "ADD git://example.com/repo.git /app/", false],
+    ["SSH Git URL", "ADD ssh://git@example.com/repo.git /app/", false],
+    ["SCP-style Git URL", "ADD git@example.com:team/repo.git /app/", false],
+    ["remote URL with flag", "ADD --checksum=sha256:abc https://example.com/file.txt /app/", false],
+    ["archive with ownership flag", "ADD --chown=app:app file.tar.gz /app/", false],
+    ["local file with mode flag", "ADD --chmod=0644 file.txt /app/", true],
+    ["all sources are archives", "ADD file.tar.gz file.tar.xz /app/", false],
+    ["local file mixed with archive", "ADD file.tar.gz file.txt /app/", true],
+    ["local file mixed with remote URL", "ADD https://example.com/file.txt local.txt /app/", true],
+    ["JSON local file with spaces", 'ADD ["file name.txt", "/app/"]', true],
+    ["JSON archive", 'ADD ["file.tar.gz", "/app/"]', false],
+    ["dynamic source", "ADD ${SOURCE} /app/", false],
+    ["ONBUILD local file", "ONBUILD ADD file.txt /app/", true],
+    ["ONBUILD archive", "ONBUILD ADD file.tar.gz /app/", false],
+    ["ONBUILD JSON ZIP", 'ONBUILD ADD ["file.zip", "/app/"]', true],
+    ["COPY already explicit", "COPY file.txt /app/", false],
+  ] as const)("%s", async (_name, instruction, flagged) => {
+    const result = await findings(
+      `FROM alpine:3.22\n${instruction}`,
+      "dockerfile-add-without-clear-need",
+      { files: {} },
+    );
+    expect(result).toHaveLength(flagged ? 1 : 0);
+    if (flagged) {
+      expect(result[0]?.location).toEqual({ path: "Dockerfile", line: 2, column: 1 });
+      expect(result[0]?.suggestion).toContain("COPY");
+    }
+  });
+});

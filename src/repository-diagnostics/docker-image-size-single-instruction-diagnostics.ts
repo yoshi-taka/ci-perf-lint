@@ -5,7 +5,6 @@ import {
   collectDockerfileStageAliases,
   dockerfileFromUsesFloatingTag,
   dockerfileSourceLooksLocalAddWithoutClearNeed,
-  instructionLooksApkAddWithoutNoCacheOrCacheMount,
   parseDockerfileAddInstruction,
   parseDockerfileFromInstruction,
 } from "./dockerfile-instructions.ts";
@@ -16,6 +15,7 @@ import {
   dockerfileBaseImageUsesFloatingTagDocsPath,
 } from "./docker-image-rule-catalog.ts";
 import { instructionInstallsAptWithRecommends } from "./docker-apt-recommends-helpers.ts";
+import { instructionInstallsApkWithoutCacheControl } from "./docker-apk-cache-helpers.ts";
 
 export function collectSingleInstructionImageSizeDiagnostics(
   repository: RepositorySignals,
@@ -88,9 +88,7 @@ export function collectSingleInstructionImageSizeDiagnostics(
     });
   }
 
-  const apkInstruction = instructions.find((instruction) =>
-    instructionLooksApkAddWithoutNoCacheOrCacheMount(instruction.text),
-  );
+  const apkInstruction = instructions.find(instructionInstallsApkWithoutCacheControl);
   if (apkInstruction) {
     diagnostics.push({
       ruleId: "dockerfile-apk-add-without-no-cache-or-cache-mount",

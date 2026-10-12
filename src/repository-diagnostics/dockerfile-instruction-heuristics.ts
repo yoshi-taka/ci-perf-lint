@@ -28,9 +28,6 @@ const gradleDependenciesRunPattern =
 const gradleBuildRunPattern =
   /^run\b[\s\S]*\b(?:gradle|gradlew|[.][/\\]gradlew)\b[\s\S]*\b(?:build|assemble|bootJar|shadowJar)\b/i;
 const bundleInstallRunPattern = /^run\b[\s\S]*\bbundle\s+install(?:\s|$)/i;
-const apkAddRunPattern = /^run\b[\s\S]*\bapk\s+add(?:\s|$)/i;
-const noCachePattern = /\s--no-cache(?:\s|$)/i;
-const apkCacheMountPattern = /^run\b[\s\S]*--mount=type=cache,[^\s]*target=\/var\/cache\/apk\b/i;
 
 function stripDockerfileComment(text: string): string {
   return text.replace(commentStripPattern, "").trim();
@@ -146,13 +143,4 @@ export function instructionLooksGradleBuildWithoutCacheMount(instruction: string
 export function instructionLooksBundleInstallWithoutCacheMount(instruction: string): boolean {
   const normalized = stripDockerfileComment(instruction);
   return bundleInstallRunPattern.test(normalized) && !runMountCachePattern.test(normalized);
-}
-
-export function instructionLooksApkAddWithoutNoCacheOrCacheMount(instruction: string): boolean {
-  const normalized = stripDockerfileComment(instruction);
-  return (
-    apkAddRunPattern.test(normalized) &&
-    !noCachePattern.test(normalized) &&
-    !apkCacheMountPattern.test(normalized)
-  );
 }

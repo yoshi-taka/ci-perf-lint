@@ -104,7 +104,10 @@ function rpmCommand(tokens: string[]) {
     name,
     paths,
     install:
-      /^(?:install|in)$/.test(action ?? "") && !(name === "zypper" && parameters.includes("-D")),
+      (/^(?:install|in)$/.test(action ?? "") ||
+        (name === "dnf" &&
+          /^(?:upgrade|up|upgrade-minimal|up-min|reinstall|rei)$/.test(action ?? ""))) &&
+      !(name === "zypper" && parameters.includes("-D")),
     clean,
   };
 }
@@ -119,17 +122,24 @@ export function collectRpmCacheDiagnostics(
     const pending = new Map<string, string[]>();
     for (const tokens of dockerRunCommands(instruction)) {
       const command = rpmCommand(tokens);
-      if (command?.install && !command.paths.every((cache) => cacheIsMounted(cache, instruction))) {
-        pending.set(`${command.name}:${command.paths.join(",")}`, command.paths);
+      if (command?.install) {
+        const retainedPaths = command.paths.filter(
+          (cache) => !cacheIsMounted(cache, instruction, ["cache", "tmpfs"]),
+        );
+        if (retainedPaths.length) {
+          pending.set(`${command.name}:${command.paths.join(",")}`, retainedPaths);
+        }
       }
       for (const [key, paths] of pending) {
         const nativeCleanup =
           command?.clean && key === `${command.name}:${command.paths.join(",")}`;
-        if (
-          nativeCleanup ||
-          paths.every((cache) => removesDirectory(tokens, cache, instruction.text))
-        ) {
+        const remainingPaths = paths.filter(
+          (cache) => !removesDirectory(tokens, cache, instruction.text),
+        );
+        if (nativeCleanup || !remainingPaths.length) {
           pending.delete(key);
+        } else {
+          pending.set(key, remainingPaths);
         }
       }
     }
