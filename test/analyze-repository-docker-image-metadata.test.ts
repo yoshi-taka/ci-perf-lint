@@ -33,6 +33,9 @@ async function analyze(
 }
 
 describe("output image metadata diagnostics", () => {
+  // Scenario coverage informed by hadolint v2.12.0 DL3009/DL3032/DL3036/
+  // DL3040/DL3046 specs. Expectations follow this tool's documented scope:
+  // DNF's cache differs from yum's, and zypper needs --all for metadata.
   test.each([
     ["update/install", "apt-get update && apt-get install -y curl", true],
     [
@@ -52,6 +55,16 @@ describe("output image metadata diagnostics", () => {
     ],
     ["lists mount", "--mount=type=cache,target=/var/lib/apt/lists apt-get update", false],
     ["apt state mount", "--mount=type=cache,dst=/var/lib/apt apt-get update", false],
+    [
+      "both apt caches with archive cleanup disabled",
+      "--mount=type=cache,target=/var/lib/apt \\\n    --mount=type=cache,target=/var/cache/apt \\\n    rm -f /etc/apt/apt.conf.d/docker-clean && apt-get update && apt-get install -y curl",
+      false,
+    ],
+    [
+      "archive-only mount with archive cleanup disabled",
+      "--mount=type=cache,target=/var/cache/apt rm -f /etc/apt/apt.conf.d/docker-clean && apt-get update && apt-get install -y curl",
+      true,
+    ],
     ["download cache alone", "--mount=type=cache,target=/var/cache/apt apt-get update", true],
     [
       "cache subdirectory is not coverage",
@@ -87,11 +100,15 @@ describe("output image metadata diagnostics", () => {
     ["yum clean", "yum install -y curl && yum clean all", false],
     ["dnf clean", "dnf install -y curl && dnf clean all", false],
     ["microdnf clean", "microdnf install -y curl && microdnf clean all", false],
+    ["yum directory cleanup", "yum install -y curl && rm -rf /var/cache/yum/*", false],
+    ["microdnf directory cleanup", "microdnf install -y curl && rm -rf /var/cache/yum/*", false],
     ["zypper clean all", "zypper in -y curl && zypper clean --all", false],
     ["zypper short clean", "zypper in -y curl && zypper cc -a", false],
     ["zypper default cleans packages only", "zypper in -y curl && zypper clean", true],
+    ["zypper short default cleans packages only", "zypper in -y curl && zypper cc", true],
     ["packages only", "dnf install -y curl && dnf clean packages", true],
     ["wrong manager", "microdnf install -y curl && dnf clean all", true],
+    ["reverse manager mismatch", "dnf install -y curl && microdnf clean all", true],
     ["before install", "yum clean all && yum install -y curl", true],
     ["repopulates cache", "dnf install -y curl && dnf clean all && dnf install -y make", true],
     ["later layer", "dnf install -y curl\nRUN dnf clean all", true],
@@ -140,6 +157,7 @@ describe("output image metadata diagnostics", () => {
     ["quoted command", "echo 'dnf install -y curl'", false],
     ["quoted clean text", "dnf install -y curl && echo 'dnf clean all'", true],
     ["help with install as argument", "dnf help install", false],
+    ["similarly named executable", "notdnf install curl", false],
     ["object property name", "constructor install", false],
   ] as const)("RPM: %s", async (_name, command, flagged) => {
     const report = await analyze(`FROM fedora:40\nRUN ${command}`);
@@ -154,6 +172,8 @@ describe("output image metadata diagnostics", () => {
     ["high UID", "useradd -u 123456 app", true],
     ["threshold", "useradd --uid=100000 app", true],
     ["below threshold", "useradd -u 99999 app", false],
+    ["implicit UID is unknown", "useradd app", false],
+    ["log flag without explicit UID", "useradd -l app", false],
     ["numeric leading zero", "useradd -u 0001000 app", false],
     ["long UID flag", "useradd --uid 123456 app", true],
     ["attached UID flag", "useradd -u123456 app", true],
@@ -203,6 +223,21 @@ describe("output image metadata diagnostics", () => {
         .sort(),
     ).toEqual([aptId, rpmId, userId].sort());
   });
+  test("same-layer cleanup remains safe through stage inheritance", async () => {
+    const report = await analyze(
+      "FROM ubuntu:24.04 AS base\nRUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*\nFROM base AS runtime\nRUN echo ready",
+    );
+    expect(report.findings.filter((finding) => finding.ruleId === aptId)).toEqual([]);
+  });
+  test.each(["apt-get update", "microdnf install -y curl", "useradd -u 123456 app"])(
+    "ONBUILD defers work to child images: %s",
+    async (command) => {
+      const report = await analyze(`FROM ubuntu:24.04\nONBUILD RUN ${command}`);
+      expect(
+        report.findings.filter((finding) => [aptId, rpmId, userId].includes(finding.ruleId)),
+      ).toEqual([]);
+    },
+  );
   test("an explicit action target selects the builder", async () => {
     const report = await analyze(staged, { target: "base" });
     expect(
