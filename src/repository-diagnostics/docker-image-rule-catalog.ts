@@ -36,8 +36,6 @@ export const dockerfileGradleBuildWithoutCacheMountDocsPath =
   "docs/rules/dockerfile-gradle-build-without-cache-mount.md";
 export const dockerfileBundleInstallWithoutCacheMountDocsPath =
   "docs/rules/dockerfile-bundle-install-without-cache-mount.md";
-export const dockerfileAptInstallWithoutCleanupOrCacheMountDocsPath =
-  "docs/rules/dockerfile-apt-install-without-cleanup-or-cache-mount.md";
 export const dockerfileAptInstallWithoutNoInstallRecommendsDocsPath =
   "docs/rules/dockerfile-apt-install-without-no-install-recommends.md";
 export const dockerfileApkAddWithoutNoCacheOrCacheMountDocsPath =

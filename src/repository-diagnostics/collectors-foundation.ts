@@ -5,6 +5,7 @@ import type {
 import { gateKeys } from "./gates.ts";
 import { collectDatadogLambdaExtensionDiagnostics } from "./datadog-lambda-extension.ts";
 import { collectDockerBuildDiagnostics } from "./docker.ts";
+import { collectDockerImageMetadataDiagnostics } from "./docker-image-metadata-diagnostics.ts";
 import { collectDockerBuildRuntimeSeparationDiagnostics } from "./docker-build-runtime-separation.ts";
 import { collectDockerRuntimeBaseImageDiagnostics } from "./docker-runtime-base-image.ts";
 import { collectElixirOtpVersionDiagnostics } from "./elixir-otp-versions.ts";
@@ -21,6 +22,11 @@ export const dockerDiagnosticCollectors = [
         scanContext,
         featureIndex,
       }),
+  },
+  {
+    id: "docker-image-metadata-diagnostics",
+    gate: gateKeys.dockerHeavy,
+    collect: collectDockerImageMetadataDiagnostics,
   },
   {
     id: "dockerfile-runtime-image-uses-heavy-base",

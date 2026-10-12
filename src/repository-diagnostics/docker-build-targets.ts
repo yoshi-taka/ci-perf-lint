@@ -15,6 +15,7 @@ export interface DockerBuildTarget {
   jobId: string;
   contextPath: string;
   dockerfilePath: string;
+  targetStage?: string;
   cacheMountPersistence?: "depot" | "blacksmith" | "buildkite-docker-state";
 }
 
@@ -121,6 +122,7 @@ function extractFromBuildPushStep(
         jobId: job.id,
         contextPath,
         dockerfilePath,
+        targetStage: typeof step.with?.target === "string" ? step.with.target : undefined,
       });
     }
   }
@@ -147,6 +149,9 @@ function extractFromRunStep(repoRoot: string, workflow: WorkflowDocument): Docke
       );
       const commandMatch = normalizedRun.match(/\bdocker\s+(?:buildx\s+build|build)\b([\s\S]*)$/i);
       const argsText = commandMatch?.[1] ?? "";
+      const targetStage = argsText
+        .match(/(?:^|\s)--target(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|]+)/)?.[1]
+        ?.replace(/^['"]|['"]$/g, "");
       const tokens = argsText
         .split(/\s+/)
         .map((token) => token.trim())
@@ -170,6 +175,7 @@ function extractFromRunStep(repoRoot: string, workflow: WorkflowDocument): Docke
         jobId: job.id,
         contextPath,
         dockerfilePath,
+        targetStage,
       });
     }
   }
@@ -313,11 +319,13 @@ async function resolveComposeTargets(
         const buildValue = serviceRecord?.build;
         let contextValue: string | undefined;
         let dockerfileValue: string | undefined;
+        let targetStage: string | undefined;
 
         if (typeof buildValue === "string") {
           contextValue = normalizeContextValue(buildValue);
         } else {
           const buildRecord = asRecord(buildValue);
+          targetStage = typeof buildRecord?.target === "string" ? buildRecord.target : undefined;
           contextValue = normalizeContextValue(
             typeof buildRecord?.context === "string" ? buildRecord.context : undefined,
           );
@@ -340,6 +348,7 @@ async function resolveComposeTargets(
           jobId: job.id,
           contextPath,
           dockerfilePath,
+          targetStage,
         });
       }
     }
@@ -420,7 +429,7 @@ export async function collectDockerBuildTargets(
 
     const uniqueTargets = new Map<string, DockerBuildTarget>();
     for (const target of allTargets) {
-      const key = `${target.contextPath}::${target.dockerfilePath}`;
+      const key = `${target.contextPath}::${target.dockerfilePath}::${target.targetStage ?? ""}`;
       if (
         !uniqueTargets.has(key) ||
         (!uniqueTargets.get(key)?.cacheMountPersistence && target.cacheMountPersistence)

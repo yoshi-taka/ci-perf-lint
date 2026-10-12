@@ -58,6 +58,7 @@ function target(
     file?: unknown;
     persistence?: DockerBuildTarget["cacheMountPersistence"];
     directory?: string;
+    targetStage?: string;
   },
 ): DockerBuildTarget | undefined {
   const { context, file, persistence, directory = "." } = options;
@@ -78,6 +79,7 @@ function target(
         ? path.resolve(repoRoot, directory, file)
         : path.join(contextPath, "Dockerfile"),
     cacheMountPersistence: persistence,
+    targetStage: options.targetStage,
   };
 }
 
@@ -87,6 +89,7 @@ interface BuildCommand {
   context: string;
   file?: string;
   builder?: string;
+  targetStage?: string;
 }
 
 function parseBuildCommand(text: string): BuildCommand | undefined {
@@ -102,6 +105,7 @@ function parseBuildCommand(text: string): BuildCommand | undefined {
   let context: string | undefined;
   let file: string | undefined;
   let builder: string | undefined;
+  let targetStage: string | undefined;
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]!;
     if (arg.startsWith("--") && arg.includes("=")) {
@@ -115,6 +119,9 @@ function parseBuildCommand(text: string): BuildCommand | undefined {
       if (option === "--builder") {
         builder = parts.join("=");
       }
+      if (option === "--target") {
+        targetStage = parts.join("=");
+      }
     } else if (valueOptions.has(arg)) {
       const value = args[++index];
       if (!value) {
@@ -125,6 +132,9 @@ function parseBuildCommand(text: string): BuildCommand | undefined {
       }
       if (arg === "--builder") {
         builder = value;
+      }
+      if (arg === "--target") {
+        targetStage = value;
       }
     } else if (!booleanOptions.has(arg)) {
       if (arg.startsWith("-") || context !== undefined) {
@@ -140,6 +150,7 @@ function parseBuildCommand(text: string): BuildCommand | undefined {
         context,
         file,
         builder,
+        targetStage,
       }
     : undefined;
 }
@@ -195,6 +206,7 @@ function githubTargets(repoRoot: string, workflow: WorkflowDocument): DockerBuil
           context: step.with?.context ?? ".",
           file: step.with?.file,
           persistence,
+          targetStage: typeof step.with?.target === "string" ? step.with.target : undefined,
         });
         if (buildTarget) {
           result.push(buildTarget);
@@ -224,6 +236,7 @@ function githubTargets(repoRoot: string, workflow: WorkflowDocument): DockerBuil
           file: build.file,
           persistence,
           directory: workflowWorkingDirectory(workflow, job, step),
+          targetStage: build.targetStage,
         });
         if (buildTarget) {
           result.push(buildTarget);
@@ -289,6 +302,7 @@ export function collectPersistentCacheDockerTargets(
             context: build.context,
             file: build.file,
             persistence,
+            targetStage: build.targetStage,
           });
           if (buildTarget) {
             result.push(buildTarget);

@@ -73,9 +73,11 @@ Current rule registry:
 - `dockerfile-pip-install-without-no-cache-or-cache-mount`
 - `dockerfile-pnpm-install-without-cleanup-or-cache-mount`
 - `dockerfile-pnpm-install-without-frozen-lockfile`
+- `dockerfile-rpm-install-without-cleanup-or-cache-mount`
 - `dockerfile-run-cd-instead-of-workdir`
 - `dockerfile-runtime-image-uses-heavy-base`
 - `dockerfile-runtime-inherits-build-environment`
+- `dockerfile-useradd-high-uid-without-no-log-init`
 - `dockerfile-uses-npm-install-with-lockfile`
 - `dockerfile-uv-install-without-no-cache-or-cache-mount`
 - `dockerfile-uv-sync-without-frozen-lockfile`

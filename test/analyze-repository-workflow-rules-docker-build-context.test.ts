@@ -385,8 +385,8 @@ describe("analyzeRepository workflow and execution rules: docker build and docke
       (candidate) => candidate.ruleId === "dockerfile-apk-add-without-no-cache-or-cache-mount",
     );
 
-    expect(aptFinding?.severity).toBe("warning");
-    expect(aptFinding?.location.line).toBe(2);
+    // The unused apt stage is not part of the output image's rootfs.
+    expect(aptFinding).toBeUndefined();
     expect(apkFinding?.severity).toBe("warning");
     expect(apkFinding?.location.line).toBe(5);
   });

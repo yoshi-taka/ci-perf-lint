@@ -28,10 +28,6 @@ const gradleDependenciesRunPattern =
 const gradleBuildRunPattern =
   /^run\b[\s\S]*\b(?:gradle|gradlew|[.][/\\]gradlew)\b[\s\S]*\b(?:build|assemble|bootJar|shadowJar)\b/i;
 const bundleInstallRunPattern = /^run\b[\s\S]*\bbundle\s+install(?:\s|$)/i;
-const aptUpdateInstallRunPattern = /^run\b[\s\S]*\bapt(?:-get)?\s+(?:update|install)(?:\s|$)/i;
-const aptCacheMountPattern =
-  /^run\b[\s\S]*--mount=type=cache,[^\s]*target=\/var\/(?:cache|lib)\/apt\b/i;
-const rmVarLibAptPattern = /\brm\s+-rf\s+\/var\/lib\/apt\/lists\/\*/i;
 const aptInstallRunPattern = /^run\b[\s\S]*\bapt(?:-get)?\s+install(?:\s|$)/i;
 const noInstallRecommendsPattern = /\s--no-install-recommends(?:\s|$)/i;
 const apkAddRunPattern = /^run\b[\s\S]*\bapk\s+add(?:\s|$)/i;
@@ -152,15 +148,6 @@ export function instructionLooksGradleBuildWithoutCacheMount(instruction: string
 export function instructionLooksBundleInstallWithoutCacheMount(instruction: string): boolean {
   const normalized = stripDockerfileComment(instruction);
   return bundleInstallRunPattern.test(normalized) && !runMountCachePattern.test(normalized);
-}
-
-export function instructionLooksAptInstallWithoutCleanupOrCacheMount(instruction: string): boolean {
-  const normalized = stripDockerfileComment(instruction);
-  return (
-    aptUpdateInstallRunPattern.test(normalized) &&
-    !aptCacheMountPattern.test(normalized) &&
-    !rmVarLibAptPattern.test(normalized)
-  );
 }
 
 export function instructionLooksAptInstallWithoutNoInstallRecommends(instruction: string): boolean {

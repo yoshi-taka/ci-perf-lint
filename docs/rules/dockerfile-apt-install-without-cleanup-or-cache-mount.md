@@ -1,27 +1,36 @@
 # dockerfile-apt-install-without-cleanup-or-cache-mount
 
-Detects Dockerfile `RUN` instructions that perform apt package work without either cleaning apt lists in the same layer or using BuildKit apt cache mounts.
+## Why it matters
 
-This rule looks for:
+apt lists retained in an output image increase layer storage and transfer work. Deleting files in a later `RUN` does not remove them from the earlier layer. BuildKit cache mounts can preserve repeated package-manager work without baking metadata into the image.
 
-- `RUN apt-get update`
-- `RUN apt-get install ...`
-- `RUN apt update`
-- `RUN apt install ...`
+## What it flags
 
-and reports when the same instruction does not include either:
+Direct `apt` / `apt-get update` or `install` commands without cleanup after the last package operation in the same `RUN`, or a cache mount covering `/var/lib/apt/lists`.
 
-- `rm -rf /var/lib/apt/lists/*`
-- a BuildKit cache mount for `/var/cache/apt` or `/var/lib/apt`
+`/var/lib/apt` and broader parent cache mounts cover lists. **A `/var/cache/apt` mount alone does not**: downloaded package archives and lists occupy different paths. Mount option order and `target`/`dst`/`destination` aliases are supported.
 
-Why it matters:
+Cleanup before package work, cleanup followed by another install/update, later-layer cleanup, unrelated mounts and quoted cleanup text do not suppress the finding. One finding per Dockerfile lists affected instructions.
 
-- apt metadata and package indexes can be saved into image layers.
-- Deleting those files in a later `RUN` instruction does not remove them from the earlier layer.
-- BuildKit cache mounts can preserve repeated package-manager work without storing cache data in the final image.
+The selected build stage and its rootfs ancestry are inspected. Independent artifact-only builders and unused stages are excluded; explicit metadata-directory copies are considered. Literal action targets, CLI `--target`, and Compose build targets are recognized. Unknown targets are not assumed to mean the last stage.
 
-What to do:
+Custom apt configuration paths, `Dir::` overrides, heredocs and uncertain shell control flow are not inferred. The scanner does not execute scripts or inspect files in the base image.
 
-- Combine update, install, and cleanup in the same `RUN` instruction for simple images.
-- Use BuildKit cache mounts for apt cache directories when repeated package downloads matter.
-- Compare image layer size and rebuild time before and after the change.
+## Suggested action
+
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+Alternatively, use a BuildKit cache mount covering the lists path. Mount `/var/cache/apt` separately when archive reuse matters. Preserve package selection and follow apt's locking/configuration requirements.
+
+## Verification
+
+Compare image layer size and cold/warm build times, including push/pull. Verify selected build targets and inherited stages. A cache mount prevents new writes from entering that layer; it does not remove lists already baked into an ancestor layer.
+
+## References
+
+- [Docker build best practices: apt-get](https://docs.docker.com/build/building/best-practices/#apt-get).
+- [Docker cache optimization: cache mounts](https://docs.docker.com/build/cache/optimize/#use-cache-mounts).
+- [Docker multi-stage builds](https://docs.docker.com/build/building/multi-stage/).

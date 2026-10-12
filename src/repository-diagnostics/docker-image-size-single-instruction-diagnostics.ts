@@ -4,7 +4,6 @@ import type { CollectedDockerfileInstruction } from "./dockerfile-instructions.t
 import {
   dockerfileFromUsesFloatingTag,
   dockerfileSourceLooksLocalAddWithoutClearNeed,
-  instructionLooksAptInstallWithoutCleanupOrCacheMount,
   instructionLooksAptInstallWithoutNoInstallRecommends,
   instructionLooksApkAddWithoutNoCacheOrCacheMount,
   parseDockerfileAddInstruction,
@@ -13,7 +12,6 @@ import {
 import {
   dockerfileAddWithoutClearNeedDocsPath,
   dockerfileApkAddWithoutNoCacheOrCacheMountDocsPath,
-  dockerfileAptInstallWithoutCleanupOrCacheMountDocsPath,
   dockerfileAptInstallWithoutNoInstallRecommendsDocsPath,
   dockerfileBaseImageUsesFloatingTagDocsPath,
 } from "./docker-image-rule-catalog.ts";
@@ -58,33 +56,6 @@ export function collectSingleInstructionImageSizeDiagnostics(
         "Compare Docker cache hits across repeated CI builds before and after pinning the base image reference.",
       aiHandoff: `Review ${dockerfileRelativePath} and replace floating Docker base image references such as untagged images or \`:latest\` with stable version tags or digests where appropriate.`,
       score: 66,
-    });
-  }
-
-  const aptInstruction = instructions.find((instruction) =>
-    instructionLooksAptInstallWithoutCleanupOrCacheMount(instruction.text),
-  );
-  if (aptInstruction) {
-    diagnostics.push({
-      ruleId: "dockerfile-apt-install-without-cleanup-or-cache-mount",
-      severity: "warning",
-      confidence: "medium",
-      scope: "repository",
-      docsPath: dockerfileAptInstallWithoutCleanupOrCacheMountDocsPath,
-      workflow: repository.primaryWorkflowPath ?? workflowPath,
-      location: {
-        path: dockerfileRelativePath,
-        line: aptInstruction.startLine,
-        column: 1,
-      },
-      message: `Dockerfile ${dockerfileRelativePath} runs apt package work without cleaning apt lists in the same layer or using BuildKit apt cache mounts.`,
-      why: "apt package lists and downloaded metadata can be saved into image layers. Deleting them in a later RUN does not remove them from the earlier layer, and missing cache mounts can also make rebuilds pay package index work repeatedly.",
-      suggestion:
-        "Either clean apt lists in the same RUN instruction with `rm -rf /var/lib/apt/lists/*`, or use BuildKit cache mounts for apt cache directories when repeated package downloads matter.",
-      measurementHint:
-        "Compare image layer size and Docker rebuild time before and after cleaning apt metadata in-layer or adding apt cache mounts.",
-      aiHandoff: `Review ${dockerfileRelativePath} and update the apt RUN instruction so apt metadata is not persisted unnecessarily. Prefer one RUN that performs update/install and removes \`/var/lib/apt/lists/*\`, or add BuildKit cache mounts for apt cache directories.`,
-      score: 73,
     });
   }
 

@@ -37,7 +37,7 @@ const TOOL_PRESENCE_SPECS: ToolPresenceSpec[] = [
   {
     key: "hasDockerBuild",
     regex:
-      /(?:docker|depot|useblacksmith)\/build-push-action@|\b(?:docker\s+(?:buildx\s+build|build)|depot\s+build)\b/,
+      /(?:docker|depot|useblacksmith)\/build-push-action@|\b(?:docker\s+(?:buildx\s+build|build)|depot\s+build)\b|\bdocker\s+compose\b[^\n]*\bbuild\b/,
     keywords: ["build-push-action@", "docker", "depot"],
   },
   {
