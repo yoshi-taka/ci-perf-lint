@@ -65,7 +65,7 @@
   "dependencies": {
     "dockerfile-ast": "^0.7.1",
     "lockparse": "^0.5.2",
-    "oxlint": "^1.86.0",
+    "oxlint": "^1.87.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
@@ -73,15 +73,15 @@
     "@codspeed/tinybench-plugin": "^5.7.1",
     "@jazzer.js/core": "^4.0.0",
     "@stryker-mutator/core": "^10.0.0",
-    "astro": "^7.3.5",
+    "astro": "^7.3.8",
     "bun-types": "^1.4.2",
-    "fallow": "^3.31.0",
+    "fallow": "^3.33.0",
     "fast-check": "^4.10.2",
-    "knip": "^6.39.0",
-    "lefthook": "^2.1.16",
+    "knip": "^6.41.0",
+    "lefthook": "^2.2.1",
     "oxfmt": "^0.71.0",
     "oxlint-tsgolint": "^7.0.2003",
-    "tinybench": "^6.2.0",
+    "tinybench": "^6.2.1",
     "typescript": "^7.0.2"
   }
 }
