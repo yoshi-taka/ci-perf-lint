@@ -267,6 +267,97 @@ scenarios.push(
   },
   { name: "Yarn native cleanup", body: "RUN yarn install && yarn cache clean", expected: [] },
   {
+    name: "Yarn cleanup before install",
+    body: "RUN yarn cache clean && yarn install",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn cache command is not cleanup",
+    body: "RUN yarn install && yarn cache",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn cache dir is not cleanup",
+    body: "RUN yarn install && yarn cache dir",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn cleanup help does not clean",
+    body: "RUN yarn install && yarn cache clean --help",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn cleanup missing cache-folder value",
+    body: "RUN yarn install && yarn cache clean --cache-folder",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn cleanup empty cache-folder value",
+    body: "RUN yarn install && yarn cache clean --cache-folder=",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn explicit cleanup cache matches install",
+    body: "RUN yarn install --cache-folder=/cache/yarn && yarn cache clean --cache-folder /cache/yarn",
+    expected: [],
+  },
+  {
+    name: "Yarn explicit cleanup overrides default",
+    body: "ENV YARN_CACHE_FOLDER=/default\nRUN yarn install --cache-folder /cache/yarn && yarn cache clean --cache-folder=/cache/yarn",
+    expected: [],
+  },
+  {
+    name: "Yarn cleanup cache mismatch",
+    body: "RUN yarn install --cache-folder=/cache/yarn && yarn cache clean --cache-folder=/other",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn bare cleanup misses install override",
+    body: "ENV YARN_CACHE_FOLDER=/default\nRUN yarn install --cache-folder=/cache/yarn && yarn cache clean",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn matching tmpfs cache",
+    body: "ENV YARN_CACHE_FOLDER=/cache/yarn\nRUN --mount=type=tmpfs,target=/cache/yarn yarn install",
+    expected: [],
+  },
+  {
+    name: "Yarn parent tmpfs cache",
+    body: "ENV YARN_CACHE_FOLDER=/cache/yarn\nRUN --mount=type=tmpfs,destination=/cache yarn install",
+    expected: [],
+  },
+  {
+    name: "Yarn unrelated tmpfs cache",
+    body: "ENV YARN_CACHE_FOLDER=/cache/yarn\nRUN --mount=type=tmpfs,target=/other yarn install",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn partial tmpfs cache",
+    body: "ENV YARN_CACHE_FOLDER=/cache/yarn\nRUN --mount=type=tmpfs,target=/cache/yarn/v6 yarn install",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn unknown default is not covered by arbitrary tmpfs",
+    body: "RUN --mount=type=tmpfs,target=/root/.cache/yarn yarn install",
+    expected: ["yarn"],
+  },
+  {
+    name: "Yarn echoed cleanup text is not executed",
+    body: "RUN yarn install && echo 'yarn cache clean'",
+    expected: ["yarn"],
+  },
+  { name: "Yarn JSON install", body: 'RUN ["yarn", "install"]', expected: ["yarn"] },
+  {
+    name: "Yarn multi-digit modern version activation",
+    body: "RUN yarn set version 10.0.0\nRUN yarn install",
+    expected: [],
+  },
+  {
+    name: "Yarn Classic version activation",
+    body: "RUN yarn set version 1.22.22\nRUN yarn install",
+    expected: ["yarn"],
+  },
+  {
     name: "Yarn config set cache",
     body: "RUN yarn config set cache-folder /cache/yarn\nRUN --mount=type=cache,target=/cache/yarn yarn install",
     expected: [],

@@ -10,6 +10,7 @@ import {
 } from "./docker-build-stage-context.ts";
 import { findDockerBuildRuntimeEvidence } from "./docker-build-runtime-evidence.ts";
 import { findRetainedCompilerArtifacts } from "./docker-rootfs-compiler-artifacts.ts";
+import { resolveDockerStagePath } from "./docker-stage-paths.ts";
 
 const nonRuntimePattern =
   /(?:^|[/._-])(?:build(?:er)?|dev|development|tests?|ci|debug|tools?|toolchain|bench(?:mark)?)(?:$|[/._-])/i;
@@ -55,7 +56,7 @@ export function findDockerRuntimeRootfsCopies(
       copy?.sources.length !== 1 ||
       /[$*?]/.test(copy.sources[0]!) ||
       path.posix.normalize(copy.sources[0]!) !== "/" ||
-      path.posix.normalize(copy.destination) !== "/" ||
+      resolveDockerStagePath(copy.destination, entry.workdir, entry.environment) !== "/" ||
       entry.instruction.flags?.some((flag) => flag.name.toLowerCase() !== "from")
     ) {
       continue;

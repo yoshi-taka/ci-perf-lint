@@ -6,9 +6,11 @@ Yarn Classic's download cache can remain in image layers alongside `node_modules
 
 ## What it flags
 
-Yarn Classic `yarn`, `yarn install`, and `yarn add` in CI build-target Dockerfiles without matching explicit cache coverage or same-RUN cleanup. One strict-mode warning per Dockerfile. Resolves `--cache-folder`, `YARN_CACHE_FOLDER`, context `.yarnrc` and `.npmrc` cache settings.
+Yarn Classic `yarn`, `yarn install`, and `yarn add` in CI build-target Dockerfiles without matching explicit cache/tmpfs coverage or same-RUN cleanup. One strict-mode warning per Dockerfile. Resolves `--cache-folder`, `YARN_CACHE_FOLDER`, context `.yarnrc` and `.npmrc` cache settings.
 
 Classic's default cache location varies, so an arbitrary mount cannot prove coverage without an explicit path. Modern Yarn evidence in packageManager, `.yarnrc.yml`, immutable flags, relevant environment settings, or visible Yarn version activation excludes the finding.
+
+Tmpfs avoids persisting the cache but does not preserve it across builds. Parent-directory mounts cover the configured cache; subdirectory and unrelated mounts do not. Native cleanup accepts `yarn cache clean --cache-folder /path` or `--cache-folder=/path` only when it targets the same effective cache as the install. Package-targeted cleanup, help/cache-info commands, earlier or later-RUN cleanup, and echoed cleanup text do not establish complete same-layer removal.
 
 ## Suggested action
 

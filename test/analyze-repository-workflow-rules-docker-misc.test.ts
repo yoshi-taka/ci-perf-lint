@@ -105,6 +105,7 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
         "FROM alpine:3.22\nrun touch /tmp/download\n# cleanup\n\nRUN rm /tmp/download\nRUN echo done\nENV READY=1\nRUN echo next\nRUN echo last\n",
       mode: "exploratory" as const,
       expected: true,
+      groups: "2, 5, 6; 8, 9",
     },
     {
       name: "combined multiline RUN is a single instruction",
@@ -137,7 +138,94 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
       mode: "strict" as const,
       expected: false,
     },
-  ])("$name", async ({ source, mode, expected }) => {
+    {
+      name: "no RUN instructions",
+      source: "FROM alpine:3.22\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "comments before a single RUN",
+      source: "FROM alpine:3.22\n# first\n# second\nRUN echo ready\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "two simple RUNs at end of file",
+      source: "FROM alpine:3.22\nRUN echo first\nRUN echo second\n",
+      mode: "exploratory" as const,
+      expected: true,
+      groups: "2, 3",
+    },
+    {
+      name: "multiple comments preserve adjacency",
+      source:
+        "FROM alpine:3.22\nRUN echo first\n# first comment\n# second comment\nRUN echo second\n",
+      mode: "exploratory" as const,
+      expected: true,
+      groups: "2, 5",
+    },
+    {
+      name: "same secret mount flags",
+      source:
+        "FROM alpine:3.22\nRUN --mount=type=secret,id=foo echo first\nRUN --mount=type=secret,id=foo echo second\n",
+      mode: "exploratory" as const,
+      expected: true,
+      groups: "2, 3",
+    },
+    {
+      name: "secret mount followed by unmounted RUN",
+      source: "FROM alpine:3.22\nRUN --mount=type=secret,id=foo echo first\nRUN echo second\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "different secret IDs",
+      source:
+        "FROM alpine:3.22\nRUN --mount=type=secret,id=foo echo first\nRUN --mount=type=secret,id=bar echo second\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "different network modes",
+      source:
+        "FROM alpine:3.22\nRUN --network=none echo first\nRUN --network=default echo second\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "different security modes",
+      source:
+        "FROM alpine:3.22\nRUN --security=sandbox echo first\nRUN --security=insecure echo second\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "flag change closes one group and starts another",
+      source:
+        "FROM alpine:3.22\nRUN --network=none echo first\nRUN --network=none echo second\nRUN --network=default echo third\nRUN --network=default echo fourth\n",
+      mode: "exploratory" as const,
+      expected: true,
+      groups: "2, 3; 4, 5",
+    },
+    {
+      name: "unmounted group after a mounted RUN",
+      source:
+        "FROM alpine:3.22\nRUN --mount=type=secret,id=foo echo first\nRUN echo second\nRUN echo third\n",
+      mode: "exploratory" as const,
+      expected: true,
+      groups: "3, 4",
+      firstLine: 3,
+    },
+    {
+      name: "JSON RUNs remain adjacent instructions",
+      source: 'FROM alpine:3.22\nRUN ["echo", "first"]\nRUN ["echo", "second"]\n',
+      mode: "exploratory" as const,
+      expected: true,
+      groups: "2, 3",
+    },
+  ])("$name", async (scenario) => {
+    const { source, mode, expected } = scenario;
     const fixtureRoot = await tempDirs.create("apl-consecutive-run-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
     await mkdir(workflowDir, { recursive: true });
@@ -158,8 +246,16 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
     expect(findings).toHaveLength(expected ? 1 : 0);
     if (expected) {
       expect(findings[0]?.severity).toBe("suggestion");
-      expect(findings[0]?.location).toEqual({ path: "Dockerfile", line: 2, column: 1 });
-      expect(findings[0]?.message).toContain("2, 5, 6; 8, 9");
+      expect(findings[0]?.location).toEqual({
+        path: "Dockerfile",
+        line: ("firstLine" in scenario ? scenario.firstLine : undefined) ?? 2,
+        column: 1,
+      });
+      if ("groups" in scenario) {
+        expect(findings[0]?.message).toBe(
+          `Dockerfile Dockerfile has consecutive RUN instructions at lines ${scenario.groups}.`,
+        );
+      }
       expect(findings[0]?.suggestion).toContain("cache reuse");
     }
   });

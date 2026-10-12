@@ -16,6 +16,8 @@ A literal full-root COPY from a local builder into the root of the selected outp
 
 Named and numeric COPY selectors, exec-form instructions and literal action/CLI build targets are supported. Literal ENV paths, known official-image defaults such as Go's `GOPATH=/go`, and named-stage inheritance resolve WORKDIR. A literal `cp` can propagate a compiled output into the path executed by the runtime.
 
+Root source paths are normalized, so `/`, `/.` and repeated root separators are equivalent. The destination is resolved using the WORKDIR and literal environment visible at the COPY instruction, not a later WORKDIR. Relative destinations that resolve to `/` are included; subdirectory destinations and unresolved paths are excluded. Multiple-source and wildcard COPY instructions do not establish a literal full-root transfer.
+
 Default Go output inference requires a root `go.mod`, a root non-test main package, and a visible COPY supplying that module to the build WORKDIR. Only simple root-package builds are inferred. Unknown GOFLAGS/workspace/config overrides, version-suffixed module paths, library-only packages, arbitrary package targets, custom compiler bases, wrappers and opaque filesystem changes are excluded.
 
 Unknown build targets, dynamic bases/selectors, external source images, PATH-only commands, tooling/dev/test output names or Dockerfile paths, and ambiguous relative paths are excluded. Compiler removal suppresses the finding rather than treating a cleaned rootfs as a compiler-heavy output.

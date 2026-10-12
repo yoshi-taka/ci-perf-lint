@@ -59,6 +59,31 @@ describe("runtime builder-rootfs transfers", () => {
     ],
     ["numeric selector", rootfs.replace("--from=build", "--from=0")],
     ["quoted paths", rootfs.replace("COPY --from=build / /", 'COPY --from=build ["/", "/"]')],
+    [
+      "quoted shell-form roots",
+      rootfs.replace("COPY --from=build / /", 'COPY --from=build "/" "/"'),
+    ],
+    ["normalized root source", rootfs.replace("COPY --from=build / /", "COPY --from=build /. /")],
+    [
+      "repeated root separators",
+      rootfs.replace("COPY --from=build / /", "COPY --from=build // //"),
+    ],
+    [
+      "relative destination at known root WORKDIR",
+      rootfs.replace("COPY --from=build / /", "COPY --from=build / ."),
+    ],
+    [
+      "parent destination resolves to root",
+      rootfs.replace("COPY --from=build / /", "WORKDIR /chroot\nCOPY --from=build / .."),
+    ],
+    [
+      "literal ENV root destination",
+      rootfs.replace("COPY --from=build / /", "ENV ROOT=/\nCOPY --from=build / ${ROOT}"),
+    ],
+    [
+      "later WORKDIR does not change earlier copy destination",
+      rootfs.replace("COPY --from=build / /", "COPY --from=build / .\nWORKDIR /chroot"),
+    ],
     ["environment before compile", rootfs.replace("RUN go build", "RUN CGO_ENABLED=0 go build")],
     [
       "JSON compile",
@@ -96,6 +121,37 @@ describe("runtime builder-rootfs transfers", () => {
       rootfs.replace("COPY --from=build / /", "COPY --from=build /out/app /out/app"),
     ],
     ["subdirectory rootfs", rootfs.replace("COPY --from=build / /", "COPY --from=build / /chroot")],
+    [
+      "subdirectory source is not whole root",
+      rootfs.replace("COPY --from=build / /", "COPY --from=build /out /"),
+    ],
+    [
+      "relative copy destination below root",
+      rootfs.replace("COPY --from=build / /", "WORKDIR /chroot\nCOPY --from=build / ."),
+    ],
+    [
+      "later root WORKDIR does not relocate earlier copy",
+      rootfs.replace("COPY --from=build / /", "WORKDIR /chroot\nCOPY --from=build / .\nWORKDIR /"),
+    ],
+    [
+      "unknown relative copy destination",
+      rootfs
+        .replace("FROM scratch", "FROM custom/runtime:1")
+        .replace("COPY --from=build / /", "COPY --from=build / ."),
+    ],
+    [
+      "unresolved destination variable",
+      rootfs.replace("COPY --from=build / /", "COPY --from=build / ${ROOT}"),
+    ],
+    [
+      "multiple copy sources are uncertain",
+      rootfs.replace("COPY --from=build / /", 'COPY --from=build ["/", "/out/app", "/"]'),
+    ],
+    [
+      "wildcard root is not a literal whole-root copy",
+      rootfs.replace("COPY --from=build / /", "COPY --from=build /* /"),
+    ],
+    ["unknown numeric source stage", rootfs.replace("--from=build", "--from=99")],
     ["context root copy", rootfs.replace("COPY --from=build / /", "COPY / /")],
     ["FROM inheritance has its own finding", rootfs.replace("FROM scratch", "FROM build")],
     ["external source image", rootfs.replace("--from=build", "--from=example.com/runtime:1")],

@@ -6,11 +6,13 @@ pip's download and wheel caches can remain in Docker image layers, adding storag
 
 ## What it flags
 
-Direct `pip install`, `pip3 install`, and `python -m pip install` commands in CI build target Dockerfiles without visible cache suppression or a BuildKit cache mount covering the effective cache directory. One strict-mode warning per Dockerfile lists affected instruction lines.
+Direct `pip install`, `pip2 install`, `pip3 install`, and `python -m pip install` commands (including versioned Python 2/3 executables) in CI build target Dockerfiles without visible cache suppression or a BuildKit cache/tmpfs mount covering the effective cache directory. `pipx` and `pipenv`, including their Python-module forms, are not treated as pip installs. One strict-mode warning per Dockerfile lists affected instruction lines.
 
 `--no-cache-dir` and literal `PIP_NO_CACHE_DIR` boolean values suppress the finding. pip accepts both true and false boolean spellings for this inverted option. `--isolated` ignores pip environment settings. Cache-directory options are evaluated in order; a later `--cache-dir` can override `--no-cache-dir`. A later direct recursive `rm` of the effective cache directory (or its parent) in the same `RUN` also suppresses the finding; deletion in another `RUN` does not.
 
 The scanner tracks Dockerfile `ENV`, `USER`, and stage inheritance. It recognizes `PIP_CACHE_DIR`, `XDG_CACHE_HOME`, `HOME`, and command-local environment assignments. An unrelated cache mount does not suppress the warning.
+
+Tmpfs keeps caches out of image layers without preserving them across builds. A parent-directory mount covers the effective cache path, but a subdirectory mount does not. Command-local suppression applies only to that pip command; echoed environment text and flags on another install do not suppress a finding.
 
 ## Suggested action
 

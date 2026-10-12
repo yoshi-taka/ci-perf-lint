@@ -34,7 +34,9 @@ export async function collectDockerRuntimeCopiesBuilderRootfsDiagnostics(
       !data.instructions.some(
         (instruction) =>
           instruction.flags?.some((flag) => flag.name.toLowerCase() === "from") &&
-          parseDockerfileCopyInstruction(instruction)?.sources.includes("/"),
+          parseDockerfileCopyInstruction(instruction)?.sources.some(
+            (source) => !/[$*?]/.test(source) && path.posix.normalize(source) === "/",
+          ),
       )
     ) {
       continue;

@@ -16,8 +16,8 @@ const meta = {
   docsPath: "docs/rules/dockerfile-pip-install-without-no-cache-or-cache-mount.md",
 } satisfies RuleMeta;
 
-const pipPattern = /^(?:\S*\/)?pip(?:3?(?:\.\d+)*)?$/;
-const pythonPattern = /^(?:\S*\/)?python(?:3?(?:\.\d+)*)?$/;
+const pipPattern = /^(?:\S*\/)?pip(?:[23](?:\.\d+)*)?$/;
+const pythonPattern = /^(?:\S*\/)?python(?:[23](?:\.\d+)*)?$/;
 // pip's no-cache callback accepts both true and false boolean spellings.
 const booleanPattern = /^(?:1|0|true|false|yes|no|on|off|y|n|t|f)$/i;
 
@@ -130,7 +130,7 @@ export function collectPipCacheDiagnostics(
           const cleaned =
             !/\||\b(?:if|then|else|case|for|while|until)\b/.test(content) &&
             cacheIsCleaned(cache, commands.slice(index + 1));
-          return !cacheIsMounted(cache, instruction) && !cleaned;
+          return !cacheIsMounted(cache, instruction, ["cache", "tmpfs"]) && !cleaned;
         })
       ) {
         lines.push(instruction.startLine);

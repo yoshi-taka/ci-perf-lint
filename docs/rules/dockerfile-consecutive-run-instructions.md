@@ -6,7 +6,7 @@ Separate `RUN` instructions create separate filesystem layers. Downloading a fil
 
 ## What it flags
 
-Two or more consecutive `RUN` instructions in a CI build target's Dockerfile. Comments and blank lines do not interrupt a group; other instructions, including `FROM`, do. One suggestion per Dockerfile lists all affected groups.
+Two or more consecutive `RUN` instructions with identical parsed RUN flags in a CI build target's Dockerfile. Comments and blank lines do not interrupt a group; other instructions, including `FROM`, do. Changes to mount, network or security flags also interrupt a group, so operations with different secrets or execution contexts are not suggested for consolidation. One suggestion per Dockerfile lists all affected groups.
 
 This is an exploratory-mode suggestion, not a strict-mode warning: independent operations can intentionally have separate cache boundaries. It covers the pattern described by hadolint DL3059, without claiming every adjacent pair should be merged.
 

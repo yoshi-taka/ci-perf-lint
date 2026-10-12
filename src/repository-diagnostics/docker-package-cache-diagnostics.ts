@@ -120,8 +120,23 @@ function nativeCleanup(
     return false;
   }
   return commands.some((tokens) => {
-    if (tool === "yarn" && tokens.join(" ") === "yarn cache clean") {
-      return packageCacheCommand(["yarn", "install"], state, settings)?.cache === cache;
+    if (tool === "yarn" && tokens[0] === "yarn" && tokens[1] === "cache" && tokens[2] === "clean") {
+      for (let index = 3; index < tokens.length; index++) {
+        if (tokens[index] === "--cache-folder") {
+          if (!/^[^-]/.test(tokens[index + 1] ?? "")) {
+            return false;
+          }
+          index++;
+          continue;
+        }
+        if (!/^--cache-folder=.+$/.test(tokens[index] ?? "")) {
+          return false;
+        }
+      }
+      return (
+        packageCacheCommand(["yarn", "install", ...tokens.slice(3)], state, settings)?.cache ===
+        cache
+      );
     }
     if (tool === "uv" && tokens.join(" ") === "uv cache clean") {
       return packageCacheCommand(["uv", "sync"], state, settings)?.cache === cache;
@@ -230,7 +245,7 @@ export function collectPackageCacheDiagnostics(
           (tokens[0] === "yarn" &&
             tokens[1] === "set" &&
             tokens[2] === "version" &&
-            /^(?:berry|stable|[2-9]\.)/.test(tokens[3] ?? ""))
+            /^(?:berry|stable|(?:[2-9]|\d{2,})\.)/.test(tokens[3] ?? ""))
         ) {
           state.modernYarn = true;
         }
@@ -243,7 +258,14 @@ export function collectPackageCacheDiagnostics(
           !/\||\b(?:if|then|else|case|for|while|until)\b/.test(content) &&
           (cacheIsCleaned(command.cache, remaining) ||
             nativeCleanup(command.tool, command.cache, remaining, state, settings));
-        if (cleaned || cacheIsMounted(command.cache, instruction)) {
+        if (
+          cleaned ||
+          cacheIsMounted(
+            command.cache,
+            instruction,
+            command.tool === "yarn" ? ["cache", "tmpfs"] : ["cache"],
+          )
+        ) {
           continue;
         }
         const affected = lines.get(command.tool) ?? [];

@@ -18,6 +18,7 @@ export function collectConsecutiveRunDiagnostics(
 ): Diagnostic[] {
   const groups: number[][] = [];
   let currentGroup: number[] = [];
+  let currentFlags: string | undefined;
   for (const instruction of instructions) {
     const text = instruction.text.trim();
     if (!text || text.startsWith("#")) {
@@ -25,12 +26,21 @@ export function collectConsecutiveRunDiagnostics(
     }
     const keyword = instruction.keyword?.toUpperCase() ?? text.split(/\s+/, 1)[0]?.toUpperCase();
     if (keyword === "RUN") {
+      const flags = JSON.stringify(instruction.flags ?? []);
+      if (currentGroup.length && flags !== currentFlags) {
+        if (currentGroup.length > 1) {
+          groups.push(currentGroup);
+        }
+        currentGroup = [];
+      }
+      currentFlags = flags;
       currentGroup.push(instruction.startLine);
     } else {
       if (currentGroup.length > 1) {
         groups.push(currentGroup);
       }
       currentGroup = [];
+      currentFlags = undefined;
     }
   }
   if (currentGroup.length > 1) {

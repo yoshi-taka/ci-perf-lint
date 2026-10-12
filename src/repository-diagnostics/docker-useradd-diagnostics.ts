@@ -53,18 +53,27 @@ function riskyUid(tokens: string[]): string | undefined {
   let login = false;
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]!;
-    if (
-      /^(?:--no-log-init|--help|--defaults|--root|--prefix)(?:=|$)/.test(arg) ||
-      /^-[^-]*[lhDRP]/.test(arg)
-    ) {
+    if (/^(?:--no-log-init|--help|--defaults|--root|--prefix)(?:=|$)/.test(arg)) {
       return undefined;
     }
-    if (arg === "-u" || arg === "--uid") {
+    if (arg === "--uid") {
       uid = args[++index];
     } else if (arg.startsWith("--uid=")) {
       uid = arg.slice(6);
-    } else if (/^-u\d+$/.test(arg)) {
-      uid = arg.slice(2);
+    } else if (/^-[^-]/.test(arg)) {
+      for (let position = 1; position < arg.length; position++) {
+        const option = arg[position]!;
+        if ("lhDRP".includes(option)) {
+          return undefined;
+        }
+        if (option === "u" || valueOptions.has(`-${option}`)) {
+          const value = arg.slice(position + 1) || args[++index];
+          if (option === "u") {
+            uid = value;
+          }
+          break;
+        }
+      }
     } else if (valueOptions.has(arg)) {
       index++;
     } else if (arg === "--") {
@@ -97,13 +106,13 @@ export function collectUseraddDiagnostics(
         continue;
       }
       const cleaned = logs.every((log) =>
-        commands
-          .slice(index + 1)
-          .some(
-            (command) =>
-              removesDirectory(command, log, instruction.text) ||
-              (directCommand(command).name === "rm" && directCommand(command).args.includes(log)),
-          ),
+        commands.slice(index + 1).some((command) => {
+          const { name, args } = directCommand(command);
+          if (name !== "rm" || args.includes("--help") || args.includes("--version")) {
+            return false;
+          }
+          return removesDirectory(command, log, instruction.text) || args.includes(log);
+        }),
       );
       if (!cleaned) {
         offenders.push({ line: instruction.startLine, uid });

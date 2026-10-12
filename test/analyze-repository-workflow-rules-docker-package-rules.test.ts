@@ -16,12 +16,26 @@ const baseOptions = { targetPath: ".", topCount: 20, mode: "strict" as const };
 describe("analyzeRepository workflow and execution rules: dockerfile package and cache-mount rules", () => {
   test.each([
     { name: "article pip3 example", body: "RUN pip3 install mysql-connector-python", lines: [2] },
+    { name: "pip2 executable", body: "RUN pip2 install MySQL_python", lines: [2] },
+    { name: "versioned pip2 executable", body: "RUN pip2.7 install requests", lines: [2] },
+    { name: "python2 module", body: "RUN python2 -m pip install requests", lines: [2] },
+    { name: "versioned python2 module", body: "RUN python2.7 -m pip install requests", lines: [2] },
     {
       name: "python module and multiline",
       body: "RUN python3.12 -m pip install \\\n    -r requirements.txt",
       lines: [2],
     },
     { name: "explicit no-cache", body: "RUN pip install --no-cache-dir requests", lines: [] },
+    {
+      name: "pip2 no-cache after package",
+      body: "RUN pip2 install requests --no-cache-dir",
+      lines: [],
+    },
+    {
+      name: "pip3 no-cache after package",
+      body: "RUN pip3 install requests --no-cache-dir",
+      lines: [],
+    },
     { name: "global no-cache flag", body: "RUN pip --no-cache-dir install requests", lines: [] },
     {
       name: "one safe install does not hide another",
@@ -54,6 +68,31 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
       lines: [],
     },
     {
+      name: "command-local assignment",
+      body: "RUN PIP_NO_CACHE_DIR=yes pip install requests",
+      lines: [],
+    },
+    {
+      name: "inverted false spelling disables cache",
+      body: "ENV PIP_NO_CACHE_DIR=off\nRUN pip install requests",
+      lines: [],
+    },
+    {
+      name: "case-insensitive boolean",
+      body: "ENV PIP_NO_CACHE_DIR=TRUE\nRUN pip install requests",
+      lines: [],
+    },
+    {
+      name: "quoted environment text does not suppress",
+      body: "RUN echo 'PIP_NO_CACHE_DIR=1' && pip install requests",
+      lines: [2],
+    },
+    {
+      name: "command-local setting does not leak",
+      body: "RUN PIP_NO_CACHE_DIR=1 pip install requests && pip install flask",
+      lines: [2],
+    },
+    {
       name: "empty ENV does not disable cache",
       body: 'ENV PIP_NO_CACHE_DIR=""\nRUN pip install requests',
       lines: [3],
@@ -82,6 +121,26 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
       name: "parent cache directory mount",
       body: "RUN --mount=type=cache,dst=/root/.cache pip install requests",
       lines: [],
+    },
+    {
+      name: "tmpfs cache mount",
+      body: "RUN --mount=type=tmpfs,target=/root/.cache/pip pip install requests",
+      lines: [],
+    },
+    {
+      name: "tmpfs parent mount",
+      body: "RUN --mount=type=tmpfs,destination=/root/.cache pip3 install requests",
+      lines: [],
+    },
+    {
+      name: "tmpfs subdirectory is incomplete",
+      body: "RUN --mount=type=tmpfs,target=/root/.cache/pip/http-v2 pip install requests",
+      lines: [2],
+    },
+    {
+      name: "unrelated tmpfs mount",
+      body: "RUN --mount=type=tmpfs,target=/tmp pip install requests",
+      lines: [2],
     },
     {
       name: "unrelated cache mount",
@@ -140,6 +199,10 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
     },
     { name: "JSON RUN", body: 'RUN ["python3", "-m", "pip", "install", "requests"]', lines: [2] },
     { name: "uv pip uses a different cache", body: "RUN uv pip install requests", lines: [] },
+    { name: "pipx executable", body: "RUN pipx install software", lines: [] },
+    { name: "pipenv executable", body: "RUN pipenv install library", lines: [] },
+    { name: "pipx Python module", body: "RUN python3 -m pipx install software", lines: [] },
+    { name: "pipenv Python module", body: "RUN python3 -m pipenv install library", lines: [] },
     { name: "non-install pip command", body: "RUN pip download requests", lines: [] },
     {
       name: "same-layer cache cleanup",
