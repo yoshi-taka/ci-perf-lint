@@ -1,6 +1,7 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { CollectedDockerfileInstruction } from "./dockerfile-instructions.ts";
+import { collectDockerfileInstructions } from "./dockerfile-instructions.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 const meta = {
@@ -72,7 +73,7 @@ function collectCommandPackages(tokens: string[]): string[] {
     if (token.startsWith("-") || token.endsWith(".deb") || token.endsWith("-")) {
       continue;
     }
-    if (packagePattern.test(token)) {
+    if (packagePattern.test(token.replace(/\+$/, ""))) {
       packages.push(token);
     }
   }
@@ -80,6 +81,12 @@ function collectCommandPackages(tokens: string[]): string[] {
 }
 
 function collectUnpinnedPackages(instruction: CollectedDockerfileInstruction): string[] {
+  if (/^ONBUILD\s+RUN\b/i.test(instruction.text.trim())) {
+    const run = collectDockerfileInstructions([
+      instruction.text.trim().replace(/^ONBUILD\s+/i, ""),
+    ])[0];
+    return run ? collectUnpinnedPackages(run) : [];
+  }
   if (!/^RUN\b/i.test(instruction.text.trim())) {
     return [];
   }

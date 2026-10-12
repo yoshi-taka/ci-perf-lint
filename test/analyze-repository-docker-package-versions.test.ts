@@ -37,6 +37,36 @@ describe("Dockerfile package version constraints", () => {
       packages: ["git"],
     },
     {
+      name: "pinned install with combined flags before subcommand and cleanup",
+      run: "apt-get update \\\n    && apt-get -yqq --no-install-recommends install nodejs=0.10 \\\n    && rm -rf /var/lib/apt/lists/*",
+      packages: [],
+    },
+    {
+      name: "unpinned install with combined flags before subcommand and cleanup",
+      run: "apt-get update \\\n    && apt-get -yqq --no-install-recommends install nodejs \\\n    && rm -rf /var/lib/apt/lists/*",
+      packages: ["nodejs"],
+    },
+    {
+      name: "multiline wildcard and epoch version pins",
+      run: "apt-get update && apt-get install --no-install-recommends -y \\\n    python-demjson=2.2.2* \\\n    wget=1.16.1* \\\n    git=1:2.5.0* \\\n    ruby=1:2.1.*",
+      packages: [],
+    },
+    {
+      name: "short target-release option with pinned backport",
+      run: "apt-get update && apt-get install -y --no-install-recommends -t bookworm-backports openjdk-21-jdk=21.0.1+12-1~bpo12+1 && rm -rf /var/lib/apt/lists/*",
+      packages: [],
+    },
+    {
+      name: "short target-release option does not pin package",
+      run: "apt-get install -y -t bookworm-backports openjdk-21-jdk",
+      packages: ["openjdk-21-jdk"],
+    },
+    {
+      name: "local deb does not hide an unpinned repository package",
+      run: "apt-get install ./wkhtmltox_0.12.5-1.bionic_amd64.deb curl",
+      packages: ["curl"],
+    },
+    {
       name: "simple wrappers",
       run: "sudo apt-get install curl && env DEBIAN_FRONTEND=noninteractive /usr/bin/apt-get install git",
       packages: ["curl", "git"],
@@ -80,6 +110,65 @@ describe("Dockerfile package version constraints", () => {
     { name: "option-only install", run: "apt-get install -y -o Dpkg::Use-Pty=0", packages: [] },
     { name: "package removal argument", run: "apt-get install curl-", packages: [] },
     {
+      name: "explicit install suffix is not a version pin",
+      run: "apt-get install curl+ libstdc++:amd64+ git-",
+      packages: ["curl+", "libstdc++:amd64+"],
+    },
+    {
+      name: "explicit install suffix with version pins",
+      run: "apt-get install curl=1.2.3+ libstdc++:amd64=12.*+",
+      packages: [],
+    },
+    {
+      name: "ONBUILD shell install",
+      instruction: "ONBUILD RUN",
+      run: "apt-get update && apt-get install -y curl",
+      packages: ["curl"],
+    },
+    {
+      name: "ONBUILD multiline mixed version constraints",
+      instruction: "ONBUILD RUN",
+      run: "apt-get install -y \\\n    curl=1.2.* \\\n    git+",
+      packages: ["git+"],
+    },
+    {
+      name: "ONBUILD pinned shell install",
+      instruction: "ONBUILD RUN",
+      run: "apt-get install curl=1.2.3 git=2.*",
+      packages: [],
+    },
+    {
+      name: "ONBUILD direct JSON exec form",
+      instruction: "ONBUILD RUN",
+      run: '["apt-get", "install", "-y", "curl+", "git=2.*"]',
+      packages: ["curl+"],
+    },
+    {
+      name: "ONBUILD pinned JSON exec form",
+      instruction: "ONBUILD RUN",
+      run: '["apt-get", "install", "curl=1.2.3"]',
+      packages: [],
+    },
+    {
+      name: "ONBUILD quoted command text is not executed",
+      instruction: "ONBUILD RUN",
+      run: "echo 'apt-get install curl'",
+      packages: [],
+    },
+    {
+      name: "ONBUILD non-RUN instruction is not executed during build",
+      instruction: "ONBUILD CMD",
+      run: '["apt-get", "install", "curl"]',
+      packages: [],
+    },
+    {
+      name: "ONBUILD and ordinary installs aggregate at original instruction lines",
+      instruction: "ONBUILD RUN",
+      run: "apt-get install curl\nRUN apt install git",
+      packages: ["curl", "git"],
+      details: "line 2: curl; line 3: git",
+    },
+    {
       name: "direct JSON exec form",
       run: '["apt-get", "install", "-y", "curl", "git=2.*"]',
       packages: ["curl"],
@@ -106,7 +195,7 @@ describe("Dockerfile package version constraints", () => {
     );
     await writeFile(
       path.join(fixtureRoot, "Dockerfile"),
-      `FROM debian:bookworm-slim\nRUN ${run}\n`,
+      `FROM debian:bookworm-slim\n${"instruction" in scenario ? scenario.instruction : "RUN"} ${run}\n`,
     );
     const options = { cwd: fixtureRoot, targetPath: ".", topCount: 100 };
     const report = await analyzeRepository({ ...options, mode: "exploratory" });

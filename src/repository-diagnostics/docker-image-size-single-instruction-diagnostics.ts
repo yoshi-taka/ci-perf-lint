@@ -2,6 +2,7 @@ import type { Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { CollectedDockerfileInstruction } from "./dockerfile-instructions.ts";
 import {
+  collectDockerfileStageAliases,
   dockerfileFromUsesFloatingTag,
   dockerfileSourceLooksLocalAddWithoutClearNeed,
   instructionLooksAptInstallWithoutNoInstallRecommends,
@@ -21,19 +22,22 @@ export function collectSingleInstructionImageSizeDiagnostics(
   workflowPath: string,
   dockerfileRelativePath: string,
   instructions: CollectedDockerfileInstruction[],
-  stageAliases: ReadonlySet<string>,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
+  const previousStageAliases = new Set<string>();
   const floatingFromInstruction = instructions.find((instruction) => {
     const fromInstruction = parseDockerfileFromInstruction(instruction);
     if (!fromInstruction) {
       return false;
     }
-    if (stageAliases.has(fromInstruction.image.toLowerCase())) {
-      return false;
+    const floating =
+      !previousStageAliases.has(fromInstruction.image.toLowerCase()) &&
+      dockerfileFromUsesFloatingTag(fromInstruction.image);
+    for (const alias of collectDockerfileStageAliases([instruction])) {
+      previousStageAliases.add(alias);
     }
-    return dockerfileFromUsesFloatingTag(fromInstruction.image);
+    return floating;
   });
   if (floatingFromInstruction) {
     diagnostics.push({

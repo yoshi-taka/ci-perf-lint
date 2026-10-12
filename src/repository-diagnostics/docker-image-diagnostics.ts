@@ -3,7 +3,6 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import { type DockerBuildTarget, normalizeRelativePath } from "./docker-build-targets.ts";
-import { collectDockerfileStageAliases } from "./dockerfile-instructions.ts";
 import {
   type NodeDockerfileLockfileKind,
   nodeDockerfileLockfileDiagnosticRules,
@@ -55,7 +54,6 @@ export async function collectDockerfileImageSizeDiagnostics(
     const dockerfileRelativePath = normalizeRelativePath(repoRoot, target.dockerfilePath);
     const { instructions, fromInstructionIndexes, finalFromInstructionIndex } = dockerfileData;
 
-    const stageAliases = collectDockerfileStageAliases(instructions);
     const packageCacheSettings = await collectPackageCacheSettings(
       context,
       target.contextPath,
@@ -98,7 +96,6 @@ export async function collectDockerfileImageSizeDiagnostics(
         target.workflow,
         dockerfileRelativePath,
         instructions,
-        stageAliases,
       ),
     );
 

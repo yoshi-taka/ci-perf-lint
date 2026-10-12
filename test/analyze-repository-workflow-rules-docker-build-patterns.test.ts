@@ -11,6 +11,102 @@ afterEach(async () => {
 });
 
 describe("analyzeRepository workflow and execution rules: docker build patterns", () => {
+  test.each([
+    { name: "untagged image", source: "FROM debian", line: 1 },
+    { name: "untagged image with stage alias", source: "FROM debian AS builder", line: 1 },
+    { name: "latest tag with stage alias", source: "FROM debian:latest AS builder", line: 1 },
+    { name: "stable version tag", source: "FROM ruby:2", line: 0 },
+    { name: "stable tag with stage alias", source: "FROM debian:bookworm AS builder", line: 0 },
+    {
+      name: "digest without tag",
+      source: `FROM registry.example.com/debian@sha256:${"a".repeat(64)}`,
+      line: 0,
+    },
+    {
+      name: "digest overrides latest tag",
+      source: `FROM registry.example.com/debian:latest@sha256:${"a".repeat(64)}`,
+      line: 0,
+    },
+    { name: "build argument image", source: "ARG BASE\nFROM ${BASE}", line: 0 },
+    { name: "scratch image", source: "FROM scratch", line: 0 },
+    {
+      name: "previous stage alias is not an external image",
+      source: "FROM golang:1.26 AS build\nRUN echo build\nFROM build AS unit-test",
+      line: 0,
+    },
+    {
+      name: "unrelated untagged image after a named stage",
+      source: "FROM golang:1.26 AS build\nRUN echo build\nFROM node AS unit-test",
+      line: 3,
+    },
+    {
+      name: "current stage alias does not hide its untagged base",
+      source: "FROM node AS node",
+      line: 1,
+    },
+    {
+      name: "later stage alias does not hide an earlier external image",
+      source: "FROM node AS build\nFROM alpine:3.22 AS node",
+      line: 1,
+    },
+    {
+      name: "later alias does not hide an untagged image in an intermediate stage",
+      source: "FROM golang:1.26 AS build\nFROM node AS runtime\nFROM alpine:3.22 AS node",
+      line: 2,
+    },
+    {
+      name: "previous stage alias with platform flag remains exempt",
+      source: "FROM node:22 AS build\nFROM --platform=$BUILDPLATFORM build AS runtime",
+      line: 0,
+    },
+    {
+      name: "chained previous stage aliases remain exempt",
+      source: "FROM node:22 AS build\nFROM build AS test\nFROM test AS runtime",
+      line: 0,
+    },
+    {
+      name: "untagged external image after alias reuse is still detected",
+      source: "FROM node:22 AS build\nFROM build AS test\nFROM debian AS runtime",
+      line: 3,
+    },
+    {
+      name: "registry port is not an image tag",
+      source: "FROM registry.example.com:5000/team/debian",
+      line: 1,
+    },
+    {
+      name: "stable image tag after registry port",
+      source: "FROM registry.example.com:5000/team/debian:bookworm",
+      line: 0,
+    },
+  ])("floating Docker base image: $name", async ({ source, line }) => {
+    const fixtureRoot = await tempDirs.create("apl-floating-base-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "docker.yml"),
+      "name: docker\non: push\njobs:\n  image:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: docker/build-push-action@v6\n        with:\n          context: .\n",
+    );
+    await writeFile(path.join(fixtureRoot, "Dockerfile"), `${source}\n`);
+
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 100,
+      mode: "strict",
+    });
+    const findings = report.findings.filter(
+      (finding) => finding.ruleId === "dockerfile-base-image-uses-floating-tag",
+    );
+
+    expect(report.workflowCount).toBe(1);
+    expect(findings).toHaveLength(line ? 1 : 0);
+    if (line) {
+      expect(findings[0]?.severity).toBe("warning");
+      expect(findings[0]?.location).toEqual({ path: "Dockerfile", line, column: 1 });
+    }
+  });
+
   test("warns for local ADD and floating Docker base image tags", async () => {
     const fixtureRoot = await tempDirs.create("apl-add-floating-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
