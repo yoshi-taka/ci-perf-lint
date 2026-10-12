@@ -13,6 +13,92 @@ afterEach(async () => {
 
 describe("analyzeRepository workflow and execution rules: docker misc", () => {
   test.each([
+    { name: "article leading cd", body: "RUN cd /usr/src/app && git clone example", lines: [2] },
+    { name: "standalone cd does not persist", body: "RUN cd /app", lines: [2] },
+    { name: "quoted directory", body: 'RUN cd "/app source" && make', lines: [2] },
+    { name: "relative directory", body: "RUN cd app && make", lines: [2] },
+    { name: "cd with option terminator", body: "RUN cd -- /app && make", lines: [2] },
+    { name: "multiline leading cd", body: "RUN cd /app && \\\n    make", lines: [2] },
+    {
+      name: "multiple RUN offenders aggregate",
+      body: "RUN cd /app && make\nRUN cd /other && make",
+      lines: [2, 3],
+    },
+    { name: "WORKDIR already explicit", body: "WORKDIR /app\nRUN make", lines: [] },
+    { name: "subshell cd is intentional", body: "RUN (cd /app && make)", lines: [] },
+    {
+      name: "multiple directory changes",
+      body: "RUN cd /app && make && cd /other && make",
+      lines: [],
+    },
+    { name: "non-leading cd", body: "RUN mkdir /app && cd /app && make", lines: [] },
+    { name: "conditional cd", body: "RUN if test -d /app; then cd /app && make; fi", lines: [] },
+    { name: "semicolon chain", body: "RUN cd /app; make", lines: [] },
+    { name: "fallback directory", body: "RUN cd /app || exit 1", lines: [] },
+    { name: "dynamic directory", body: 'RUN cd "$APP_DIR" && make', lines: [] },
+    { name: "home shorthand", body: "RUN cd ~/app && make", lines: [] },
+    { name: "previous directory", body: "RUN cd - && make", lines: [] },
+    { name: "quoted command text", body: 'RUN echo "cd /app && make"', lines: [] },
+    {
+      name: "JSON shell command is excluded",
+      body: 'RUN ["sh", "-c", "cd /app && make"]',
+      lines: [],
+    },
+    { name: "heredoc data", body: "RUN cat <<EOF\ncd /app && make\nEOF", lines: [] },
+    {
+      name: "explicit Bash shell",
+      body: 'SHELL ["/bin/bash", "-c"]\nRUN cd /app && make',
+      lines: [3],
+    },
+    {
+      name: "non-POSIX shell",
+      body: 'SHELL ["powershell", "-command"]\nRUN cd /app && make',
+      lines: [],
+    },
+    {
+      name: "stage inherits non-POSIX shell",
+      body: 'SHELL ["powershell", "-command"]\nFROM base\nRUN cd /app && make',
+      lines: [],
+    },
+    {
+      name: "new base resets shell",
+      body: 'SHELL ["powershell", "-command"]\nFROM alpine:3.22\nRUN cd /app && make',
+      lines: [4],
+    },
+  ])("WORKDIR guidance: $name", async ({ body, lines }) => {
+    const fixtureRoot = await tempDirs.create("apl-docker-workdir-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "docker.yml"),
+      "name: docker\non: push\njobs:\n  image:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: docker/build-push-action@v6\n        with:\n          context: .\n",
+    );
+    await writeFile(path.join(fixtureRoot, "Dockerfile"), `FROM alpine:3.22 AS base\n${body}\n`);
+    const options = { cwd: fixtureRoot, targetPath: ".", topCount: 100 };
+    const report = await analyzeRepository({ ...options, mode: "exploratory" });
+    const findings = report.findings.filter(
+      (finding) => finding.ruleId === "dockerfile-run-cd-instead-of-workdir",
+    );
+    expect(findings).toHaveLength(lines.length ? 1 : 0);
+    if (lines.length) {
+      expect(findings[0]?.severity).toBe("suggestion");
+      expect(findings[0]?.location).toEqual({ path: "Dockerfile", line: lines[0], column: 1 });
+      expect(findings[0]?.suggestion).toContain("later relative");
+    }
+    if (body === "RUN cd /usr/src/app && git clone example") {
+      const strict = await analyzeRepository({ ...options, mode: "strict" });
+      expect(
+        strict.findings.some(
+          (finding) => finding.ruleId === "dockerfile-run-cd-instead-of-workdir",
+        ),
+      ).toBe(false);
+    }
+    if (lines.length > 1) {
+      expect(findings[0]?.message).toContain("line 2: /app; line 3: /other");
+    }
+  });
+
+  test.each([
     {
       name: "comments and blank lines preserve consecutive RUN groups",
       source:

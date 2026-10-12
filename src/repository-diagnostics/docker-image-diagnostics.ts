@@ -15,6 +15,7 @@ import { collectFinalStageBroadCopyDiagnostics } from "./docker-final-stage-copy
 import { collectSingleInstructionImageSizeDiagnostics } from "./docker-image-size-single-instruction-diagnostics.ts";
 import { collectConsecutiveRunDiagnostics } from "./docker-consecutive-run-diagnostics.ts";
 import { collectPipCacheDiagnostics } from "./docker-pip-cache-diagnostics.ts";
+import { collectWorkdirDiagnostics } from "./docker-workdir-diagnostics.ts";
 import {
   collectPackageCacheDiagnostics,
   collectPackageCacheSettings,
@@ -61,6 +62,12 @@ export async function collectDockerfileImageSizeDiagnostics(
       instructions,
     );
     diagnostics.push(
+      ...collectWorkdirDiagnostics(
+        repository,
+        target.workflow,
+        dockerfileRelativePath,
+        instructions,
+      ),
       ...collectPackageCacheDiagnostics(
         repository,
         target.workflow,
