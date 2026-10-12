@@ -78,6 +78,7 @@ export async function collectLargeBarrelFileDiagnostics(
     repoRoot,
     "oxc(no-barrel-file)",
     warnings,
+    context,
   );
   if (!barrelDiagnostics) {
     return [];

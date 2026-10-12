@@ -170,6 +170,25 @@ describe("RepositoryScanContext", () => {
     expect([...firstFiles].sort()).toEqual(["src/app.py", "src/module.PY"]);
   });
 
+  test("hasFileMatching detects matches and ignores default ignored directories", async () => {
+    const repoRoot = await tempDirs.create("actions-perf-context-match-");
+    await mkdir(path.join(repoRoot, "node_modules", "dep"), { recursive: true });
+    await writeFile(path.join(repoRoot, "node_modules", "dep", "index.ts"), "export {};\n");
+    await writeFile(path.join(repoRoot, "main.ts"), "export {};\n");
+
+    const context = new RepositoryScanContext(repoRoot, []);
+
+    expect(await context.hasFileMatching((relativePath) => relativePath.endsWith(".ts"))).toBe(
+      true,
+    );
+    expect(await context.hasFileMatching((relativePath) => relativePath.endsWith(".rs"))).toBe(
+      false,
+    );
+    expect(
+      await context.hasFileMatching((relativePath) => relativePath.includes("node_modules")),
+    ).toBe(false);
+  });
+
   test("keeps raw text and records a warning for invalid package.json", async () => {
     const repoRoot = await tempDirs.create("actions-perf-context-invalid-");
     const packageJsonPath = path.join(repoRoot, "package.json");

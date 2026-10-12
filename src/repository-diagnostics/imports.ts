@@ -66,6 +66,7 @@ export async function collectExplicitImportExtensionDiagnostics(
       repoRoot,
       "eslint-plugin-import(extensions)",
       warnings,
+      context,
     )) ?? [];
 
   const MAX_INDIVIDUAL_FINDINGS = 200;

@@ -43,6 +43,19 @@ process.on("exit", () => {
 
 const embeddedOxlintPlans = new WeakMap<RepositoryScanContext, EmbeddedOxlintScanPlan>();
 
+const embeddedOxlintSourceFilePattern = /\.(?:[cm]?[jt]sx?|vue|astro|svelte)$/i;
+
+async function repoHasLintableSource(
+  scanContext: RepositoryScanContext | undefined,
+): Promise<boolean> {
+  if (!scanContext) {
+    return true;
+  }
+  return scanContext.hasFileMatching((relativePath) =>
+    embeddedOxlintSourceFilePattern.test(relativePath),
+  );
+}
+
 export function setEmbeddedOxlintScanPlan(
   scanContext: RepositoryScanContext,
   plan: EmbeddedOxlintScanPlan,
@@ -97,6 +110,9 @@ async function collectEmbeddedOxlintJsonDiagnostics(
   }
 
   const promise = (async () => {
+    if (!(await repoHasLintableSource(scanContext))) {
+      return [];
+    }
     return runEmbeddedOxlint(repoRoot, plan, warnings, scanContext);
   })();
 

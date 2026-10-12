@@ -107,6 +107,7 @@ export class RepositoryScanContext {
   readonly #parsedMakefileLoads = new LruMap<string, Promise<ParsedMakefile | null>>(64);
   #rgFileListPromise: Promise<string[] | null> | null = null;
   #filePathSet: Set<string> | null | undefined;
+  #hasGitDir: boolean | undefined;
   static #rgPath: string | null | undefined;
 
   constructor(repoRoot: string, warnings: AnalysisWarning[]) {
@@ -118,37 +119,54 @@ export class RepositoryScanContext {
     void this.#getRgFileList();
   }
 
-  async estimatedFileCount(): Promise<number | null> {
+  async #hasGitDirectory(): Promise<boolean> {
+    if (this.#hasGitDir !== undefined) {
+      return this.#hasGitDir;
+    }
+
     try {
-      if (hasBun) {
-        const proc = Bun.spawn(["git", "-C", this.repoRoot, "ls-files"], {
-          stdio: ["ignore", "pipe", "pipe"],
-        });
-        const [exitCode, stdout] = await Promise.all([
-          proc.exited,
-          new Response(proc.stdout).text(),
-        ]);
-        if (exitCode === 0) {
-          return stdout === "" ? 0 : stdout.trimEnd().split("\n").length;
-        }
-      } else {
-        const proc = spawn("git", ["-C", this.repoRoot, "ls-files"], {
-          stdio: ["ignore", "pipe", "pipe"],
-        });
-        const chunks: string[] = [];
-        for await (const chunk of proc.stdout) {
-          chunks.push(chunk.toString());
-        }
-        const stdout = chunks.join("");
-        const exitCode = await new Promise<number>((resolve) => {
-          proc.on("close", resolve);
-        });
-        if (exitCode === 0) {
-          return stdout === "" ? 0 : stdout.trimEnd().split("\n").length;
-        }
-      }
+      await stat(path.join(this.repoRoot, ".git"));
+      this.#hasGitDir = true;
     } catch {
-      // git not available
+      this.#hasGitDir = false;
+    }
+
+    return this.#hasGitDir;
+  }
+
+  async estimatedFileCount(): Promise<number | null> {
+    if (await this.#hasGitDirectory()) {
+      try {
+        if (hasBun) {
+          const proc = Bun.spawn(["git", "-C", this.repoRoot, "ls-files"], {
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+          const [exitCode, stdout] = await Promise.all([
+            proc.exited,
+            new Response(proc.stdout).text(),
+          ]);
+          if (exitCode === 0) {
+            return stdout === "" ? 0 : stdout.trimEnd().split("\n").length;
+          }
+        } else {
+          const proc = spawn("git", ["-C", this.repoRoot, "ls-files"], {
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+          const chunks: string[] = [];
+          for await (const chunk of proc.stdout) {
+            chunks.push(chunk.toString());
+          }
+          const stdout = chunks.join("");
+          const exitCode = await new Promise<number>((resolve) => {
+            proc.on("close", resolve);
+          });
+          if (exitCode === 0) {
+            return stdout === "" ? 0 : stdout.trimEnd().split("\n").length;
+          }
+        }
+      } catch {
+        // git not available
+      }
     }
     const files = await this.#getRgFileList();
     return files !== null ? files.length : null;
@@ -361,6 +379,15 @@ export class RepositoryScanContext {
         }
       }
     }
+  }
+
+  async hasFileMatching(predicate: (relativePath: string) => boolean): Promise<boolean> {
+    for await (const relativePath of this.walkFilesIter(".")) {
+      if (predicate(relativePath)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   async walkFiles(relativeDir = ".", options: WalkFilesOptions = {}): Promise<string[]> {
@@ -600,5 +627,6 @@ export class RepositoryScanContext {
     this.#parsedMakefileLoads.clear();
     this.#rgFileListPromise = null;
     this.#filePathSet = undefined;
+    this.#hasGitDir = undefined;
   }
 }

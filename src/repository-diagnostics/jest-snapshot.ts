@@ -157,6 +157,7 @@ export async function collectLargeJestSnapshotDiagnostics(
     repoRoot,
     "eslint-plugin-jest(no-large-snapshots)",
     warnings,
+    context,
   );
   if (!snapshotDiagnostics) {
     return collectExternalJestSnapshotDiagnostics(context, repository);
