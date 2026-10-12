@@ -8,6 +8,8 @@ import { collectDockerBuildDiagnostics } from "./docker.ts";
 import { collectDockerImageMetadataDiagnostics } from "./docker-image-metadata-diagnostics.ts";
 import { collectDockerBuildRuntimeSeparationDiagnostics } from "./docker-build-runtime-separation.ts";
 import { collectDockerRuntimeBaseImageDiagnostics } from "./docker-runtime-base-image.ts";
+import { collectDockerExtractsCopiedArchiveDiagnostics } from "./docker-extracts-copied-archive.ts";
+import { collectDockerRuntimeCopiesBuilderRootfsDiagnostics } from "./docker-runtime-copies-builder-rootfs.ts";
 import { collectElixirOtpVersionDiagnostics } from "./elixir-otp-versions.ts";
 import { collectLargeFileDiagnostics } from "./large-files.ts";
 import { collectPreferMiseOverAsdfDiagnostics } from "./prefer-mise-over-asdf.ts";
@@ -27,6 +29,16 @@ export const dockerDiagnosticCollectors = [
     id: "docker-image-metadata-diagnostics",
     gate: gateKeys.dockerHeavy,
     collect: collectDockerImageMetadataDiagnostics,
+  },
+  {
+    id: "dockerfile-extracts-copied-archive",
+    gate: gateKeys.dockerHeavy,
+    collect: collectDockerExtractsCopiedArchiveDiagnostics,
+  },
+  {
+    id: "dockerfile-runtime-copies-builder-rootfs",
+    gate: gateKeys.dockerHeavy,
+    collect: collectDockerRuntimeCopiesBuilderRootfsDiagnostics,
   },
   {
     id: "dockerfile-runtime-image-uses-heavy-base",

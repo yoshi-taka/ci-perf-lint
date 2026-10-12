@@ -62,6 +62,7 @@ Current rule registry:
 - `dockerfile-consecutive-run-instructions`
 - `dockerfile-copies-all-before-deps`
 - `dockerfile-copy-link-without-cache-benefit`
+- `dockerfile-extracts-copied-archive`
 - `dockerfile-final-stage-copies-broad-context`
 - `dockerfile-go-build-without-cache-mount`
 - `dockerfile-go-mod-download-without-cache-mount`
@@ -75,6 +76,7 @@ Current rule registry:
 - `dockerfile-pnpm-install-without-frozen-lockfile`
 - `dockerfile-rpm-install-without-cleanup-or-cache-mount`
 - `dockerfile-run-cd-instead-of-workdir`
+- `dockerfile-runtime-copies-builder-rootfs`
 - `dockerfile-runtime-image-uses-heavy-base`
 - `dockerfile-runtime-inherits-build-environment`
 - `dockerfile-useradd-high-uid-without-no-log-init`
