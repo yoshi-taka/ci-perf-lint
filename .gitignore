@@ -15,5 +15,6 @@ node_modules
 !test/fixtures/*/node_modules/**
 docs/internal
 site/.astro
+.astro/
 site/dist
 site/src/pages/rules/*.md
