@@ -1,4 +1,8 @@
 {
+  // "Astro project missing .astro/ types" is expected and accepted: the Astro
+  // site lives in site/ (which is ignored below), and its generated types go to
+  // site/.astro via `astro sync --root site`. fallow assumes the Astro project
+  // is at the package root, so no root .astro/ is generated on purpose.
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "ignorePatterns": ["dist/**", "site/**", "packages/ci-perf-lint/**", "test/fixtures/**", "fuzz/**", "profile-*.ts", "scripts/**", "src/rules/shared/evidence-propagation.ts", "src/rules/shared/finding-sheet.ts", "src/rules/shared/singularity.ts", "src/rules/shared/workflow-interaction.ts", "src/transform-stability.ts"],
   "ignoreDependencies": ["bun", "@codspeed/tinybench-plugin"],

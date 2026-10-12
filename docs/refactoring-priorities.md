@@ -420,7 +420,7 @@ Five quick refactorings prompted by `fallow:full` health/refactoring targets:
 - **`consider-filter-blob-none-for-release-metadata.ts`** — extracted `evaluateJobForBlobNone` from check() loop with 5 guard conditions.
 - **`embedded-oxlint-runner.ts`** — split into 5 files: parser, config, spawn, path, runner. 468→143 lines in runner. Top hotspot (14 commits, 1186 churn).
 
-Thresholds relaxed in `.fallowrc.json`:
+Thresholds relaxed in `.fallowrc.jsonc`:
 - `maxCognitive`: 20 → 35
 - `maxCrap`: 50 → 300
 - Added `scripts/` to `ignorePatterns`
