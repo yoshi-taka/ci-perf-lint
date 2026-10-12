@@ -8,6 +8,7 @@ CPU.*.md
 .stryker-tmp
 .cifuzz-corpus
 .rule-coverage-matrix.json
+.bun-test-timings.json
 artifacts
 node_modules
 !test/fixtures/*/node_modules/
