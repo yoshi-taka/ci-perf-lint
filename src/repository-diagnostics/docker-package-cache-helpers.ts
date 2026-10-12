@@ -1,41 +1,8 @@
 import path from "node:path";
 import type { CollectedDockerfileInstruction } from "./dockerfile-instructions.ts";
+export { shellCommands } from "../rules/shared/command-patterns.ts";
 
-const tokenPattern = /(?:'[^']*'|"[^"]*"|\\[^\r\n]|[^\s'"\\;&|()<>])+|[;&|()<>]|\r?\n/g;
-const separatorPattern = /^[;&|()\r\n]+$/;
 const assignmentPattern = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
-
-function unquote(token: string): string {
-  return token.replace(
-    /'([^']*)'|"([^"]*)"/g,
-    (_match, single: string | undefined, double: string | undefined) => single ?? double ?? "",
-  );
-}
-
-export function shellCommands(text: string): string[][] {
-  const commands: string[][] = [];
-  let tokens: string[] = [];
-  let comment = false;
-  for (const match of text.replace(/\\\r?\n/g, " ").matchAll(tokenPattern)) {
-    const token = match[0];
-    if (/^\r?\n$/.test(token)) {
-      comment = false;
-    }
-    if (comment) {
-      continue;
-    }
-    if (token.startsWith("#")) {
-      comment = true;
-    } else if (separatorPattern.test(token)) {
-      commands.push(tokens);
-      tokens = [];
-    } else {
-      tokens.push(unquote(token));
-    }
-  }
-  commands.push(tokens);
-  return commands;
-}
 
 export function applyAssignments(tokens: string[], environment: Map<string, string>): number {
   let index = 0;

@@ -1,4 +1,38 @@
 const npmRunMatcher = /^\s*npm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)(\s+--(?:\s+.*)?)?\s*$/;
+const commandTokenPattern = /(?:'[^']*'|"[^"]*"|\\[^\r\n]|[^\s'"\\;&|()<>])+|[;&|()<>]|\r?\n/g;
+const commandSeparatorPattern = /^[;&|()\r\n]+$/;
+
+/** Tokenize command arguments while preserving quoted words and dynamic values. */
+export function shellCommands(text: string): string[][] {
+  const commands: string[][] = [];
+  let tokens: string[] = [];
+  let comment = false;
+  for (const match of text.replace(/\\\r?\n/g, " ").matchAll(commandTokenPattern)) {
+    const token = match[0];
+    if (/^\r?\n$/.test(token)) {
+      comment = false;
+    }
+    if (comment) {
+      continue;
+    }
+    if (token.startsWith("#")) {
+      comment = true;
+    } else if (commandSeparatorPattern.test(token)) {
+      commands.push(tokens);
+      tokens = [];
+    } else {
+      tokens.push(
+        token.replace(
+          /'([^']*)'|"([^"]*)"/g,
+          (_match, single: string | undefined, double: string | undefined) =>
+            single ?? double ?? "",
+        ),
+      );
+    }
+  }
+  commands.push(tokens);
+  return commands;
+}
 
 export function detectSimpleNpmRunFromText(
   text: string,

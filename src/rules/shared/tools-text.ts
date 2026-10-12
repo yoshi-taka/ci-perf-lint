@@ -1,3 +1,6 @@
+import path from "node:path";
+import { shellCommands } from "./command-patterns.ts";
+
 const lintToolMatchers = [
   ["eslint", /(?:^|\s)(?:npx\s+)?eslint(?:\s|$)|--eslint(?:\s|$)/i],
   ["prettier", /(?:^|\s)(?:npx\s+)?prettier(?:\s|$)|--prettier(?:\s|$)/i],
@@ -43,22 +46,62 @@ const npxEligibleTools = new Set<string>([
   "stylelint",
 ]);
 
-const installCommandMatchers = [
-  ["npm", /\bnpm\s+(?:ci|install)\b/i],
-  ["pnpm", /\bpnpm\s+install\b/i],
-  ["yarn", /\byarn\s+install\b/i],
-  ["bun", /\bbun\s+install\b/i],
-  ["pip", /\bpip\s+install\b/i],
-  ["pipenv", /\bpipenv\s+install\b/i],
-  ["poetry", /\bpoetry\s+install\b/i],
-  ["uv", /\buv\s+sync\b/i],
-  ["go", /\bgo\s+mod\s+download\b/i],
-  ["maven", /\b(?:mvn|\.\/mvnw)\b/i],
-  ["gradle", /\b(?:gradle|\.\/gradlew)\b/i],
-  ["sbt", /\bsbt\b/i],
-  ["bundler", /\bbundle\s+install\b/i],
-  ["nuget", /\b(?:dotnet|nuget)\s+restore\b/i],
+const installFamilyPriority = [
+  "npm",
+  "pnpm",
+  "yarn",
+  "bun",
+  "pip",
+  "pipenv",
+  "poetry",
+  "uv",
+  "go",
+  "maven",
+  "gradle",
+  "sbt",
+  "bundler",
+  "nuget",
 ] as const;
+const installExecutables: ReadonlyMap<string, DependencyFamily> = new Map([
+  ["npm", "npm"],
+  ["pnpm", "pnpm"],
+  ["yarn", "yarn"],
+  ["bun", "bun"],
+  ["pip", "pip"],
+  ["pipenv", "pipenv"],
+  ["poetry", "poetry"],
+  ["uv", "uv"],
+  ["go", "go"],
+  ["mvn", "maven"],
+  ["mvnw", "maven"],
+  ["gradle", "gradle"],
+  ["gradlew", "gradle"],
+  ["sbt", "sbt"],
+  ["bundle", "bundler"],
+  ["dotnet", "nuget"],
+  ["nuget", "nuget"],
+]);
+const installValueOptions = new Set([
+  "--prefix",
+  "--dir",
+  "--cwd",
+  "--directory",
+  "-C",
+  "--filter",
+  "--workspace",
+  "-w",
+  "--cache",
+  "--cache-dir",
+  "--cache-folder",
+  "--index-url",
+  "--extra-index-url",
+  "--trusted-host",
+  "--proxy",
+  "--timeout",
+  "--path",
+  "-r",
+  "--requirement",
+]);
 
 export type DependencyFamily =
   | "npm"
@@ -89,17 +132,103 @@ export function usesLanguageInstall(stepText: string): boolean {
 }
 
 export function detectInstallCommandFromText(run: string): string | undefined {
-  if (/\b(?:bun\s+install\s+--lockfile-only|npm\s+install\s+--package-lock-only)\b/i.test(run)) {
+  const commands = shellCommands(run);
+  // Heredoc bodies are data or scripts with separate execution semantics.
+  if (
+    commands.some((tokens) =>
+      tokens.some((token, index) => token === "<" && tokens[index + 1] === "<"),
+    )
+  ) {
     return undefined;
   }
-
-  for (const [manager, matcher] of installCommandMatchers) {
-    if (matcher.test(run)) {
-      return manager;
+  const families = new Set<DependencyFamily>();
+  for (const tokens of commands) {
+    const family = installFamilyForCommand(tokens);
+    if (family) {
+      families.add(family);
     }
   }
+  return installFamilyPriority.find((family) => families.has(family));
+}
 
-  return undefined;
+function installFamilyForCommand(tokens: string[]): DependencyFamily | undefined {
+  let index = tokens[0] === "env" ? 1 : 0;
+  while (/^[A-Za-z_]\w*=/.test(tokens[index] ?? "")) {
+    index++;
+  }
+  if (tokens[index] === "sudo" || tokens[index] === "corepack") {
+    index++;
+  }
+  let executable = path.posix.basename(tokens[index++] ?? "").toLowerCase();
+  if (/^python(?:[23](?:\.\d+)*)?$/.test(executable)) {
+    while (/^-(?:I|u|s|S|E|B)$/.test(tokens[index] ?? "")) {
+      index++;
+    }
+    if (tokens[index] !== "-m" || tokens[index + 1] !== "pip") {
+      return undefined;
+    }
+    executable = "pip";
+    index += 2;
+  }
+  const family = /^pip[23](?:\.\d+)*$/.test(executable)
+    ? "pip"
+    : installExecutables.get(executable);
+  if (!family) {
+    return undefined;
+  }
+  const args = tokens.slice(index);
+  const flags: string[] = [];
+  for (let i = 0; i < args.length && args[i] !== "--"; i++) {
+    if (installValueOptions.has(args[i]!)) {
+      i++;
+    } else if (args[i]?.startsWith("-")) {
+      flags.push(args[i]!);
+    }
+  }
+  if (flags.some((flag) => ["--help", "-h", "--version"].includes(flag))) {
+    return undefined;
+  }
+  if (["maven", "gradle", "sbt"].includes(family)) {
+    return family;
+  }
+  let actionIndex = 0;
+  while (args[actionIndex]?.startsWith("-") && args[actionIndex] !== "--") {
+    actionIndex += installValueOptions.has(args[actionIndex]!) ? 2 : 1;
+  }
+  if (args[actionIndex] === "--") {
+    actionIndex++;
+  }
+  const action = args[actionIndex];
+  if (family === "go") {
+    return action === "mod" && args[actionIndex + 1] === "download" ? family : undefined;
+  }
+  if (family === "nuget") {
+    return action === "restore" ? family : undefined;
+  }
+  if (family === "uv") {
+    return action === "sync" || (action === "pip" && args[actionIndex + 1] === "install")
+      ? family
+      : undefined;
+  }
+  if (action !== "install" && !(family === "npm" && action === "ci")) {
+    return undefined;
+  }
+  const lockOnlyFlag =
+    family === "npm" ? "--package-lock-only" : family === "bun" ? "--lockfile-only" : undefined;
+  if (lockOnlyFlag) {
+    let lockOnly = false;
+    for (const flag of flags) {
+      if (flag === lockOnlyFlag || flag === `${lockOnlyFlag}=true`) {
+        lockOnly = true;
+      } else if (flag === `${lockOnlyFlag}=false` || flag === `--no-${lockOnlyFlag.slice(2)}`) {
+        lockOnly = false;
+      }
+    }
+    if (lockOnly) {
+      return undefined;
+    }
+  }
+  return family;
 }
 
 export function detectLintToolFromText(stepName: string, run: string): string | undefined {
