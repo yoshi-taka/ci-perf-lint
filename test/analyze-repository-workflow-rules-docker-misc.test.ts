@@ -12,6 +12,72 @@ afterEach(async () => {
 });
 
 describe("analyzeRepository workflow and execution rules: docker misc", () => {
+  test.each([
+    {
+      name: "comments and blank lines preserve consecutive RUN groups",
+      source:
+        "FROM alpine:3.22\nrun touch /tmp/download\n# cleanup\n\nRUN rm /tmp/download\nRUN echo done\nENV READY=1\nRUN echo next\nRUN echo last\n",
+      mode: "exploratory" as const,
+      expected: true,
+    },
+    {
+      name: "combined multiline RUN is a single instruction",
+      source: "FROM alpine:3.22\nRUN touch /tmp/download && \\\n    rm /tmp/download\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "stage boundaries interrupt RUN groups",
+      source: "FROM alpine:3.22 AS build\nRUN echo build\nFROM alpine:3.22\nRUN echo runtime\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "other instructions interrupt RUN groups",
+      source:
+        "FROM alpine:3.22\nRUN echo first\nWORKDIR /app\nRUN echo second\nCOPY . .\nRUN echo third\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "heredoc contents do not become extra RUN instructions",
+      source: "FROM alpine:3.22\nRUN <<EOF\necho first\nRUN echo text\nEOF\n",
+      mode: "exploratory" as const,
+      expected: false,
+    },
+    {
+      name: "strict mode omits advisory RUN consolidation",
+      source: "FROM alpine:3.22\nRUN echo first\nRUN echo second\n",
+      mode: "strict" as const,
+      expected: false,
+    },
+  ])("$name", async ({ source, mode, expected }) => {
+    const fixtureRoot = await tempDirs.create("apl-consecutive-run-");
+    const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+    await mkdir(workflowDir, { recursive: true });
+    await writeFile(
+      path.join(workflowDir, "docker.yml"),
+      "name: docker\non: push\njobs:\n  image:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: docker/build-push-action@v6\n        with:\n          context: .\n      - run: docker build .\n",
+    );
+    await writeFile(path.join(fixtureRoot, "Dockerfile"), source);
+    const report = await analyzeRepository({
+      cwd: fixtureRoot,
+      targetPath: ".",
+      topCount: 100,
+      mode,
+    });
+    const findings = report.findings.filter(
+      (finding) => finding.ruleId === "dockerfile-consecutive-run-instructions",
+    );
+    expect(findings).toHaveLength(expected ? 1 : 0);
+    if (expected) {
+      expect(findings[0]?.severity).toBe("suggestion");
+      expect(findings[0]?.location).toEqual({ path: "Dockerfile", line: 2, column: 1 });
+      expect(findings[0]?.message).toContain("2, 5, 6; 8, 9");
+      expect(findings[0]?.suggestion).toContain("cache reuse");
+    }
+  });
+
   test("warns when pushed Docker build action omits zstd compression", async () => {
     const fixtureRoot = await tempDirs.create("apl-docker-zstd-action-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");

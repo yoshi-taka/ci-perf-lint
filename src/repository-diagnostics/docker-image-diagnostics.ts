@@ -9,9 +9,16 @@ import {
   nodeDockerfileLockfileDiagnosticRules,
 } from "./docker-image-rule-catalog.ts";
 import { collectCargoInstallDiagnostics } from "./docker-cargo-install-diagnostics.ts";
+import { collectAptVersionDiagnostics } from "./docker-apt-version-diagnostics.ts";
 import { collectCompiledBuildSourceLayerDiagnostics } from "./docker-compiled-build-source-layer-diagnostics.ts";
 import { collectFinalStageBroadCopyDiagnostics } from "./docker-final-stage-copy-diagnostics.ts";
 import { collectSingleInstructionImageSizeDiagnostics } from "./docker-image-size-single-instruction-diagnostics.ts";
+import { collectConsecutiveRunDiagnostics } from "./docker-consecutive-run-diagnostics.ts";
+import { collectPipCacheDiagnostics } from "./docker-pip-cache-diagnostics.ts";
+import {
+  collectPackageCacheDiagnostics,
+  collectPackageCacheSettings,
+} from "./docker-package-cache-diagnostics.ts";
 import {
   collectDockerInstallContextProbes,
   dockerInstallContextHasSignals,
@@ -48,7 +55,37 @@ export async function collectDockerfileImageSizeDiagnostics(
     const { instructions, fromInstructionIndexes, finalFromInstructionIndex } = dockerfileData;
 
     const stageAliases = collectDockerfileStageAliases(instructions);
+    const packageCacheSettings = await collectPackageCacheSettings(
+      context,
+      target.contextPath,
+      instructions,
+    );
     diagnostics.push(
+      ...collectPackageCacheDiagnostics(
+        repository,
+        target.workflow,
+        dockerfileRelativePath,
+        instructions,
+        packageCacheSettings,
+      ),
+      ...collectPipCacheDiagnostics(
+        repository,
+        target.workflow,
+        dockerfileRelativePath,
+        instructions,
+      ),
+      ...collectAptVersionDiagnostics(
+        repository,
+        target.workflow,
+        dockerfileRelativePath,
+        instructions,
+      ),
+      ...collectConsecutiveRunDiagnostics(
+        repository,
+        target.workflow,
+        dockerfileRelativePath,
+        instructions,
+      ),
       ...collectSingleInstructionImageSizeDiagnostics(
         repository,
         target.workflow,
