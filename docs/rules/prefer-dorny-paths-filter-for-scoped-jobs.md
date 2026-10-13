@@ -11,9 +11,8 @@ Why this rule exists:
 Current MVP heuristic:
 
 - the workflow runs on `pull_request` or branch `push`
-- at least two heavy jobs are present
-- the repository looks monorepo-like or at least two heavy job names look component-scoped
-- no `dorny/paths-filter` step is already visible
+- at least two ungated heavy job names look component-scoped (for example backend/frontend)
+- monorepo markers alone do not establish component scope; generic test/result/lint jobs do not count without a component-scoped name
 - jobs already gated by `needs.*.outputs.*` or `steps.*.outputs.*` are not counted
 
 Typical remediation:
@@ -23,3 +22,7 @@ Typical remediation:
 - expose filter outputs as job outputs
 - guard heavy component jobs with `if: needs.<changes-job>.outputs.<component> == 'true'`
 - keep required-check behavior in mind when making jobs conditional
+
+The action brand is not the optimization: equivalent change detection such as `tj-actions/changed-files` is valid. Existing output-gated jobs are excluded regardless of the action used. Scope and heaviness remain name/text heuristics, so verify file dependencies, shared build inputs, and actual job cost before applying filters.
+
+Measure skipped runner minutes across representative PRs and total wall time including the changes job. Gating tiny aggregation jobs may add more overhead than it saves. Preserve required-check completion and docs tests; markdown is not automatically irrelevant.

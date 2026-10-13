@@ -16,6 +16,9 @@ Current MVP heuristic:
 - the setup action does not visibly enable its built-in cache for that dependency family
 - and the job does not already use one explicit matching `actions/cache` strategy
 
+All eligible setup steps are reported; output `--top` limits presentation, not collection.
+Only visible workflow install commands are considered. Installs hidden in Makefiles or scripts can be missed.
+
 Built-in cache defaults considered by the rule:
 
 - `setup-go` is treated as cache-enabled by default

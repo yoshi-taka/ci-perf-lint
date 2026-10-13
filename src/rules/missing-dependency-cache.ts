@@ -158,6 +158,6 @@ export const missingDependencyCacheRule = {
       }
     }
 
-    return findings.slice(0, 3);
+    return findings;
   },
 };

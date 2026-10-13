@@ -37,7 +37,7 @@ function looksComponentScoped(job: WorkflowJob): boolean {
 
 export const preferDornyPathsFilterForScopedJobsRule = {
   meta,
-  check(workflow: WorkflowDocument, context: RuleContext) {
+  check(workflow: WorkflowDocument, _context: RuleContext) {
     const ts = getTriggerSemantics(workflow);
 
     if ((!ts.hasPullRequest && !ts.hasBranchPush) || ts.hasTagOnlyPush) {
@@ -52,13 +52,11 @@ export const preferDornyPathsFilterForScopedJobsRule = {
     }
 
     const scopedHeavyJobs = heavyJobs.filter((job) => looksComponentScoped(job));
-    const enoughRepoContext = context.repository.hasMonorepoMarkers || scopedHeavyJobs.length >= 2;
-
-    if (!enoughRepoContext) {
+    if (scopedHeavyJobs.length < 2) {
       return [];
     }
 
-    const representativeJobs = (scopedHeavyJobs.length > 0 ? scopedHeavyJobs : heavyJobs)
+    const representativeJobs = scopedHeavyJobs
       .slice(0, 3)
       .map((job) => `"${job.id}"`)
       .join(", ");

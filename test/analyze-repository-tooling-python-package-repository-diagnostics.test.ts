@@ -1011,7 +1011,7 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
   });
 
   describe("prefer-python-3-11", () => {
-    test("warns on setup-python, matrix, and requires-python below 3.11", async () => {
+    test("warns on tooling and requires-python pins but preserves compatibility matrices", async () => {
       const report = await getFixtureReport(fixtures.preferPython311Like, {
         targetPath: ".",
         topCount: 20,
@@ -1030,7 +1030,7 @@ describe("analyzeRepository repo-aware and tooling rules: python package diagnos
       const workflowFindings = report.findings.filter(
         (c) => c.ruleId === "prefer-python-3-11" && c.scope !== "repository",
       );
-      expect(workflowFindings.some((c) => c.message.includes('Job "test"'))).toBe(true);
+      expect(workflowFindings.some((c) => c.message.includes('Job "test"'))).toBe(false);
       expect(workflowFindings.some((c) => c.message.includes('Job "lint"'))).toBe(true);
     });
 

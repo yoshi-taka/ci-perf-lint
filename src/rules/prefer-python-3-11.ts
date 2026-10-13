@@ -76,6 +76,20 @@ function collectJobOffenders(job: WorkflowJob): Offender[] {
   const matrixVersions: string[] = [];
   const strategy = asRecord(job.raw.strategy);
   readMatrixPythonVersions(strategy?.matrix, matrixVersions);
+  // Mixed old/new runtime matrices preserve compatibility coverage, not a tooling pin.
+  const usesVersionMatrix = job.steps.some(
+    (step) =>
+      step.uses?.toLowerCase().startsWith("actions/setup-python@") &&
+      typeof step.with?.["python-version"] === "string" &&
+      /^\$\{\{\s*matrix\.python-version\s*\}\}$/.test(step.with["python-version"]),
+  );
+  const hasModernMatrixVersion = matrixVersions.some((version) => {
+    const match = version.match(/^(\d+)\.(\d+)/);
+    return match !== null && !pythonVersionIsBelow311(Number(match[1]), Number(match[2]));
+  });
+  if (usesVersionMatrix && hasModernMatrixVersion) {
+    return offenders;
+  }
   for (const version of matrixVersions) {
     if (isBelow311(version)) {
       offenders.push({ node: job.idNode ?? job.node, version });
@@ -107,7 +121,7 @@ export const preferPython311Rule = {
           why: preferPython311Why,
           suggestion: preferPython311Suggestion,
           measurementHint: preferPython311MeasurementHint,
-          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and move its setup-python version (or matrix python-version) to at least 3.11. Update .python-version, tox/nox basepython, and requires-python to match, then confirm tests still pass.`,
+          aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and consider Python 3.11+ for tooling that does not require an older runtime. Preserve supported-version compatibility tests and requires-python; compare total job time and confirm tests still pass.`,
           score: 54,
         }),
       );

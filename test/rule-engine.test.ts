@@ -303,7 +303,7 @@ describe("evaluateRules", () => {
     await cleanup();
   });
 
-  test("maxFindings caps total findings per ruleId", async () => {
+  test("missing dependency cache findings include every eligible job", async () => {
     const { workflow, cleanup } = await createWorkflowDoc(
       [
         "name: CI",
@@ -321,7 +321,7 @@ describe("evaluateRules", () => {
     const context: RuleContext = { repository: createSignals() };
     const result = await evaluateRules(workflow, context);
     const missingCacheCount = result.filter((d) => d.ruleId === "missing-dependency-cache").length;
-    expect(missingCacheCount).toBeLessThanOrEqual(3);
+    expect(missingCacheCount).toBe(5);
     await cleanup();
   });
 

@@ -53,9 +53,12 @@ function hasFailureCancelledGuard(ifText: string): boolean {
 }
 
 function hasStatusFunction(ifText: string): boolean {
-  return (
-    /\b(?:always|failure|cancelled|success)\(\)/.test(ifText) || ifText.includes("!cancelled()")
-  );
+  return /\b(?:always|failure|cancelled|success)\s*\(\s*\)/.test(ifText);
+}
+
+function isDefaultSuccessCondition(ifText: string): boolean {
+  const expression = ifText.trim().replace(/^\$\{\{\s*|\s*\}\}$/g, "");
+  return !hasStatusFunction(expression) || /^success\s*\(\s*\)$/.test(expression);
 }
 
 function hasPositiveStatusFunction(ifText: string, name: "failure" | "cancelled"): boolean {
@@ -113,7 +116,7 @@ export const missingReleaseDownstreamSuccessGuardRule = {
       }
 
       const ifText = getJobIfText(job);
-      if (!ifText) {
+      if (!ifText || isDefaultSuccessCondition(ifText)) {
         continue;
       }
 
@@ -125,11 +128,13 @@ export const missingReleaseDownstreamSuccessGuardRule = {
         continue;
       }
 
-      if (hasOptionalSkipBypass(ifText)) {
+      const hasFailureAndCancellationGuard = hasFailureCancelledGuard(ifText);
+      if (
+        hasOptionalSkipBypass(ifText) &&
+        (hasFailureAndCancellationGuard || hasNeedsSuccessGuard(ifText))
+      ) {
         continue;
       }
-
-      const hasFailureAndCancellationGuard = hasFailureCancelledGuard(ifText);
       if (hasNeedsSuccessGuard(ifText) && hasFailureAndCancellationGuard) {
         continue;
       }
@@ -139,10 +144,7 @@ export const missingReleaseDownstreamSuccessGuardRule = {
           withRepositoryReleaseDownstreamGuardPrecedent(_context, workflow.relativePath, job.id),
         )(
           buildDiagnostic(workflow, meta, job.ifNode ?? job.idNode ?? job.node, {
-            severity:
-              hasFailureAndCancellationGuard || !hasStatusFunction(ifText)
-                ? "suggestion"
-                : undefined,
+            severity: hasFailureAndCancellationGuard ? "suggestion" : undefined,
             message: `Release-like downstream job "${job.id}" depends on upstream jobs without an explicit success guard.`,
             why: hasFailureAndCancellationGuard
               ? "This job already avoids running after upstream failure or cancellation, so the remaining issue is mostly release readability: which upstream jobs must succeed versus which may intentionally be skipped is not explicit in `needs.*.result` terms."

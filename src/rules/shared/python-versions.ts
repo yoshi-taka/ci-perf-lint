@@ -77,10 +77,10 @@ export function requiresPythonConstrainsBelow311(spec: string): boolean {
 }
 
 export const preferPython311Why =
-  "Python 3.11 is the Faster CPython milestone: it is 10-60% faster than 3.10 (about 1.25x on the pyperformance suite) with 10-15% faster interpreter startup, which directly shortens CI jobs that run Python. Python 3.10 also reaches end-of-life in October 2026, and 3.9/3.8 are already end-of-life, so older runtimes stop receiving security fixes.";
+  "Python 3.11 is the Faster CPython milestone: the pyperformance suite reports 10-60% faster execution than 3.10 (about 1.25x on average), with 10-15% faster interpreter startup. Total CI savings depend on the workload; downloads, native tools, and compatibility tests may not benefit. Older-runtime support and lifecycle policy must be evaluated separately.";
 
 export const preferPython311Suggestion =
-  "Move CI to Python 3.11 or newer (3.12/3.13 continue the performance work). Update setup-python version inputs, .python-version, tox/nox basepython, and requires-python together. If a pinned dependency blocks 3.11, upgrade that dependency first; only suppress this rule with a documented rationale.";
+  "Try Python 3.11+ for tooling jobs that do not require an older runtime. Preserve supported-version compatibility tests and package support declarations; do not raise requires-python solely to speed up CI. Keep the runtime change only if tests pass and total job time improves.";
 
 export const preferPython311MeasurementHint =
   "Compare Python job wall-clock time, import/startup time, and test duration before and after moving the runtime to 3.11 or newer.";
