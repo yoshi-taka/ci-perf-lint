@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { detectInstallCommandFromText } from "../src/rules/shared/tools-text.ts";
+import {
+  collectPlainPipInstalls,
+  detectPlainPipInstall,
+  pipInstallSuggestion,
+} from "../src/rules/shared/command-patterns.ts";
 
 describe("install command boundaries", () => {
   test.each([
@@ -60,5 +65,104 @@ describe("install command boundaries", () => {
     ["echo ready\n# npm install --package-lock-only\nnpm ci", "npm"],
   ] as const)("%s", (command, expected) => {
     expect(detectInstallCommandFromText(command)).toBe(expected);
+  });
+});
+
+describe("plain pip invocation boundaries", () => {
+  test.each([
+    ["pip install requests", "pip install requests", "uv pip install requests"],
+    ["pip3 install requests", "pip3 install requests", "uv pip install --python python3 requests"],
+    [
+      "python3.12 -m pip install requests",
+      "python3.12 -m pip install requests",
+      "uv pip install --python python3.12 requests",
+    ],
+    [
+      "/opt/venv/bin/python -m pip install requests",
+      "/opt/venv/bin/python -m pip install requests",
+      "uv pip install --python /opt/venv/bin/python requests",
+    ],
+    [
+      'pip install -r "requirements dev.txt"',
+      'pip install -r "requirements dev.txt"',
+      'uv pip install -r "requirements dev.txt"',
+    ],
+    ['pip install "$PACKAGE"', 'pip install "$PACKAGE"', 'uv pip install "$PACKAGE"'],
+    ["uv pip install requests && pip install flask", "pip install flask", "uv pip install flask"],
+    [
+      "pip install requests && uv pip install flask",
+      "pip install requests",
+      "uv pip install requests",
+    ],
+    ["echo ready && pip install requests", "pip install requests", "uv pip install requests"],
+    [
+      "pip install requests # uv pip install flask",
+      "pip install requests",
+      "uv pip install requests",
+    ],
+    [
+      "pip install \\\n  -r requirements.txt",
+      "pip install   -r requirements.txt",
+      "uv pip install -r requirements.txt",
+    ],
+    [
+      "pip --disable-pip-version-check install requests",
+      "pip --disable-pip-version-check install requests",
+      undefined,
+    ],
+    [
+      "pip --index-url https://example.com install requests",
+      "pip --index-url https://example.com install requests",
+      undefined,
+    ],
+    [
+      "pip install --disable-pip-version-check requests",
+      "pip install --disable-pip-version-check requests",
+      undefined,
+    ],
+    [
+      "env PIP_INDEX_URL=https://example.com pip install requests",
+      "env PIP_INDEX_URL=https://example.com pip install requests",
+      undefined,
+    ],
+    ["/opt/venv/bin/pip install requests", "/opt/venv/bin/pip install requests", undefined],
+    ["python3 -I -m pip install requests", "python3 -I -m pip install requests", undefined],
+    ["pip --log install install requests", "pip --log install install requests", undefined],
+    ["pip --log install list", undefined, undefined],
+    ["echo 'pip install requests'", undefined, undefined],
+    ['printf "%s" "pip install requests"', undefined, undefined],
+    ["# pip install requests", undefined, undefined],
+    ["uv pip install requests", undefined, undefined],
+    ["pipenv install", undefined, undefined],
+    ["pipx install software", undefined, undefined],
+    ["python3 -m pipenv install", undefined, undefined],
+    ["pip2 install requests", undefined, undefined],
+    ["python2 -m pip install requests", undefined, undefined],
+    ["pip install --help", undefined, undefined],
+    ["pip --help install requests", undefined, undefined],
+    ["pip install --dry-run requests", undefined, undefined],
+    ["cat <<EOF\npip install requests\nEOF", undefined, undefined],
+    ["sh -c 'pip install requests'", undefined, undefined],
+  ] as const)("%s", (text, command, replacement) => {
+    const install = detectPlainPipInstall(text);
+    if (command === undefined) {
+      expect(install).toBeUndefined();
+    } else {
+      expect(install?.command).toBe(command);
+      expect(install?.replacement).toBe(replacement);
+    }
+  });
+  test("all plain installs are collected independently", () => {
+    expect(
+      collectPlainPipInstalls(
+        "pip install requests && uv pip install pytest && pip install flask",
+      ).map((install) => install.command),
+    ).toEqual(["pip install requests", "pip install flask"]);
+  });
+  test("pip-only global options receive migration guidance", () => {
+    const install = detectPlainPipInstall("pip --disable-pip-version-check install requests");
+    expect(install).toBeDefined();
+    expect(pipInstallSuggestion(install!)).toContain("translating pip-specific options");
+    expect(pipInstallSuggestion(install!)).not.toContain("uv pip --disable-pip-version-check");
   });
 });

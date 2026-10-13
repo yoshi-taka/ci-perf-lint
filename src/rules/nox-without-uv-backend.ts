@@ -2,6 +2,8 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { collectNoxCommands, noxHasBackendChoice } from "./shared/nox-commands.ts";
+import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "nox-without-uv-backend",
@@ -10,30 +12,9 @@ const meta = {
   docsPath: "docs/rules/nox-without-uv-backend.md",
 } satisfies RuleMeta;
 
-const noxRunPattern = /(?:^|\s)(?:(?:python|python3)\s+-m\s+)?nox(?:\s|$)/i;
-const pipInstallPattern = /\b(?:pip|uv\s+pip)\s+install\b/i;
-const uvFlagPattern = /--uv\b/i;
-
-function stepRunsNox(run: string): boolean {
-  return noxRunPattern.test(run) && !pipInstallPattern.test(run);
-}
-
-function stepHasUvFlag(run: string): boolean {
-  return uvFlagPattern.test(run);
-}
-
-function findNoxStepsWithoutUvFlag(steps: { run?: string }[]): number[] {
-  return steps
-    .map((step, i) => {
-      const run = step.run ?? "";
-      return stepRunsNox(run) && !stepHasUvFlag(run) ? i : -1;
-    })
-    .filter((i) => i !== -1);
-}
-
 export const noxWithoutUvBackendRule = {
   meta,
-  check(workflow: WorkflowDocument, context: RuleContext) {
+  async check(workflow: WorkflowDocument, context: RuleContext) {
     if (!context.repository.python.usesNox) {
       return [];
     }
@@ -41,21 +22,34 @@ export const noxWithoutUvBackendRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
-      const noxSteps = findNoxStepsWithoutUvFlag(job.steps);
-      if (noxSteps.length === 0) {
-        continue;
-      }
-
-      for (const stepIndex of noxSteps) {
-        const step = job.steps[stepIndex]!;
+      for (const step of job.steps) {
+        const commands = collectNoxCommands(step.run ?? "", workflowStepEnv(workflow, job, step));
+        let untuned = false;
+        for (const command of commands) {
+          if (
+            command.needsUv &&
+            !(await noxHasBackendChoice(
+              context.scanContext,
+              command.noxfile,
+              workflowWorkingDirectory(workflow, job, step),
+            ))
+          ) {
+            untuned = true;
+            break;
+          }
+        }
+        if (!untuned) {
+          continue;
+        }
         findings.push(
           buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
-            message: `Job "${job.id}" runs nox without the --uv flag.`,
-            why: "nox can use uv for virtualenv creation and package installation by passing the --uv flag or setting nox.options.uv = True in noxfile.py. This speeds up session setup with no behavioral changes.",
+            message: `Job "${job.id}" runs nox without visible backend selection.`,
+            why: "The uv backend can reduce nox virtualenv creation and package installation time. Verify session requirements and pip compatibility when changing the backend.",
             suggestion:
-              'Add "--uv" to the nox command (e.g., "nox --uv -s <session>") or add "nox.options.uv = True" to noxfile.py.',
-            measurementHint: "Compare nox session setup time before and after adding --uv.",
-            aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and add --uv to the nox command or set nox.options.uv = True in noxfile.py.`,
+              'Select uv with "--default-venv-backend=uv" (e.g., "nox --default-venv-backend=uv -s <session>") or set nox.options.default_venv_backend = "uv" in the applicable noxfile. Preserve session-specific backend requirements.',
+            measurementHint:
+              "Compare nox session setup time before and after selecting the uv backend.",
+            aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and select the uv backend for the identified nox commands when compatible with their sessions. Preserve command boundaries, session arguments and applicable noxfile settings.`,
             score: 42,
           }),
         );

@@ -8,6 +8,7 @@ import {
 import {
   detectSimpleNpmRunFromText,
   detectPlainPipInstall,
+  pipInstallSuggestion,
   lineColumnForIndex,
   MAKE_LIKE_RE,
   HAS_PARALLEL_FLAG_RE,
@@ -132,17 +133,17 @@ export async function collectVercelJsonDiagnostics(
 
     const location = findJsonFieldLocation(text, field);
 
-    const pipPkg = detectPlainPipInstall(command);
-    if (pipPkg) {
+    const pipInstall = detectPlainPipInstall(command);
+    if (pipInstall) {
       diagnostics.push(
         buildRepositoryDiagnostic(context.repository, preferUvPipOverPipMeta, {
           location: { path: relativePath, line: location.line, column: location.column },
           message: `vercel.json ${field} uses pip install; prefer "uv pip install" for faster installs.`,
-          why: "uv pip install is a drop-in replacement for pip install that is significantly faster, especially for projects with many dependencies. It accepts the same arguments, reads the same requirements files, and installs into the same environment.",
-          suggestion: `Replace "pip install ${pipPkg}" with "uv pip install ${pipPkg}".`,
+          why: "uv pip install can reduce dependency installation time. Verify the selected Python environment, option compatibility and resolved dependencies when migrating from pip.",
+          suggestion: pipInstallSuggestion(pipInstall),
           measurementHint:
             "Compare pip install vs uv pip install wall-clock time for the same package set.",
-          aiHandoff: `Review vercel.json ${field} "${command}" and replace "pip install" with "uv pip install". uv pip install is a drop-in replacement.`,
+          aiHandoff: `Review vercel.json ${field} "${command}" and migrate the identified pip install command to uv. Preserve surrounding commands and the Python environment, translate pip-specific options and ensure uv is available.`,
           score: 56,
         }),
       );

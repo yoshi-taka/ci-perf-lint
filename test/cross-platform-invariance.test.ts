@@ -67,6 +67,21 @@ const autoFixtureSets: AutoFixtureCase[] = [
     steps: ["npm ci", "npx eslint"],
   },
   {
+    name: "redundant-npx boolean option",
+    ruleId: "redundant-npx-or-bootstrap",
+    steps: ["npm ci", "npx --yes eslint ."],
+  },
+  {
+    name: "redundant-npx explicit package",
+    ruleId: "redundant-npx-or-bootstrap",
+    steps: ["npm ci", "npx --package=eslint eslint ."],
+  },
+  {
+    name: "redundant-pnpm-dlx precheck",
+    ruleId: "redundant-npx-or-bootstrap",
+    steps: ["npm ci", "pnpm dlx eslint ."],
+  },
+  {
     name: "docker-build-nocache (auto)",
     ruleId: "docker-build-cache-disabled-in-ci",
     steps: ["docker build --no-cache ."],

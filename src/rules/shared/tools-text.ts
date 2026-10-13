@@ -1,5 +1,5 @@
 import path from "node:path";
-import { shellCommands } from "./command-patterns.ts";
+import { parseBootstrapInvocation, shellCommands } from "./command-patterns.ts";
 
 const lintToolMatchers = [
   ["eslint", /(?:^|\s)(?:npx\s+)?eslint(?:\s|$)|--eslint(?:\s|$)/i],
@@ -268,31 +268,9 @@ export function detectPythonToolFromText(stepName: string, run: string): string 
 }
 
 export function detectRedundantBootstrapToolFromText(run: string): string | undefined {
-  const trimmed = run.trim();
-  const match = trimmed.match(
-    /^(npx|pnpx|pnpm\s+dlx|bunx|yarn\s+dlx|uvx|uv\s+tool\s+run)(?:\s+(?:--yes|--no|--package|-p)\s+\S+)*\s+((?:@[^/\s]+\/)?[^\s]+)(?:\s|$)/i,
-  );
-  const runner = match?.[1]?.toLowerCase();
-  const tool = match?.[2];
-  if (!runner || !tool) {
+  const tool = parseBootstrapInvocation(run)?.tool;
+  if (!tool || scaffoldToolPattern.test(tool)) {
     return undefined;
   }
-
-  if (
-    tool.startsWith("./") ||
-    tool.startsWith("../") ||
-    tool.startsWith("/") ||
-    tool.startsWith("$") ||
-    tool.includes("=") ||
-    scaffoldToolPattern.test(tool)
-  ) {
-    return undefined;
-  }
-
-  const baseTool = tool.includes("@") && !tool.includes("/") ? tool.split("@")[0]! : tool;
-  if (tool !== baseTool) {
-    return undefined;
-  }
-
-  return npxEligibleTools.has(baseTool) ? baseTool : undefined;
+  return npxEligibleTools.has(tool) ? tool : undefined;
 }

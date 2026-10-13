@@ -6,7 +6,7 @@ Flags `pip install` commands in jobs that already have `setup-uv` available. If 
 
 ## Why it matters
 
-`uv pip install` is a drop-in replacement for `pip install`. It accepts the same arguments, reads the same requirements files, and installs into the same virtual environment. The resolver and installer are significantly faster, especially for projects with many dependencies.
+`uv pip install` can substantially reduce dependency installation time. Common package and requirements-file installs can be migrated, but pip-specific options, Python environment selection and dependency resolution still need verification.
 
 When a job already sets up uv, using plain `pip install` is a missed optimization opportunity.
 
@@ -14,14 +14,21 @@ When a job already sets up uv, using plain `pip install` is a missed optimizatio
 
 The rule looks for:
 
-- jobs that use `astral-sh/setup-uv`
-- a step that runs `pip install` (without the `uv` prefix)
+- an earlier step in the same job uses `astral-sh/setup-uv`
+- a direct `pip install`, `pip3 install`, or `python -m pip install` command (including versioned Python 3 executables)
+
+Commands are checked independently. A step mixing `uv pip install` with plain pip still reports the plain pip command. Quotes, comments and multiline continuations are handled; echoed command text is not executed. One finding per workflow step lists only its affected install commands.
+
+Suggestions preserve quoted arguments and surrounding commands. Python-module and versioned pip forms make the Python target explicit using `--python`. Commands with pip global options, pip-specific install options, environment prefixes or absolute pip paths receive migration guidance rather than an unverified exact rewrite.
+
+The same detector is used for `vercel.json` install/build commands and `wrangler.toml` build commands. Those repository findings do not assume uv has already been set up; ensure it is available before changing the configured command.
 
 The rule intentionally skips:
 
 - jobs that do not use `setup-uv`
-- steps that already use `uv pip install`
+- commands that already use `uv pip install`
 - steps using other package managers (poetry, pipenv, etc.)
+- pip installs before setup-uv, help/version/dry-run invocations, Python 2, heredoc bodies and opaque shell-wrapper commands
 
 ## When to ignore it
 

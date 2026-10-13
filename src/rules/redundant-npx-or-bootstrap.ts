@@ -6,7 +6,7 @@ import { detectRedundantBootstrapToolFromText, usesLanguageInstall } from "./sha
 import { extractSemanticSteps, groupStepsByJob } from "./shared/semantic-adapter.ts";
 
 const NPX_RE =
-  /\bnpx\b|\bnpm\s+bootstrap\b|\bpnpx\b|\bbunx\b|\byarn\s+dlx\b|\budu\s+dlx\b|\budu\s+tool\s+run\b|\buvx\b|\buv\s+tool\s+run\b/;
+  /\bnpx\b|\bnpm\s+bootstrap\b|\bpnpx\b|\bbunx\b|\b(?:pnpm|yarn)\s+dlx\b|\buvx\b|\buv\s+tool\s+run\b/;
 
 const meta = {
   id: "redundant-npx-or-bootstrap",

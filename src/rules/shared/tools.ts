@@ -1,5 +1,6 @@
 import type { WorkflowStep } from "../../workflow.ts";
 import { getStepFacts } from "./step-facts.ts";
+import { parseBootstrapInvocation } from "./command-patterns.ts";
 
 export type { DependencyFamily, SetupActionKind } from "./tools-text.ts";
 export {
@@ -34,11 +35,5 @@ export function normalizeRunCommand(run: string | undefined): string {
   if (!run) {
     return "";
   }
-  return run
-    .trim()
-    .replace(
-      /^(npx|pnpx|pnpm\s+dlx|bunx|yarn\s+dlx|uvx|uv\s+tool\s+run)(?:\s+(?:--yes|--no|--package|-p)\s+\S+)*\s+/i,
-      "",
-    )
-    .trim();
+  return parseBootstrapInvocation(run)?.command ?? run.trim();
 }

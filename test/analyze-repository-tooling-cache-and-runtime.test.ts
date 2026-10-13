@@ -19,6 +19,53 @@ function getFixtureReport(
 }
 
 describe("analyzeRepository repo-aware and tooling rules: cache and runtime", () => {
+  test.each([
+    {
+      name: "boolean runner flag",
+      first: "npx --yes eslint .",
+      second: "npx eslint .",
+      duplicate: true,
+      bootstraps: 2,
+    },
+    {
+      name: "explicit pinned package retains its identity",
+      first: "npx --package=eslint@9 eslint .",
+      second: "npx eslint .",
+      duplicate: false,
+      bootstraps: 1,
+    },
+    {
+      name: "distinct lint targets remain distinct",
+      first: "npx --yes eslint src",
+      second: "npx eslint test",
+      duplicate: false,
+      bootstraps: 2,
+    },
+  ])("bootstrap normalization: $name", async ({ first, second, duplicate, bootstraps }) => {
+    const root = await tempDirs.create("apl-bootstrap-signatures-");
+    const workflowDir = path.join(root, ".github", "workflows");
+    await mkdir(workflowDir, { recursive: true });
+    const jobs = [first, second]
+      .map(
+        (command, index) =>
+          `  lint${index}:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm ci\n      - run: ${command}`,
+      )
+      .join("\n");
+    await writeFile(path.join(workflowDir, "ci.yml"), `name: checks\non: push\njobs:\n${jobs}\n`);
+    const report = await analyzeRepository({
+      cwd: root,
+      targetPath: ".",
+      mode: "exploratory",
+      topCount: 100,
+    });
+    expect(report.findings.some((finding) => finding.ruleId === "duplicate-install-or-lint")).toBe(
+      duplicate,
+    );
+    expect(
+      report.findings.filter((finding) => finding.ruleId === "redundant-npx-or-bootstrap"),
+    ).toHaveLength(bootstraps);
+  });
+
   test("finds duplicated lint and npx bootstrap patterns", async () => {
     const report = await memoizedAnalyzeRepository({
       cwd: fixtures.duplicationLike,
