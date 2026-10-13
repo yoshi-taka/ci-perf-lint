@@ -4,6 +4,7 @@ import path from "node:path";
 import { analyzeRepository } from "../src/repo.ts";
 import { runCli } from "../src/main.ts";
 import type { WorkflowJob, WorkflowStep } from "../src/workflow.ts";
+import type { RuleMeta } from "../src/types.ts";
 import {
   fixtureCacheKey,
   fixtureFingerprint,
@@ -93,6 +94,35 @@ export function createWorkflowStep(overrides: Partial<WorkflowStep> = {}): Workf
 
 type AnalyzeRepositoryOptions = Parameters<typeof analyzeRepository>[0];
 type AnalyzeRepositoryResult = Awaited<ReturnType<typeof analyzeRepository>>;
+
+/** Guard absence assertions against filtered suggestions and skipped/failed collectors. */
+export function assertRuleTestReport(
+  report: Pick<AnalyzeRepositoryResult, "analysisWarnings">,
+  rule: Pick<RuleMeta, "id" | "severity">,
+  mode: AnalyzeRepositoryOptions["mode"] = "strict",
+): void {
+  if (rule.severity === "suggestion" && mode !== "exploratory") {
+    throw new Error(`Rule test "${rule.id}" requires exploratory mode to observe suggestions.`);
+  }
+  const warning = report.analysisWarnings.find(
+    (entry) =>
+      entry.source === rule.id &&
+      ["gate-skipped", "rule-error", "collector-error"].includes(entry.kind),
+  );
+  if (warning) {
+    throw new Error(`Rule test "${rule.id}" did not complete: ${warning.kind}: ${warning.message}`);
+  }
+}
+
+export async function analyzeRepositoryForRule(
+  options: AnalyzeRepositoryOptions,
+  rule: Pick<RuleMeta, "id" | "severity">,
+): Promise<AnalyzeRepositoryResult> {
+  assertRuleTestReport({ analysisWarnings: [] }, rule, options.mode);
+  const report = await analyzeRepository(options);
+  assertRuleTestReport(report, rule, options.mode);
+  return report;
+}
 
 const analyzeRepositoryCache = new Map<string, Promise<AnalyzeRepositoryResult>>();
 

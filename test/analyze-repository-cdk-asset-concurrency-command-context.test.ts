@@ -1,12 +1,11 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import path from "node:path";
 import { stringify } from "yaml";
-import { analyzeRepository } from "../src/repo.ts";
 import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 import { collectRepositorySignals } from "../src/repository-signals.ts";
 import { collectCdkAssetBuildConcurrencyDiagnostics } from "../src/repository-diagnostics/cdk-asset-build-concurrency.ts";
 import { parseWorkflow } from "../src/workflow.ts";
-import { createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
+import { analyzeRepositoryForRule, createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 afterEach(() => tempDirs.cleanup());
@@ -28,17 +27,15 @@ async function scan(command: string, assetCount = 2, extraJobs: Record<string, u
       (_, index) => `new DockerImageAsset(scope, "Image${index}", { directory: "image${index}" });`,
     ).join("\n"),
   });
-  const report = await analyzeRepository({
-    cwd,
-    targetPath: ".",
-    topCount: 1000,
-    mode: "exploratory",
-  });
-  expect(
-    report.analysisWarnings.some(
-      (warning) => warning.kind === "gate-skipped" && warning.source === ruleId,
-    ),
-  ).toBe(false);
+  const report = await analyzeRepositoryForRule(
+    {
+      cwd,
+      targetPath: ".",
+      topCount: 1000,
+      mode: "exploratory",
+    },
+    { id: ruleId, severity: "suggestion" },
+  );
   return report.findings.filter((finding) => finding.ruleId === ruleId);
 }
 

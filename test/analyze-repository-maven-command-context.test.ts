@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { stringify } from "yaml";
-import { analyzeRepository } from "../src/repo.ts";
-import { createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
+import { analyzeRepositoryForRule, createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 afterEach(() => tempDirs.cleanup());
@@ -22,7 +21,10 @@ async function scan(
     ".github/workflows/ci.yml": stringify({ on: "push", ...extra, jobs }),
     ...files,
   });
-  const report = await analyzeRepository({ cwd, targetPath: ".", topCount: 1000, mode: "strict" });
+  const report = await analyzeRepositoryForRule(
+    { cwd, targetPath: ".", topCount: 1000, mode: "strict" },
+    { id: ruleId, severity: "warning" },
+  );
   return report.findings.filter((finding) => finding.ruleId === ruleId);
 }
 

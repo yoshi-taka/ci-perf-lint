@@ -74,6 +74,19 @@
 - If a fixture needs to model an exception case rather than a positive or clean baseline, prefer a descriptive suffix that still preserves the scenario stem, for example `deep-checkout-mutating-action` or `clean-no-findings`.
 - Before adding a new fixture, check whether an existing `*-like` or `*-ok` fixture already expresses the same repository shape closely enough.
 
+## Guard rule-specific absence assertions
+
+Use `analyzeRepositoryForRule(options, { id, severity })` from `test/helpers.ts` when a fixture is intended to exercise one rule's command/configuration behavior. It rejects suggestion tests outside exploratory mode and target-rule `gate-skipped`, `rule-error` or `collector-error` telemetry, so an empty result cannot silently pass for those reasons. Existing report callers can use `assertRuleTestReport(report, rule, mode)`.
+
+This guard does not prove that every detector or config signal matched. Keep a positive baseline in the same behavior family; for config scope, include a case where the applicable config actually suppresses the finding. Tests intentionally exercising gate skips, mode filtering, or rule failures should use `analyzeRepository()` directly and assert the expected telemetry/output.
+
+```ts
+const report = await analyzeRepositoryForRule(
+  { cwd, targetPath: ".", topCount: 100, mode: "exploratory" },
+  { id: "prefer-cdk-asset-build-concurrency", severity: "suggestion" },
+);
+```
+
 ## Anti-patterns
 
 - Do not add new tests back into a single catch-all `main.test.ts`.
