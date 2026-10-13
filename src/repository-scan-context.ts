@@ -134,6 +134,10 @@ export class RepositoryScanContext {
     return this.#hasGitDir;
   }
 
+  async hasGitDirectory(): Promise<boolean> {
+    return this.#hasGitDirectory();
+  }
+
   async estimatedFileCount(): Promise<number | null> {
     if (await this.#hasGitDirectory()) {
       try {

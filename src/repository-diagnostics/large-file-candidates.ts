@@ -102,7 +102,9 @@ export function largeFileCandidateIndex(
       })),
     collector: () =>
       (collector ??= (async () => {
-        const tracked = await getGitTrackedFiles(scanContext.repoRoot);
+        const tracked = (await scanContext.hasGitDirectory())
+          ? await getGitTrackedFiles(scanContext.repoRoot)
+          : null;
         const candidates = tracked
           ? tracked.filter(isLargeFile)
           : await scanContext.walkFiles(".", {
