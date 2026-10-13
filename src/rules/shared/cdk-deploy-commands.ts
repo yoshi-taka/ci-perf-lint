@@ -83,6 +83,7 @@ interface CdkDeploymentCommand {
   verb: string;
   expressEnabled: boolean;
   methodConfigured: boolean;
+  assetBuildConcurrencyConfigured: boolean;
   changeSetRequired: boolean;
 }
 
@@ -90,6 +91,7 @@ function parseCdkDeploymentCommand(words: string[]): CdkDeploymentCommand | unde
   let verb: string | undefined;
   let enabled = false;
   let methodConfigured = false;
+  let assetBuildConcurrencyConfigured = false;
   let changeSetNamed = false;
   let importExistingResources = false;
   let revertDrift = false;
@@ -120,6 +122,7 @@ function parseCdkDeploymentCommand(words: string[]): CdkDeploymentCommand | unde
         return undefined;
       }
       methodConfigured ||= name === "--method" || name === "-m";
+      assetBuildConcurrencyConfigured ||= name === "--asset-build-concurrency";
       changeSetNamed ||= name === "--change-set-name";
     } else if (["--help", "-h", "--version"].includes(word)) {
       return undefined;
@@ -155,6 +158,7 @@ function parseCdkDeploymentCommand(words: string[]): CdkDeploymentCommand | unde
     verb,
     expressEnabled: enabled,
     methodConfigured,
+    assetBuildConcurrencyConfigured,
     changeSetRequired: changeSetNamed || importExistingResources || revertDrift,
   };
 }
@@ -212,5 +216,11 @@ export function textHasCdkDeployCommandWithoutMethod(text: string): boolean {
   return collectCdkDeploymentCommands(text).some(
     (command) =>
       command.verb === "deploy" && !command.methodConfigured && !command.changeSetRequired,
+  );
+}
+
+export function textHasCdkDeployCommandWithoutAssetBuildConcurrency(text: string): boolean {
+  return collectCdkDeploymentCommands(text).some(
+    (command) => command.verb === "deploy" && !command.assetBuildConcurrencyConfigured,
   );
 }

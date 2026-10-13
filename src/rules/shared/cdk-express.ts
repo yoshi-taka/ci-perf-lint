@@ -8,6 +8,7 @@ import { shellCommandSegments } from "./command-patterns.ts";
 import {
   textHasCdkCommandWithoutExpress,
   textHasCdkDeployCommandWithoutMethod,
+  textHasCdkDeployCommandWithoutAssetBuildConcurrency,
 } from "./cdk-deploy-commands.ts";
 
 const AWS_CDK_CLI_PACKAGE = "aws-cdk";
@@ -90,16 +91,12 @@ export function cdkCliVersionIsBelowHotswapFloor(version: SemverTuple | undefine
   return version !== undefined && compareSemver(version, CDK_HOTSWAP_MIN) < 0;
 }
 
-const CDK_DEPLOY_ONLY = /\b(?:aws-cdk|cdk)\s+deploy\b/;
-
 export function textDeploysCdkWithoutMethodDirect(text: string): boolean {
   return textHasCdkDeployCommandWithoutMethod(text);
 }
 
-const ASSET_BUILD_CONCURRENCY_FLAG = /--asset-build-concurrency\b/;
-
 export function textDeploysCdkWithoutAssetBuildConcurrency(text: string): boolean {
-  return CDK_DEPLOY_ONLY.test(text) && !ASSET_BUILD_CONCURRENCY_FLAG.test(text);
+  return textHasCdkDeployCommandWithoutAssetBuildConcurrency(text);
 }
 
 export function cdkCliVersionSupportsMethodDirect(version: SemverTuple | undefined): boolean {
