@@ -1,7 +1,9 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
-import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { collectStorybookCommands } from "./shared/storybook-commands.ts";
+import { workflowStepEnv } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "prefer-storybook-test-flag",
@@ -10,32 +12,17 @@ const meta = {
   docsPath: "docs/rules/prefer-storybook-test-flag.md",
 } satisfies RuleMeta;
 
-const storybookBuildPattern = /\b(?:build-storybook|storybook\s+build)\b/i;
-const scriptInvocationPattern =
-  /\b(?:npm|yarn|pnpm|bun)\s+(?:run\s+)?[\w:.-]*(?:build-storybook|storybook)\b/i;
-const testFlagPattern = /(?:^|\s)--test(?:\s|$)/;
-const storybookTestPattern =
-  /\b(?:test-storybook|storybook\s+test|@storybook\/test-runner|chromatic|chromaui\/action|chromatic-com\/storybook)\b/i;
-const sbTestBuildEnvPattern = /\bSB_TESTBUILD\b\s*[:=]\s*["']?(?:true|1|yes)["']?/i;
-
-function stepText(step: WorkflowStep): string {
-  return `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`;
-}
-
-function isDirectStorybookBuildWithoutTestFlag(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
-  if (!storybookBuildPattern.test(run) || scriptInvocationPattern.test(run)) {
-    return false;
+function jobBuildsStorybookForTests(workflow: WorkflowDocument, job: WorkflowJob): boolean {
+  let untunedBuild = false;
+  let testConsumer = false;
+  for (const step of job.steps) {
+    const commands = collectStorybookCommands(step.run ?? "", workflowStepEnv(workflow, job, step));
+    untunedBuild ||= commands.builds.includes(false);
+    testConsumer ||=
+      commands.testConsumer ||
+      /^(?:chromaui\/action|chromatic-com\/storybook)@/.test(step.uses ?? "");
   }
-  return !testFlagPattern.test(run);
-}
-
-function jobBuildsStorybookForTests(job: WorkflowJob): boolean {
-  const buildsWithoutTestFlag = job.steps.some(isDirectStorybookBuildWithoutTestFlag);
-  if (!buildsWithoutTestFlag) {
-    return false;
-  }
-  return job.steps.some((step) => storybookTestPattern.test(stepText(step)));
+  return untunedBuild && testConsumer;
 }
 
 export const preferStorybookTestFlagRule = {
@@ -51,12 +38,8 @@ export const preferStorybookTestFlagRule = {
       return [];
     }
 
-    if (sbTestBuildEnvPattern.test(workflow.source ?? "")) {
-      return [];
-    }
-
     return workflow.jobs
-      .filter((job) => !job.usesReusableWorkflow && jobBuildsStorybookForTests(job))
+      .filter((job) => !job.usesReusableWorkflow && jobBuildsStorybookForTests(workflow, job))
       .map((job) =>
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" builds Storybook for tests without the --test flag.`,

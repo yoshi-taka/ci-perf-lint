@@ -1,6 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import { analyzeRepository } from "../src/repo.ts";
 import { createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
+import {
+  cleanupFixture,
+  expectEveryPlatformHasFindings,
+  makeEquivalentWorkflowFixtures,
+} from "./cross-platform-invariance-helpers.ts";
 
 const tempDirs = createTempDirTracker();
 afterEach(async () => {
@@ -96,6 +101,75 @@ test.each([
   "bun install",
 ])("reports disabled frozen behavior: %s", async (run) => {
   const report = await analyze([run], { "pnpm-lock.yaml": "lockfileVersion: '9.0'\n" });
+  expect(report.findings.filter((f) => f.ruleId === "prefer-frozen-lockfile")).toHaveLength(1);
+});
+
+test.each([
+  "cat <<EOF\nbun install\nEOF",
+  "cat <<'EOF'\nbun install\nEOF",
+  'cat <<"EOF"\nbun install\nEOF',
+  "cat <<-EOF\n\tbun install\n\tEOF",
+  "cat 3<<EOF\nbun install\nEOF",
+  "cat <<EOF > instructions.txt\nbun install\nEOF",
+  "cat <<ONE <<TWO\npnpm install --no-frozen-lockfile\nONE\nbun install\nTWO",
+  "cat <<EOF\nyarn install --immutable=false\nEOF",
+  "cat <<EOF\nbun install", // Unterminated input is also opaque.
+  "cat <<< 'bun install'",
+  "sh <<EOF\nbun install\nEOF",
+  "bun install\ncat <<EOF\ninstructions\nEOF", // Entire script, not just the body.
+])("does not infer installs in heredoc scripts: %s", async (run) => {
+  const report = await analyze([run]);
+  expect(report.findings.some((f) => f.ruleId === "prefer-frozen-lockfile")).toBe(false);
+});
+
+test("heredoc exclusion cannot hide an install in another step", async () => {
+  const report = await analyze(["cat <<EOF\nbun install\nEOF", "bun install"]);
+  expect(report.findings.filter((f) => f.ruleId === "prefer-frozen-lockfile")).toHaveLength(1);
+});
+
+test.each([
+  [["cat <<EOF\nbun install\nEOF"], false],
+  [["cat <<'EOF'\nbun install\nEOF", "bun install"], true],
+  [["echo '<<EOF'\nbun install"], true],
+] as const)(
+  "frozen-lockfile input boundaries agree across CI platforms: %s",
+  async (runs, expected) => {
+    const root = await makeEquivalentWorkflowFixtures({
+      steps: runs.map((run) => JSON.stringify(run)),
+    });
+    try {
+      const report = await analyzeRepository({
+        cwd: root,
+        targetPath: ".",
+        topCount: 1000,
+        mode: "exploratory",
+      });
+      expect(report.workflowCount).toBe(4);
+      const findings = report.findings.filter(
+        (finding) => finding.ruleId === "prefer-frozen-lockfile",
+      );
+      if (expected) {
+        expectEveryPlatformHasFindings(findings, "prefer-frozen-lockfile");
+        expect(findings).toHaveLength(4);
+      } else {
+        expect(findings).toEqual([]);
+      }
+    } finally {
+      await cleanupFixture(root);
+    }
+  },
+);
+
+test.each([
+  "echo '<<EOF'\nbun install",
+  'echo "<<EOF"\nbun install',
+  'echo "<" "<" EOF\nbun install',
+  "echo \\<\\<EOF\nbun install",
+  "# cat <<EOF\nbun install",
+  "echo instructions # cat <<EOF\nbun install",
+  "cat < instructions.txt\nbun install",
+])("heredoc-like text is not an input body: %s", async (run) => {
+  const report = await analyze([run]);
   expect(report.findings.filter((f) => f.ruleId === "prefer-frozen-lockfile")).toHaveLength(1);
 });
 

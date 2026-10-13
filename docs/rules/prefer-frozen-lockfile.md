@@ -14,6 +14,8 @@ Explicit flags are unnecessary when the package manager already enables equivale
 
 The separate `prefer-npm-ci` rule covers npm. `pnpm ci` is not the recommended pnpm command.
 
+Scripts containing heredoc or here-string input redirections are conservatively excluded as a whole. Their input text is not treated as executable install commands; other steps are still checked. Commands in a shell interpreter's heredoc are not inferred either.
+
 ## Suggested action
 
 Commit a current lockfile and use `pnpm install --frozen-lockfile`, `yarn install --immutable` (modern), `yarn install --frozen-lockfile` (Classic), or `bun ci`.

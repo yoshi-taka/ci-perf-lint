@@ -3,7 +3,11 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { CIDocument } from "./shared/any-step.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { extractSemanticSteps } from "./shared/semantic-adapter.ts";
-import { shellCommandSegments, staticShellWords } from "./shared/command-patterns.ts";
+import {
+  hasShellInputDocument,
+  shellCommandSegments,
+  staticShellWords,
+} from "./shared/command-patterns.ts";
 import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 
 const meta = {
@@ -45,6 +49,11 @@ export const preferFrozenLockfileRule = {
   async check(doc: CIDocument, context: RuleContext): Promise<Diagnostic[]> {
     const findings: Diagnostic[] = [];
     for (const step of extractSemanticSteps(doc)) {
+      // Heredoc bodies are data, not separate executable command lines.
+      // Leave the entire script opaque rather than guessing delimiter semantics.
+      if (hasShellInputDocument(step.text)) {
+        continue;
+      }
       let env: Record<string, unknown> = {};
       let cwd = step.workingDirectory ?? ".";
       if (doc.kind === "github-actions") {
