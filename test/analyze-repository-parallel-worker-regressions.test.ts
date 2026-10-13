@@ -19,6 +19,124 @@ const job = (command: string, extra = "", stepExtra = "") =>
 
 describe("test-worker config scope", () => {
   test.each([
+    ['npx jest --testNamePattern "slow --maxWorkers=2"', true],
+    ['npx jest --testNamePattern "slow --runInBand"', true],
+    ['npx vitest run --testNamePattern "slow --pool=forks"', true],
+    ['npx playwright test --grep "smoke --workers=2"', true],
+    ['pytest -k "smoke -n 2"', true],
+    ["npx jest --runInBand=false", true],
+    ["npx jest -w2", false],
+    ["npx playwright test -j2", false],
+    ["pytest -n logical", false],
+    ["pytest -n0", false],
+    ["npx --yes jest", true],
+    ["npx jest -- --maxWorkers=2", true],
+    ["npx jest --maxWorkers=2 && npx jest", true],
+    ["npx jest --help", false],
+    ["npx playwright test --list", false],
+    ["pytest --collect-only", false],
+  ])("argument tuning ownership: %s", async (command, expected) => {
+    const report = await scan({}, job(`|\n          ${command}`));
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(expected);
+  });
+  test("a config flag inside a pattern cannot select a tuned config", async () => {
+    const report = await scan(
+      {
+        "package.json": "{}",
+        "jest.config.js": "export default { maxWorkers: 2 };",
+        "other.config.js": "export default {};",
+      },
+      job(
+        '|\n          npx jest --testNamePattern "suite --config=jest.config.js" --config other.config.js',
+      ),
+    );
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(true);
+  });
+  test("a fake config flag does not invalidate the real default config", async () => {
+    const report = await scan(
+      { "package.json": "{}", "jest.config.js": "export default { maxWorkers: 2 };" },
+      job('|\n          npx jest --testNamePattern "suite --config=other.js"'),
+    );
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(false);
+  });
+  test("inline config cannot borrow worker settings from a default file", async () => {
+    const report = await scan(
+      { "package.json": "{}", "jest.config.js": "export default { maxWorkers: 2 };" },
+      job("|\n          npx jest --config='{}'"),
+    );
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(true);
+  });
+  test("inline maxWorkers is visible tuning", async () => {
+    const report = await scan({}, job("|\n          npx jest --config='{\"maxWorkers\":2}'"));
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(false);
+  });
+  test("cd into another package cannot reuse root config evidence", async () => {
+    const report = await scan(
+      {
+        "package.json": "{}",
+        "jest.config.js": "export default { maxWorkers: 2 };",
+        "packages/app/jest.config.js": "export default {};",
+      },
+      job("|\n          cd packages/app && npx jest"),
+    );
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(true);
+  });
+  test.each(["pytest -o addopts=", "pytest -oaddopts="])(
+    "clearing addopts invalidates file tuning: %s",
+    async (command) => {
+      const report = await scan({ "pytest.ini": "[pytest]\naddopts = -n auto\n" }, job(command));
+      expect(
+        report.findings.some(
+          (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+        ),
+      ).toBe(true);
+    },
+  );
+  test("pytest ENV tuning is visible", async () => {
+    const report = await scan({}, job("pytest", "    env:\n      PYTEST_ADDOPTS: '-n logical'\n"));
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(false);
+  });
+  test("step ENV can clear inherited pytest tuning", async () => {
+    const report = await scan(
+      {},
+      job("pytest", "", '        env:\n          PYTEST_ADDOPTS: ""\n'),
+      "env:\n  PYTEST_ADDOPTS: '-n auto'\n",
+    );
+    expect(
+      report.findings.some(
+        (finding) => finding.ruleId === "missing-test-worker-tuning-for-standard-runner",
+      ),
+    ).toBe(true);
+  });
+  test.each([
     ["jest.config.js", "npx jest", "// maxWorkers: 2"],
     ["jest.config.js", "npx jest", "/* maxWorkers: 2 */"],
     ["vitest.config.ts", "npx vitest run", "/* poolOptions: {} */"],

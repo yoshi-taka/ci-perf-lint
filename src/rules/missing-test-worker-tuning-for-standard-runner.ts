@@ -4,7 +4,12 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobRunsOnStandardHostedRunner } from "./shared/workflow-jobs.ts";
 import path from "node:path";
-import { shellCommandSegments } from "./shared/command-patterns.ts";
+import {
+  collectTestWorkerCommands,
+  type TestTool,
+  type TestWorkerCommand,
+} from "./shared/test-worker-commands.ts";
+import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "missing-test-worker-tuning-for-standard-runner",
@@ -13,86 +18,47 @@ const meta = {
   docsPath: "docs/rules/missing-test-worker-tuning-for-standard-runner.md",
 } satisfies RuleMeta;
 
-type TestTool = "jest" | "vitest" | "playwright" | "pytest";
-
 const testToolWorkerTuningRules: readonly {
   tool: TestTool;
-  detectionMatcher: RegExp;
-  tuningMatcher: RegExp;
   examples: string;
 }[] = [
   {
     tool: "jest",
-    detectionMatcher: /^(?:(?:npx|bunx|pnpm exec|yarn exec)\s+)?jest(?:\s|$)/i,
-    tuningMatcher: /--maxWorkers(?:=|\s)\S+|--runInBand\b/i,
     examples: "`--maxWorkers` or `--runInBand`",
   },
   {
     tool: "vitest",
-    detectionMatcher: /^(?:(?:npx|bunx|pnpm exec|yarn exec)\s+)?vitest(?:\s|$)/i,
-    tuningMatcher: /--maxWorkers(?:=|\s)\S+|--minWorkers(?:=|\s)\S+|--pool(?:=|\s)\S+/i,
     examples: "`--maxWorkers` or `--minWorkers`",
   },
   {
     tool: "playwright",
-    detectionMatcher: /^(?:(?:npx|bunx|pnpm exec|yarn exec)\s+)?playwright\s+test\b/i,
-    tuningMatcher: /(?:^|\s)--workers(?:=|\s)\S+/i,
     examples: "`--workers`",
   },
   {
     tool: "pytest",
-    detectionMatcher: /^(?:(?:python|python3)\s+-m\s+|uv run\s+)?pytest(?:\s|$)/i,
-    tuningMatcher: /\s-n\s*(?:auto|\d+)\b|\s--numprocesses(?:=|\s)(?:auto|\d+)/i,
     examples: "`-n auto` or `--numprocesses`",
   },
 ];
-
-function detectDirectTestTool(command: string): TestTool | undefined {
-  return testToolWorkerTuningRules.find((rule) => rule.detectionMatcher.test(command))?.tool;
-}
-
-function hasVisibleWorkerTuning(step: WorkflowStep, tool: TestTool): boolean {
-  const run = step.run ?? "";
-  return testToolWorkerTuningRules.some(
-    (rule) => rule.tool === tool && rule.tuningMatcher.test(run),
-  );
-}
 
 function workerTuningExamples(tool: TestTool): string {
   return testToolWorkerTuningRules.find((rule) => rule.tool === tool)?.examples ?? "worker flags";
 }
 
-function defaultWorkingDirectory(raw: Record<string, unknown> | undefined): string | undefined {
-  const defaults = raw?.defaults;
-  if (!defaults || typeof defaults !== "object" || !("run" in defaults)) {
-    return undefined;
+function hasApplicableConfig(command: TestWorkerCommand, context: RuleContext): boolean {
+  if (command.configOverridden || command.config === null || command.directory === undefined) {
+    return false;
   }
-  const run = defaults.run;
-  if (!run || typeof run !== "object" || !("working-directory" in run)) {
-    return undefined;
-  }
-  return typeof run["working-directory"] === "string" ? run["working-directory"] : undefined;
-}
-
-function hasApplicableConfig(
-  workflow: WorkflowDocument,
-  job: WorkflowJob,
-  step: WorkflowStep,
-  tool: TestTool,
-  context: RuleContext,
-): boolean {
-  const configs = context.repository.frameworks.testWorkerTuningConfigured[tool] ?? [];
-  const cwd =
-    step.workingDirectory ??
-    defaultWorkingDirectory(job.raw) ??
-    defaultWorkingDirectory(workflow.parsed) ??
-    ".";
-  const config = /(?:^|\s)(?:--config|-c)(?:=|\s+)["']?([^\s"']+)/.exec(step.run ?? "");
-  if (config?.[1]) {
-    return configs.includes(path.posix.normalize(path.posix.join(cwd, config[1])));
+  const configs = context.repository.frameworks.testWorkerTuningConfigured[command.tool] ?? [];
+  if (command.config !== undefined) {
+    if (path.posix.isAbsolute(command.config)) {
+      return false;
+    }
+    return configs.includes(
+      path.posix.normalize(path.posix.join(command.directory, command.config)),
+    );
   }
   // Root config evidence cannot prove tuning for a command in another package.
-  return path.posix.normalize(cwd) === "." && configs.length > 0;
+  return path.posix.normalize(command.directory) === "." && configs.length > 0;
 }
 
 function getUntunedTestStep(
@@ -101,17 +67,13 @@ function getUntunedTestStep(
   context: RuleContext,
 ): { step: WorkflowStep; tool: TestTool } | undefined {
   for (const step of job.steps) {
-    for (const command of shellCommandSegments(step.run ?? "")) {
-      const tool = detectDirectTestTool(command);
-      if (!tool) {
-        continue;
-      }
-      const commandStep = { ...step, run: command };
-      if (
-        !hasVisibleWorkerTuning(commandStep, tool) &&
-        !hasApplicableConfig(workflow, job, commandStep, tool, context)
-      ) {
-        return { step, tool };
+    for (const command of collectTestWorkerCommands(
+      step.run ?? "",
+      workflowStepEnv(workflow, job, step),
+      workflowWorkingDirectory(workflow, job, step),
+    )) {
+      if (!command.tuned && !hasApplicableConfig(command, context)) {
+        return { step, tool: command.tool };
       }
     }
   }

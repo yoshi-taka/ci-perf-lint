@@ -27,9 +27,15 @@ The rule looks for:
   - Playwright: `workers` in `playwright.config.*`
   - pytest-xdist: `-n` / `--numprocesses` in `addopts` in `pytest.ini`, `setup.cfg`, `tox.ini`, or `pyproject.toml`
 
+Command arguments are tokenized before detecting worker options or config selection. Flags inside test-name patterns, grep/keyword expressions, report paths or other option values do not count as tuning. `--` ends tool-option parsing. Comments, echoed commands, help/version/list-only invocations and heredoc bodies are excluded.
+
+Jest `-w`/`-i`, Playwright `-j`, pytest `-n4`/`-n logical`, boolean serialization settings and literal pytest `PYTEST_ADDOPTS` are recognized. `--runInBand=false` does not prove serialization. Versioned Python 3 module forms and known bootstrap runners are supported; opaque or dynamic invocation prefixes are not inferred. Explicit worker counts and pool choices are respected.
+
 It intentionally ignores custom runners, larger runners, self-hosted runners, and wrapper scripts where CPU shape is not obvious from workflow YAML.
 
 Config evidence is specific to the test runner. Jest settings do not suppress Playwright, Vitest, or pytest findings. Root configs apply to root commands, or an explicit matching config path; they do not prove tuning for another package's working directory or a different `--config` file.
+
+Config paths use the same argument parser, including quoted paths and later overrides. Literal `cd` changes are resolved per command. Jest inline JSON configs are inspected for `maxWorkers`; pytest `-o addopts=...` overrides prevent unrelated file tuning from suppressing a finding.
 
 ## When to ignore it
 

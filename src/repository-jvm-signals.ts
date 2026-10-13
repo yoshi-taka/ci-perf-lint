@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AnyWorkflowDocument } from "./ci-types.ts";
 import { collectCommandEntries } from "./rules/shared/any-step.ts";
 import { shellCommandSegments, staticShellWords } from "./rules/shared/command-patterns.ts";
+import { collectGradleCommands, findGradleBuildRoot } from "./rules/shared/gradle-commands.ts";
 
 async function hasSrcSubdir(context: RepositoryScanContext, subdir: string): Promise<boolean> {
   try {
@@ -59,6 +60,13 @@ export async function collectJvmSignals(
   for (const workflow of workflows) {
     for (const entry of collectCommandEntries(workflow)) {
       let cwd = entry.workingDirectory ?? ".";
+      for (const command of collectGradleCommands(entry.text, {}, cwd)) {
+        const root = await findGradleBuildRoot(context, command.directory);
+        if (root !== undefined) {
+          usesGradle = true;
+          buildRoots.add(root);
+        }
+      }
       for (const segment of shellCommandSegments(entry.text)) {
         const words = staticShellWords(segment);
         if (!words) {
@@ -69,7 +77,7 @@ export async function collectJvmSignals(
           continue;
         }
         const tool = words[0] ?? "";
-        if (!/^(?:.*\/)?(?:gradlew?|mvnw?)$/.test(tool)) {
+        if (!/^(?:.*\/)?mvnw?$/.test(tool)) {
           continue;
         }
         const relativeRoot = path.posix.normalize(path.posix.join(cwd, path.posix.dirname(tool)));
@@ -80,15 +88,7 @@ export async function collectJvmSignals(
         ) {
           continue;
         }
-        const names = tool.includes("gradle")
-          ? [
-              "build.gradle",
-              "build.gradle.kts",
-              "settings.gradle",
-              "settings.gradle.kts",
-              "gradlew",
-            ]
-          : ["pom.xml", "mvnw"];
+        const names = ["pom.xml", "mvnw"];
         const present = (
           await Promise.all(
             names.map((name) => context.pathExists(context.resolve(relativeRoot, name))),
@@ -98,7 +98,6 @@ export async function collectJvmSignals(
           continue;
         }
         buildRoots.add(relativeRoot);
-        usesGradle ||= tool.includes("gradle");
         usesMaven ||= tool.includes("mvn");
       }
     }
