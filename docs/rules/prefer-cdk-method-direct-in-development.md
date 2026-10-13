@@ -16,6 +16,10 @@ Flags development `cdk deploy` commands that do not use `--method=direct`.
 - `aws-cdk` CLI below 2.118.0 is not flagged, because `--method=direct` could fail with `No updates are to be performed` on stacks that resolve SSM parameters (fixed in 2.118.0).
 - Production and release contexts are not flagged.
 
+Commands and option values are parsed separately, on both workflow and package.json surfaces. Echoed deploy examples, comments, `--app` strings, context values and flags on another command do not prove a deployment method or a change-set requirement. Known bootstrap runners, literal environment assignments, executable paths and global options before `deploy` are supported. Help/version, heredoc scripts, command substitutions, dynamic arguments and opaque or unknown options are not inferred.
+
+`--method=direct`, `--method direct`, `-m direct` and `-mdirect` are recognized; any explicit method, including `change-set`, remains respected. `--` ends option parsing. A named change set or an enabled `--import-existing-resources` / `--revert-drift` excludes that invocation. Explicit `false` or `--no-...` disables the boolean requirement, and later boolean settings override earlier ones. One configured invocation cannot hide another unconfigured deploy in the same step or script.
+
 ## Suggested action
 
 - Add `--method=direct` to development `cdk deploy` commands.

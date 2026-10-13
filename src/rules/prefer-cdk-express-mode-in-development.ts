@@ -15,7 +15,6 @@ import {
   groupCdkStepsByCliVersion,
   textDeploysCdkWithoutExpress,
 } from "./shared/cdk-express.ts";
-import { shellCommandSegments } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "prefer-cdk-express-mode-in-development",
@@ -35,9 +34,7 @@ export const preferCdkExpressModeInDevelopmentRule = {
         continue;
       }
 
-      const candidates = job.steps.filter((step) =>
-        shellCommandSegments(step.run ?? "").some(textDeploysCdkWithoutExpress),
-      );
+      const candidates = job.steps.filter((step) => textDeploysCdkWithoutExpress(step.run ?? ""));
       if (candidates.length === 0) {
         continue;
       }

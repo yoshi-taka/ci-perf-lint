@@ -22,6 +22,10 @@ The rule stays silent for:
 - commands that already pass `--express`
 - `cdk synth` and `cdk diff`, which do not deploy stacks
 
+Direct executable commands are parsed separately, including known bootstrap runners, literal environment-assignment prefixes and executable paths. Echoes, comments, option values, help/version requests, heredoc bodies, command substitutions and opaque shell control flow are not deploy commands. Unknown options or dynamic argument lists are not inferred.
+
+`--express`, `--express=true` and `--express true` enable express mode. `--express=false`, `--express false` and `--no-express` do not; later settings override earlier settings within the same command. `--` ends option parsing. Flags in `--app`, context, profile or other option values cannot enable express mode, and a tuned command cannot hide another untuned invocation in the same workflow step or package script. Development/production and CLI-version gates are unchanged.
+
 ## Suggested action
 
 - Add `--express` to development `cdk deploy`, `cdk destroy`, and `cdk bootstrap` commands.

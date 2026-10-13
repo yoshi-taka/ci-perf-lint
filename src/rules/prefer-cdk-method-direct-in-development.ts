@@ -11,16 +11,13 @@ import {
   groupCdkStepsByCliVersion,
   textDeploysCdkWithoutMethodDirect,
 } from "./shared/cdk-express.ts";
-import { shellCommandSegments } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "prefer-cdk-method-direct-in-development",
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-cdk-method-direct-in-development.md",
-  precheck: predicateToPrecheck([
-    { pred: sourceContains("cdk deploy"), weight: 1, label: "has-cdk-deploy" },
-  ]),
+  precheck: predicateToPrecheck([{ pred: sourceContains("cdk"), weight: 1, label: "has-cdk" }]),
 } satisfies RuleMeta;
 
 export const preferCdkMethodDirectInDevelopmentRule = {
@@ -34,7 +31,7 @@ export const preferCdkMethodDirectInDevelopmentRule = {
       }
 
       const candidates = job.steps.filter((step) =>
-        shellCommandSegments(step.run ?? "").some(textDeploysCdkWithoutMethodDirect),
+        textDeploysCdkWithoutMethodDirect(step.run ?? ""),
       );
       if (candidates.length === 0) {
         continue;

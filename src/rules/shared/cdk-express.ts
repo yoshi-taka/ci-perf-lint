@@ -5,6 +5,10 @@ import { readLockedDependencyVersion } from "../../repository-dependency-version
 import { workflowLooksReleaseLike } from "./workflow-jobs.ts";
 import { getTriggerSemantics } from "./workflow-triggers.ts";
 import { shellCommandSegments } from "./command-patterns.ts";
+import {
+  textHasCdkCommandWithoutExpress,
+  textHasCdkDeployCommandWithoutMethod,
+} from "./cdk-deploy-commands.ts";
 
 const AWS_CDK_CLI_PACKAGE = "aws-cdk";
 
@@ -21,8 +25,6 @@ const CDK_METHOD_DIRECT_MIN: SemverTuple = [2, 118, 0];
 const CDK_DEPLOY_VERB = /\b(?:aws-cdk|cdk)\s+(?:deploy|destroy|bootstrap)\b/;
 
 const CDK_INSTALL_VERSION = /\b(?:aws-cdk|cdk)@(\d+\.\d+(?:\.\d+)?)/;
-
-const EXPRESS_FLAG = /(?:^|\s)--express(?=\s|=|$)/;
 
 const EXACT_VERSION_SPEC = /^[=v]?\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/;
 
@@ -69,12 +71,8 @@ export function formatSemver(version: SemverTuple): string {
   return version.join(".");
 }
 
-function textHasCdkExpressFlag(text: string): boolean {
-  return EXPRESS_FLAG.test(text);
-}
-
 export function textDeploysCdkWithoutExpress(text: string): boolean {
-  return CDK_DEPLOY_VERB.test(text) && !textHasCdkExpressFlag(text);
+  return textHasCdkCommandWithoutExpress(text);
 }
 
 const CDK_WATCH_VERB = /\b(?:aws-cdk|cdk)\s+watch\b/;
@@ -94,14 +92,8 @@ export function cdkCliVersionIsBelowHotswapFloor(version: SemverTuple | undefine
 
 const CDK_DEPLOY_ONLY = /\b(?:aws-cdk|cdk)\s+deploy\b/;
 
-const METHOD_FLAG = /(?:^|\s)(?:--method|-m)(?=\s|=|$)/;
-
-const METHOD_DIRECT_INCOMPATIBLE = /--import-existing-resources\b|--revert-drift\b/;
-
 export function textDeploysCdkWithoutMethodDirect(text: string): boolean {
-  return (
-    CDK_DEPLOY_ONLY.test(text) && !METHOD_FLAG.test(text) && !METHOD_DIRECT_INCOMPATIBLE.test(text)
-  );
+  return textHasCdkDeployCommandWithoutMethod(text);
 }
 
 const ASSET_BUILD_CONCURRENCY_FLAG = /--asset-build-concurrency\b/;
