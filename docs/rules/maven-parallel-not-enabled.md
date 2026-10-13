@@ -23,6 +23,10 @@ Does not report when:
 - Only a single `pom.xml` is found and the root POM has no `<modules>`
 - No Maven lifecycle goal runs in CI
 
+Lifecycle goals and thread settings are parsed as command arguments. Echoed examples, comments, properties, profile names, settings paths and other option values are not lifecycle goals or thread flags. `-T2`, `-T=2`, `-T 1C`, `--threads=2` and fractional core counts are recognized only for their own invocation. `--` ends global-option parsing. Help/version, heredoc scripts, command substitutions, dynamic arguments and opaque shell control flow are not inferred.
+
+Literal `MAVEN_ARGS` settings are considered (Maven 3.9+); workflow/job/step ENV and inline assignments apply only to the appropriate invocation. `MAVEN_OPTS` is a JVM option string and does not configure Maven's `--threads`. Root `.mvn/maven.config` uses the same argument analysis, including quoted option values, whole-line comments and multiline options. Unknown configuration is conservatively excluded rather than declared untuned.
+
 ## Severity
 
 `warning` — parallel execution is a large, low-risk win for most multi-module builds, but plugins that are not marked `@threadSafe` can break under parallelism.

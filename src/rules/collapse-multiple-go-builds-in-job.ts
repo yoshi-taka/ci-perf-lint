@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getJobStepAnalysis, goBuildOccurrenceCountInRun } from "./shared/job-step-analysis.ts";
+import { collectGoBuildCommands } from "./shared/go-build-commands.ts";
 
 const meta = {
   id: "collapse-multiple-go-builds-in-job",
@@ -12,18 +13,7 @@ const meta = {
 } satisfies RuleMeta;
 
 function stepHasMultiPackageGoBuild(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
-  if (!/\bgo\s+build\b/i.test(run)) {
-    return false;
-  }
-
-  const normalized = run.replace(/\\\r?\n/g, " ").replace(/\s+/g, " ");
-  const match = normalized.match(/\bgo\s+build\b([\s\S]*?)(?:&&|\|\||;|\n|$)/i);
-  const args = match?.[1] ?? "";
-  const packageArgs = args
-    .split(/\s+/)
-    .filter((token) => token.startsWith("./") && !token.includes("="));
-  return packageArgs.length >= 2;
+  return collectGoBuildCommands(step.run ?? "").some((command) => command.targets.length >= 2);
 }
 
 export const collapseMultipleGoBuildsInJobRule = {

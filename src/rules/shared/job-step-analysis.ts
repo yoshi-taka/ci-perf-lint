@@ -1,4 +1,5 @@
 import type { WorkflowJob } from "../../workflow.ts";
+import { collectGoBuildCommands } from "./go-build-commands.ts";
 
 function stepRunsGoVet(run: string): boolean {
   return /\bgo\s+vet(?:\s|$)/i.test(run);
@@ -29,7 +30,7 @@ function stepRunsBroadSerialGoTest(run: string): boolean {
 }
 
 export function goBuildOccurrenceCountInRun(run: string): number {
-  return run.match(/\bgo\s+build(?:\s|$)/gi)?.length ?? 0;
+  return collectGoBuildCommands(run).length;
 }
 
 export interface JobStepAnalysis {

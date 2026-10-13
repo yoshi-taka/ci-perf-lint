@@ -3,7 +3,8 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
-import { shellCommandSegments } from "../rules/shared/command-patterns.ts";
+import { collectMavenCommands, mavenConfiguresThreads } from "../rules/shared/maven-commands.ts";
+import { workflowStepEnv } from "../rules/shared/workflow-command-context.ts";
 
 const meta = {
   id: "maven-parallel-not-enabled",
@@ -13,11 +14,6 @@ const meta = {
 } satisfies RuleMeta;
 
 const POM_FILE = /^pom\.xml$/;
-
-const MAVEN_LIFECYCLE =
-  /\b(?:mvn|mvnw)\b.*\b(?:compile|test|package|verify|install|deploy|integration-test)\b/i;
-
-const PARALLEL_FLAG = /(?:^|\s)(?:-T(?:\d|\s)|--threads(?:\s|=))/;
 
 async function rootPomHasModules(scanContext: RepositoryScanContext): Promise<boolean> {
   const text = await scanContext.readTextFileOrWarn(scanContext.resolve("pom.xml"));
@@ -67,9 +63,10 @@ export async function collectMavenParallelNotEnabledDiagnostics(
     return [];
   }
 
-  const hasUntunedLifecycle = context.predicateIndex.allSteps.some(({ step }) =>
-    shellCommandSegments(step.run ?? "").some(
-      (command) => MAVEN_LIFECYCLE.test(command) && !PARALLEL_FLAG.test(command),
+  const hasUntunedLifecycle = context.predicateIndex.allSteps.some(({ workflow, job, step }) =>
+    collectMavenCommands(step.run ?? "", workflowStepEnv(workflow, job, step)).some(
+      (command) =>
+        command.lifecycle && !command.parallelConfigured && !command.opaque && !command.inactive,
     ),
   );
   if (!hasUntunedLifecycle) {
@@ -79,7 +76,7 @@ export async function collectMavenParallelNotEnabledDiagnostics(
   const configPath = context.scanContext.resolve(".mvn", "maven.config");
   if (await context.scanContext.pathExists(configPath)) {
     const config = await context.scanContext.readTextFileOrWarn(configPath);
-    if (config && PARALLEL_FLAG.test(config.replace(/^\s*#.*$/gm, ""))) {
+    if (config && mavenConfiguresThreads(config) !== false) {
       return [];
     }
   }
