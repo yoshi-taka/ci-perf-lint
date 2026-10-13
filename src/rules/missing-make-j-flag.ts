@@ -1,11 +1,11 @@
-import { isMap, type Node } from "yaml";
 import path from "node:path";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
-import { getNode, getScalarString } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { collectMakeBuildCommands, type MakeBuildCommand } from "./shared/make-build-commands.ts";
+import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 import {
   parseMakefile,
   extractMakeTarget,
@@ -20,11 +20,6 @@ const meta = {
   docsPath: "docs/rules/missing-make-j-flag.md",
 } satisfies RuleMeta;
 
-const MAKE_LIKE = /^\s*(?:make|gmake)\b/;
-const CMAKE_BUILD = /^\s*cmake\s+--build\b/;
-const HAS_PARALLEL_FLAG = /(?:^|\s)(?:-j\s*\d*|--jobs(?:\s*=\s*\d+)?|--parallel)\b/;
-const HAS_NINJA = /\b[Nn]inja\b/;
-
 function getRepoRoot(workflow: WorkflowDocument): string {
   const relDir = path.dirname(workflow.relativePath);
   const upCount = relDir === "." ? 0 : relDir.split("/").length;
@@ -34,28 +29,28 @@ function getRepoRoot(workflow: WorkflowDocument): string {
 
 async function stepTargetIsInternalParallel(
   workflow: WorkflowDocument,
-  job: WorkflowJob,
-  step: WorkflowStep,
+  command: MakeBuildCommand,
   scanContext?: RepositoryScanContext,
 ): Promise<boolean> {
-  if (!scanContext) {
+  if (
+    !scanContext ||
+    command.customMakefile ||
+    command.targets.length !== 1 ||
+    command.directory === undefined ||
+    path.posix.isAbsolute(command.directory) ||
+    command.directory === ".." ||
+    command.directory.startsWith("../")
+  ) {
     return false;
   }
 
-  const run = step.run?.trim();
-  if (!run) {
-    return false;
-  }
-
-  const target = extractMakeTarget(run);
+  const target = extractMakeTarget(command.text);
   if (!target) {
     return false;
   }
 
   const repoRoot = getRepoRoot(workflow);
-  const jobWd = getScalarString(getNode(job.node, "working-directory"));
-  const workingDir = step.workingDirectory ?? jobWd ?? undefined;
-  const dir = workingDir ? path.resolve(repoRoot, workingDir) : repoRoot;
+  const dir = path.resolve(repoRoot, command.directory);
 
   const parsed = await scanContext.parseMakefileAtDir(dir);
   if (!parsed) {
@@ -86,72 +81,6 @@ async function stepTargetIsInternalParallel(
   return detectInternalParallelTool(recipes, parsed.variables) !== null;
 }
 
-function hasParallelFlagInCommand(run: string): boolean {
-  return HAS_PARALLEL_FLAG.test(run);
-}
-
-function* collectEnvMaps(
-  workflow: WorkflowDocument,
-  job: WorkflowJob,
-  step: WorkflowStep,
-): Generator<Node> {
-  const workflowEnvNode = workflow.root ? getNode(workflow.root, "env") : undefined;
-  if (workflowEnvNode) {
-    yield workflowEnvNode;
-  }
-
-  const jobEnvNode = getNode(job.node, "env");
-  if (jobEnvNode) {
-    yield jobEnvNode;
-  }
-
-  const stepEnvNode = getNode(step.node, "env");
-  if (stepEnvNode) {
-    yield stepEnvNode;
-  }
-}
-
-function envContains(envMap: Node, key: string, valuePattern?: RegExp): boolean {
-  if (!isMap(envMap)) {
-    return false;
-  }
-  for (const item of envMap.items) {
-    const k = getScalarString(item.key);
-    if (k !== key) {
-      continue;
-    }
-    if (!valuePattern) {
-      return true;
-    }
-    const v = getScalarString(item.value);
-    if (v && valuePattern.test(v)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function jobUsesNinja(job: WorkflowJob): boolean {
-  for (const step of job.steps) {
-    if (step.run && HAS_NINJA.test(step.run)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function hasParallelEnv(workflow: WorkflowDocument, job: WorkflowJob, step: WorkflowStep): boolean {
-  for (const envMap of collectEnvMaps(workflow, job, step)) {
-    if (envContains(envMap, "MAKEFLAGS", /(?:^|\s)-j/)) {
-      return true;
-    }
-    if (envContains(envMap, "CMAKE_BUILD_PARALLEL_LEVEL", /\d+/)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 interface DelinquentStep {
   step: WorkflowStep;
   kind: "make" | "cmake";
@@ -163,36 +92,40 @@ async function collectDelinquentSteps(
   scanContext?: RepositoryScanContext,
 ): Promise<DelinquentStep[]> {
   const result: DelinquentStep[] = [];
+  const generators = new Map<string, string | undefined>();
   for (const step of job.steps) {
-    const run = step.run?.trim();
-    if (!run || run.includes("\n")) {
-      continue;
+    for (const command of collectMakeBuildCommands(
+      step.run ?? "",
+      workflowStepEnv(workflow, job, step),
+      workflowWorkingDirectory(workflow, job, step),
+    )) {
+      if (command.kind === "cmake-configure") {
+        if (command.directory !== undefined) {
+          generators.set(command.directory, command.generator);
+        }
+        continue;
+      }
+      if (!command.needsParallel) {
+        continue;
+      }
+      if (
+        command.kind === "make" &&
+        (await stepTargetIsInternalParallel(workflow, command, scanContext))
+      ) {
+        continue;
+      }
+      const generator =
+        command.directory === undefined ? undefined : generators.get(command.directory);
+      if (
+        command.kind === "cmake" &&
+        (generator === "Ninja" || generator === "Ninja Multi-Config")
+      ) {
+        continue;
+      }
+      if (!result.some((item) => item.step === step && item.kind === command.kind)) {
+        result.push({ step, kind: command.kind });
+      }
     }
-
-    let kind: "make" | "cmake" | undefined;
-    if (MAKE_LIKE.test(run)) {
-      kind = "make";
-    } else if (CMAKE_BUILD.test(run)) {
-      kind = "cmake";
-    }
-
-    if (!kind) {
-      continue;
-    }
-    if (hasParallelFlagInCommand(run)) {
-      continue;
-    }
-    if (hasParallelEnv(workflow, job, step)) {
-      continue;
-    }
-    if (kind === "make" && (await stepTargetIsInternalParallel(workflow, job, step, scanContext))) {
-      continue;
-    }
-    if (kind === "cmake" && jobUsesNinja(job)) {
-      continue;
-    }
-
-    result.push({ step, kind });
   }
   return result;
 }
@@ -228,20 +161,22 @@ export const missingMakeJFlagRule = {
       }
 
       const firstStep = delinquent[0]!.step;
-      const stepNumbers = delinquent.map((d) => job.steps.indexOf(d.step) + 1);
+      const stepNumbers = [...new Set(delinquent.map((d) => job.steps.indexOf(d.step) + 1))];
       const stepList =
         stepNumbers.length === 1 ? `step #${stepNumbers[0]}` : `steps #${stepNumbers.join(", #")}`;
 
       const kinds = [...new Set(delinquent.map((d) => d.kind))];
-      const toolLabel = kinds.length === 1 && kinds[0] === "cmake" ? "cmake --build" : "make/gmake";
+      const toolLabel =
+        kinds.length > 1
+          ? "make/gmake and cmake --build"
+          : kinds[0] === "cmake"
+            ? "cmake --build"
+            : "make/gmake";
 
       findings.push(
         buildDiagnostic(workflow, meta, firstStep.runNode ?? firstStep.node, {
-          message: `Job "${job.id}" runs ${toolLabel} without parallelization in ${stepList}.`,
-          why:
-            delinquent.length === 1
-              ? "Make defaults to serial execution. Explicit parallelization matches runner CPU count and cuts build wall time significantly."
-              : `Make defaults to serial execution. ${delinquent.length} commands in the same job each run serially, multiplying the wasted wall time.`,
+          message: `Job "${job.id}" runs ${toolLabel} without visible parallel controls in ${stepList}.`,
+          why: "No applicable command or environment parallel settings are visible for this build path. Make normally runs serially unless its build configuration supplies parallelism; CMake defaults depend on the native generator. Matching available CPUs can reduce wall time for independent build work.",
           suggestion: formatSuggestion(delinquent),
           measurementHint: "Compare build step duration before and after adding parallel flags.",
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and add parallelization flags to ${toolLabel} commands.`,

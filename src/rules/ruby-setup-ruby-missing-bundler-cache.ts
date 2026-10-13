@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { isManualCacheStep, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
+import { textRunsBundlerInstall } from "./shared/bundler-commands.ts";
 
 const meta = {
   id: "ruby-setup-ruby-missing-bundler-cache",
@@ -13,21 +14,14 @@ const meta = {
 
 const rubySetupUsesPattern = /^ruby\/setup-ruby(?:@|$)/i;
 
-const bundleInstallPattern = /\bbundle\s+install\b/i;
-
-const bundleNotInstallPattern = /\bbundle\s+(?:check|exec|outdated|audit)\b/i;
-
-const bundleNoCacheFlagPattern = /\bbundle\s+install\s+--no-cache\b/i;
-
 const noCacheNamePattern = /\b(?:no\s+cache|disable\s+cache)\b/i;
 
-function findRubySetupStep(job: WorkflowJob): WorkflowStep | undefined {
-  return job.steps.find((step) => step.uses && rubySetupUsesPattern.test(step.uses));
-}
-
-function setupStepHasBundlerCache(step: WorkflowStep): boolean {
+function setupStepNeedsBundlerCache(step: WorkflowStep): boolean {
   const val = step.with?.["bundler-cache"];
-  return val === true || val === "true";
+  const normalized = typeof val === "string" ? val.trim().toLowerCase() : val;
+  return (
+    normalized === undefined || normalized === false || normalized === "false" || normalized === ""
+  );
 }
 
 function hasNoCacheCommentInName(step: WorkflowStep): boolean {
@@ -35,20 +29,21 @@ function hasNoCacheCommentInName(step: WorkflowStep): boolean {
   return noCacheNamePattern.test(name);
 }
 
-function findBundlerInstallStep(job: WorkflowJob): WorkflowStep | undefined {
-  return job.steps.find((step) => {
-    const run = step.run ?? "";
-    if (!run) {
-      return false;
+function findUncachedBundlerSetup(job: WorkflowJob): WorkflowStep | undefined {
+  let setupStep: WorkflowStep | undefined;
+  for (const step of job.steps) {
+    if (step.uses && rubySetupUsesPattern.test(step.uses)) {
+      setupStep = step;
+    } else if (
+      setupStep &&
+      setupStepNeedsBundlerCache(setupStep) &&
+      !hasNoCacheCommentInName(step) &&
+      textRunsBundlerInstall(step.run ?? "")
+    ) {
+      return setupStep;
     }
-    if (bundleNotInstallPattern.test(run)) {
-      return false;
-    }
-    if (bundleNoCacheFlagPattern.test(run)) {
-      return false;
-    }
-    return bundleInstallPattern.test(run);
-  });
+  }
+  return undefined;
 }
 
 function jobRunsInsideContainer(job: WorkflowJob): boolean {
@@ -57,14 +52,15 @@ function jobRunsInsideContainer(job: WorkflowJob): boolean {
 
 function jobHasCustomBundlerCache(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    if (!isManualCacheStep(step)) {
+    if (!isManualCacheStep(step) || step.uses?.toLowerCase().startsWith("actions/cache/save@")) {
       return false;
     }
-    const path = step.with?.path;
-    if (typeof path !== "string") {
-      return false;
-    }
-    return /\b(?:vendor\/bundle|\.bundle|rubygems|gems)\b/i.test(path);
+    const paths = step.with?.path;
+    const values = typeof paths === "string" ? [paths] : Array.isArray(paths) ? paths : [];
+    return values.some(
+      (value) =>
+        typeof value === "string" && /\b(?:vendor\/bundle|\.bundle|rubygems|gems)\b/i.test(value),
+    );
   });
 }
 
@@ -78,21 +74,8 @@ export const rubySetupRubyMissingBundlerCacheRule = {
         continue;
       }
 
-      const setupStep = findRubySetupStep(job);
+      const setupStep = findUncachedBundlerSetup(job);
       if (!setupStep) {
-        continue;
-      }
-
-      if (setupStepHasBundlerCache(setupStep)) {
-        continue;
-      }
-
-      const installStep = findBundlerInstallStep(job);
-      if (!installStep) {
-        continue;
-      }
-
-      if (hasNoCacheCommentInName(installStep)) {
         continue;
       }
 
@@ -109,10 +92,10 @@ export const rubySetupRubyMissingBundlerCacheRule = {
           message: `Job "${job.id}" uses \`ruby/setup-ruby\` and runs \`bundle install\` manually, but does not enable \`bundler-cache: true\`.`,
           why: "ruby/setup-ruby supports built-in Bundler caching via `bundler-cache: true`. When enabled, it runs `bundle install` and caches installed gems automatically, reducing dependency install time on repeated CI runs.",
           suggestion:
-            "Replace the manual `bundle install` step by adding `bundler-cache: true` to the `ruby/setup-ruby` step.",
+            "Consider adding `bundler-cache: true` to the matching `ruby/setup-ruby` step after aligning its Gemfile, environment and working directory with the manual install. Remove only redundant install commands; preserve bundle check, bundle exec and other surrounding work.",
           measurementHint:
             "Compare total job duration before and after enabling `bundler-cache: true`.",
-          aiHandoff: `In ${workflow.relativePath} job "${job.id}", \`ruby/setup-ruby\` is used without \`bundler-cache: true\` but a manual \`bundle install\` step exists. If this job repeats dependency installs on every run, adding \`bundler-cache: true\` to the \`ruby/setup-ruby\` step can save time by caching installed gems.`,
+          aiHandoff: `In ${workflow.relativePath} job "${job.id}", align the matching Ruby setup action's Gemfile, environment and working directory with the manual Bundler install, then consider bundler-cache: true. Preserve preceding bundle configuration and surrounding checks/tests; remove only redundant install invocations after verifying equivalent behavior.`,
           score: 70,
         }),
       );

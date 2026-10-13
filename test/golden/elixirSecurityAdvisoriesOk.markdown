@@ -55,8 +55,8 @@
 - Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-make-j-flag`
-- Message: Job "ci" runs make/gmake without parallelization in steps #3, #4, #5.
-- Why it matters: Make defaults to serial execution. 3 commands in the same job each run serially, multiplying the wasted wall time.
+- Message: Job "ci" runs make/gmake without visible parallel controls in steps #3, #4, #5.
+- Why it matters: No applicable command or environment parallel settings are visible for this build path. Make normally runs serially unless its build configuration supplies parallelism; CMake defaults depend on the native generator. Matching available CPUs can reduce wall time for independent build work.
 - Suggested action: Add -j$(nproc) to make/gmake or set MAKEFLAGS=-j$(nproc) in workflow/job/step env.
 - Measurement hint: Compare build step duration before and after adding parallel flags.
 

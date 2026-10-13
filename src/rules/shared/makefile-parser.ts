@@ -1,3 +1,10 @@
+import { collectMakeBuildCommands } from "./make-build-commands.ts";
+import {
+  parseBootstrapInvocation,
+  shellCommandSegments,
+  shellCommands,
+} from "./command-patterns.ts";
+
 export interface ParsedMakefile {
   targets: Map<string, string>;
   variables: Map<string, string>;
@@ -25,9 +32,31 @@ const INTERNAL_PARALLEL_PATTERNS: { pattern: RegExp; tool: string; category: str
 ];
 
 function detectToolInText(text: string): ToolMatch | null {
-  for (const entry of INTERNAL_PARALLEL_PATTERNS) {
-    if (entry.pattern.test(text)) {
-      return { tool: entry.tool, category: entry.category };
+  for (const segment of shellCommandSegments(text)) {
+    const command = segment.trim().replace(/^[@+-]+/, "");
+    const tokens = shellCommands(parseBootstrapInvocation(command)?.command ?? command)[0] ?? [];
+    if (tokens[0] === "env") {
+      tokens.shift();
+    }
+    while (/^[A-Za-z_]\w*=/.test(tokens[0] ?? "")) {
+      tokens.shift();
+    }
+    if (
+      (["pnpm", "yarn"].includes(tokens[0] ?? "") && tokens[1] === "exec") ||
+      (tokens[0] === "npm" && ["exec", "x"].includes(tokens[1] ?? ""))
+    ) {
+      tokens.splice(0, 2);
+      if (tokens[0] === "--") {
+        tokens.shift();
+      }
+    }
+    const executable = tokens[0]?.split("/").at(-1);
+    const normalized = [executable, ...tokens.slice(1)].join(" ");
+    for (const entry of INTERNAL_PARALLEL_PATTERNS) {
+      const expected = entry.tool.split(" ", 1)[0];
+      if (executable === expected && entry.pattern.test(normalized)) {
+        return { tool: entry.tool, category: entry.category };
+      }
     }
   }
   return null;
@@ -115,25 +144,9 @@ export function parseMakefile(source: string): ParsedMakefile {
 }
 
 export function extractMakeTarget(run: string): string | null {
-  const parts = run.trim().split(/\s+/);
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i]!;
-    if (part === "-C" || part === "--directory") {
-      i++;
-      continue;
-    }
-    if (part.startsWith("-")) {
-      continue;
-    }
-    if (part.startsWith("$")) {
-      continue;
-    }
-    if (TARGET_CHAR.test(part)) {
-      return part;
-    }
-    break;
-  }
-  return null;
+  const target = collectMakeBuildCommands(run).find((command) => command.kind === "make")
+    ?.targets[0];
+  return target && TARGET_CHAR.test(target) ? target : null;
 }
 
 const SUB_MAKE_RE = /(?:make|\$\(MAKE\))\s+(?:-C\s+\S+\s+)?([a-zA-Z0-9_./-]+)/g;
@@ -193,14 +206,6 @@ export function detectInternalParallelTool(
       if (m2) {
         return m2;
       }
-    }
-  }
-
-  for (const [_name, value] of variables) {
-    const expanded = expandExpression(value, variables);
-    const m = detectToolInText(`${_name}=${expanded}`);
-    if (m) {
-      return m;
     }
   }
 

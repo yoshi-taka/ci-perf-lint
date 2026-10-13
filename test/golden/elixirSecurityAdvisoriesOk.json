@@ -82,8 +82,8 @@
       "line": 21,
       "column": 14
     },
-    "message": "Job \"ci\" runs make/gmake without parallelization in steps #3, #4, #5.",
-    "why": "Make defaults to serial execution. 3 commands in the same job each run serially, multiplying the wasted wall time.",
+    "message": "Job \"ci\" runs make/gmake without visible parallel controls in steps #3, #4, #5.",
+    "why": "No applicable command or environment parallel settings are visible for this build path. Make normally runs serially unless its build configuration supplies parallelism; CMake defaults depend on the native generator. Matching available CPUs can reduce wall time for independent build work.",
     "suggestion": "Add -j$(nproc) to make/gmake or set MAKEFLAGS=-j$(nproc) in workflow/job/step env.",
     "measurementHint": "Compare build step duration before and after adding parallel flags.",
     "aiHandoff": "Review .github/workflows/elixir-ci.yml job \"ci\" and add parallelization flags to make/gmake commands.",

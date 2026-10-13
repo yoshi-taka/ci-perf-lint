@@ -10,9 +10,8 @@ import {
   detectPlainPipInstall,
   pipInstallSuggestion,
   lineColumnForIndex,
-  MAKE_LIKE_RE,
-  HAS_PARALLEL_FLAG_RE,
 } from "../rules/shared/command-patterns.ts";
+import { textRunsUntunedMake } from "../rules/shared/make-build-commands.ts";
 
 const redundantNpxOrBootstrapMeta = {
   id: "redundant-npx-or-bootstrap",
@@ -149,7 +148,7 @@ export async function collectVercelJsonDiagnostics(
       );
     }
 
-    if (MAKE_LIKE_RE.test(command) && !HAS_PARALLEL_FLAG_RE.test(command)) {
+    if (textRunsUntunedMake(command)) {
       diagnostics.push(
         buildRepositoryDiagnostic(context.repository, missingMakeJFlagMeta, {
           location: { path: relativePath, line: location.line, column: location.column },

@@ -189,9 +189,6 @@ export function parseBootstrapInvocation(
   return { tool, command: trimmed.slice(tokens[index]!.index) };
 }
 
-export const MAKE_LIKE_RE = /^\s*(?:make|gmake)\b/;
-export const HAS_PARALLEL_FLAG_RE = /(?:^|\s)(?:-j\s*\d*|--jobs(?:\s*=\s*\d+)?|--parallel)\b/;
-
 const pipGlobalFlags = new Set([
   "--disable-pip-version-check",
   "--no-input",
