@@ -19,6 +19,7 @@ interface CliOptions {
   mode: AuditMode;
   workflowOnly: boolean;
   repositoryOnly: boolean;
+  repositoryVisibility?: "private" | "public";
   findingsOnly: boolean;
   showWorkflows: boolean;
   showAllLocations: boolean;
@@ -57,6 +58,7 @@ const supportedOptionFlags = [
   "--findings-only",
   "--workflow-only",
   "--repository-only",
+  "--assume-visibility",
   "--show-workflows",
   "--show-all-locations",
 ] as const;
@@ -82,6 +84,9 @@ Options:
   --mode                strict (default) or exploratory (includes suggestions).
   --workflow-only       Only workflow-scoped findings.
   --repository-only     Only repository-wide source/tooling findings.
+  --assume-visibility private|public
+                        Assert target repository visibility (default: unknown).
+                        Inner-loop advice still requires private API verification.
   --findings-only       Emit a flat finding list with no aggregation or handoff guidance.
                         --format json becomes a raw finding array. --top N limits the list
                         only when explicitly passed; otherwise the full list is emitted.
@@ -177,6 +182,16 @@ export function parseArgs(args: string[]): CliOptions | null {
 
     if (arg === "--findings-only") {
       options.findingsOnly = true;
+      continue;
+    }
+
+    if (arg === "--assume-visibility") {
+      const value = args[index + 1];
+      if (value !== "private" && value !== "public") {
+        throw new Error(`Unsupported repository visibility: ${String(value)}`);
+      }
+      options.repositoryVisibility = value;
+      index += 1;
       continue;
     }
 
@@ -278,6 +293,7 @@ export async function runCli(args: string[], cwd: string, logger: LoggerLike): P
       mode: options.mode,
       workflowOnly: options.workflowOnly,
       repositoryOnly: options.repositoryOnly,
+      repositoryVisibility: options.repositoryVisibility,
     });
 
     for (const warning of report.analysisWarnings) {

@@ -99,6 +99,7 @@ export interface RepositoryDiagnosticGateResolution {
 }
 
 export interface RepositoryDiagnosticContext {
+  repositoryVisibility?: "private" | "public";
   repoRoot: string;
   repository: RepositorySignals;
   workflows: WorkflowDocument[];

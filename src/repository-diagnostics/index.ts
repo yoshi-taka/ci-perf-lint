@@ -2,6 +2,7 @@ import { collectBundlerExternalSubpathLeakDiagnostics } from "./bundler-external
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import { collectJvmCdsOpportunityDiagnostics } from "./jvm-cds-opportunity.ts";
 import { collectMavenParallelNotEnabledDiagnostics } from "./maven-parallel-not-enabled.ts";
+import { collectPreferInnerLoopChecksDiagnostics } from "./prefer-inner-loop-checks.ts";
 import type { Diagnostic } from "../types.ts";
 import type { GatedContext, GateKey, RepositoryDiagnosticContext } from "./collector-types.ts";
 import {
@@ -80,6 +81,10 @@ export const repositoryDiagnosticCollectors = [
     gate: gateKeys.jvm,
     collect: (context: GatedContext<"hasJvm">) =>
       collectMavenParallelNotEnabledDiagnostics(context),
+  } as const,
+  {
+    id: "prefer-inner-loop-checks",
+    collect: collectPreferInnerLoopChecksDiagnostics,
   } as const,
 ] as const;
 

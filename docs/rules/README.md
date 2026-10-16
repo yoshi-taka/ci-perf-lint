@@ -165,6 +165,7 @@ Current rule registry:
 - `prefer-eslint-plugin-import-x`
 - `prefer-explicit-import-extensions`
 - `prefer-frozen-lockfile`
+- `prefer-inner-loop-checks`
 - `prefer-install-action-2-38-for-nextest`
 - `prefer-jest-30-for-jest-29`
 - `prefer-knip-in-ci`

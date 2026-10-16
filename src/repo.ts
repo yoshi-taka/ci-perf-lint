@@ -85,6 +85,7 @@ interface AnalyzeOptions {
   mode?: AuditMode;
   workflowOnly?: boolean;
   repositoryOnly?: boolean;
+  repositoryVisibility?: "private" | "public";
 }
 
 interface ScannedRepo {
@@ -97,6 +98,7 @@ interface ScannedRepo {
   readonly analysisWarnings: AnalysisWarning[];
   readonly workflowOnly: boolean;
   readonly repositoryOnly: boolean;
+  readonly repositoryVisibility?: "private" | "public";
   readonly timer: PhaseTimer;
   readonly mode: AuditMode;
   readonly topCount: number;
@@ -290,6 +292,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     githubWorkflows,
     jobSummaries,
     signals: repositoryAnalysis.signals,
+    repositoryVisibility: options.repositoryVisibility,
     scanContext,
     repoRoot: target.repoRoot,
     analysisWarnings,
@@ -411,6 +414,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           return [] as Diagnostic[];
         })()
       : collectRepositoryDiagnostics({
+          repositoryVisibility: scanned.repositoryVisibility,
           repoRoot,
           repository: ruleContext.repository,
           workflows: githubWorkflows as WorkflowDocument[],
