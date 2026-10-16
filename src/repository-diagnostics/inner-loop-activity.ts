@@ -9,8 +9,7 @@ const DAY = 86_400_000;
 const MIN_RUNS_PER_WEEKDAY = 20;
 const MIN_ACTIVE_DAYS = 3;
 const MIN_SETUP_SECONDS = 60;
-const MAX_PAGES = 5;
-const SAMPLE_RUNS = 5;
+const MAX_PAGES = 2;
 
 interface ActivityJob {
   id: string;
@@ -22,6 +21,7 @@ export interface InnerLoopActivity {
   activeDays: number;
   setupSeconds: number;
   samples: number;
+  lowerBound: boolean;
   timeZone: string;
 }
 
@@ -141,7 +141,7 @@ export async function collectInnerLoopActivity(
     const signal = AbortSignal.timeout(10_000);
     let requests = 0;
     const get = async (endpoint: string): Promise<Record<string, unknown>> => {
-      if (++requests > 20) {
+      if (++requests > 4) {
         throw new Error("request budget exhausted");
       }
       const response = await request(`${expected}${endpoint}`, {
@@ -163,104 +163,101 @@ export async function collectInnerLoopActivity(
     if (repository.private !== true || repository.full_name !== env.GITHUB_REPOSITORY) {
       return result;
     }
-    for (const [workflow, jobs] of candidates) {
-      const runs: Record<string, unknown>[] = [];
-      let complete = false;
-      for (let page = 1; page <= MAX_PAGES; page++) {
-        const response = await get(
-          `${repoPath}/actions/workflows/${encodeURIComponent(workflow.split("/").at(-1)!)}/runs?created=${encodeURIComponent(`>=${since}`)}&per_page=100&page=${page}`,
-        );
-        if (!Array.isArray(response.workflow_runs) || !Number.isInteger(response.total_count)) {
-          break;
-        }
-        const entries = response.workflow_runs.map(record);
-        if (
-          entries.some(
-            (entry) =>
-              !entry ||
-              !Number.isSafeInteger(entry.id) ||
-              !Number.isFinite(timestamp(entry.created_at)),
-          )
-        ) {
-          break;
-        }
-        runs.push(
-          ...entries.filter((entry): entry is Record<string, unknown> => entry !== undefined),
-        );
-        if (runs.length >= Number(response.total_count)) {
-          complete = true;
-          break;
-        }
-        if (entries.length === 0) {
-          break;
-        }
-      }
-      if (!complete) {
-        continue;
-      }
-      const relevant = runs.filter((run) => {
-        const event = run.event;
-        return (
-          ["push", "pull_request", "merge_group"].includes(String(event)) &&
-          daySet.has(localDate(timestamp(run.created_at)))
-        );
-      });
-      const uniqueRuns = [...new Map(relevant.map((run) => [run.id, run])).values()];
-      const runsPerWeekday = uniqueRuns.length / 5;
-      const activeDays = new Set(uniqueRuns.map((run) => localDate(timestamp(run.created_at))))
-        .size;
-      if (runsPerWeekday < MIN_RUNS_PER_WEEKDAY || activeDays < MIN_ACTIVE_DAYS) {
-        continue;
-      }
-      const completed = uniqueRuns
-        .filter((run) => run.status === "completed")
-        .sort((a, b) => timestamp(b.created_at) - timestamp(a.created_at));
-      const count = Math.min(SAMPLE_RUNS, completed.length);
-      const samples = Array.from(
-        { length: count },
-        (_, index) =>
-          completed[count === 1 ? 0 : Math.floor((index * (completed.length - 1)) / (count - 1))]!,
+    let uniqueRuns: Record<string, unknown>[] = [];
+    let complete = false;
+    let retrieved = 0;
+    const byId = new Map<unknown, Record<string, unknown>>();
+    let runsPerWeekday = 0;
+    let activeDays = 0;
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const response = await get(
+        `${repoPath}/actions/runs?created=${encodeURIComponent(`>=${since}`)}&per_page=100&page=${page}`,
       );
-      const durations = new Map<string, number[]>();
-      for (const run of samples) {
-        const response = await get(
-          `${repoPath}/actions/runs/${String(run.id)}/jobs?per_page=100&filter=latest`,
-        );
-        if (!Array.isArray(response.jobs) || response.total_count !== response.jobs.length) {
-          continue;
-        }
-        for (const candidate of jobs) {
-          const name = candidate.job.raw.name ?? candidate.job.id;
-          const matches = response.jobs.map(record).filter((job) => job?.name === name);
-          if (matches.length !== 1) {
-            continue;
-          }
-          const duration = setupDuration(matches[0]!, candidate.job);
-          if (duration === undefined) {
-            continue;
-          }
-          const values = durations.get(candidate.id) ?? [];
-          values.push(duration);
-          durations.set(candidate.id, values);
+      if (!Array.isArray(response.workflow_runs) || !Number.isInteger(response.total_count)) {
+        return result;
+      }
+      const entries = response.workflow_runs.map(record);
+      if (
+        entries.some(
+          (entry) =>
+            !entry ||
+            !Number.isSafeInteger(entry.id) ||
+            !Number.isFinite(timestamp(entry.created_at)),
+        )
+      ) {
+        return result;
+      }
+      retrieved += entries.length;
+      for (const entry of entries) {
+        if (
+          entry &&
+          ["push", "pull_request", "merge_group"].includes(String(entry.event)) &&
+          daySet.has(localDate(timestamp(entry.created_at)))
+        ) {
+          byId.set(entry.id, entry);
         }
       }
-      for (const [id, values] of durations) {
-        if (values.length < 3 || values.length !== samples.length) {
-          continue;
-        }
-        values.sort((a, b) => a - b);
-        const middle = Math.floor(values.length / 2);
-        const setupSeconds =
-          values.length % 2 ? values[middle]! : (values[middle - 1]! + values[middle]!) / 2;
-        if (setupSeconds >= MIN_SETUP_SECONDS) {
-          result.set(id, {
-            runsPerWeekday,
-            activeDays,
-            setupSeconds,
-            samples: values.length,
-            timeZone,
-          });
-        }
+      uniqueRuns = [...byId.values()];
+      runsPerWeekday = uniqueRuns.length / 5;
+      activeDays = new Set(uniqueRuns.map((run) => localDate(timestamp(run.created_at)))).size;
+      complete = retrieved >= Number(response.total_count);
+      const hasRepresentative = uniqueRuns.some(
+        (run) =>
+          run.status === "completed" && typeof run.path === "string" && candidates.has(run.path),
+      );
+      // Observed runs alone can prove a lower bound. No need to exhaust history.
+      if (
+        complete ||
+        (runsPerWeekday >= MIN_RUNS_PER_WEEKDAY &&
+          activeDays >= MIN_ACTIVE_DAYS &&
+          hasRepresentative) ||
+        entries.length === 0
+      ) {
+        break;
+      }
+    }
+    if (runsPerWeekday < MIN_RUNS_PER_WEEKDAY || activeDays < MIN_ACTIVE_DAYS) {
+      return result;
+    }
+    const run = uniqueRuns
+      .filter(
+        (entry) =>
+          entry.status === "completed" &&
+          typeof entry.path === "string" &&
+          candidates.has(entry.path),
+      )
+      .sort(
+        (a, b) => timestamp(b.created_at) - timestamp(a.created_at) || Number(b.id) - Number(a.id),
+      )[0];
+    if (!run) {
+      return result;
+    }
+    const response = await get(
+      `${repoPath}/actions/runs/${String(run.id)}/jobs?per_page=100&filter=latest`,
+    );
+    if (!Array.isArray(response.jobs) || response.total_count !== response.jobs.length) {
+      return result;
+    }
+    // A single jobs response covers every candidate job in this representative workflow.
+    for (const candidate of candidates.get(String(run.path)) ?? []) {
+      const name = candidate.job.raw.name ?? candidate.job.id;
+      const matches = response.jobs.map(record).filter((job) => job?.name === name);
+      if (matches.length !== 1) {
+        continue;
+      }
+      const duration = setupDuration(matches[0]!, candidate.job);
+      if (duration === undefined) {
+        continue;
+      }
+      if (duration >= MIN_SETUP_SECONDS) {
+        result.set(candidate.id, {
+          runsPerWeekday,
+          activeDays,
+          setupSeconds: duration,
+          samples: 1,
+          lowerBound: !complete,
+          timeZone,
+        });
       }
     }
   } catch {

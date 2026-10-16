@@ -123,7 +123,7 @@ export async function collectPreferInnerLoopChecksDiagnostics(
       }
       diagnostics.push(
         buildDiagnostic(workflow, meta, job.idNode, {
-          message: `Job "${job.id}" runs only lint/format checks and setup in a verified private repository with agent validation policy and automation (${evidence.join(", ")}). Over the last five complete weekdays (${observed.timeZone}): ${observed.runsPerWeekday.toFixed(1)} workflow runs/day across ${observed.activeDays} active days; recognized setup median ${observed.setupSeconds.toFixed(0)}s (${observed.samples} job samples).`,
+          message: `Job "${job.id}" runs only lint/format checks and setup in a verified private repository with agent validation policy and automation (${evidence.join(", ")}). Over the last five complete weekdays (${observed.timeZone}): ${observed.lowerBound ? "at least " : ""}${observed.runsPerWeekday.toFixed(1)} repository workflow runs/day across ${observed.lowerBound ? "at least " : ""}${observed.activeDays} active days; recognized setup ${observed.setupSeconds.toFixed(0)}s (single job observation, not a median).`,
           why: "A dedicated check job pays runner/container startup, checkout, and dependency setup costs even when fast checks can run inside the agent's development loop.",
           suggestion:
             "Consider moving lint/format checks exclusively to the agent inner loop and retiring the dedicated CI job after verifying enforcement and contributor trust. Formatting is the lowest-risk starting point; keep CI checks where independent validation is required.",

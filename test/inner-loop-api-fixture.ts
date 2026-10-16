@@ -7,6 +7,7 @@ export const activityDays = ["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-
 export function activityRuns(count = 100) {
   return Array.from({ length: count }, (_, index) => ({
     id: index + 1,
+    path: ".github/workflows/ci.yml",
     created_at: `${activityDays[index % 5]}T12:00:00Z`,
     event: "push",
     status: "completed",

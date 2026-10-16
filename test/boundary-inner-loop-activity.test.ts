@@ -62,6 +62,8 @@ async function scan(
     status?: number;
     throw?: boolean;
     duplicateJob?: boolean;
+    extraWorkflows?: number;
+    extraJob?: boolean;
   } = {},
 ) {
   const root = await tempDirs.create("apl-activity-");
@@ -101,7 +103,7 @@ async function scan(
     if (url.pathname.endsWith("/example/private")) {
       return Response.json({ full_name: "example/private", private: options.private ?? true });
     }
-    if (url.pathname.includes("/workflows/")) {
+    if (url.pathname.endsWith("/actions/runs")) {
       const page = Number(url.searchParams.get("page"));
       return Response.json({
         total_count: options.total ?? runs.length,
@@ -109,27 +111,44 @@ async function scan(
       });
     }
     const job = options.job ?? activityApiJob();
-    const jobs = options.duplicateJob ? [job, job] : [job];
+    const jobs = options.duplicateJob
+      ? [job, job]
+      : options.extraJob
+        ? [job, { ...job, name: "format" }]
+        : [job];
     return Response.json({ total_count: jobs.length, jobs });
   }) as typeof fetch;
-  const results = await collectInnerLoopActivity(
-    root,
-    new Map([[workflow.relativePath, [{ id: "lint", job: workflow.jobs[0]! }]]]),
-    { env: { ...activityEnvironment(root), ...options.env }, request, now: activityNow },
-  );
+  const candidates = new Map([[workflow.relativePath, [{ id: "lint", job: workflow.jobs[0]! }]]]);
+  if (options.extraJob) {
+    candidates
+      .get(workflow.relativePath)!
+      .push({ id: "format", job: { ...workflow.jobs[0]!, id: "format" } });
+  }
+  for (let i = 0; i < (options.extraWorkflows ?? 0); i++) {
+    candidates.set(`.github/workflows/other-${i}.yml`, [
+      { id: `other-${i}`, job: workflow.jobs[0]! },
+    ]);
+  }
+  const results = await collectInnerLoopActivity(root, candidates, {
+    env: { ...activityEnvironment(root), ...options.env },
+    request,
+    now: activityNow,
+  });
   return { results, requests };
 }
 
-test("20/day and 60s setup boundaries pass with five spread samples", async () => {
+test("20/day and 60s setup boundaries pass with three API requests", async () => {
   const { results, requests } = await scan();
   expect(results.get("lint")).toMatchObject({
     runsPerWeekday: 20,
     activeDays: 5,
     setupSeconds: 60,
-    samples: 5,
+    samples: 1,
+    lowerBound: false,
     timeZone: "UTC",
   });
-  expect(requests).toHaveLength(7);
+  expect(requests).toHaveLength(3);
+  expect(requests[1]?.pathname).toBe("/repos/example/private/actions/runs");
 });
 
 test("zero days remain in denominator and low activity avoids jobs requests", async () => {
@@ -166,16 +185,46 @@ test("weekends, current day, schedule and repeated IDs do not inflate activity",
   }
 });
 
-test("pagination covers the window rather than dividing only the newest page", async () => {
+test("sufficient observed activity stops pagination and is labeled a lower bound", async () => {
   const { results, requests } = await scan({ runs: activityRuns(140) });
-  expect(results.get("lint")?.runsPerWeekday).toBe(28);
-  expect(requests).toHaveLength(8);
+  expect(results.get("lint")).toMatchObject({ runsPerWeekday: 20, lowerBound: true });
+  expect(requests).toHaveLength(3);
 });
 
-test("incomplete pagination cannot prove sufficient activity", async () => {
+test("high volume does not require exhausting pagination", async () => {
   const { results, requests } = await scan({ runs: activityRuns(600), total: 600 });
+  expect(results.get("lint")).toMatchObject({ runsPerWeekday: 20, lowerBound: true });
+  expect(requests).toHaveLength(3);
+});
+
+test("one additional history page is allowed, total requests never exceed four", async () => {
+  const runs = activityRuns(200).map((run, index) =>
+    index < 100 ? { ...run, event: "schedule" } : run,
+  );
+  const { results, requests } = await scan({ runs });
+  expect(results.get("lint")).toMatchObject({ runsPerWeekday: 20, lowerBound: false });
+  expect(requests).toHaveLength(4);
+});
+
+test("insufficient activity after two pages is skipped without more API calls", async () => {
+  const runs = activityRuns(600).map((run) => ({ ...run, created_at: "2026-10-16T12:00:00Z" }));
+  const { results, requests } = await scan({ runs });
   expect(results.size).toBe(0);
-  expect(requests).toHaveLength(6);
+  expect(requests).toHaveLength(3);
+});
+
+test("all candidate workflows share repo activity and one representative jobs response", async () => {
+  const { results, requests } = await scan({ extraWorkflows: 100, extraJob: true });
+  expect([...results.keys()]).toEqual(["lint", "format"]);
+  expect(requests).toHaveLength(3);
+  expect(requests.filter((url) => url.pathname.endsWith("/jobs"))).toHaveLength(1);
+});
+
+test("no matching representative workflow does not fetch arbitrary jobs", async () => {
+  const runs = activityRuns().map((run) => ({ ...run, path: ".github/workflows/unrelated.yml" }));
+  const { results, requests } = await scan({ runs });
+  expect(results.size).toBe(0);
+  expect(requests).toHaveLength(2);
 });
 
 test.each([

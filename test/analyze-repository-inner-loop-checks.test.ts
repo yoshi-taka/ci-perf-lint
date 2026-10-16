@@ -68,7 +68,7 @@ async function scan(
   const code = `
     Date.now = () => ${activityNow};
     globalThis.fetch = async (url) => {
-      const value = String(url).includes('/actions/workflows/')
+      const value = new URL(String(url)).pathname.endsWith('/actions/runs')
         ? { total_count: ${options.runs ?? 100}, workflow_runs: ${JSON.stringify(activityRuns(options.runs ?? 100))} }
         : String(url).includes('/jobs?')
           ? { total_count: 1, jobs: [${JSON.stringify(activityApiJob(options.setupSeconds))}] }
@@ -119,8 +119,8 @@ test("private agent validation policy plus skill flags lint as warning in strict
   expect(findings[0]?.location.path).toBe(".github/workflows/ci.yml");
   expect(findings[0]?.message).toContain("AGENTS.md");
   expect(findings[0]?.message).toContain("SKILL.md");
-  expect(findings[0]?.message).toContain("20.0 workflow runs/day");
-  expect(findings[0]?.message).toContain("median 60s");
+  expect(findings[0]?.message).toContain("20.0 repository workflow runs/day");
+  expect(findings[0]?.message).toContain("setup 60s (single job observation, not a median)");
   expect((await scan({ cli: true })).findings).toHaveLength(1);
 });
 
