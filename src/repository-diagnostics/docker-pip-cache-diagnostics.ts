@@ -2,6 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { CollectedDockerfileInstruction } from "./dockerfile-instructions.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { describeLaterCacheCleanup } from "./docker-later-cache-cleanup.ts";
 import {
   applyAssignments,
   cacheIsCleaned,
@@ -94,6 +95,7 @@ export function collectPipCacheDiagnostics(
   let alias: string | undefined;
   const stages = new Map<string, { environment: Map<string, string>; rootUser: boolean }>();
   const lines: number[] = [];
+  const cleanupEvidence: string[] = [];
   for (const instruction of instructions) {
     const keyword =
       instruction.keyword?.toUpperCase() ??
@@ -130,7 +132,11 @@ export function collectPipCacheDiagnostics(
           const cleaned =
             !/\||\b(?:if|then|else|case|for|while|until)\b/.test(content) &&
             cacheIsCleaned(cache, commands.slice(index + 1));
-          return !cacheIsMounted(cache, instruction, ["cache", "tmpfs"]) && !cleaned;
+          const retained = !cacheIsMounted(cache, instruction, ["cache", "tmpfs"]) && !cleaned;
+          if (retained) {
+            cleanupEvidence.push(describeLaterCacheCleanup(instructions, instruction, [cache]));
+          }
+          return retained;
         })
       ) {
         lines.push(instruction.startLine);
@@ -146,7 +152,7 @@ export function collectPipCacheDiagnostics(
       meta,
       {
         location: { path: dockerfileRelativePath, line: lines[0]!, column: 1 },
-        message: `Dockerfile ${dockerfileRelativePath} installs pip packages without disabling or mounting the pip cache at lines ${lines.join(", ")}.`,
+        message: `Dockerfile ${dockerfileRelativePath} installs pip packages without disabling or mounting the pip cache at lines ${lines.join(", ")}.${cleanupEvidence.join("")}`,
         why: "pip download and wheel caches can remain in Docker image layers, increasing build storage and image transfer costs. A BuildKit cache mount preserves rebuild reuse without baking that cache into the image.",
         suggestion:
           "Use pip install --no-cache-dir for simple installs, or mount the effective pip cache directory with BuildKit type=cache when rebuild reuse matters. Review existing pip configuration and same-layer cleanup before changing the install.",

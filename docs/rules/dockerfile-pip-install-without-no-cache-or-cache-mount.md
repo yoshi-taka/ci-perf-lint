@@ -16,6 +16,8 @@ Tmpfs keeps caches out of image layers without preserving them across builds. A 
 
 ## Suggested action
 
+Recognizable later same-stage recursive cache removal adds the install RUN line, cleanup RUN line, and effective cache path to the diagnostic. Later cleanup cannot reclaim earlier-layer bytes. Detection is unchanged; uncertain context changes and cleanup inside mounts are not inferred.
+
 For simple installs:
 
 ```dockerfile

@@ -4,6 +4,7 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { CollectedDockerfileInstruction } from "./dockerfile-instructions.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import { cacheIsMounted } from "./docker-package-cache-helpers.ts";
+import { describeLaterCacheCleanup } from "./docker-later-cache-cleanup.ts";
 import {
   directCommand,
   dockerRunCommands,
@@ -118,6 +119,7 @@ export function collectRpmCacheDiagnostics(
   instructions: CollectedDockerfileInstruction[],
 ): Diagnostic[] {
   const offenders: { line: number; tools: string[] }[] = [];
+  const cleanupEvidence: string[] = [];
   for (const instruction of instructions) {
     const pending = new Map<string, string[]>();
     for (const tokens of dockerRunCommands(instruction)) {
@@ -144,6 +146,22 @@ export function collectRpmCacheDiagnostics(
       }
     }
     if (pending.size) {
+      for (const [key, paths] of pending) {
+        const tool = key.split(":", 1)[0];
+        cleanupEvidence.push(
+          describeLaterCacheCleanup(instructions, instruction, paths, (commands, cache) =>
+            commands.some((tokens) => {
+              const command = rpmCommand(tokens);
+              return (
+                command !== undefined &&
+                command.name === tool &&
+                command.clean &&
+                command.paths.includes(cache)
+              );
+            }),
+          ),
+        );
+      }
       offenders.push({
         line: instruction.startLine,
         tools: [...new Set([...pending.keys()].map((key) => key.split(":", 1)[0]!))],
@@ -156,7 +174,7 @@ export function collectRpmCacheDiagnostics(
   return [
     buildRepositoryDiagnostic(repository, meta, {
       location: { path: dockerfilePath, line: offenders[0]!.line, column: 1 },
-      message: `Dockerfile ${dockerfilePath} retains RPM package metadata/cache after installs: ${offenders.map(({ line, tools }) => `line ${line}: ${tools.join(", ")}`).join("; ")}.`,
+      message: `Dockerfile ${dockerfilePath} retains RPM package metadata/cache after installs: ${offenders.map(({ line, tools }) => `line ${line}: ${tools.join(", ")}`).join("; ")}.${cleanupEvidence.join("")}`,
       why: "RPM package managers can leave repository metadata and downloaded cache data in output image layers. Later-layer cleanup cannot reclaim those bytes, increasing image storage, push, pull and extraction work.",
       suggestion:
         "Run the matching yum/dnf/microdnf clean all or zypper clean --all after the last install in the same RUN, or mount the effective cache directories with BuildKit. Preserve intentional package-cache reuse outside image layers.",

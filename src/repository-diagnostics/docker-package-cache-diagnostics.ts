@@ -5,6 +5,7 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { CollectedDockerfileInstruction } from "./dockerfile-instructions.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { describeLaterCacheCleanup } from "./docker-later-cache-cleanup.ts";
 import {
   applyAssignments,
   cacheIsCleaned,
@@ -184,6 +185,7 @@ export function collectPackageCacheDiagnostics(
   let alias: string | undefined;
   const stages = new Map<string, PackageCacheState>();
   const lines = new Map<CacheTool, number[]>();
+  const cleanupEvidence = new Map<CacheTool, Set<string>>();
   for (const instruction of instructions) {
     const keyword =
       instruction.keyword?.toUpperCase() ??
@@ -273,6 +275,17 @@ export function collectPackageCacheDiagnostics(
           affected.push(instruction.startLine);
         }
         lines.set(command.tool, affected);
+        const evidence = describeLaterCacheCleanup(
+          instructions,
+          instruction,
+          [command.cache],
+          (later, cache) => nativeCleanup(command.tool, cache, later, state, settings),
+        );
+        if (evidence) {
+          const entries = cleanupEvidence.get(command.tool) ?? new Set<string>();
+          entries.add(evidence);
+          cleanupEvidence.set(command.tool, entries);
+        }
       }
     }
   }
@@ -293,7 +306,7 @@ export function collectPackageCacheDiagnostics(
         meta,
         {
           location: { path: dockerfileRelativePath, line: affected[0]!, column: 1 },
-          message: `Dockerfile ${dockerfileRelativePath} performs ${rule.tool} dependency installation without externalizing or cleaning its download cache at lines ${affected.join(", ")}.`,
+          message: `Dockerfile ${dockerfileRelativePath} performs ${rule.tool} dependency installation without externalizing or cleaning its download cache at lines ${affected.join(", ")}.${[...(cleanupEvidence.get(rule.tool) ?? [])].join("")}`,
           why: "Dependency download caches can be stored in image layers, increasing build storage and transfer costs. BuildKit cache mounts retain rebuild reuse outside the layer; installed dependencies must remain available at runtime.",
           suggestion: rule.action,
           measurementHint:

@@ -10,6 +10,8 @@ npm's download cache is separate from installed `node_modules` and can persist i
 
 ## Suggested action
 
+Recognizable later same-stage cache removal (including matching `npm cache clean --force`) adds the install RUN line, cleanup RUN line, and effective cache path to the diagnostic. Later cleanup cannot reclaim earlier-layer bytes. Detection is unchanged; uncertain context changes and cleanup inside mounts are not inferred.
+
 ```dockerfile
 RUN --mount=type=cache,target=/root/.npm npm ci
 ```

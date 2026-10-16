@@ -20,6 +20,8 @@ Custom apt configuration paths, `Dir::` overrides, heredocs and uncertain shell 
 
 ## Suggested action
 
+When a later same-stage cleanup is recognizable, the diagnostic also shows the package-work RUN line, cleanup RUN line, and cache path. Later cleanup does not reclaim earlier-layer bytes; this evidence does not change which cases are flagged. Uncertain context changes and cleanup inside mounts are not inferred.
+
 ```dockerfile
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*

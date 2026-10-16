@@ -12,6 +12,8 @@ Visible global-virtual-store mode is excluded because dependencies can need that
 
 ## Suggested action
 
+Recognizable later same-stage recursive store removal adds the install RUN line, cleanup RUN line, and effective store path to the diagnostic. Later cleanup cannot reclaim earlier-layer bytes. Detection is unchanged; uncertain context changes and cleanup inside mounts are not inferred.
+
 ```dockerfile
 ENV PNPM_HOME=/pnpm
 RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile

@@ -23,6 +23,8 @@ Unknown custom configs, install roots, unresolved cache paths, dry runs and unce
 
 ## Suggested action
 
+Recognizable later same-stage cleanup adds the install RUN line, cleanup RUN line, and cache path to the diagnostic. This includes matching native cleanup commands. It explains why later cleanup cannot reclaim earlier-layer bytes without changing detection. Uncertain context changes and cleanup inside mounts are not inferred.
+
 ```dockerfile
 RUN dnf install -y curl && dnf clean all
 RUN zypper --non-interactive install curl && zypper clean --all

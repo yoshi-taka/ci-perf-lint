@@ -14,6 +14,8 @@ Tmpfs avoids persisting the cache but does not preserve it across builds. Parent
 
 ## Suggested action
 
+Recognizable later same-stage cache removal (including matching `yarn cache clean`) adds the install RUN line, cleanup RUN line, and effective cache path to the diagnostic. Later cleanup cannot reclaim earlier-layer bytes. Detection is unchanged; uncertain context changes and cleanup inside mounts are not inferred.
+
 ```dockerfile
 ENV YARN_CACHE_FOLDER=/cache/yarn
 RUN --mount=type=cache,target=/cache/yarn yarn install --frozen-lockfile

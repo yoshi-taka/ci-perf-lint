@@ -12,6 +12,8 @@ Bun's global registry cache is separate from installed dependencies but can pers
 
 ## Suggested action
 
+Recognizable later same-stage recursive cache removal adds the install RUN line, cleanup RUN line, and effective cache path to the diagnostic. Later cleanup cannot reclaim earlier-layer bytes. Detection is unchanged; uncertain context changes and cleanup inside mounts are not inferred.
+
 ```dockerfile
 ENV BUN_INSTALL_CACHE_DIR=/cache/bun
 RUN --mount=type=cache,target=/cache/bun bun install --frozen-lockfile

@@ -12,6 +12,8 @@ The effective path comes from `--cache-dir`, `UV_CACHE_DIR`, `XDG_CACHE_HOME`, o
 
 ## Suggested action
 
+Recognizable later same-stage cache removal (including matching `uv cache clean`) adds the install RUN line, cleanup RUN line, and effective cache path to the diagnostic. Later cleanup cannot reclaim earlier-layer bytes. Detection is unchanged; uncertain context changes and cleanup inside mounts are not inferred.
+
 ```dockerfile
 ENV UV_LINK_MODE=copy
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
