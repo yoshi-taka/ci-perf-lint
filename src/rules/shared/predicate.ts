@@ -254,37 +254,35 @@ export function toDNF(pred: Predicate): DNF {
   return { clauses };
 }
 
-function collectDNFClauses(pred: Predicate): DNFClause[] {
+function collectDNFClauses(pred: Predicate, negated = false): DNFClause[] {
   switch (pred.kind) {
     case "true":
-      return [new Set()];
+      return negated ? [] : [new Set()];
     case "false":
-      return [];
+      return negated ? [new Set()] : [];
     case "not":
-      return collectDNFClauses(pred.operand).map(
-        (clause) => new Set([...clause].map((s) => (s.startsWith("~") ? s.slice(1) : `~${s}`))),
-      );
-    case "and": {
-      const clauseSets = pred.operands.map((o) => collectDNFClauses(o));
-      return crossProduct(clauseSets);
+      return collectDNFClauses(pred.operand, !negated);
+    case "and":
+    case "or": {
+      // De Morgan: negation swaps conjunction and disjunction before expansion.
+      const clauseSets = pred.operands.map((o) => collectDNFClauses(o, negated));
+      return (pred.kind === "and") !== negated ? crossProduct(clauseSets) : clauseSets.flat();
     }
-    case "or":
-      return pred.operands.flatMap((o) => collectDNFClauses(o));
     case "workflow-fact":
-      return [new Set([lit(`fact:${pred.key}=${pred.expected}`, true)])];
+      return [new Set([lit(`fact:${pred.key}=${pred.expected}`, !negated)])];
     case "tool-present":
-      return [new Set([lit(`tool:${pred.key}=present`, true)])];
+      return [new Set([lit(`tool:${pred.key}=present`, !negated)])];
     case "tool-absent":
-      return [new Set([lit(`tool:${pred.key}=absent`, true)])];
+      return [new Set([lit(`tool:${pred.key}=absent`, !negated)])];
     case "has-node-type":
-      return [new Set([lit(`node:${pred.nodeType}`, true)])];
+      return [new Set([lit(`node:${pred.nodeType}`, !negated)])];
     case "scope-is":
-      return [new Set([lit(`scope:${pred.scope}`, true)])];
+      return [new Set([lit(`scope:${pred.scope}`, !negated)])];
     case "source-contains":
-      return [new Set([lit(`source:${pred.pattern}`, true)])];
+      return [new Set([lit(`source:${pred.pattern}`, !negated)])];
     case "all-workflows":
     case "any-workflows":
-      return [new Set([`quantifier:${pred.kind}`])];
+      return [new Set([lit(`quantifier:${pred.kind}`, !negated)])];
   }
 }
 

@@ -18,6 +18,7 @@ import {
   findUnreachable,
   generateDecisionTable,
   evaluate,
+  type Predicate,
   type EvalContext,
 } from "../src/rules/shared/predicate.ts";
 import type { WorkflowDocument } from "../src/workflow.ts";
@@ -197,6 +198,55 @@ describe("DNF conversion", () => {
   test("false → no clauses", () => {
     const dnf = toDNF(FALSE);
     expect(dnf.clauses).toHaveLength(0);
+  });
+
+  test("not AND → OR of negated literals", () => {
+    expect(toDNF(not(and(sourceContains("a"), sourceContains("b")))).clauses).toEqual([
+      new Set(["~source:a"]),
+      new Set(["~source:b"]),
+    ]);
+  });
+
+  test("not OR → AND of negated literals", () => {
+    expect(toDNF(not(or(sourceContains("a"), sourceContains("b")))).clauses).toEqual([
+      new Set(["~source:a", "~source:b"]),
+    ]);
+  });
+
+  test("negation preserves evaluator semantics for all assignments", () => {
+    const a = sourceContains("a");
+    const b = sourceContains("b");
+    const c = sourceContains("c");
+    // Raw nodes also cover constants, empty operands and double negation that
+    // the construction helpers would otherwise simplify before conversion.
+    const predicates: Predicate[] = [
+      { kind: "not", operand: TRUE },
+      { kind: "not", operand: FALSE },
+      { kind: "not", operand: { kind: "and", operands: [] } },
+      { kind: "not", operand: { kind: "or", operands: [] } },
+      { kind: "not", operand: { kind: "not", operand: a } },
+      not(and(a, b)),
+      not(or(a, b)),
+      not(and(a, or(b, c))),
+      not(or(and(a, b), c)),
+      not(and(a, not(b))),
+      not(or(a, not(a))),
+      not(and(a, not(a))),
+    ];
+    for (const pred of predicates) {
+      const dnf = toDNF(pred);
+      for (let mask = 0; mask < 8; mask++) {
+        const source = ["a", "b", "c"].filter((_, i) => (mask & (1 << i)) !== 0).join("");
+        const actual = dnf.clauses.some((clause) =>
+          [...clause].every((literal) => {
+            const negated = literal.startsWith("~");
+            const key = negated ? literal.slice(1) : literal;
+            return source.includes(key.slice("source:".length)) !== negated;
+          }),
+        );
+        expect(actual).toBe(evaluate(pred, dummyCtx({ source })));
+      }
+    }
   });
 });
 
