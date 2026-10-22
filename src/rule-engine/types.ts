@@ -67,11 +67,7 @@ export interface BothRuleModule extends RuleBase {
 }
 
 export type AnyRuleModule =
-  | RuleModule
-  | BuildkiteRuleModule
-  | BothRuleModule
-  | GitlabCiRuleModule
-  | CircleCiRuleModule;
+  RuleModule | BuildkiteRuleModule | BothRuleModule | GitlabCiRuleModule | CircleCiRuleModule;
 
 export type RulesByKind = Record<CiKind, readonly AnyRuleModule[]>;
 

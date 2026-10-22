@@ -4,10 +4,7 @@ import type { GitlabCiDocument } from "./gitlab-ci-workflow.ts";
 import type { CircleCiDocument } from "./circleci-workflow.ts";
 
 export type AnyWorkflowDocument =
-  | WorkflowDocument
-  | PipelineDocument
-  | GitlabCiDocument
-  | CircleCiDocument;
+  WorkflowDocument | PipelineDocument | GitlabCiDocument | CircleCiDocument;
 
 export type CiKind = AnyWorkflowDocument["kind"];
 

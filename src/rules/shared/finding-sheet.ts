@@ -1,11 +1,7 @@
 import type { Confidence, Diagnostic, RuleMeta, Severity, SourceLocation } from "../../types.ts";
 
 export type SemanticCategory =
-  | "performance"
-  | "reliability"
-  | "security"
-  | "correctness"
-  | "maintainability";
+  "performance" | "reliability" | "security" | "correctness" | "maintainability";
 
 export type SheetType = "workflow" | "repository" | "aggregated";
 

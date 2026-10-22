@@ -1,5 +1,8 @@
 [install]
 minimumReleaseAge = 259200
 
+[fmt]
+printWidth = 100
+
 [test]
 preload = ["./test/setup.ts"]

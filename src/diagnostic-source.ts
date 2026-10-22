@@ -20,9 +20,7 @@ export interface CompositeDiagnosticSource<
 }
 
 export type DiagnosticSource =
-  | WorkflowDiagnosticSource
-  | RepositoryDiagnosticSource
-  | CompositeDiagnosticSource;
+  WorkflowDiagnosticSource | RepositoryDiagnosticSource | CompositeDiagnosticSource;
 
 export type DiagnosticSourceKind = DiagnosticSource["kind"];
 

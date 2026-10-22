@@ -6,12 +6,7 @@ import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { DockerBuildTarget, CollectedDockerfileData } from "./docker-build-targets.ts";
 
 export type EcosystemFeature =
-  | "javascript"
-  | "docker"
-  | "terraform"
-  | "python"
-  | "datadog"
-  | "elixir";
+  "javascript" | "docker" | "terraform" | "python" | "datadog" | "elixir";
 
 const ECOSYSTEM_FEATURES: Record<EcosystemFeature, string> = {
   javascript: "hasNpmEcosystem",
