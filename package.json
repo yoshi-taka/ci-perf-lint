@@ -36,9 +36,9 @@
     "test:slow:mutation:repo": "bun --bun stryker run stryker/stryker.repo.config.mjs",
     "test:slow:mutation:rule-engine": "bun --bun stryker run stryker/stryker.rule-engine.config.mjs",
     "test:slow:mutation:renderer": "bun --bun stryker run stryker/stryker.renderer.config.mjs",
-    "lint": "oxlint --type-aware --type-check --deny-warnings --fix src test && oxfmt --write src test/*.ts scripts/*.ts",
-    "format": "oxfmt --write src test/*.ts scripts/*.ts",
-    "format:check": "oxfmt --check src test/*.ts scripts/*.ts",
+    "lint": "oxlint --type-aware --type-check --deny-warnings --fix src test && bun fmt src test/*.ts scripts/*.ts",
+    "format": "bun fmt src test/*.ts scripts/*.ts",
+    "format:check": "bun fmt --check src test/*.ts scripts/*.ts",
     "build": "bun build ./src/cli.ts --outdir ./dist --target node --external yaml --external dockerfile-ast --external oxlint",
     "prepack": "bun run build",
     "cache:fixtures": "bun run scripts/cache-fixtures.ts",
@@ -65,7 +65,7 @@
   "dependencies": {
     "dockerfile-ast": "^0.7.1",
     "lockparse": "^0.5.2",
-    "oxlint": "^1.87.0",
+    "oxlint": "^1.88.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
@@ -73,15 +73,15 @@
     "@codspeed/tinybench-plugin": "^5.7.1",
     "@jazzer.js/core": "^4.0.0",
     "@stryker-mutator/core": "^10.0.0",
-    "astro": "^7.3.8",
-    "bun-types": "^1.4.2",
-    "fallow": "^3.33.0",
+    "astro": "^7.4.0",
+    "bun-types": "^1.4.3",
+    "fallow": "^3.34.0",
     "fast-check": "^4.10.2",
     "knip": "^6.41.0",
-    "lefthook": "^2.2.1",
+    "lefthook": "^2.2.2",
     "oxfmt": "^0.71.0",
-    "oxlint-tsgolint": "^7.0.2003",
-    "tinybench": "^6.2.1",
+    "oxlint-tsgolint": "^7.0.2004",
+    "tinybench": "^6.2.2",
     "typescript": "^7.0.2"
   }
 }
