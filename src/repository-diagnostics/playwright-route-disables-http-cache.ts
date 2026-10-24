@@ -38,12 +38,12 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
           },
           message:
             "Playwright route registration disables the browser HTTP cache, even for a narrow API URL pattern.",
-          why: "Repeated navigations can refetch JavaScript, CSS, and fonts instead of reusing cached assets. Static detection does not establish the actual slowdown.",
+          why: "While routing is active, repeated navigations can refetch JavaScript, CSS, and fonts instead of reusing cached assets. Static detection does not establish the route lifetime or actual slowdown.",
           suggestion:
-            "Measure repeated navigation cost with and without routing. For fetch/XHR-only API mocks, consider an addInitScript patch after checking interception coverage; retain routing where required for correctness.",
+            "First, await page.unroute() or context.unroute() with the matching URL/handler as soon as the mocks are no longer needed. In Chromium, HTTP cache reuse resumes when the last page/context route is removed and no HTTP/proxy authentication keeps interception active. If mocks must remain active, consider an addInitScript fetch/XHR patch only after checking interception coverage; retain routing where required for correctness.",
           measurementHint:
-            "Compare warm navigations in the same context, asset server hits, and transferred bytes using the same build and browser. Fresh contexts may have no cache reuse to recover.",
-          aiHandoff: `Review routing at ${path} without changing test assertions. Benchmark cache reuse before changing mocks. An in-page fetch/XHR patch does not cover navigation, workers, or every network API; do not replace routing automatically.`,
+            "Compare warm navigations in the same context before routing, during routing, and after awaiting removal of the last route. Measure asset server hits and transferred bytes using the same build and browser. Check remaining page/context routes and HTTP/proxy authentication if cache reuse does not resume. Fresh contexts may have no cache reuse to recover.",
+          aiHandoff: `Review routing at ${path} without changing test assertions. First identify when each mock is no longer needed and await unroute with its matching URL/handler before subsequent navigations; do not remove mocks still required by background requests or unrelated routes. Benchmark cache reuse and check remaining page/context routes and HTTP/proxy authentication. Only consider an addInitScript fetch/XHR patch if early cleanup is insufficient; it does not cover navigation, workers, or every network API. Do not replace routing automatically.`,
           score: 45,
         }),
       );

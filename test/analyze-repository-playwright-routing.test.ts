@@ -38,7 +38,32 @@ test('api', async ({ page, context }) => {
       scope: "repository",
     });
     expect(findings[0]!.suggestion).toContain("addInitScript");
+    expect(findings[0]!.suggestion).toContain("await page.unroute()");
+    expect(findings[0]!.suggestion).toContain("context.unroute()");
+    expect(findings[0]!.suggestion.indexOf("unroute")).toBeLessThan(
+      findings[0]!.suggestion.indexOf("addInitScript"),
+    );
+    expect(findings[0]!.suggestion).toContain("last page/context route");
+    expect(findings[0]!.suggestion).toContain("HTTP/proxy authentication");
     expect(findings[0]!.measurementHint).toContain("same context");
+    expect(findings[0]!.measurementHint).toContain("after awaiting removal of the last route");
+    expect(findings[0]!.aiHandoff).toContain("background requests");
+  });
+
+  test("keeps a route finding after cleanup because its active lifetime is not inferred", async () => {
+    const findings = await scan({
+      "e2e/cleanup.spec.ts": `import { test } from '@playwright/test';
+test('api', async ({ page, context }) => {
+  const handler = r => r.fulfill({ json: { ready: true } });
+  await context.route('**/api/bootstrap', handler);
+  await page.goto('/');
+  await context.unroute('**/api/bootstrap', handler);
+  await page.goto('/next');
+});`,
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.why).toContain("While routing is active");
+    expect(findings[0]!.why).toContain("route lifetime");
   });
 
   test("includes inline fixtures in helper files but excludes generated assets", async () => {
