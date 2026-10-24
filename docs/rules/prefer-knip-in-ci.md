@@ -13,6 +13,8 @@ Suggests running knip, the JavaScript/TypeScript unused-code and unused-dependen
 
 Small projects are skipped: below five direct dependencies the unused-dependency savings rarely justify adding a checker. This is the JS/TS counterpart to `prefer-cargo-shear-in-ci`.
 
+The priority score is 20: missing tooling alone does not prove unused code or measurable CI savings.
+
 ## Why it matters
 
 knip finds unused files, exports, and dependencies across a JavaScript/TypeScript project. Unused dependencies are still installed, so they slow installs and can add type-checking and resolution work, and unused files/exports add build and test work. Removing the findings shrinks `node_modules` and CI time.

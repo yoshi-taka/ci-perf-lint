@@ -15,6 +15,7 @@ import { collectPackageJsonCdkMethodDirectDiagnostics } from "./package-json-cdk
 import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxlint-type-check.ts";
 import { collectCypressGithubActionNpmRunDiagnostics } from "./cypress-github-action-npm-run.ts";
 import { collectPlaywrightConfigNpmRunDiagnostics } from "./playwright-config-npm-run.ts";
+import { collectPlaywrightRouteDisablesHttpCacheDiagnostics } from "./playwright-route-disables-http-cache.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectConsiderMsw3UpgradeDiagnostics } from "./consider-msw-3-upgrade.ts";
 import { collectPreferVitestPerformanceMilestoneDiagnostics } from "./prefer-vitest-performance-milestone.ts";
@@ -104,6 +105,11 @@ export const javascriptDiagnosticCollectors = [
     id: "playwright-config-uses-npm-run",
     gate: gateKeys.javascriptTooling,
     collect: (context) => collectPlaywrightConfigNpmRunDiagnostics(context),
+  },
+  {
+    id: "playwright-route-disables-http-cache",
+    gate: gateKeys.javascriptTooling,
+    collect: (context) => collectPlaywrightRouteDisablesHttpCacheDiagnostics(context),
   },
   {
     id: "cypress-github-action-uses-npm-run",

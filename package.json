@@ -39,7 +39,7 @@
     "lint": "oxlint --type-aware --type-check --deny-warnings --fix src test && bun fmt src test/*.ts scripts/*.ts",
     "format": "bun fmt src test/*.ts scripts/*.ts",
     "format:check": "bun fmt --check src test/*.ts scripts/*.ts",
-    "build": "bun build ./src/cli.ts --outdir ./dist --target node --external yaml --external dockerfile-ast --external oxlint",
+    "build": "bun build ./src/cli.ts --outdir ./dist --target node --external yaml --external dockerfile-ast --external oxlint --external oxc-parser",
     "prepack": "bun run build",
     "cache:fixtures": "bun run scripts/cache-fixtures.ts",
     "new-rule": "bun run scripts/new-rule.ts",
@@ -65,6 +65,7 @@
   "dependencies": {
     "dockerfile-ast": "^0.7.1",
     "lockparse": "^0.5.2",
+    "oxc-parser": "^0.155.0",
     "oxlint": "^1.88.0",
     "yaml": "^2.9.1"
   },

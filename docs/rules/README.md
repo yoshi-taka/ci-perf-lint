@@ -124,6 +124,7 @@ Current rule registry:
 - `outdated-setup-action-without-cache`
 - `pdm-without-use-uv`
 - `playwright-config-uses-npm-run`
+- `playwright-route-disables-http-cache`
 - `prefer-aws-cdk-cli-2-1125-for-hotswap`
 - `prefer-aws-cdk-lib-2-267`
 - `prefer-aws-cdk-lib-offline-validation`

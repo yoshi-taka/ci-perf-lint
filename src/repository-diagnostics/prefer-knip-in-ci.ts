@@ -97,7 +97,7 @@ export async function collectPreferKnipInCiDiagnostics(
         "Compare dependency count, install time, type-check time, and CI wall-clock time before and after removing knip findings.",
       aiHandoff:
         "Add knip to the project (devDependency + config), run it, review unused files/exports/dependencies, add ignore entries for intentional cases, remove the confirmed-unused dependencies and dead code, then compare install and type-check time and confirm the build and tests still pass.",
-      score: 45,
+      score: 20,
     }),
   ];
 }

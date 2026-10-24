@@ -313,6 +313,7 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
 
     const finding = report.findings.find((c) => c.ruleId === "prefer-knip-in-ci");
     expect(finding).toBeDefined();
+    expect(finding?.score).toBe(20);
     expect(finding?.severity).toBe("warning");
     expect(finding?.docsPath).toBe("docs/rules/prefer-knip-in-ci.md");
     expect(finding?.message).toContain("knip");
