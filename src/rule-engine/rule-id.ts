@@ -140,6 +140,7 @@ export const RULE_REGISTRY = {
   "setup-node-cache-dependency-path-unset": { kind: "repository" },
   "gradle-parallel-not-enabled": { kind: "repository" },
   "consider-msw-3-upgrade": { kind: "repository" },
+  "consider-oxlint-warning-rules-off-in-ci": { kind: "repository" },
   "maven-parallel-not-enabled": { kind: "repository" },
   "prefer-vitest-performance-milestone": { kind: "repository" },
   "recommend-modern-test-runner": { kind: "repository" },

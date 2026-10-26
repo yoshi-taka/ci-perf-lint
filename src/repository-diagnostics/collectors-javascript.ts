@@ -18,6 +18,7 @@ import { collectPlaywrightConfigNpmRunDiagnostics } from "./playwright-config-np
 import { collectPlaywrightRouteDisablesHttpCacheDiagnostics } from "./playwright-route-disables-http-cache.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectConsiderMsw3UpgradeDiagnostics } from "./consider-msw-3-upgrade.ts";
+import { collectConsiderOxlintWarningRulesOffInCiDiagnostics } from "./consider-oxlint-warning-rules-off-in-ci.ts";
 import { collectPreferVitestPerformanceMilestoneDiagnostics } from "./prefer-vitest-performance-milestone.ts";
 import { collectRecommendModernTestRunnerDiagnostics } from "./recommend-modern-test-runner.ts";
 import { collectPreferCargoShearInCiDiagnostics } from "./prefer-cargo-shear-in-ci.ts";
@@ -179,6 +180,11 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptTooling,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectConsiderMsw3UpgradeDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "consider-oxlint-warning-rules-off-in-ci",
+    gate: gateKeys.javascriptLinting,
+    collect: (context) => collectConsiderOxlintWarningRulesOffInCiDiagnostics(context),
   },
   {
     id: "prefer-vitest-performance-milestone",
