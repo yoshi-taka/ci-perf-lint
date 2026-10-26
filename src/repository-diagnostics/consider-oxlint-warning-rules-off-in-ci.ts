@@ -20,7 +20,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 // These options either make warnings intentional or make the effective rules unknown.
 function needsWarningsOrUnknownConfig(words: string[]): boolean {
   return words.some((word) =>
-    /^(?:--(?:deny-warnings|max-warnings|quiet|silent|fix(?:-suggestions|-dangerously)?|format|config|allow|warn|deny|init|print-config|rules|lsp|debug|help|version|report-unused-disable-directives(?:-severity)?)(?:=|$)|-[cfAWDhV])/.test(
+    /^(?:--(?:deny-warnings|max-warnings|fix(?:-suggestions|-dangerously)?|format|config|allow|warn|deny|init|print-config|rules|lsp|debug|help|version|report-unused-disable-directives(?:-severity)?)(?:=|$)|-[cfAWDhV])/.test(
       word,
     ),
   );
@@ -134,13 +134,13 @@ export async function collectConsiderOxlintWarningRulesOffInCiDiagnostics({
     buildRepositoryDiagnostic(repository, meta, {
       location: { path: ".oxlintrc.json", ...lineColumnForIndex(text, text.indexOf(firstKey)) },
       message: `CI runs Oxlint with ${warnings.length} explicitly warning-level rule(s) and no warning failure threshold.`,
-      why: "Warning-level rules still perform lint analysis even when warnings do not fail CI. Rules used only for local feedback can add unnecessary CI work.",
+      why: "Warning-level rules still perform lint analysis even when warnings do not fail CI. Oxlint --quiet and --silent only suppress diagnostic output; they do not skip warning-rule execution. Rules used only for local feedback can add unnecessary CI work.",
       suggestion:
-        "Review whether these warnings are consumed in CI logs or reports. Only for local-only feedback, use a CI-specific config that turns those rules off while retaining error rules and local warnings. Keep warnings needed for quality gates, fixes, or reporting.",
+        "Review whether these warnings are consumed in CI logs or reports. Only for local-only feedback, turn those rules off in a CI-specific config or gate their severity on process.env.CI in a JS/TS config, retaining error rules and local warnings. --quiet and --silent alone do not save warning analysis work. Keep warnings needed for quality gates, fixes, or reporting.",
       measurementHint:
         "Compare Oxlint wall-clock time on the same CI runner and inputs; confirm required errors and reports remain covered. No speedup is guaranteed.",
       aiHandoff:
-        "Review .oxlintrc.json and CI lint entrypoints. Confirm warning consumers before disabling any rules in a CI-specific config. Do not disable embedded scanner diagnostics, replace warn with error for speed, or assume --deny-warnings skips analysis. Preserve local feedback and required CI checks.",
+        "Review .oxlintrc.json and CI lint entrypoints. Confirm warning consumers before disabling local-only warning rules via a CI-specific config or process.env.CI-gated severity in JS/TS config. Preserve rule options, error rules and local warnings. Do not disable embedded scanner diagnostics, replace warn with error for speed, or assume --quiet, --silent or --deny-warnings skips analysis. Preserve required CI checks.",
       score: 25,
     }),
   ];

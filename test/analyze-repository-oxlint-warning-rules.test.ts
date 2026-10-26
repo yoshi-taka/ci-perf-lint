@@ -83,8 +83,6 @@ describe("Oxlint warning rules in CI", () => {
     "--deny-warnings",
     "--max-warnings=0",
     "--max-warnings 10",
-    "--quiet",
-    "--silent",
     "--fix",
     "--fix-suggestions",
     "--fix-dangerously",
@@ -97,6 +95,42 @@ describe("Oxlint warning rules in CI", () => {
     "--print-config",
   ])("preserves intentional warning/config behavior: %s", async (flag) => {
     expect(await findings({ lint: `oxlint ${flag} src` })).toHaveLength(0);
+  });
+
+  test.each(["--quiet", "--silent", "--quiet --silent"])(
+    "detects hidden warnings that still execute: %s",
+    async (flag) => {
+      const result = await findings({ lint: `oxlint ${flag} src` });
+      expect(result).toHaveLength(1);
+      expect(result[0]?.why).toContain("do not skip warning-rule execution");
+      expect(result[0]?.suggestion).toContain("process.env.CI");
+      expect(result[0]?.aiHandoff).toContain(
+        "Preserve rule options, error rules and local warnings",
+      );
+    },
+  );
+
+  test.each(["oxlint --quiet src", "bunx oxlint --silent src", "bun run check"])(
+    "detects direct or nested hidden-warning invocation: %s",
+    async (run) => {
+      expect(await findings({ run, lint: "oxlint --quiet src" })).toHaveLength(1);
+    },
+  );
+
+  test.each([
+    "--quiet --deny-warnings",
+    "--silent --max-warnings=0",
+    "--quiet --fix",
+    "--silent --format json",
+    "--quiet -c custom.json",
+  ])("preserves gates/fixes/reports even with hidden warnings: %s", async (flag) => {
+    expect(await findings({ lint: `oxlint ${flag} src` })).toHaveLength(0);
+  });
+
+  test("does not report rules already off when output is hidden", async () => {
+    expect(
+      await findings({ lint: "oxlint --quiet src", config: '{"rules":{"no-debugger":"off"}}' }),
+    ).toHaveLength(0);
   });
 
   test.each([

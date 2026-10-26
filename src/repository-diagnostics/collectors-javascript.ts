@@ -18,6 +18,7 @@ import { collectPlaywrightConfigNpmRunDiagnostics } from "./playwright-config-np
 import { collectPlaywrightRouteDisablesHttpCacheDiagnostics } from "./playwright-route-disables-http-cache.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectConsiderMsw3UpgradeDiagnostics } from "./consider-msw-3-upgrade.ts";
+import { collectConsiderEslintWarningRulesOffInCiDiagnostics } from "./consider-eslint-warning-rules-off-in-ci.ts";
 import { collectConsiderOxlintWarningRulesOffInCiDiagnostics } from "./consider-oxlint-warning-rules-off-in-ci.ts";
 import { collectPreferVitestPerformanceMilestoneDiagnostics } from "./prefer-vitest-performance-milestone.ts";
 import { collectRecommendModernTestRunnerDiagnostics } from "./recommend-modern-test-runner.ts";
@@ -174,6 +175,11 @@ export const javascriptDiagnosticCollectors = [
     id: "setup-node-cache-dependency-path-unset",
     gate: gateKeys.javascriptHeavy,
     collect: (context) => collectSetupNodeCacheDependencyPathUnsetDiagnostics(context),
+  },
+  {
+    id: "consider-eslint-warning-rules-off-in-ci",
+    gate: gateKeys.javascriptLinting,
+    collect: (context) => collectConsiderEslintWarningRulesOffInCiDiagnostics(context),
   },
   {
     id: "consider-msw-3-upgrade",

@@ -29,6 +29,7 @@ Current rule registry:
 - `circleci-checkout-uses-full-clone`
 - `collapse-multiple-go-builds-in-job`
 - `consider-caching-os-packages-or-using-a-custom-image`
+- `consider-eslint-warning-rules-off-in-ci`
 - `consider-filter-blob-none-for-release-metadata`
 - `consider-msw-3-upgrade`
 - `consider-mypy-2-upgrade`
