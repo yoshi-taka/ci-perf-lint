@@ -20,6 +20,8 @@ CMake presets, Make eval expressions, command substitutions and unresolved argum
 
 The same Make argument parser is used for Make commands in Vercel, Wrangler and Amplify configuration. These repository checks do not infer workflow ENV or Makefile execution context.
 
+Vercel CI's `vercel.json` → `ci.bootstrapping.installCommand` is also checked, respecting its `installEnv.MAKEFLAGS`. This environment is separate from ordinary deployment commands. No warning is emitted for missing CPU allocation or for an explicitly chosen job count.
+
 Makefile analysis (new):
 
 The rule reads the default Makefile in the resolved command directory and follows a literal single-target chain

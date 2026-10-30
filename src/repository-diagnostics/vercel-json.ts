@@ -1,3 +1,4 @@
+import { isMap, isScalar, parseDocument } from "yaml";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
@@ -11,7 +12,7 @@ import {
   pipInstallSuggestion,
   lineColumnForIndex,
 } from "../rules/shared/command-patterns.ts";
-import { textRunsUntunedMake } from "../rules/shared/make-build-commands.ts";
+import { collectMakeBuildCommands } from "../rules/shared/make-build-commands.ts";
 
 const redundantNpxOrBootstrapMeta = {
   id: "redundant-npx-or-bootstrap",
@@ -42,8 +43,25 @@ const preferUvPipOverPipMeta = {
 } satisfies RuleMeta;
 
 function findJsonFieldLocation(text: string, fieldName: string): { line: number; column: number } {
-  const keyMatch = new RegExp(`"${fieldName}"\\s*:`).exec(text);
-  return lineColumnForIndex(text, keyMatch?.index ?? 0);
+  let node: unknown = parseDocument(text).contents;
+  const parts = fieldName.split(".");
+  for (const [index, part] of parts.entries()) {
+    if (!isMap(node)) {
+      break;
+    }
+    const pair = node.items.find((item) => isScalar(item.key) && item.key.value === part);
+    if (index === parts.length - 1 && isScalar(pair?.key)) {
+      return lineColumnForIndex(text, pair.key.range?.[0] ?? 0);
+    }
+    node = pair?.value;
+  }
+  return { line: 1, column: 1 };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 export async function collectVercelJsonDiagnostics(
@@ -77,6 +95,9 @@ export async function collectVercelJsonDiagnostics(
     typeof vercelConfig.installCommand === "string" ? vercelConfig.installCommand : undefined;
   const buildCommand =
     typeof vercelConfig.buildCommand === "string" ? vercelConfig.buildCommand : undefined;
+  const bootstrapping = asRecord(asRecord(vercelConfig.ci).bootstrapping);
+  const ciInstallCommand =
+    typeof bootstrapping.installCommand === "string" ? bootstrapping.installCommand : undefined;
   const relativePath = "vercel.json";
 
   if (installCommand && buildCommand) {
@@ -102,20 +123,26 @@ export async function collectVercelJsonDiagnostics(
     }
   }
 
-  if (buildCommand) {
-    const npmRun = detectSimpleNpmRunFromText(buildCommand);
+  for (const [field, command] of [
+    ["buildCommand", buildCommand],
+    ["ci.bootstrapping.installCommand", ciInstallCommand],
+  ] as const) {
+    if (!command) {
+      continue;
+    }
+    const npmRun = detectSimpleNpmRunFromText(command);
     if (npmRun) {
-      const location = findJsonFieldLocation(text, "buildCommand");
+      const location = findJsonFieldLocation(text, field);
       diagnostics.push(
         buildRepositoryDiagnostic(context.repository, preferNodeRunOverNpmRunMeta, {
           location: { path: relativePath, line: location.line, column: location.column },
-          message: `vercel.json buildCommand runs package script "${npmRun.script}" through npm run.`,
+          message: `vercel.json ${field} runs package script "${npmRun.script}" through npm run.`,
           why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
           suggestion:
             "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
           measurementHint:
             "Compare the build step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
-          aiHandoff: `Review vercel.json buildCommand "${buildCommand}". Only replace it with \`${npmRun.replacement}\` after checking npm compatibility.`,
+          aiHandoff: `Review vercel.json ${field} "${command}". Only replace it with \`${npmRun.replacement}\` after checking npm compatibility.`,
           score: 30,
         }),
       );
@@ -125,6 +152,7 @@ export async function collectVercelJsonDiagnostics(
   for (const [field, command] of [
     ["installCommand", installCommand],
     ["buildCommand", buildCommand],
+    ["ci.bootstrapping.installCommand", ciInstallCommand],
   ] as const) {
     if (!command) {
       continue;
@@ -148,7 +176,13 @@ export async function collectVercelJsonDiagnostics(
       );
     }
 
-    if (textRunsUntunedMake(command)) {
+    const environment =
+      field === "ci.bootstrapping.installCommand" ? asRecord(bootstrapping.installEnv) : {};
+    if (
+      collectMakeBuildCommands(command, environment).some(
+        (entry) => entry.kind === "make" && entry.needsParallel,
+      )
+    ) {
       diagnostics.push(
         buildRepositoryDiagnostic(context.repository, missingMakeJFlagMeta, {
           location: { path: relativePath, line: location.line, column: location.column },

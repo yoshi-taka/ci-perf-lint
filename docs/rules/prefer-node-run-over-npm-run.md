@@ -30,6 +30,8 @@ Current MVP heuristic:
 - commands with npm flags or workspace flags are ignored
 - workflow multiline scripts are ignored
 
+Simple `vercel.json` `buildCommand` and Vercel CI `ci.bootstrapping.installCommand` invocations are also checked. These configuration checks do not prove the Node.js version or npm lifecycle compatibility; verify both before replacing the command.
+
 Typical remediation:
 
 - replace `npm run lint` with `node --run lint` only when the repository targets a Node.js version that supports it

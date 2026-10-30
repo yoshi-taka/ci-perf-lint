@@ -21,7 +21,7 @@ Commands are checked independently. A step mixing `uv pip install` with plain pi
 
 Suggestions preserve quoted arguments and surrounding commands. Python-module and versioned pip forms make the Python target explicit using `--python`. Commands with pip global options, pip-specific install options, environment prefixes or absolute pip paths receive migration guidance rather than an unverified exact rewrite.
 
-The same detector is used for `vercel.json` install/build commands and `wrangler.toml` build commands. Those repository findings do not assume uv has already been set up; ensure it is available before changing the configured command.
+The same detector is used for `vercel.json` install/build commands, Vercel CI's `ci.bootstrapping.installCommand`, and `wrangler.toml` build commands. Those repository findings do not assume uv has already been set up; ensure it is available before changing the configured command. Vercel CI only transfers files inside the repository from bootstrapping to task instances, so tools needed by tasks must be installed there.
 
 The rule intentionally skips:
 
