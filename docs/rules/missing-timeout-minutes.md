@@ -13,11 +13,13 @@ Why this rule exists:
 Current MVP heuristic:
 
 - the workflow is not manual-only
-- the workflow is triggered by `push` or `pull_request`
+- the workflow is triggered by `push` or `pull_request`; for `issue_comment`, `pull_request_review_comment`, or `pull_request_review`, only jobs with their own agentic/AI-assisted signals are included
 - the workflow has a relatively small number of jobs, so job-level timeout ownership is clear
 - the job looks heavy from its commands or name, or it is agentic enough to justify a job-level timeout
 - the job is not a matrix job
 - the job does not define job-level `timeout-minutes`
+
+Comment/review-triggered AI jobs are included even when a mention or other job-level condition gates them: once started, they still need a runtime ceiling. Non-agentic sibling jobs are not included solely because another job runs an AI action. This does not recommend cancellation or removing dependencies between jobs.
 
 Typical remediation:
 

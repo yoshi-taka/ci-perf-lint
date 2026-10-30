@@ -15,6 +15,8 @@ import {
   workflowHasPushTrigger,
 } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { getTriggerFacts } from "./shared/trigger-facts.ts";
+import { getJobFacts } from "./shared/workflow-analysis.ts";
 import { identityDiagnosticTransform, pipe } from "./shared/diagnostic-transform.ts";
 import {
   withRepositoryTimeoutPrecedent,
@@ -46,7 +48,15 @@ export const missingTimeoutMinutesRule = {
       return [];
     }
 
-    if (!workflowHasPullRequestTrigger(workflow) && !workflowHasPushTrigger(workflow)) {
+    const hasStandardTrigger =
+      workflowHasPullRequestTrigger(workflow) || workflowHasPushTrigger(workflow);
+    const { events } = getTriggerFacts(workflow);
+    const hasCommentOrReviewTrigger =
+      events.has("issue_comment") ||
+      events.has("pull_request_review_comment") ||
+      events.has("pull_request_review");
+
+    if (!hasStandardTrigger && !hasCommentOrReviewTrigger) {
       return [];
     }
 
@@ -55,6 +65,7 @@ export const missingTimeoutMinutesRule = {
         (job) =>
           !job.usesReusableWorkflow &&
           !jobIsStaticallyDisabled(job) &&
+          (hasStandardTrigger || getJobFacts(job).looksAgenticLike) &&
           ((isHeavyJob(job) && hasDirectHeavySignals(job)) ||
             workflowLooksAgenticLike(workflow, job)) &&
           !jobHasTimeout(job),
