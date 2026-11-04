@@ -6,6 +6,7 @@ import { collectAvoidMypyProductionBundleDiagnostics } from "./avoid-mypy-produc
 import { collectConsiderMypy2UpgradeDiagnostics } from "./mypy-2-upgrade.ts";
 import { collectOutdatedPydanticV2Diagnostics } from "./outdated-pydantic-v2.ts";
 import { collectMypyMilestoneDiagnostics } from "./mypy-milestone.ts";
+import { collectPreferMoto5121Diagnostics } from "./prefer-moto-5-1-21.ts";
 import { collectMypy2MilestoneDiagnostics } from "./mypy-2-milestone.ts";
 import { collectPreferMypyNumWorkersDiagnostics } from "./prefer-mypy-num-workers.ts";
 import { collectPreferPydanticV2Diagnostics } from "./prefer-pydantic-v2.ts";
@@ -72,6 +73,12 @@ export const pythonDiagnosticCollectors = [
     gate: gateKeys.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectOutdatedPydanticV2Diagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-moto-5-1-21",
+    gate: gateKeys.pythonHeavy,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPreferMoto5121Diagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-mypy-2-performance-milestone",

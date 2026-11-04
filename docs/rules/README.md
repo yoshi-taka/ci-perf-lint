@@ -176,6 +176,7 @@ Current rule registry:
 - `prefer-localstack-alternatives`
 - `prefer-localstack-performance-milestone`
 - `prefer-mise-over-asdf`
+- `prefer-moto-5-1-21`
 - `prefer-mypy-2-performance-milestone`
 - `prefer-mypy-num-workers`
 - `prefer-mypy-performance-milestone`

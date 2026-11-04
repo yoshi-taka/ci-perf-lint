@@ -78,6 +78,7 @@ import { preferInstallAction238ForNextestRule } from "./prefer-install-action-2-
 import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-complex-git-hooks.ts";
 import { preferLocalstackAlternativesRule } from "./prefer-localstack-alternatives.ts";
 import { preferLocalstackPerformanceMilestoneRule } from "./prefer-localstack-performance-milestone.ts";
+import { preferMoto5121Rule } from "./prefer-moto-5-1-21.ts";
 import { preferJest30ForJest29Rule } from "./prefer-jest-30-for-jest-29.ts";
 import { preferRuffFormatOverBlackRule } from "./prefer-ruff-format-over-black.ts";
 import { preferEslintConcurrencyRule } from "./prefer-eslint-concurrency.ts";
@@ -196,6 +197,7 @@ export const allRules = [
   preferJest30ForJest29Rule,
   preferLocalstackAlternativesRule,
   preferLocalstackPerformanceMilestoneRule,
+  preferMoto5121Rule,
   preferBuildxBuildOverDockerBuildRule,
   preferAwsCdkCli21125ForHotswapRule,
   preferCacheAptPkgsAction131Rule,
