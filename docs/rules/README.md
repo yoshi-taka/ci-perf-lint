@@ -166,6 +166,8 @@ Current rule registry:
 - `prefer-dorny-paths-filter-for-scoped-jobs`
 - `prefer-download-artifact-v8-for-archives`
 - `prefer-dynamodb-local-3-1`
+- `prefer-elasticmq-1-3-5`
+- `prefer-elasticmq-native-image`
 - `prefer-elixir-parallel-deps-compile`
 - `prefer-eslint-concurrency`
 - `prefer-eslint-plugin-import-x`

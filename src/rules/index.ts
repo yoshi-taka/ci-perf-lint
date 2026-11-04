@@ -77,6 +77,7 @@ import { preferDornyPathsFilterForScopedJobsRule } from "./prefer-dorny-paths-fi
 import { preferDownloadArtifactV8ForArchivesRule } from "./prefer-download-artifact-v8-for-archives.ts";
 import { preferDynamodbLocal31Rule } from "./prefer-dynamodb-local-3-1.ts";
 import { preferElixirParallelDepsCompileRule } from "./prefer-elixir-parallel-deps-compile.ts";
+import { preferElasticmq135Rule, preferElasticmqNativeImageRule } from "./elasticmq-performance.ts";
 import { preferInstallAction238ForNextestRule } from "./prefer-install-action-2-38-for-nextest.ts";
 import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-complex-git-hooks.ts";
 import { preferLocalstackAlternativesRule } from "./prefer-localstack-alternatives.ts";
@@ -218,6 +219,8 @@ export const allRules = [
   preferDirectUploadForCompressedArtifactsRule,
   preferDownloadArtifactV8ForArchivesRule,
   preferDynamodbLocal31Rule,
+  preferElasticmq135Rule,
+  preferElasticmqNativeImageRule,
   preferElixirParallelDepsCompileRule,
   preferEslintConcurrencyRule,
   preferInstallAction238ForNextestRule,

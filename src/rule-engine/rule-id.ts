@@ -79,6 +79,8 @@ export const RULE_REGISTRY = {
   "prefer-download-artifact-v8-for-archives": { kind: "workflow" },
   "prefer-dorny-paths-filter-for-scoped-jobs": { kind: "workflow" },
   "prefer-dynamodb-local-3-1": { kind: "workflow" },
+  "prefer-elasticmq-1-3-5": { kind: "workflow" },
+  "prefer-elasticmq-native-image": { kind: "workflow" },
   "prefer-elixir-parallel-deps-compile": { kind: "workflow" },
   "prefer-eslint-concurrency": { kind: "workflow" },
   "prefer-frozen-lockfile": { kind: "workflow" },
