@@ -173,6 +173,7 @@ Current rule registry:
 - `prefer-jest-30-for-jest-29`
 - `prefer-knip-in-ci`
 - `prefer-lefthook-for-complex-git-hooks`
+- `prefer-localstack-alternatives`
 - `prefer-localstack-performance-milestone`
 - `prefer-mise-over-asdf`
 - `prefer-mypy-2-performance-milestone`

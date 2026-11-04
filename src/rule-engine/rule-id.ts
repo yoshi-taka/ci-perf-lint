@@ -82,6 +82,7 @@ export const RULE_REGISTRY = {
   "prefer-install-action-2-38-for-nextest": { kind: "workflow" },
   "prefer-jest-30-for-jest-29": { kind: "workflow" },
   "prefer-lefthook-for-complex-git-hooks": { kind: "workflow" },
+  "prefer-localstack-alternatives": { kind: "workflow" },
   "prefer-localstack-performance-milestone": { kind: "workflow" },
   "prefer-native-arm-runner-over-qemu": { kind: "workflow" },
   "prefer-nextest-for-heavy-rust-tests": { kind: "workflow" },
