@@ -76,6 +76,7 @@ import { preferDownloadArtifactV8ForArchivesRule } from "./prefer-download-artif
 import { preferElixirParallelDepsCompileRule } from "./prefer-elixir-parallel-deps-compile.ts";
 import { preferInstallAction238ForNextestRule } from "./prefer-install-action-2-38-for-nextest.ts";
 import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-complex-git-hooks.ts";
+import { preferLocalstackPerformanceMilestoneRule } from "./prefer-localstack-performance-milestone.ts";
 import { preferJest30ForJest29Rule } from "./prefer-jest-30-for-jest-29.ts";
 import { preferRuffFormatOverBlackRule } from "./prefer-ruff-format-over-black.ts";
 import { preferEslintConcurrencyRule } from "./prefer-eslint-concurrency.ts";
@@ -192,6 +193,7 @@ export const allRules = [
   preferLefthookForComplexGitHooksRule,
   preferDornyPathsFilterForScopedJobsRule,
   preferJest30ForJest29Rule,
+  preferLocalstackPerformanceMilestoneRule,
   preferBuildxBuildOverDockerBuildRule,
   preferAwsCdkCli21125ForHotswapRule,
   preferCacheAptPkgsAction131Rule,
