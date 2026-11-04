@@ -62,6 +62,16 @@ const staticFixtureSets: StaticFixtureCase[] = [
 
 const autoFixtureSets: AutoFixtureCase[] = [
   {
+    name: "DynamoDB Local pinned PartiQL milestone",
+    ruleId: "prefer-dynamodb-local-3-1",
+    steps: ["docker run --rm amazon/dynamodb-local:3.0.0 -jar DynamoDBLocal.jar -sharedDb"],
+  },
+  {
+    name: "DynamoDB Local disposable shared storage",
+    ruleId: "consider-dynamodb-local-in-memory",
+    steps: ["docker run --rm amazon/dynamodb-local:latest -jar DynamoDBLocal.jar -sharedDb"],
+  },
+  {
     name: "redundant-npx (auto)",
     ruleId: "redundant-npx-or-bootstrap",
     steps: ["npm ci", "npx eslint"],

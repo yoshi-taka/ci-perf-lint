@@ -20,6 +20,7 @@ import { collapseMultipleGoBuildsInJobRule } from "./collapse-multiple-go-builds
 import { considerCachingOsPackagesOrUsingACustomImageRule } from "./consider-caching-os-packages-or-using-a-custom-image.ts";
 import { considerFilterBlobNoneForReleaseMetadataRule } from "./consider-filter-blob-none-for-release-metadata.ts";
 import { considerRustNightlyParallelFrontendRule } from "./consider-rust-nightly-parallel-frontend.ts";
+import { considerDynamodbLocalInMemoryRule } from "./consider-dynamodb-local-in-memory.ts";
 import { considerSlimOverAlpineForCiRule } from "./consider-slim-over-alpine-for-ci.ts";
 import { cudaTorchInstallOnCpuRunnerRule } from "./cuda-torch-install-on-cpu-runner.ts";
 import { dockerBuildCacheDisabledInCiRule } from "./docker-build-cache-disabled-in-ci.ts";
@@ -74,6 +75,7 @@ import { dbIoReduceRule } from "./db-io-reduce.ts";
 import { preferDirectUploadForCompressedArtifactsRule } from "./prefer-direct-upload-for-compressed-artifacts.ts";
 import { preferDornyPathsFilterForScopedJobsRule } from "./prefer-dorny-paths-filter-for-scoped-jobs.ts";
 import { preferDownloadArtifactV8ForArchivesRule } from "./prefer-download-artifact-v8-for-archives.ts";
+import { preferDynamodbLocal31Rule } from "./prefer-dynamodb-local-3-1.ts";
 import { preferElixirParallelDepsCompileRule } from "./prefer-elixir-parallel-deps-compile.ts";
 import { preferInstallAction238ForNextestRule } from "./prefer-install-action-2-38-for-nextest.ts";
 import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-complex-git-hooks.ts";
@@ -157,6 +159,7 @@ export const allRules = [
   circleciCheckoutUsesFullCloneRule,
   collapseMultipleGoBuildsInJobRule,
   considerCachingOsPackagesOrUsingACustomImageRule,
+  considerDynamodbLocalInMemoryRule,
   considerFilterBlobNoneForReleaseMetadataRule,
   considerRustNightlyParallelFrontendRule,
   considerSlimOverAlpineForCiRule,
@@ -214,6 +217,7 @@ export const allRules = [
   dbIoReduceRule,
   preferDirectUploadForCompressedArtifactsRule,
   preferDownloadArtifactV8ForArchivesRule,
+  preferDynamodbLocal31Rule,
   preferElixirParallelDepsCompileRule,
   preferEslintConcurrencyRule,
   preferInstallAction238ForNextestRule,

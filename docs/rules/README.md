@@ -29,6 +29,7 @@ Current rule registry:
 - `circleci-checkout-uses-full-clone`
 - `collapse-multiple-go-builds-in-job`
 - `consider-caching-os-packages-or-using-a-custom-image`
+- `consider-dynamodb-local-in-memory`
 - `consider-eslint-warning-rules-off-in-ci`
 - `consider-filter-blob-none-for-release-metadata`
 - `consider-msw-3-upgrade`
@@ -164,6 +165,7 @@ Current rule registry:
 - `prefer-direct-visx-imports`
 - `prefer-dorny-paths-filter-for-scoped-jobs`
 - `prefer-download-artifact-v8-for-archives`
+- `prefer-dynamodb-local-3-1`
 - `prefer-elixir-parallel-deps-compile`
 - `prefer-eslint-concurrency`
 - `prefer-eslint-plugin-import-x`
