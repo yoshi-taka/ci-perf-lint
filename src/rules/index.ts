@@ -79,6 +79,10 @@ import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-comp
 import { preferLocalstackAlternativesRule } from "./prefer-localstack-alternatives.ts";
 import { preferLocalstackPerformanceMilestoneRule } from "./prefer-localstack-performance-milestone.ts";
 import { preferMoto5121Rule } from "./prefer-moto-5-1-21.ts";
+import {
+  preferMockserver91Rule,
+  preferWiremock311Rule,
+} from "./mock-server-performance-milestones.ts";
 import { preferJest30ForJest29Rule } from "./prefer-jest-30-for-jest-29.ts";
 import { preferRuffFormatOverBlackRule } from "./prefer-ruff-format-over-black.ts";
 import { preferEslintConcurrencyRule } from "./prefer-eslint-concurrency.ts";
@@ -197,6 +201,7 @@ export const allRules = [
   preferJest30ForJest29Rule,
   preferLocalstackAlternativesRule,
   preferLocalstackPerformanceMilestoneRule,
+  preferMockserver91Rule,
   preferMoto5121Rule,
   preferBuildxBuildOverDockerBuildRule,
   preferAwsCdkCli21125ForHotswapRule,
@@ -246,6 +251,7 @@ export const allRules = [
   preferSetupUvV9ForVersionResolutionRule,
   preferUv012Rule,
   preferUvPipOverPipRule,
+  preferWiremock311Rule,
   preferWorkflowDispatchRunDetailsRule,
   preferZstdCompressionForPushedDockerImagesRule,
   railsDbSchemaLoadOverMigrateRule,

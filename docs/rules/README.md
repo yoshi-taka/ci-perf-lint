@@ -176,6 +176,7 @@ Current rule registry:
 - `prefer-localstack-alternatives`
 - `prefer-localstack-performance-milestone`
 - `prefer-mise-over-asdf`
+- `prefer-mockserver-9-1`
 - `prefer-moto-5-1-21`
 - `prefer-mypy-2-performance-milestone`
 - `prefer-mypy-num-workers`
@@ -222,6 +223,7 @@ Current rule registry:
 - `prefer-uv-0-12`
 - `prefer-uv-pip-over-pip`
 - `prefer-vitest-performance-milestone`
+- `prefer-wiremock-3-11`
 - `prefer-workflow-dispatch-run-details`
 - `prefer-zstd-compression-for-pushed-docker-images`
 - `pyramid-config-scan-unrestricted`
