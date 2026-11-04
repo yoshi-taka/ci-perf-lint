@@ -2,6 +2,8 @@
 
 This repository-wide finding comes from an embedded `oxlint` scan using `jest/no-large-snapshots`.
 
+Inline snapshots in test source are checked by the embedded linter. External `.snap` files are checked separately using the shared repository file list. The embedded linter skips `*.snapshot/` and `__snapshots__/` directories in every repository, avoiding analysis of snapshot-generated code; this does not exclude those directories from external `.snap` checks or other repository collectors.
+
 ## What it flags
 
 Jest snapshots that exceed configured size limits: 50 lines for inline snapshots or 300 lines for external (`.snap`) snapshot files.

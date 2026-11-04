@@ -8,6 +8,8 @@ This repository-wide finding uses embedded Oxlint with `import/extensions` confi
 
 It only runs for large or complex repositories that appear to use Vite, Astro, SvelteKit, or SolidStart. Package imports are intentionally ignored.
 
+The embedded scan plan uses the same eligibility check as this finding. Other JavaScript repositories do not enable `import/extensions` just because another embedded rule needs a scan.
+
 The following are excluded to avoid context-dependent false positives:
 
 - **CommonJS `require()` calls.** Node.js CJS resolver resolves extensionless paths natively without probing candidate extensions. The Vite-family resolver probe cost does not apply.

@@ -62,6 +62,10 @@ describe("embedded oxlint fixture retry", () => {
       expect(result).toEqual([]);
       expect(calls).toHaveLength(2);
       expect(calls[1]!.join(" ")).toContain("**/fixtures/**");
+      for (const call of calls) {
+        expect(call.join(" ")).toContain("**/*.snapshot/**");
+        expect(call.join(" ")).toContain("**/__snapshots__/**");
+      }
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }

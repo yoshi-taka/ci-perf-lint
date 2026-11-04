@@ -38,19 +38,10 @@ import { ResourceEvaluator } from "./resource-evaluator.ts";
 import type { ResourceEvaluationObservability } from "./semantic-resource.ts";
 import { registerDefaultResources } from "./resources/index.ts";
 import { setEmbeddedOxlintScanPlan } from "./embedded-oxlint.ts";
+import { buildEmbeddedOxlintScanPlan } from "./embedded-oxlint-plan.ts";
 
 const resourceRegistry: ResourceRegistry = new ResourceRegistry();
 registerDefaultResources(resourceRegistry);
-
-function embeddedOxlintScanPlan(collectorIds: readonly string[]) {
-  const collectors = new Set(collectorIds);
-  return {
-    importExtensions: collectors.has("prefer-explicit-import-extensions"),
-    restrictedImports: collectors.has("restricted-import-diagnostics"),
-    barrels: collectors.has("detected-large-barrel-file"),
-    snapshots: collectors.has("large-jest-snapshot"),
-  };
-}
 
 export const repositoryDiagnosticCollectors = [
   ...javascriptDiagnosticCollectors,
@@ -191,7 +182,11 @@ export async function collectRepositoryDiagnostics(
 
   setEmbeddedOxlintScanPlan(
     context.scanContext,
-    embeddedOxlintScanPlan(applicableCollectors.map((collector) => collector.id)),
+    await buildEmbeddedOxlintScanPlan(
+      applicableCollectors.map((collector) => collector.id),
+      context.repository,
+      context.scanContext,
+    ),
   );
 
   for (const collector of repositoryDiagnosticCollectors) {

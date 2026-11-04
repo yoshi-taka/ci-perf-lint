@@ -7,7 +7,7 @@ import {
   type EmbeddedOxlintDiagnostic,
 } from "./embedded-oxlint.ts";
 import { explicitImportExtensionsMeta } from "./imports-metadata.ts";
-import { looksLikeJavaScriptRepository, repositoryUsesViteFamily } from "./imports-shared.ts";
+import { shouldScanExplicitImportExtensions } from "./imports-shared.ts";
 export { collectRestrictedImportRepositoryDiagnostics } from "./imports-direct-import-diagnostics.ts";
 
 function isBuildOutputRelativePath(relativePath: string): boolean {
@@ -49,15 +49,7 @@ export async function collectExplicitImportExtensionDiagnostics(
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  if (
-    !(await looksLikeJavaScriptRepository(context)).value ||
-    !repository.looksLargeOrComplex ||
-    !repositoryUsesViteFamily(repository)
-  ) {
-    return [];
-  }
-
-  if (repository.workflowCount === 0 || !repository.primaryWorkflowPath) {
+  if (!(await shouldScanExplicitImportExtensions(repository, context))) {
     return [];
   }
 

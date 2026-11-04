@@ -29,6 +29,8 @@ const embeddedOxlintDefaultIgnorePatterns = [
   "**/fixtures/**",
   "**/__fixtures__/**",
   "**/*.fixture.*",
+  "**/*.snapshot/**",
+  "**/__snapshots__/**",
 ];
 
 function timingsEnabled(): boolean {

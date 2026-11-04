@@ -117,9 +117,22 @@ export function nextjsHasAutomaticMuiImportOptimization(repository: RepositorySi
   );
 }
 
-export function repositoryUsesViteFamily(repository: RepositorySignals): boolean {
+function repositoryUsesViteFamily(repository: RepositorySignals): boolean {
   const { usesVite, usesAstro, usesSvelteKit, usesSolidStart } = repository.frameworks;
   return usesVite || usesAstro || usesSvelteKit || usesSolidStart;
+}
+
+export async function shouldScanExplicitImportExtensions(
+  repository: RepositorySignals,
+  scanContext: RepositoryScanContext,
+): Promise<boolean> {
+  return (
+    repository.looksLargeOrComplex &&
+    repositoryUsesViteFamily(repository) &&
+    repository.workflowCount > 0 &&
+    Boolean(repository.primaryWorkflowPath) &&
+    (await looksLikeJavaScriptRepository(scanContext)).value
+  );
 }
 
 const pytestConfigFileNames = ["pytest.ini", "pyproject.toml", "setup.cfg", "tox.ini"] as const;
