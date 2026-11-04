@@ -148,6 +148,7 @@ export const RULE_REGISTRY = {
   "unnecessary-npm-global-upgrade-before-npm-install": { kind: "workflow" },
   "wasteful-npm-global-install": { kind: "workflow" },
   "wasteful-package-install-in-container": { kind: "workflow" },
+  "prefer-nock-memory-fixes": { kind: "repository" },
   "prefer-node-run-over-npm-run": { kind: "repository" },
   "setup-node-cache-dependency-path-unset": { kind: "repository" },
   "gradle-parallel-not-enabled": { kind: "repository" },

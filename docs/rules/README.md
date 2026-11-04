@@ -193,6 +193,7 @@ Current rule registry:
 - `prefer-nextjs-13-minor-performance-milestone`
 - `prefer-nextjs-14-minor-performance-milestone`
 - `prefer-nextjs-16-minor-performance-milestone`
+- `prefer-nock-memory-fixes`
 - `prefer-node-run-over-npm-run`
 - `prefer-npm-ci`
 - `prefer-oxfmt-over-prettier`
