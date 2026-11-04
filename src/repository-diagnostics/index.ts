@@ -3,6 +3,10 @@ import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-no
 import { collectJvmCdsOpportunityDiagnostics } from "./jvm-cds-opportunity.ts";
 import { collectMavenParallelNotEnabledDiagnostics } from "./maven-parallel-not-enabled.ts";
 import { collectPreferInnerLoopChecksDiagnostics } from "./prefer-inner-loop-checks.ts";
+import {
+  collectTestcontainersFixedSleepDiagnostics,
+  collectTestcontainersSharedLifecycleDiagnostics,
+} from "./testcontainers-java.ts";
 import type { Diagnostic } from "../types.ts";
 import type { GatedContext, GateKey, RepositoryDiagnosticContext } from "./collector-types.ts";
 import {
@@ -66,6 +70,11 @@ export const repositoryDiagnosticCollectors = [
       collectBundlerExternalSubpathLeakDiagnostics(context),
   } as const,
   {
+    id: "consider-testcontainers-shared-lifecycle",
+    gate: gateKeys.jvm,
+    collect: collectTestcontainersSharedLifecycleDiagnostics,
+  } as const,
+  {
     id: "gradle-parallel-not-enabled",
     gate: gateKeys.gradle,
     collect: (context: GatedContext<"hasGradle">) =>
@@ -85,6 +94,11 @@ export const repositoryDiagnosticCollectors = [
   {
     id: "prefer-inner-loop-checks",
     collect: collectPreferInnerLoopChecksDiagnostics,
+  } as const,
+  {
+    id: "testcontainers-fixed-sleep-after-start",
+    gate: gateKeys.jvm,
+    collect: collectTestcontainersFixedSleepDiagnostics,
   } as const,
 ] as const;
 

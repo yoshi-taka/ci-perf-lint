@@ -37,6 +37,7 @@ Current rule registry:
 - `consider-oxlint-warning-rules-off-in-ci`
 - `consider-rust-nightly-parallel-frontend`
 - `consider-slim-over-alpine-for-ci`
+- `consider-testcontainers-shared-lifecycle`
 - `cuda-torch-install-on-cpu-runner`
 - `cypress-github-action-uses-npm-run`
 - `db-io-reduce`
@@ -263,6 +264,7 @@ Current rule registry:
 - `terraform-lockfile-missing`
 - `terraform-pagerduty-team-membership-version`
 - `terraform-parallelism-unconfigured`
+- `testcontainers-fixed-sleep-after-start`
 - `tox-without-tox-uv`
 - `ts-loader-fork-ts-checker`
 - `ungated-heavy-job`
