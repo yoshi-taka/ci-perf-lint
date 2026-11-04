@@ -21,6 +21,7 @@ import { collectConsiderMsw3UpgradeDiagnostics } from "./consider-msw-3-upgrade.
 import { collectConsiderEslintWarningRulesOffInCiDiagnostics } from "./consider-eslint-warning-rules-off-in-ci.ts";
 import { collectConsiderOxlintWarningRulesOffInCiDiagnostics } from "./consider-oxlint-warning-rules-off-in-ci.ts";
 import { collectPreferVitestPerformanceMilestoneDiagnostics } from "./prefer-vitest-performance-milestone.ts";
+import { collectPreferAzurite336Diagnostics } from "./prefer-azurite-3-36.ts";
 import { collectRecommendModernTestRunnerDiagnostics } from "./recommend-modern-test-runner.ts";
 import { collectPreferCargoShearInCiDiagnostics } from "./prefer-cargo-shear-in-ci.ts";
 import { collectPreferKnipInCiDiagnostics } from "./prefer-knip-in-ci.ts";
@@ -72,6 +73,11 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectAvoidPrettierEslintDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-azurite-3-36",
+    gate: gateKeys.javascriptHeavy,
+    collect: collectPreferAzurite336Diagnostics,
   },
   {
     id: "prefer-eslint-concurrency",

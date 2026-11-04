@@ -66,6 +66,7 @@ import { preferWorkflowDispatchRunDetailsRule } from "./prefer-workflow-dispatch
 import { preferBuildxBuildOverDockerBuildRule } from "./prefer-buildx-build-over-docker-build.ts";
 import { preferCacheAptPkgsAction131Rule } from "./prefer-cache-apt-pkgs-action-1-3-1.ts";
 import { preferAwsCdkCli21125ForHotswapRule } from "./prefer-aws-cdk-cli-2-1125-for-hotswap.ts";
+import { preferAzurite336Rule } from "./prefer-azurite-3-36.ts";
 import { preferCdkExpressModeInDevelopmentRule } from "./prefer-cdk-express-mode-in-development.ts";
 import { preferCdkMethodDirectInDevelopmentRule } from "./prefer-cdk-method-direct-in-development.ts";
 import { preferCcacheAction1220OnWindowsRule } from "./prefer-ccache-action-1-2-20-on-windows.ts";
@@ -205,6 +206,7 @@ export const allRules = [
   preferMoto5121Rule,
   preferBuildxBuildOverDockerBuildRule,
   preferAwsCdkCli21125ForHotswapRule,
+  preferAzurite336Rule,
   preferCacheAptPkgsAction131Rule,
   preferCcacheAction1220OnWindowsRule,
   preferCdkExpressModeInDevelopmentRule,

@@ -130,6 +130,7 @@ Current rule registry:
 - `prefer-aws-cdk-cli-2-1125-for-hotswap`
 - `prefer-aws-cdk-lib-2-267`
 - `prefer-aws-cdk-lib-offline-validation`
+- `prefer-azurite-3-36`
 - `prefer-buildx-bake-for-multiple-images`
 - `prefer-buildx-build-over-docker-build`
 - `prefer-cache-apt-pkgs-action-1-3-1`
