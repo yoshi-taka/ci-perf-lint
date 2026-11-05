@@ -1,5 +1,7 @@
-import { DockerfileParser } from "dockerfile-ast";
-import type { Flag, JSONArgument } from "dockerfile-ast";
+import { collectDockerfileInstructions } from "./dockerfile-parser.ts";
+import type { CollectedDockerfileInstruction } from "./dockerfile-parser.ts";
+export { collectDockerfileInstructions } from "./dockerfile-parser.ts";
+export type { CollectedDockerfileInstruction } from "./dockerfile-parser.ts";
 export {
   instructionLooksBundleInstallWithoutCacheMount,
   instructionLooksBunInstallWithoutFrozenLockfile,
@@ -19,7 +21,6 @@ export {
 
 const commentStripPattern = /\s+#.*$/;
 const tokenSplitPattern = /"[^"]*"|'[^']*'|\S+/g;
-const continuationPattern = /\\\s*$/;
 const keywordPattern = /^\S+/;
 const flagOptionPattern = /^--[^\s=]+(?:=(?:"[^"]*"|'[^']*'|\S+))?\s*/;
 const linkFalsePattern = /^--link=false$/i;
@@ -49,18 +50,6 @@ export function lineLooksInstall(line: string): boolean {
   return installPattern.test(normalized);
 }
 
-export interface CollectedDockerfileInstruction {
-  text: string;
-  startLine: number;
-  keyword?: string;
-  argumentsContent?: string | null;
-  flags?: {
-    name: string;
-    value: string | null;
-  }[];
-  jsonStrings?: string[];
-}
-
 interface DockerfileCopyInstruction {
   sources: string[];
   destination: string;
@@ -69,76 +58,6 @@ interface DockerfileCopyInstruction {
 
 interface DockerfileFromInstruction {
   image: string;
-}
-
-function collectDockerfileInstructionsWithFallback(
-  lines: string[],
-): CollectedDockerfileInstruction[] {
-  const instructions: CollectedDockerfileInstruction[] = [];
-  let currentText = "";
-  let currentStartLine = 1;
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    const isContinuation = continuationPattern.test(line);
-    const withoutContinuation = line.replace(continuationPattern, "");
-
-    if (currentText.length === 0) {
-      currentStartLine = index + 1;
-      currentText = withoutContinuation;
-    } else {
-      currentText = `${currentText} ${withoutContinuation.trim()}`;
-    }
-
-    if (!isContinuation) {
-      instructions.push({
-        text: currentText,
-        startLine: currentStartLine,
-      });
-      currentText = "";
-    }
-  }
-
-  if (currentText.length > 0) {
-    instructions.push({
-      text: currentText,
-      startLine: currentStartLine,
-    });
-  }
-
-  return instructions;
-}
-
-export function collectDockerfileInstructions(lines: string[]): CollectedDockerfileInstruction[] {
-  try {
-    const dockerfile = DockerfileParser.parse(lines.join("\n"));
-    return dockerfile.getInstructions().map((instruction) => {
-      const flags =
-        "getFlags" in instruction && typeof instruction.getFlags === "function"
-          ? (instruction.getFlags() as Flag[]).map((flag) => ({
-              name: flag.getName(),
-              value: flag.getValue(),
-            }))
-          : undefined;
-      const jsonStrings =
-        "getJSONStrings" in instruction && typeof instruction.getJSONStrings === "function"
-          ? (instruction.getJSONStrings() as JSONArgument[]).map((argument) =>
-              argument.getJSONValue(),
-            )
-          : undefined;
-
-      return {
-        text: instruction.toString(),
-        startLine: instruction.getRange().start.line + 1,
-        keyword: instruction.getKeyword(),
-        argumentsContent: instruction.getArgumentsContent(),
-        flags,
-        jsonStrings,
-      };
-    });
-  } catch {
-    return collectDockerfileInstructionsWithFallback(lines);
-  }
 }
 
 function stripDockerfileComment(text: string): string {
@@ -152,6 +71,10 @@ function normalizeDockerfilePathToken(token: string): string {
 export function parseDockerfileCopyInstruction(
   instruction: CollectedDockerfileInstruction,
 ): DockerfileCopyInstruction | undefined {
+  // Inline file contents are not COPY source paths.
+  if (instruction.argumentsContent?.includes("\n")) {
+    return undefined;
+  }
   const keyword =
     instruction.keyword ?? stripDockerfileComment(instruction.text).match(keywordPattern)?.[0];
   if (keyword?.toLowerCase() !== "copy") {
@@ -235,6 +158,9 @@ export function parseDockerfileCopyInstruction(
 export function parseDockerfileAddInstruction(
   instruction: CollectedDockerfileInstruction,
 ): DockerfileCopyInstruction | undefined {
+  if (instruction.argumentsContent?.includes("\n")) {
+    return undefined;
+  }
   if (/^ONBUILD\s+ADD\b/i.test(instruction.text.trim())) {
     const add = collectDockerfileInstructions([
       instruction.text.trim().replace(/^ONBUILD\s+/i, ""),

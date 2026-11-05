@@ -43,7 +43,7 @@ function absolutePath(value: string, workdir?: string): string | undefined {
 function commandArguments(instruction: CollectedDockerfileInstruction): string[] | undefined {
   const text = argumentsText(instruction);
   let json = instruction.jsonStrings;
-  // dockerfile-ast can remove spaces inside JSON strings; preserve the raw values.
+  // Validate raw JSON too: callers may supply instruction evidence directly.
   if (text.startsWith("[")) {
     try {
       const value: unknown = JSON.parse(text);

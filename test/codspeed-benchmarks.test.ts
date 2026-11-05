@@ -83,6 +83,7 @@ test.each([false, true])(
     expect(stdout).toContain("evaluateRules > simple workflow");
     expect(stdout).toContain("renderReport > markdown format");
     expect(stdout).toContain("computePairProximity > cross-job pairs only");
+    expect(stdout).toContain("Dockerfile extraction > 2000-line heredoc");
   },
   15000,
 );
