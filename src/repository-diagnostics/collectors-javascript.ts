@@ -16,12 +16,14 @@ import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxl
 import { collectCypressGithubActionNpmRunDiagnostics } from "./cypress-github-action-npm-run.ts";
 import { collectPlaywrightConfigNpmRunDiagnostics } from "./playwright-config-npm-run.ts";
 import { collectPlaywrightRouteDisablesHttpCacheDiagnostics } from "./playwright-route-disables-http-cache.ts";
+import { collectTestcontainersNodeFixedSleepDiagnostics } from "./testcontainers-node.ts";
 import { collectSetupNodeCacheDependencyPathUnsetDiagnostics } from "./setup-node-cache-dependency-path-unset.ts";
 import { collectConsiderMsw3UpgradeDiagnostics } from "./consider-msw-3-upgrade.ts";
 import { collectConsiderEslintWarningRulesOffInCiDiagnostics } from "./consider-eslint-warning-rules-off-in-ci.ts";
 import { collectConsiderOxlintWarningRulesOffInCiDiagnostics } from "./consider-oxlint-warning-rules-off-in-ci.ts";
 import { collectPreferVitestPerformanceMilestoneDiagnostics } from "./prefer-vitest-performance-milestone.ts";
 import { collectPreferNockMemoryFixDiagnostics } from "./prefer-nock-memory-fixes.ts";
+import { collectPreferMsw2MemoryFixDiagnostics } from "./prefer-msw-2-memory-fixes.ts";
 import { collectPreferAzurite336Diagnostics } from "./prefer-azurite-3-36.ts";
 import { collectRecommendModernTestRunnerDiagnostics } from "./recommend-modern-test-runner.ts";
 import { collectPreferCargoShearInCiDiagnostics } from "./prefer-cargo-shear-in-ci.ts";
@@ -144,6 +146,11 @@ export const javascriptDiagnosticCollectors = [
       collectPackageJsonCdkMethodDirectDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
+    id: "prefer-msw-2-memory-fixes",
+    gate: gateKeys.javascriptHeavy,
+    collect: collectPreferMsw2MemoryFixDiagnostics,
+  },
+  {
     id: "prefer-nock-memory-fixes",
     gate: gateKeys.javascriptHeavy,
     collect: collectPreferNockMemoryFixDiagnostics,
@@ -182,6 +189,11 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectRestrictedImportRepositoryDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "testcontainers-node-fixed-sleep-after-start",
+    gate: gateKeys.javascriptHeavy,
+    collect: collectTestcontainersNodeFixedSleepDiagnostics,
   },
   {
     id: "setup-node-cache-dependency-path-unset",
