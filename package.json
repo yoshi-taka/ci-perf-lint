@@ -64,7 +64,6 @@
   },
   "dependencies": {
     "dockerfile-ast": "^0.7.1",
-    "lockparse": "^0.5.2",
     "oxc-parser": "^0.155.0",
     "oxlint": "^1.90.0",
     "yaml": "^2.9.1"

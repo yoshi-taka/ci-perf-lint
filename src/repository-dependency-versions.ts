@@ -1,11 +1,11 @@
-import { parse as parseLockfile, type ParsedLockFile } from "lockparse";
+import { readRootLockfileVersions } from "./root-lockfile-versions.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
 import { packageJsonDependencyVersionSpec } from "./repository-package-helpers.ts";
 
 const lockfileNames = ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock"] as const;
 const cache = new WeakMap<
   RepositoryScanContext,
-  Map<string, Promise<ParsedLockFile | undefined>>
+  Map<string, Promise<Map<string, string> | undefined>>
 >();
 
 async function loadLockfile(context: RepositoryScanContext, fileName: string) {
@@ -28,23 +28,7 @@ async function loadLockfile(context: RepositoryScanContext, fileName: string) {
       return undefined;
     }
     const packageJson = (await context.loadPackageJson()).value;
-    try {
-      // lockparse links Yarn root dependencies through npm: descriptors, including v1.
-      const input =
-        fileName === "yarn.lock" && text.includes("yarn lockfile v1")
-          ? text.replace(
-              /^([^\s#][^\n]*):$/gm,
-              (_, selectors: string) =>
-                `${selectors
-                  .split(", ")
-                  .map((selector) => selector.replace(/^(["']?@?[^@\s"']+)@(?!npm:)/, "$1@npm:"))
-                  .join(", ")}:`,
-            )
-          : text;
-      return await parseLockfile(input, fileName, packageJson);
-    } catch {
-      return undefined;
-    }
+    return packageJson ? readRootLockfileVersions(text, fileName, packageJson) : undefined;
   })();
   loads.set(fileName, load);
   return load;
@@ -59,16 +43,9 @@ export async function readLockedDependencyVersion(
     if (!lockfile) {
       continue;
     }
-    const root = lockfile.root;
-    const dependencies = [
-      ...root.devDependencies,
-      ...root.dependencies,
-      ...root.optionalDependencies,
-      ...root.peerDependencies,
-    ];
-    const dependency = dependencies.find((entry) => entry.name === packageName);
-    if (dependency && /^\d+\.\d+\.\d+(?:\+[\w.-]+)?$/.test(dependency.version)) {
-      return dependency.version;
+    const version = lockfile.get(packageName);
+    if (version) {
+      return version;
     }
   }
   return undefined;
