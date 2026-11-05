@@ -66,22 +66,22 @@
     "dockerfile-ast": "^0.7.1",
     "lockparse": "^0.5.2",
     "oxc-parser": "^0.155.0",
-    "oxlint": "^1.88.0",
+    "oxlint": "^1.90.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@astrojs/sitemap": "^3.7.4",
-    "@codspeed/tinybench-plugin": "^5.7.1",
+    "@codspeed/tinybench-plugin": "^6.1.0",
     "@jazzer.js/core": "^4.0.0",
-    "@stryker-mutator/core": "^10.0.0",
-    "astro": "^7.4.0",
-    "bun-types": "^1.4.3",
-    "fallow": "^3.34.1",
+    "@stryker-mutator/core": "^10.1.1",
+    "astro": "^7.4.5",
+    "bun-types": "^1.4.4",
+    "fallow": "^3.38.1",
     "fast-check": "^4.10.2",
-    "knip": "^6.42.0",
+    "knip": "^6.44.1",
     "lefthook": "^2.2.2",
-    "oxlint-tsgolint": "^7.0.2004",
-    "tinybench": "^6.2.2",
+    "oxlint-tsgolint": "^7.0.2005",
+    "tinybench": "^6.2.3",
     "typescript": "^7.0.2"
   }
 }
