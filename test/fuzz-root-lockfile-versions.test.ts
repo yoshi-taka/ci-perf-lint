@@ -20,7 +20,13 @@ const boundaryString = fc
     { maxLength: 15 },
   )
   .map((parts) => parts.join(""));
-const separator = fc.constantFrom(" ", "\r\n", "/* boundary */", "// boundary\r\n");
+const separator = fc.constantFrom(
+  " ",
+  "\r\n",
+  "/* boundary */",
+  "// boundary\r\n",
+  "// boundary\r",
+);
 
 function read(text: string) {
   return readRootLockfileVersions(text, "bun.lock", manifest);
@@ -48,6 +54,9 @@ describe("fuzz: Bun root lockfile string boundaries", () => {
             packages: { husky: [`husky@${locked}`, noise, {}, ""] },
             noise,
           });
+          // Independent native Rust parser as a positive oracle for this JSONC
+          // subset only; JSON5's extra accepted syntax is NOT our input contract.
+          expect(Bun.JSON5.parse(decorated)).toEqual(JSON.parse(strict));
           expect([...read(strict)]).toEqual([["husky", locked]]);
           expect([...read(decorated)]).toEqual([...read(strict)]);
         },
