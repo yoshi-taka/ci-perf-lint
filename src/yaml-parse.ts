@@ -235,6 +235,7 @@ class Parser {
   private flowCloseEnd: number | null = null;
   private seqItemRecovery = false;
   private explicitCommaDocEnd: number | null = null;
+  private explicitIgnoredDocEnd: number | null = null;
   private seqFirstItem = false;
   private commaRecovery: {
     commaStart: number;
@@ -1279,6 +1280,8 @@ class Parser {
         : node.range[2];
     } else if (this.flowCloseEnd !== null && this.findEndMarkerAfter(node.range[2]) === null) {
       docEnd = Math.max(node.range[2], this.flowCloseEnd);
+    } else if (this.explicitIgnoredDocEnd !== null) {
+      docEnd = this.explicitIgnoredDocEnd;
     } else if (this.explicitCommaDocEnd !== null) {
       docEnd = this.explicitCommaDocEnd;
     } else if (this.flowCommentEnd !== null) {
@@ -1485,6 +1488,9 @@ class Parser {
           return null;
         }
         const piece = this.src.slice(lineStart, colon).trim();
+        if (piece.length === 0) {
+          return null;
+        }
         if (piece.length > 0) {
           if (text.length > 0) {
             text += pendingBreaks > 0 ? "\n".repeat(pendingBreaks) : " ";
@@ -2017,6 +2023,8 @@ class Parser {
       }
       if (pair.value !== null) {
         lastEnd = pair.value.range[2];
+      } else if ((pair as unknown as { explicitLineEnd?: number }).explicitLineEnd !== undefined) {
+        lastEnd = (pair as unknown as { explicitLineEnd?: number }).explicitLineEnd!;
       } else if ((pair as unknown as { commaKeyEnd?: number }).commaKeyEnd !== undefined) {
         lastEnd = (pair as unknown as { commaKeyEnd?: number }).commaKeyEnd!;
       } else if (pair.key?.kind === "scalar" && pair.key.source === "") {
@@ -2147,6 +2155,17 @@ class Parser {
       const value = this.parseIndicatorValue(indent, false);
       return makePair(key, value);
     }
+    this.collectTrivia();
+    if (
+      this.i < this.n &&
+      this.src[this.i] === ":" &&
+      this.isSep(this.i + 1) &&
+      this.column() > indent
+    ) {
+      this.i += 1;
+      const value = this.parseIndicatorValue(indent, false);
+      return makePair(key, value);
+    }
     if (key.kind !== "scalar" && key.kind !== "alias" && this.errors.length > errorsBeforeKey) {
       const pair = makePair(key, null);
       Object.defineProperty(pair, "unwrapKeyMap", { value: true, enumerable: false });
@@ -2181,8 +2200,31 @@ class Parser {
     } else if (this.i >= this.n || this.isLineBreak(this.i) || this.atDocMarker()) {
       const emptyPos = this.i;
       this.collectTrivia();
-      if (this.i < this.n && this.column() > indent) {
+      if (
+        this.i < this.n &&
+        !this.atDocMarker() &&
+        this.src[this.i] === ":" &&
+        this.isSep(this.i + 1)
+      ) {
+        key = this.makeEmptyScalar(emptyPos);
+        key.spaceBefore = true;
+      } else if (
+        this.i < this.n &&
+        !this.atDocMarker() &&
+        this.src[this.i] === "-" &&
+        this.isSep(this.i + 1)
+      ) {
+        key = this.parseBlockSeq(this.column());
+        key.spaceBefore = true;
+      } else if (this.i < this.n && this.column() > indent) {
         key = this.parseBlockNode(indent + 1, true) ?? makeScalar(null);
+        if (key.kind === "map" && key.items.length > 0) {
+          const firstKey = key.items[0]?.key ?? null;
+          if (firstKey?.kind === "scalar" && firstKey.source !== "") {
+            key.range[0] = firstKey.range[1];
+          }
+        }
+        key.spaceBefore = true;
       } else {
         key = this.makeEmptyScalar(emptyPos);
         key.spaceBefore = true;
@@ -2293,10 +2335,30 @@ class Parser {
       return makePair(key, value);
     }
     this.collectTrivia();
-    if (this.i < this.n && this.column() === indent && this.src[this.i] === ":") {
+    if (
+      this.i < this.n &&
+      this.src[this.i] === ":" &&
+      this.isSep(this.i + 1) &&
+      this.column() >= indent
+    ) {
       this.i += 1;
       const value = this.parseIndicatorValue(indent, false);
       return makePair(key, value);
+    }
+    if (
+      this.i < this.n &&
+      this.column() === indent &&
+      this.src[this.i] === "-" &&
+      this.isSep(this.i + 1)
+    ) {
+      const after = this.afterLineBreak(this.lineEnd(key.range[1]));
+      this.i = this.afterLineBreak(this.lineEnd(this.i));
+      if (this.i >= this.n) {
+        this.explicitIgnoredDocEnd = after;
+      }
+      const pair = makePair(key, null);
+      Object.defineProperty(pair, "explicitLineEnd", { value: after, enumerable: false });
+      return pair;
     }
     return makePair(key, null);
   }
@@ -2423,7 +2485,28 @@ class Parser {
         }
         return empty;
       }
-      if (!seqItem && ch !== "[" && ch !== "{" && this.lineHasMapping()) {
+      let compactColonFirst = false;
+      {
+        let probe = this.i - 1;
+        while (probe >= 0 && (this.src[probe] === " " || this.src[probe] === "\t")) {
+          probe -= 1;
+        }
+        if (probe >= 0 && this.src[probe] === ":") {
+          const lineStart = this.lineStartIndex(probe);
+          let first = lineStart;
+          while (first < probe && (this.src[first] === " " || this.src[first] === "\t")) {
+            first += 1;
+          }
+          compactColonFirst = first === probe;
+        }
+      }
+      if (
+        !seqItem &&
+        ch !== "[" &&
+        ch !== "{" &&
+        (!compactColonFirst || ch === ":") &&
+        this.lineHasMapping()
+      ) {
         this.recordError(
           "BLOCK_AS_IMPLICIT_KEY",
           "Nested mappings are not allowed in compact mappings",
@@ -3571,10 +3654,6 @@ class Parser {
       const nextLineStart = this.lineStartIndex(contentPos);
       const nextIndent = contentPos - nextLineStart;
       if (!recover && this.flowDepth === 0 && parentIndent >= 0 && nextIndent <= parentIndent) {
-        this.i = stop;
-        break;
-      }
-      if (!recover && nextChar === "?" && this.isSep(contentPos + 1)) {
         this.i = stop;
         break;
       }
