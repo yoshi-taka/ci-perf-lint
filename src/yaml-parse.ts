@@ -41,6 +41,7 @@ export interface ParsePairNode {
   kind: "pair";
   key: ParseNode | null;
   value: ParseNode | null;
+  explicit?: boolean;
 }
 
 export interface ParseMapNode {
@@ -236,6 +237,9 @@ class Parser {
   private seqItemRecovery = false;
   private explicitCommaDocEnd: number | null = null;
   private explicitIgnoredDocEnd: number | null = null;
+  private tabColonKeyStart: number | null = null;
+  private tabColonLineStart: number | null = null;
+  private parsingExplicitKey = false;
   private seqFirstItem = false;
   private commaRecovery: {
     commaStart: number;
@@ -408,7 +412,20 @@ class Parser {
           probe += 1;
         }
         if (probe < this.n && this.src[probe] !== "#" && !this.isLineBreak(probe)) {
-          return lineStart;
+          let allowedAfterDash = false;
+          if (lineStart > 0) {
+            const prevNewline = lineStart - 1;
+            const prevStart = this.lineStartIndex(prevNewline - 1);
+            const prevText = this.src.slice(prevStart, prevNewline).trim();
+            allowedAfterDash =
+              prevText === "-" ||
+              prevText.startsWith("- ") ||
+              prevText === "- x" ||
+              prevText.startsWith("- x ");
+          }
+          if (!allowedAfterDash) {
+            return lineStart;
+          }
         }
       }
       const next = this.src.indexOf("\n", lineStart);
@@ -1137,6 +1154,319 @@ class Parser {
         this.flowCommentEnd = probe;
       }
     }
+    if (
+      !this.suppressTrailing &&
+      this.errors.length === 0 &&
+      node.kind === "map" &&
+      this.i < this.n
+    ) {
+      const lastPair = node.items[node.items.length - 1];
+      const lastValue = lastPair?.value ?? null;
+      if (lastValue !== null && (lastValue.kind === "map" || lastValue.kind === "seq")) {
+        const baseIndent = this.lineIndentOf(lastValue.range[0]);
+        let scan = this.i;
+        let valid = true;
+        let sawComment = false;
+        let sawContent = false;
+        {
+          const currentLineStart = this.lineStartIndex(this.i);
+          if (currentLineStart > 0) {
+            const prevLineStart = this.lineStartIndex(currentLineStart - 1);
+            if (this.src.slice(prevLineStart, currentLineStart).trim().startsWith("#")) {
+              sawComment = true;
+            }
+          }
+        }
+        while (scan < this.n) {
+          const lineEnd = this.lineEnd(scan);
+          const lineStart = this.lineStartIndex(scan);
+          const text = this.src.slice(lineStart, lineEnd).trim();
+          if (text.length === 0 || text.startsWith("#")) {
+            if (text.startsWith("#")) {
+              sawComment = true;
+            }
+            scan = this.afterLineBreak(lineEnd);
+            continue;
+          }
+          let probe = lineStart;
+          while (probe < lineEnd && (this.src[probe] === " " || this.src[probe] === "\t")) {
+            probe += 1;
+          }
+          if (probe - lineStart <= baseIndent) {
+            valid = false;
+            break;
+          }
+          sawContent = true;
+          scan = this.afterLineBreak(lineEnd);
+        }
+        if (valid && sawComment) {
+          let target = lastValue;
+          while (target.kind === "map" && target.items.length > 0) {
+            const tail = target.items[target.items.length - 1];
+            if (tail?.value && tail.value.kind === "map") {
+              target = tail.value;
+              continue;
+            }
+            break;
+          }
+          const innerPair =
+            target.kind === "map" ? target.items[target.items.length - 1] : undefined;
+          if (innerPair?.key?.comment !== undefined && !sawContent) {
+            lastValue.range[1] = Math.max(lastValue.range[1], scan);
+          }
+          this.suppressTrailing = true;
+        }
+      }
+    }
+    if (!this.suppressTrailing && node.kind === "map" && this.i >= this.n) {
+      const lastPair = node.items[node.items.length - 1];
+      if (
+        lastPair?.explicit === true &&
+        lastPair.value === null &&
+        lastPair.key !== null &&
+        (lastPair.key.kind === "map" || lastPair.key.kind === "seq") &&
+        lastPair.key.comment !== undefined
+      ) {
+        const comment = lastPair.key.comment;
+        lastPair.key.comment = undefined;
+        const innerPair = lastPair.key.items[lastPair.key.items.length - 1];
+        if (innerPair?.kind === "pair" && innerPair.key !== null) {
+          innerPair.key.comment = innerPair.key.comment
+            ? `${innerPair.key.comment}\n${comment}`
+            : comment;
+          if (innerPair.key.kind === "scalar" && innerPair.key.source === "") {
+            innerPair.key.range[2] = Math.max(innerPair.key.range[2], this.i);
+          }
+        }
+        lastPair.key.range[1] = Math.max(lastPair.key.range[1], this.i);
+        lastPair.key.range[2] = Math.max(lastPair.key.range[2], this.i);
+        node.range[1] = Math.max(node.range[1], this.i);
+        node.range[2] = Math.max(node.range[2], this.i);
+      }
+    }
+    if (!this.suppressTrailing && node.kind === "map") {
+      const lastPair = node.items[node.items.length - 1];
+      const lastValue = lastPair?.value ?? null;
+      if (
+        lastPair !== undefined &&
+        (lastPair as unknown as { explicit?: boolean }).explicit !== true &&
+        lastValue !== null &&
+        (lastValue.kind === "map" || lastValue.kind === "seq") &&
+        lastValue.range[1] < lastValue.range[2]
+      ) {
+        let target = lastValue;
+        while (target.kind === "map" && target.items.length > 0) {
+          const tail = target.items[target.items.length - 1];
+          if (tail?.value && tail.value.kind === "map") {
+            target = tail.value;
+            continue;
+          }
+          break;
+        }
+        const innerPair = target.kind === "map" ? target.items[target.items.length - 1] : undefined;
+        if (innerPair?.key?.comment !== undefined) {
+          lastValue.range[1] = lastValue.range[2];
+        }
+      }
+      if (
+        lastPair !== undefined &&
+        (lastPair as unknown as { explicit?: boolean }).explicit !== true &&
+        lastValue !== null &&
+        (lastValue.kind === "map" || lastValue.kind === "seq") &&
+        lastValue.comment !== undefined
+      ) {
+        const comment = lastValue.comment;
+        lastValue.comment = undefined;
+        lastValue.range[1] = Math.max(lastValue.range[1], lastValue.range[2]);
+        let target = lastValue;
+        while (target.kind === "map" && target.items.length > 0) {
+          const tail = target.items[target.items.length - 1];
+          if (tail?.value && tail.value.kind === "map") {
+            target = tail.value;
+            continue;
+          }
+          break;
+        }
+        const innerPair = target.kind === "map" ? target.items[target.items.length - 1] : undefined;
+        if (innerPair?.key !== null && innerPair?.key !== undefined) {
+          innerPair.key.comment = innerPair.key.comment
+            ? `${innerPair.key.comment}\n${comment}`
+            : comment;
+          if (innerPair.key.kind === "scalar" && innerPair.key.source === "") {
+            innerPair.key.range[2] = Math.max(innerPair.key.range[2], lastValue.range[2]);
+          }
+        }
+      }
+    }
+    if (
+      !this.suppressTrailing &&
+      node.kind === "map" &&
+      this.i >= this.n &&
+      this.pendingComments.length > 0 &&
+      this.pendingCommentIndent > 0
+    ) {
+      const lastPair = node.items[node.items.length - 1];
+      const lastValue = lastPair?.value ?? null;
+      if (
+        lastPair !== undefined &&
+        (lastPair as unknown as { explicit?: boolean }).explicit !== true &&
+        lastValue !== null &&
+        (lastValue.kind === "map" || lastValue.kind === "seq")
+      ) {
+        const end = this.pendingCommentEnd || this.i;
+        let target = lastValue;
+        while (target.kind === "map" && target.items.length > 0) {
+          const tail = target.items[target.items.length - 1];
+          if (tail?.value && tail.value.kind === "map") {
+            target = tail.value;
+            continue;
+          }
+          break;
+        }
+        const innerPair = target.kind === "map" ? target.items[target.items.length - 1] : undefined;
+        if (innerPair?.key !== null && innerPair?.key !== undefined) {
+          const text = this.pendingComments.join("\n");
+          if (text.length > 0) {
+            innerPair.key.comment = innerPair.key.comment
+              ? `${innerPair.key.comment}\n${text}`
+              : text;
+          }
+          if (innerPair.key.kind === "scalar" && innerPair.key.source === "") {
+            innerPair.key.range[2] = Math.max(innerPair.key.range[2], end);
+          }
+        }
+        lastValue.range[1] = Math.max(lastValue.range[1], end);
+        lastValue.range[2] = Math.max(lastValue.range[2], end);
+        node.range[1] = Math.max(node.range[1], end);
+        node.range[2] = Math.max(node.range[2], end);
+        this.pendingComments = [];
+        this.pendingBlank = false;
+        this.pendingBlankBefore = false;
+        this.pendingCommentEnd = 0;
+        this.pendingCommentLineEnd = 0;
+        this.pendingCommentIndent = -1;
+        this.suppressTrailing = true;
+      }
+    }
+    if (
+      !this.suppressTrailing &&
+      node.kind === "map" &&
+      this.i >= this.n &&
+      this.pendingComments.length > 0
+    ) {
+      const lastPair = node.items[node.items.length - 1];
+      if (lastPair?.explicit === true && lastPair.value === null) {
+        const end = this.pendingCommentEnd || this.i;
+        const key = lastPair.key;
+        if (key !== null && (key.kind === "map" || key.kind === "seq")) {
+          key.range[1] = Math.max(key.range[1], end);
+          key.range[2] = Math.max(key.range[2], end);
+          const innerPair = key.items[key.items.length - 1];
+          if (innerPair?.kind === "pair" && innerPair.key !== null) {
+            if (innerPair.key.kind === "scalar" && innerPair.key.source === "") {
+              innerPair.key.range[2] = Math.max(innerPair.key.range[2], end);
+            }
+            const text = this.pendingComments.join("\n");
+            if (text.length > 0) {
+              innerPair.key.comment = innerPair.key.comment
+                ? `${innerPair.key.comment}\n${text}`
+                : text;
+            }
+          }
+        }
+        node.range[2] = Math.max(node.range[2], end);
+        this.pendingComments = [];
+        this.pendingBlank = false;
+        this.pendingBlankBefore = false;
+        this.pendingCommentEnd = 0;
+        this.pendingCommentLineEnd = 0;
+        this.pendingCommentIndent = -1;
+      }
+    }
+    if (!this.suppressTrailing && node.kind === "map" && this.i < this.n) {
+      const lastPair = node.items[node.items.length - 1];
+      if (lastPair?.explicit === true && lastPair.value === null) {
+        let scan = this.i;
+        let lastContentStart = -1;
+        let lastContentLineStart = -1;
+        let lastCommentLineEnd = -1;
+        let hasContent = false;
+        let hasComment = false;
+        const comments: string[] = [];
+        let valid = true;
+        while (scan < this.n) {
+          const lineEnd = this.lineEnd(scan);
+          const lineStart = this.lineStartIndex(scan);
+          const prefix = this.src.slice(lineStart, scan);
+          const text = this.src.slice(scan, lineEnd).trim();
+          const hashInLine = this.src.indexOf("#", lineStart);
+          const commentLine =
+            text.length === 0 ||
+            (hashInLine !== -1 &&
+              hashInLine < lineEnd &&
+              (this.src.slice(lineStart, hashInLine).trim() === "" || prefix.includes("#")));
+          if (commentLine) {
+            if (hashInLine !== -1 && hashInLine < lineEnd) {
+              comments.push(normalizeComment(this.src.slice(hashInLine + 1, lineEnd)));
+              hasComment = true;
+              lastCommentLineEnd = lineEnd;
+            }
+            scan = this.afterLineBreak(lineEnd);
+            continue;
+          }
+          let probe = lineStart;
+          while (probe < lineEnd && (this.src[probe] === " " || this.src[probe] === "\t")) {
+            probe += 1;
+          }
+          if (probe - lineStart <= 0) {
+            valid = false;
+            break;
+          }
+          lastContentStart = probe;
+          lastContentLineStart = lineStart;
+          hasContent = true;
+          scan = this.afterLineBreak(lineEnd);
+        }
+        if (valid && (hasContent || hasComment)) {
+          const end = hasContent ? lastContentStart : this.afterLineBreak(lastCommentLineEnd);
+          const quotedTail =
+            hasContent &&
+            (this.src[lastContentStart] === "'" || this.src[lastContentStart] === '"');
+          const rangeOneEnd = quotedTail ? lastContentLineStart : end;
+          const key = lastPair.key;
+          if (key !== null && (key.kind === "map" || key.kind === "seq")) {
+            key.range[1] = Math.max(key.range[1], rangeOneEnd);
+            key.range[2] = Math.max(key.range[2], end);
+            if (key.comment !== undefined) {
+              const mapComment = key.comment;
+              key.comment = undefined;
+              const lastInner = key.items[key.items.length - 1];
+              if (lastInner?.kind === "pair" && lastInner.key !== null) {
+                lastInner.key.comment = lastInner.key.comment
+                  ? `${lastInner.key.comment}\n${mapComment}`
+                  : mapComment;
+              }
+            }
+            const innerPair = key.items[key.items.length - 1];
+            if (innerPair?.kind === "pair" && innerPair.key !== null) {
+              if (innerPair.key.kind === "scalar" && innerPair.key.source === "") {
+                innerPair.key.range[2] = Math.max(innerPair.key.range[2], end);
+              }
+              if (comments.length > 0) {
+                const text = comments.join("\n");
+                innerPair.key.comment = innerPair.key.comment
+                  ? `${innerPair.key.comment}\n${text}`
+                  : text;
+              }
+            }
+          }
+          node.range[1] = Math.max(node.range[1], end);
+          node.range[2] = Math.max(node.range[2], end);
+          this.i = scan;
+          this.suppressTrailing = true;
+        }
+      }
+    }
     const trailingComments = this.pendingComments.length > 0;
     const hadTrailing = trailingComments || this.pendingBlank;
     if (!this.suppressTrailing) {
@@ -1758,6 +2088,7 @@ class Parser {
         } else if (
           collectionTab === -1 &&
           previous === null &&
+          !this.parsingExplicitKey &&
           collectionIndicator === "?" &&
           (this.i + 1 >= this.n || this.isSep(this.i + 1)) &&
           !(() => {
@@ -1785,14 +2116,23 @@ class Parser {
             ) {
               nextContent += 1;
             }
+            const nextFirst = this.src[nextContent];
+            const nextIsIndicator =
+              (nextFirst === "?" || nextFirst === "-" || nextFirst === ":") &&
+              (nextContent + 1 >= this.n || this.isSep(nextContent + 1));
             if (
               nextContent < this.n &&
               !this.isLineBreak(nextContent) &&
-              this.src[nextContent] !== ":"
+              nextFirst !== ":" &&
+              nextFirst !== "#" &&
+              !nextIsIndicator &&
+              !this.lineHasMappingAt(nextContent)
             ) {
               const nextIndent = nextContent - nextLine;
               const currentIndent = this.i - collectionLineStart;
-              if (nextIndent === currentIndent) {
+              if (nextIndent <= 0) {
+                // root-level sibling: valid continuation of enclosing map
+              } else if (nextIndent === currentIndent) {
                 this.recordError(
                   "MISSING_CHAR",
                   "Sequence item without - indicator",
@@ -1832,12 +2172,22 @@ class Parser {
             tabPos + 1,
           );
         } else if (tabPos === -1 && indicator === "?") {
-          this.recordError(
-            "MISSING_CHAR",
-            "Sequence item without - indicator",
-            currentLineStart,
-            currentLineStart + 1,
-          );
+          const nextLinePos = this.afterLineBreak(this.lineEnd(this.i));
+          let nextProbe = nextLinePos;
+          while (
+            nextProbe < this.n &&
+            (this.src[nextProbe] === " " || this.src[nextProbe] === "\t")
+          ) {
+            nextProbe += 1;
+          }
+          if (nextProbe < this.n && nextProbe - nextLinePos > 0 && this.column() > indent) {
+            this.recordError(
+              "MISSING_CHAR",
+              "Sequence item without - indicator",
+              currentLineStart,
+              currentLineStart + 1,
+            );
+          }
         }
       }
       const inlineColon =
@@ -1873,7 +2223,16 @@ class Parser {
         const hasInlineValue =
           inlineProbe < this.n && !this.isLineBreak(inlineProbe) && this.src[inlineProbe] !== "#";
         const value = this.parseIndicatorValue(indent, false);
+        let colonLeadingSpaces = 0;
+        {
+          let probe = lineStart;
+          while (probe < this.n && this.src[probe] === " ") {
+            colonLeadingSpaces += 1;
+            probe += 1;
+          }
+        }
         if (
+          colonLeadingSpaces >= 2 &&
           (!hasInlineValue || (previous?.kind === "scalar" && previous.comment !== undefined)) &&
           value.kind === "scalar" &&
           value.type === "PLAIN" &&
@@ -1888,12 +2247,22 @@ class Parser {
         ) {
           const newline = this.src.indexOf("\n", value.range[0]);
           const continuation = newline === -1 ? value.range[0] : newline + 1;
-          this.recordError(
-            "BAD_INDENT",
-            "All mapping items must start at the same column",
-            continuation,
-            continuation + 1,
-          );
+          let contentProbe = continuation;
+          while (contentProbe < this.n) {
+            const contentLineEnd = this.lineEnd(contentProbe);
+            if (this.src.slice(contentProbe, contentLineEnd).trim().length > 0) {
+              break;
+            }
+            contentProbe = this.afterLineBreak(contentLineEnd);
+          }
+          if (this.lineIndentOf(contentProbe) <= colonLeadingSpaces) {
+            this.recordError(
+              "BAD_INDENT",
+              "All mapping items must start at the same column",
+              continuation,
+              continuation + 1,
+            );
+          }
         }
         const pair = makePair(key, value);
         map.items.push(pair);
@@ -1968,6 +2337,20 @@ class Parser {
       }
       const pairStart = this.i;
       const pair = this.parsePair(indent);
+      if (
+        this.tabColonKeyStart !== null &&
+        this.tabColonLineStart !== null &&
+        pairStart === this.tabColonLineStart
+      ) {
+        if (pair.key?.kind === "scalar" && pair.key.source === "") {
+          pair.key.range = [this.tabColonKeyStart, this.tabColonKeyStart, this.tabColonKeyStart];
+        }
+        this.tabColonKeyStart = null;
+        this.tabColonLineStart = null;
+      } else if (this.tabColonLineStart !== null && pairStart > this.tabColonLineStart) {
+        this.tabColonKeyStart = null;
+        this.tabColonLineStart = null;
+      }
       if (firstPair) {
         firstPair = false;
         if (!explicitFirst && pair.key !== null) {
@@ -2189,6 +2572,7 @@ class Parser {
       this.pendingComments = [...markerComment.comments];
     }
     let key: ParseNode;
+    let blockIndentedKey = false;
     const keyTrivia = this.takeTriviaForNode();
     if (markerComment) {
       this.collectTrivia();
@@ -2212,15 +2596,28 @@ class Parser {
         this.i < this.n &&
         !this.atDocMarker() &&
         this.src[this.i] === "-" &&
-        this.isSep(this.i + 1)
+        this.isSep(this.i + 1) &&
+        this.column() >= indent
       ) {
+        const previousExplicit = this.parsingExplicitKey;
+        this.parsingExplicitKey = true;
         key = this.parseBlockSeq(this.column());
+        this.parsingExplicitKey = previousExplicit;
         key.spaceBefore = true;
       } else if (this.i < this.n && this.column() > indent) {
+        blockIndentedKey = true;
+        const previousExplicit = this.parsingExplicitKey;
+        this.parsingExplicitKey = true;
         key = this.parseBlockNode(indent + 1, true) ?? makeScalar(null);
+        this.parsingExplicitKey = previousExplicit;
         if (key.kind === "map" && key.items.length > 0) {
-          const firstKey = key.items[0]?.key ?? null;
-          if (firstKey?.kind === "scalar" && firstKey.source !== "") {
+          const firstPair = key.items[0];
+          const firstKey = firstPair?.key ?? null;
+          if (
+            (firstPair as unknown as { explicit?: boolean }).explicit !== true &&
+            firstKey?.kind === "scalar" &&
+            firstKey.source !== ""
+          ) {
             key.range[0] = firstKey.range[1];
           }
         }
@@ -2232,13 +2629,17 @@ class Parser {
     } else if (this.src[this.i] === "-" && this.isSep(this.i + 1)) {
       key = this.parseBlockSeq(this.column());
     } else {
+      const previousPlainIndent = this.plainIndent;
+      this.plainIndent = this.lineIndent();
       key = this.parseInlineNode(true);
+      this.plainIndent = previousPlainIndent;
     }
     if (key.kind === "scalar" || key.kind === "alias") {
       key.range[2] = key.range[1];
     }
     let explicitTriviaUsed = false;
     if (
+      !blockIndentedKey &&
       this.i < this.n &&
       this.src[this.i] === ":" &&
       this.lineStartIndex(this.i) === this.lineStartIndex(Math.max(key.range[0], key.range[1] - 1))
@@ -2331,6 +2732,16 @@ class Parser {
       this.lineStartIndex(this.i) === this.lineStartIndex(Math.max(key.range[0], key.range[1] - 1))
     ) {
       this.i += 1;
+      if (blockIndentedKey) {
+        let after = this.i;
+        while (after < this.n && (this.src[after] === " " || this.src[after] === "\t")) {
+          after += 1;
+        }
+        if (this.src[after] === ":" && this.isSep(after + 1)) {
+          this.i = this.afterLineBreak(this.lineEnd(after));
+          return makePair(key, null);
+        }
+      }
       const value = this.parseIndicatorValue(indent, false);
       return makePair(key, value);
     }
@@ -2342,8 +2753,52 @@ class Parser {
       this.column() >= indent
     ) {
       this.i += 1;
-      const value = this.parseIndicatorValue(indent, false);
+      if (blockIndentedKey) {
+        let after = this.i;
+        while (after < this.n && (this.src[after] === " " || this.src[after] === "\t")) {
+          after += 1;
+        }
+        if (this.src[after] === ":" && this.isSep(after + 1)) {
+          this.i = this.afterLineBreak(this.lineEnd(after));
+          return makePair(key, null);
+        }
+      }
+      let value = this.parseIndicatorValue(indent, false);
+      if (
+        value.kind === "scalar" &&
+        value.source === "" &&
+        this.i < this.n &&
+        this.src[this.i] === ":" &&
+        this.isSep(this.i + 1)
+      ) {
+        value = this.parseBlockNode(0, true) ?? value;
+      }
       return makePair(key, value);
+    }
+    if (
+      key.kind === "scalar" &&
+      key.source !== "" &&
+      this.i < this.n &&
+      !this.atDocMarker() &&
+      this.pendingComments.length === 0 &&
+      key.comment === undefined &&
+      !this.pendingBlank &&
+      this.lineStartIndex(this.i) !== this.lineStartIndex(key.range[0]) &&
+      this.column() > indent &&
+      this.src[this.i] !== ":" &&
+      this.src[this.i] !== "-" &&
+      this.src[this.i] !== "?"
+    ) {
+      const lineEnd = this.lineEnd(this.i);
+      const text = this.src.slice(this.i, lineEnd).trim();
+      if (text.length > 0) {
+        const combined = `${String(key.value)} ${text}`;
+        key.value = combined;
+        key.source = combined;
+        key.range[1] = lineEnd;
+        key.range[2] = lineEnd;
+        this.i = this.afterLineBreak(lineEnd);
+      }
     }
     if (
       this.i < this.n &&
@@ -2352,12 +2807,63 @@ class Parser {
       this.isSep(this.i + 1)
     ) {
       const after = this.afterLineBreak(this.lineEnd(key.range[1]));
+      const dashStart = this.i;
+      const dashIndent = this.lineIndentOf(dashStart);
+      const collectionEnd =
+        dashIndent > 0
+          ? dashStart
+          : key.kind === "map" || key.kind === "seq"
+            ? key.range[2]
+            : after;
       this.i = this.afterLineBreak(this.lineEnd(this.i));
+      for (;;) {
+        if (this.i >= this.n || this.atDocMarker()) {
+          break;
+        }
+        const lineEnd = this.lineEnd(this.i);
+        const text = this.src.slice(this.i, lineEnd).trim();
+        if (text.startsWith("#") || text.length === 0) {
+          this.i = this.afterLineBreak(lineEnd);
+          continue;
+        }
+        let probe = this.i;
+        while (probe < lineEnd && (this.src[probe] === " " || this.src[probe] === "\t")) {
+          probe += 1;
+        }
+        if (probe - this.i <= indent) {
+          if (
+            probe - this.i === indent &&
+            this.src[probe] === "-" &&
+            this.isSep(probe + 1) &&
+            text.length > 0
+          ) {
+            this.i = this.afterLineBreak(lineEnd);
+            continue;
+          }
+          break;
+        }
+        if (
+          this.src[this.i] === "\t" &&
+          probe > this.i &&
+          !(this.src[probe] === "-" && this.isSep(probe + 1))
+        ) {
+          if (this.src.slice(probe, lineEnd).trim() === ":") {
+            this.tabColonKeyStart = dashStart;
+            this.tabColonLineStart = probe;
+          }
+          this.i = probe;
+          break;
+        }
+        this.i = this.afterLineBreak(lineEnd);
+      }
       if (this.i >= this.n) {
-        this.explicitIgnoredDocEnd = after;
+        this.explicitIgnoredDocEnd = collectionEnd;
       }
       const pair = makePair(key, null);
-      Object.defineProperty(pair, "explicitLineEnd", { value: after, enumerable: false });
+      Object.defineProperty(pair, "explicitLineEnd", {
+        value: collectionEnd,
+        enumerable: false,
+      });
       return pair;
     }
     return makePair(key, null);
@@ -3537,6 +4043,7 @@ class Parser {
         !recover &&
         this.flowDepth === 0 &&
         contentPos < this.n &&
+        this.lineIndentOf(contentPos) > parentIndent &&
         (this.src[contentPos] === '"' || this.src[contentPos] === "'") &&
         (() => {
           const lineEnd = this.lineEnd(contentPos);

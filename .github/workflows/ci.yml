@@ -51,6 +51,8 @@ jobs:
 
       - name: Test
         run: bun run test
+        env:
+          FAST_CHECK_SEED: 20261107
 
       - name: Self-audit workflows
         run: bun run dist/cli.js . --workflow-only --format text

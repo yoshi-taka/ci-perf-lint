@@ -69,3 +69,68 @@ describe("plain scalar continuation lines", () => {
     );
   });
 });
+
+function expectValid(source: string): void {
+  const reference = referenceParse(source);
+  if (reference.errors.length > 0 || reference.warnings.length > 0) {
+    return;
+  }
+  const candidate = parseDocument(source);
+  expect({ source, errors: candidate.errors.map((error) => error.code) }).toEqual({
+    source,
+    errors: [],
+  });
+  expect({ source, warnings: candidate.warnings.map((warning) => warning.code) }).toEqual({
+    source,
+    warnings: [],
+  });
+  expect({ source, value: candidate.toJS({ mapAsMap: true }) }).toEqual({
+    source,
+    value: reference.toJS({ mapAsMap: true }),
+  });
+}
+
+const quotedSuffixSources = new Set<string>();
+for (const prefix of ["value: ", "value: \t", "- "]) {
+  for (const quoted of ['"a"', "'a b'"]) {
+    for (const suffix of ["#", "# c", ",", "]", "}", ":", ": x", " # c"]) {
+      quotedSuffixSources.add(`${prefix}${quoted}${suffix}\n`);
+      quotedSuffixSources.add(`${prefix}${quoted}${suffix}\nnext: true\n`);
+    }
+  }
+}
+
+const commentIndentSources = new Set<string>();
+for (const comment of ["value: # c\n", "value: #\n", "value: a # c\n"]) {
+  for (const prefix of ["", " ", "  ", "\t", " \t"]) {
+    for (const token of [":", ": x", "-", "- x", "?", "? x", "a: x"]) {
+      commentIndentSources.add(`${comment}${prefix}${token}\n`);
+      commentIndentSources.add(`${comment}${prefix}${token}\n  a\n`);
+    }
+  }
+}
+
+const quotedKeySources = new Set<string>();
+for (const key of ['"a:b"', "'a:b'", '"husky@npm:^9.0.0"', '"a:b:c"', '"a#b:c"']) {
+  for (const value of ["value", "{}", "[]", ""]) {
+    quotedKeySources.add(`${key}: ${value}\n`);
+    quotedKeySources.add(`outer:\n  ${key}: ${value}\n`);
+  }
+}
+
+describe("provisional diagnostic acceptance matrices", () => {
+  test.each([...quotedSuffixSources].map((source) => ({ source })))(
+    "quoted scalar suffix %# stays valid",
+    ({ source }) => expectValid(source),
+  );
+
+  test.each([...commentIndentSources].map((source) => ({ source })))(
+    "comment-indented continuation %# stays valid",
+    ({ source }) => expectValid(source),
+  );
+
+  test.each([...quotedKeySources].map((source) => ({ source })))(
+    "quoted key %# stays valid",
+    ({ source }) => expectValid(source),
+  );
+});

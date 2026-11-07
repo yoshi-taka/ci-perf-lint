@@ -15,8 +15,9 @@ function check(source: string): void {
   }
   expect(candidate.errors).toEqual([]);
   expect(candidate.warnings).toEqual([]);
-  expect(candidate.toJS()).toEqual(reference.toJS());
-  expect(candidate.contents?.toJSON()).toEqual(reference.contents?.toJSON());
+  // Structural comparison avoids complex-key stringification, which has
+  // dedicated formatter tests.
+  expect(candidate.toJS({ mapAsMap: true })).toEqual(reference.toJS({ mapAsMap: true }));
 }
 
 const textLine = fc
@@ -56,29 +57,54 @@ const singleQuoted = fc
   .array(fc.constantFrom("a", "b", " ", "-", ":", "#", "/", "🎉", "''"), { maxLength: 12 })
   .map((parts) => `value: '${parts.join("")}'\n`);
 
+const plainStart = textLine.filter((line) => line !== "" && !/^[#&*!|>'"%@`[\]{},?:-]/.test(line));
+
 const plainMultiline = fc
   .tuple(
-    fc.array(
-      textLine.filter((line) => line !== "" && !/^[#&*!|>'"%@`[\]{},?:-]/.test(line)),
-      {
-        minLength: 1,
-        maxLength: 4,
-      },
-    ),
+    plainStart,
+    fc.array(textLine, { maxLength: 3 }),
     fc.constantFrom(2, 4),
     fc.constantFrom(0, 1, 2),
   )
-  .map(([lines, indent, blanks]) => {
+  .map(([first, rest, indent, blanks]) => {
     const separator = `\n${"\n".repeat(blanks)}`;
-    return `value: ${lines[0]}\n${lines
-      .slice(1)
+    return `value: ${first}\n${rest
       .map((line) => `${" ".repeat(indent)}${line}`)
       .join(separator)}\n`;
   });
 
+const continuationPrefix = fc.constantFrom("", " ", "  ", "\t", " \t");
+const continuationToken = fc.constantFrom(
+  "'",
+  '"',
+  "#",
+  "# c",
+  "':",
+  '":',
+  ":",
+  ": x",
+  "-",
+  "- x",
+  "?",
+  "? x",
+  "a",
+  "a:",
+  "?: x",
+  "-: x",
+);
+const continuationDocument = fc
+  .array(fc.tuple(continuationPrefix, continuationToken), { minLength: 1, maxLength: 3 })
+  .map((lines) => `value: a\n${lines.map(([prefix, token]) => `${prefix}${token}`).join("\n")}\n`);
+
 for (let batch = 0; batch < 5; batch++) {
   test(`fuzz: BNF block scalar headers and content (batch ${batch + 1})`, () => {
     fc.assert(fc.property(blockScalar, check), options);
+  });
+}
+
+for (let batch = 0; batch < 3; batch++) {
+  test(`fuzz: continuation indicators and heuristic boundaries (batch ${batch + 1})`, () => {
+    fc.assert(fc.property(continuationDocument, check), options);
   });
 }
 
