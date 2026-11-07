@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { extractSemanticSteps, groupStepsByJob } from "../src/rules/shared/semantic-adapter.ts";
 import type { WorkflowDocument, WorkflowStep, WorkflowJob } from "../src/workflow.ts";
-import type { YAMLMap } from "yaml";
+import type { YAMLMap } from "../src/yaml.ts";
 
 function makeStep(run: string): WorkflowStep {
   return { run, node: { items: [] } as unknown as YAMLMap<unknown, unknown> };

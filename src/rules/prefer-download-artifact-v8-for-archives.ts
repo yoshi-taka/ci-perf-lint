@@ -1,5 +1,5 @@
 import path from "node:path";
-import { isScalar } from "yaml";
+import { isScalar } from "../yaml.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";

@@ -28,7 +28,7 @@
     "test:isolate": "bun test --isolate",
     "test:timings": "AGENT=1 bun test --parallel --timings=.bun-test-timings.json --update-timings",
     "test:fuzz:fast": "bun test --parallel test/fuzz-*.test.ts",
-    "test:fuzz:jazzer": "bun build ./src/workflow.ts --outdir ./dist --target node --external yaml && bun x jazzer fuzz/workflow.fuzz.mjs fuzz/corpus/workflow --sync",
+    "test:fuzz:jazzer": "bun build ./src/workflow.ts --outdir ./dist --target node --external oxlint --external oxc-parser && bun x jazzer fuzz/workflow.fuzz.mjs fuzz/corpus/workflow --sync",
     "test:slow:mutation": "bun run test:slow:mutation:rule-engine && bun run test:slow:mutation:workflow && bun run test:slow:mutation:core && bun run test:slow:mutation:repo && bun run test:slow:mutation:renderer",
     "test:slow:mutation:core": "bun --bun stryker run stryker/stryker.core.config.mjs",
     "test:slow:mutation:smoke": "bun --bun stryker run stryker/stryker.core.config.mjs",
@@ -39,7 +39,7 @@
     "lint": "oxlint --type-aware --type-check --deny-warnings --fix src test && bun fmt src test/*.ts scripts/*.ts",
     "format": "bun fmt src test/*.ts scripts/*.ts",
     "format:check": "bun fmt --check src test/*.ts scripts/*.ts",
-    "build": "bun build ./src/cli.ts --outdir ./dist --target node --external yaml --external oxlint --external oxc-parser",
+    "build": "bun build ./src/cli.ts --outdir ./dist --target node --external oxlint --external oxc-parser",
     "prepack": "bun run build",
     "cache:fixtures": "bun run scripts/cache-fixtures.ts",
     "new-rule": "bun run scripts/new-rule.ts",
@@ -64,8 +64,7 @@
   },
   "dependencies": {
     "oxc-parser": "^0.155.0",
-    "oxlint": "^1.90.0",
-    "yaml": "^2.9.1"
+    "oxlint": "^1.90.0"
   },
   "devDependencies": {
     "@astrojs/sitemap": "^3.7.4",
@@ -80,6 +79,7 @@
     "lefthook": "^2.2.2",
     "oxlint-tsgolint": "^7.0.2005",
     "tinybench": "^6.2.3",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "yaml": "^2.9.1"
   }
 }

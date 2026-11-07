@@ -2,7 +2,7 @@ import path from "node:path";
 import {
   LineCounter,
   parseDocument,
-  type Document,
+  type ParsedDocument,
   type Node,
   type Pair,
   type YAMLMap,
@@ -10,7 +10,7 @@ import {
   isNode,
   isScalar,
   isSeq,
-} from "yaml";
+} from "./yaml.ts";
 import { lazyNodeRecord, nodeToRecord } from "./lazy-node-record.ts";
 import type { SourceLocation } from "./types.ts";
 
@@ -222,7 +222,7 @@ export function parseGitlabCi(
   const relativePath = path.relative(repoRoot, fullPath) || path.basename(fullPath);
   const startedAt = performance.now();
   const lineCounter = new LineCounter();
-  let yamlDocument: Document.Parsed;
+  let yamlDocument: ParsedDocument;
   try {
     yamlDocument = parseDocument(source, { lineCounter });
   } catch (error) {

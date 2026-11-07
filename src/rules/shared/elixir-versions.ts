@@ -1,4 +1,4 @@
-import type { Node } from "yaml";
+import type { Node } from "../../yaml.ts";
 import type { WorkflowJob, WorkflowStep } from "../../workflow.ts";
 import { getMapValue, getScalarValue } from "../../workflow.ts";
 

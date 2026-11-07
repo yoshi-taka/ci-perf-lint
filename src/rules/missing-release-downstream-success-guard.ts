@@ -1,7 +1,7 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
-import type { YAMLMap } from "yaml";
+import type { YAMLMap } from "../yaml.ts";
 import { getScalarValue, getStringOrArrayValue } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";

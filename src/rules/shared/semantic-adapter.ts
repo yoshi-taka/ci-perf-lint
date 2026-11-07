@@ -1,4 +1,4 @@
-import type { Node } from "yaml";
+import type { Node } from "../../yaml.ts";
 import type { CIDocument, CommandEntry } from "./any-step.ts";
 import { collectCommandEntries } from "./any-step.ts";
 import {

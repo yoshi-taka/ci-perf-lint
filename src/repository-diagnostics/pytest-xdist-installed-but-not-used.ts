@@ -1,5 +1,5 @@
 import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
-import { isScalar } from "yaml";
+import { isScalar } from "../yaml.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";

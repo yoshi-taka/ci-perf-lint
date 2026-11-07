@@ -1,4 +1,4 @@
-import { isMap, type Node } from "yaml";
+import { isMap, type Node } from "../yaml.ts";
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";

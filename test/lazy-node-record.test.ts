@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseDocument, isMap, isNode, type Node } from "yaml";
+import { parseDocument, isMap, isNode, type Node } from "../src/yaml.ts";
 import { lazyNodeRecord, lazyOptionalNodeRecord, nodeToRecord } from "../src/lazy-node-record.ts";
 
 function parseYaml(source: string) {

@@ -1,4 +1,4 @@
-import type { Node } from "yaml";
+import type { Node } from "./yaml.ts";
 import type { Confidence, RuleMeta, Severity, SourceLocation } from "./types.ts";
 import {
   composeDiagnosticSources,

@@ -1,4 +1,4 @@
-import { parseDocument } from "yaml";
+import { parseDocument } from "./yaml.ts";
 import {
   dependencySectionsOf,
   packageJsonDependencyVersionSpec,

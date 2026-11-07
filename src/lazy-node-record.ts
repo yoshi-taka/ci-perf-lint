@@ -1,4 +1,4 @@
-import type { Node } from "yaml";
+import type { Node } from "./yaml.ts";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (value && typeof value === "object" && !Array.isArray(value)) {

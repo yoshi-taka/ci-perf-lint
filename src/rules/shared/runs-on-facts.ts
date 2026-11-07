@@ -1,5 +1,5 @@
 import type { WorkflowJob } from "../../workflow.ts";
-import type { YAMLMap } from "yaml";
+import type { YAMLMap } from "../../yaml.ts";
 import { getNode, getStringOrArrayValue } from "../../workflow.ts";
 
 export type RunsOnOs = "ubuntu" | "windows" | "macos" | "unknown";

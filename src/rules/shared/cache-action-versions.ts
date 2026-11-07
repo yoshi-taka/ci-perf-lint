@@ -1,4 +1,4 @@
-import { isScalar } from "yaml";
+import { isScalar } from "../../yaml.ts";
 import type { WorkflowStep } from "../../workflow.ts";
 
 /** Moving tags cannot establish whether a patch-level performance fix is missing. */

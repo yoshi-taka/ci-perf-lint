@@ -1,7 +1,7 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
-import type { YAMLMap } from "yaml";
+import type { YAMLMap } from "../yaml.ts";
 import { getScalarValue } from "../workflow.ts";
 import { isHeavyJob } from "./shared/workflow-jobs.ts";
 import { getTriggerSemantics } from "./shared/workflow-triggers.ts";

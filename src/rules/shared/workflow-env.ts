@@ -1,4 +1,4 @@
-import { isMap } from "yaml";
+import { isMap } from "../../yaml.ts";
 import {
   getMapValue,
   type WorkflowDocument,

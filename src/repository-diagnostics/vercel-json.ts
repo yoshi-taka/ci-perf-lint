@@ -1,4 +1,4 @@
-import { isMap, isScalar, parseDocument } from "yaml";
+import { isMap, isScalar, parseDocument } from "../yaml.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";

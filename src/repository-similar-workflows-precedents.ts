@@ -1,5 +1,5 @@
 import type { WorkflowDocument, WorkflowJob } from "./workflow.ts";
-import type { YAMLMap } from "yaml";
+import type { YAMLMap } from "./yaml.ts";
 import { getScalarValue, getStringOrArrayValue } from "./workflow.ts";
 import { collectScopePrefixes } from "./rules/shared/workflow-path-prefixes.ts";
 import {

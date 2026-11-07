@@ -1,5 +1,5 @@
 import path from "node:path";
-import { parseDocument } from "yaml";
+import { parseDocument } from "../yaml.ts";
 import type { AnalysisWarning } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { AnyWorkflowDocument } from "../ci-types.ts";
@@ -374,7 +374,7 @@ async function loadComposeServices(
     }
 
     try {
-      const parsed = parseDocument(composeText).toJSON() as unknown;
+      const parsed = parseDocument(composeText).toJSON();
       const composeValue = asRecord(parsed);
       return asRecord(composeValue?.services);
     } catch (error) {

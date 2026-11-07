@@ -1,5 +1,5 @@
 import path from "node:path";
-import { parseDocument } from "yaml";
+import { parseDocument } from "../yaml.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";

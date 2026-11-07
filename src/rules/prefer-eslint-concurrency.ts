@@ -1,4 +1,4 @@
-import type { Node } from "yaml";
+import type { Node } from "../yaml.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";

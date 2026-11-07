@@ -1,5 +1,5 @@
 import type { WorkflowDocument, WorkflowJob } from "../../workflow.ts";
-import type { YAMLMap } from "yaml";
+import type { YAMLMap } from "../../yaml.ts";
 import { getScalarValue, getMapValue } from "../../workflow.ts";
 import { getJobFacts, getWorkflowFacts } from "./workflow-analysis.ts";
 

@@ -1,5 +1,5 @@
 /* oxlint-disable typescript/prefer-for-of */
-import type { Node } from "yaml";
+import type { Node } from "../../yaml.ts";
 import type { WorkflowDocument, WorkflowStep } from "../../workflow.ts";
 import type { PipelineDocument, PipelineStep } from "../../buildkite-workflow.ts";
 import type { CircleCiDocument } from "../../circleci-workflow.ts";

@@ -7,7 +7,6 @@
       "dependencies": {
         "oxc-parser": "^0.155.0",
         "oxlint": "^1.90.0",
-        "yaml": "^2.9.1",
       },
       "devDependencies": {
         "@astrojs/sitemap": "^3.7.4",
@@ -23,6 +22,7 @@
         "oxlint-tsgolint": "^7.0.2005",
         "tinybench": "^6.2.3",
         "typescript": "^7.0.2",
+        "yaml": "^2.9.1",
       },
     },
   },

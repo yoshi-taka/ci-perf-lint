@@ -1,5 +1,5 @@
 import path from "node:path";
-import { isMap, isScalar, parseDocument } from "yaml";
+import { isMap, isScalar, parseDocument } from "../yaml.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import {

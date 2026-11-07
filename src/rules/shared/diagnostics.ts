@@ -1,4 +1,4 @@
-import type { Node } from "yaml";
+import type { Node } from "../../yaml.ts";
 import type { Confidence, RuleMeta, Severity, SourceLocation } from "../../types.ts";
 import type { ProvenancedDiagnostic, WorkflowDiagnosticSource } from "../../diagnostic-source.ts";
 import type { AnyWorkflowDocument } from "../../ci-types.ts";

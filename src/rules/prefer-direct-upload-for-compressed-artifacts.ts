@@ -1,9 +1,9 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import type { Node } from "yaml";
+import type { Node } from "../yaml.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { isScalar } from "yaml";
+import { isScalar } from "../yaml.ts";
 
 const meta = {
   id: "prefer-direct-upload-for-compressed-artifacts",

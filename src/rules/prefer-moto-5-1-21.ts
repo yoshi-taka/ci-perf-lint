@@ -1,4 +1,4 @@
-import { isMap } from "yaml";
+import { isMap } from "../yaml.ts";
 import type { Diagnostic } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import { getNode, getScalarString, getScalarValue, type WorkflowDocument } from "../workflow.ts";

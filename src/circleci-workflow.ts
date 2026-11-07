@@ -3,14 +3,14 @@ import {
   LineCounter,
   parseDocument,
   YAMLMap,
-  type Document,
+  type ParsedDocument,
   type Node,
   type Pair,
   isMap,
   isNode,
   isScalar,
   isSeq,
-} from "yaml";
+} from "./yaml.ts";
 import { lazyNodeRecord, nodeToRecord } from "./lazy-node-record.ts";
 import type { SourceLocation } from "./types.ts";
 
@@ -301,7 +301,7 @@ export function parseCircleCi(
 
   const relativePath = path.relative(repoRoot, fullPath) || path.basename(fullPath);
   const lineCounter = new LineCounter();
-  let yamlDocument: Document.Parsed;
+  let yamlDocument: ParsedDocument;
   try {
     yamlDocument = parseDocument(source, {
       lineCounter,

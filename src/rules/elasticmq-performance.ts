@@ -1,4 +1,4 @@
-import { isMap } from "yaml";
+import { isMap } from "../yaml.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import { versionSpecIsBelow } from "../repository-dependency-versions.ts";

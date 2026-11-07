@@ -1,4 +1,4 @@
-import { isMap } from "yaml";
+import { isMap } from "../yaml.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { CIDocument } from "./shared/any-step.ts";
