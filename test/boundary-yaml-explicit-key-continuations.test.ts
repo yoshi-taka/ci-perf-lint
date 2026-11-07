@@ -7,6 +7,7 @@ import { captureYamlWarnings } from "./yaml-document-test-helpers.ts";
 // previously produced false diagnostics on valid YAML (explicit keys, empty
 // keys and sequence indicators on following lines). Invalid-input presence is
 // covered by the dedicated boundary corpora; this matrix guards valid input.
+// Cases are chunked so thousands of checks do not register thousands of tests.
 const prefixes = ["", " ", "  ", "\t", " \t"];
 const tokens = [":", ": x", "?", "? x", "-", "- x", "'", '"', "#", "# c", "'x", "'x:", "a"];
 const sources = new Set<string>();
@@ -21,29 +22,45 @@ for (const first of prefixes) {
   }
 }
 
+function chunked<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function validFailures(inputs: Iterable<string>): unknown[] {
+  const failures: unknown[] = [];
+  for (const source of inputs) {
+    const reference = referenceParse(source);
+    if (reference.errors.length > 0 || reference.warnings.length > 0) {
+      // Malformed cases are outside this property; other corpora cover them.
+      continue;
+    }
+    const candidate = parseDocument(source);
+    const errors = candidate.errors.map((error) => error.code);
+    const warnings = candidate.warnings.map((warning) => warning.code);
+    if (errors.length > 0 || warnings.length > 0) {
+      failures.push({ source, errors, warnings });
+      continue;
+    }
+    // Compare structurally: collection-valued keys stringify differently in
+    // warning text, which is covered by dedicated formatting tests.
+    const expected = captureYamlWarnings(() => reference.toJS({ mapAsMap: true })).result;
+    const actual = captureYamlWarnings(() => candidate.toJS({ mapAsMap: true })).result;
+    if (!Bun.deepEquals(actual, expected)) {
+      failures.push({ source, expected, actual });
+    }
+  }
+  return failures;
+}
+
 describe("plain scalar continuation lines", () => {
-  test.each([...sources].map((source, index) => ({ index, source })))(
-    "valid continuation %# does not become a diagnostic",
-    ({ source }) => {
-      const reference = referenceParse(source);
-      if (reference.errors.length > 0 || reference.warnings.length > 0) {
-        // Malformed cases are outside this property; other corpora cover them.
-        return;
-      }
-      const candidate = parseDocument(source);
-      expect({ source, errors: candidate.errors.map((error) => error.code) }).toEqual({
-        source,
-        errors: [],
-      });
-      expect({ source, warnings: candidate.warnings.map((warning) => warning.code) }).toEqual({
-        source,
-        warnings: [],
-      });
-      // Compare structurally: collection-valued keys stringify differently in
-      // warning text, which is covered by dedicated formatting tests.
-      const expected = captureYamlWarnings(() => reference.toJS({ mapAsMap: true })).result;
-      const actual = captureYamlWarnings(() => candidate.toJS({ mapAsMap: true })).result;
-      expect({ source, value: actual }).toEqual({ source, value: expected });
+  test.each(chunked([...sources], 250).map((chunk, index) => ({ index, chunk })))(
+    "valid continuation chunk %# does not become a diagnostic",
+    ({ chunk }) => {
+      expect(validFailures(chunk)).toEqual([]);
     },
   );
 
@@ -69,26 +86,6 @@ describe("plain scalar continuation lines", () => {
     );
   });
 });
-
-function expectValid(source: string): void {
-  const reference = referenceParse(source);
-  if (reference.errors.length > 0 || reference.warnings.length > 0) {
-    return;
-  }
-  const candidate = parseDocument(source);
-  expect({ source, errors: candidate.errors.map((error) => error.code) }).toEqual({
-    source,
-    errors: [],
-  });
-  expect({ source, warnings: candidate.warnings.map((warning) => warning.code) }).toEqual({
-    source,
-    warnings: [],
-  });
-  expect({ source, value: candidate.toJS({ mapAsMap: true }) }).toEqual({
-    source,
-    value: reference.toJS({ mapAsMap: true }),
-  });
-}
 
 const quotedSuffixSources = new Set<string>();
 for (const prefix of ["value: ", "value: \t", "- "]) {
@@ -119,18 +116,17 @@ for (const key of ['"a:b"', "'a:b'", '"husky@npm:^9.0.0"', '"a:b:c"', '"a#b:c"']
 }
 
 describe("provisional diagnostic acceptance matrices", () => {
-  test.each([...quotedSuffixSources].map((source) => ({ source })))(
-    "quoted scalar suffix %# stays valid",
-    ({ source }) => expectValid(source),
-  );
-
-  test.each([...commentIndentSources].map((source) => ({ source })))(
-    "comment-indented continuation %# stays valid",
-    ({ source }) => expectValid(source),
-  );
-
-  test.each([...quotedKeySources].map((source) => ({ source })))(
-    "quoted key %# stays valid",
-    ({ source }) => expectValid(source),
-  );
+  test.each(
+    chunked(
+      [
+        ["quoted scalar suffix", quotedSuffixSources],
+        ["comment-indented continuation", commentIndentSources],
+        ["quoted key", quotedKeySources],
+      ] as const,
+      50,
+    ).map((chunk, index) => ({ index, chunk })),
+  )("acceptance chunk %# stays valid", ({ chunk }) => {
+    const inputs = chunk.flatMap(([, set]) => [...set]);
+    expect(validFailures(inputs)).toEqual([]);
+  });
 });
