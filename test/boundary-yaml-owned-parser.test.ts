@@ -20,7 +20,9 @@ describe("owned parser integration", () => {
       const owned = parseYaml(source);
       expect(owned.errors).toEqual([]);
       expect(owned.warnings).toEqual([]);
-      expect(parseDocument(source).toJS()).toEqual(nativeParse(source).toJS());
+      expect(parseDocument(source).toJS({ mapAsMap: true })).toEqual(
+        nativeParse(source).toJS({ mapAsMap: true }),
+      );
     }
   });
 
@@ -75,7 +77,9 @@ describe("owned parser integration", () => {
       "%YAML 1.2\n---\n# before\nnumber: 1.200 # after\nbinary: !!binary aGVsbG8=\ndate: !!timestamp 2026-11-07\n";
     const owned = parseYaml(source);
     expect(owned.errors).toEqual([]);
-    expect(parseDocument(source).toJS()).toEqual(nativeParse(source).toJS());
+    expect(parseDocument(source).toJS({ mapAsMap: true })).toEqual(
+      nativeParse(source).toJS({ mapAsMap: true }),
+    );
     expect(parseDocument(source).contents?.toJSON()).toEqual(
       nativeParse(source).contents?.toJSON(),
     );
