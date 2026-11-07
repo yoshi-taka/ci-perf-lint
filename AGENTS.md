@@ -173,7 +173,10 @@ Fixture names generally use:
 
 For code changes, run lint + knip + tests after completing work, not incrementally during work.
 
+During iteration, run only related tests; run the full suite before commit/push.
+
 ```sh
+bun run test:related   # maps changed files to related tests; --list to preview
 bun run lint
 bun run audit:static
 bun run test

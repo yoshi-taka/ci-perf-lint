@@ -60,7 +60,8 @@
     "perf:flame": "bun --profile src/cli.ts",
     "perf:profile": "bun --cpu-prof --cpu-prof-dir .profile src/cli.ts",
     "perf:mem": "bun --heap-prof --heap-prof-dir .profile src/cli.ts",
-    "setup-hooks": "lefthook install"
+    "setup-hooks": "lefthook install",
+    "test:related": "bun run scripts/test-related.ts"
   },
   "dependencies": {
     "oxc-parser": "^0.155.0",
