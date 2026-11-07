@@ -13,9 +13,13 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 
 It checks these entries:
 
+- `@heroicons/react/16/solid`
+- `@heroicons/react/16/outline`
 - `@heroicons/react/20/solid`
+- `@heroicons/react/20/outline`
 - `@heroicons/react/24/solid`
 - `@heroicons/react/24/outline`
+- the equivalent `@heroicons/vue/...` and `@heroicons/svelte/...` grouped entries
 
 It does not flag already-direct icon imports.
 

@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { fixtures } from "./fixtures.ts";
-import { memoizedAnalyzeRepository } from "./helpers.ts";
+import {
+  createTempDirTracker,
+  memoizedAnalyzeRepository,
+  writeRepositoryFiles,
+} from "./helpers.ts";
+
+const tempDirs = createTempDirTracker();
 
 function getFixtureReport(
   cwd: string,
@@ -134,4 +140,45 @@ describe("import diagnostics: ui libraries and icon packages", () => {
       expect(findings.some((finding) => finding.message.includes(testCase.message))).toBe(true);
     },
   );
+});
+
+test("reads dependencies from nested workspace package.json files", async () => {
+  const root = await tempDirs.create("apl-import-workspace-deps-");
+  await writeRepositoryFiles(root, {
+    "package.json": "{}",
+    ".github/workflows/ci.yml":
+      "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n",
+    "web/package.json": '{"dependencies":{"date-fns":"4.0.0"}}',
+    "web/src/dates.ts":
+      'import { format } from "date-fns";\nexport const value = format(new Date(), "yyyy");\n',
+  });
+  const report = await memoizedAnalyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  expect(
+    report.findings.some((finding) => finding.ruleId === "prefer-direct-date-fns-imports"),
+  ).toBe(true);
+});
+
+test("detects grouped Vue Heroicons imports", async () => {
+  const root = await tempDirs.create("apl-heroicons-vue-");
+  await writeRepositoryFiles(root, {
+    "package.json": '{"dependencies":{"@heroicons/vue":"2.0.0"}}',
+    ".github/workflows/ci.yml":
+      "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n",
+    "src/icons.ts":
+      'import { CheckIcon } from "@heroicons/vue/20/solid";\nexport const icon = CheckIcon;\n',
+  });
+  const report = await memoizedAnalyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  expect(
+    report.findings.some((finding) => finding.ruleId === "prefer-direct-heroicons-imports"),
+  ).toBe(true);
 });

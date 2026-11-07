@@ -112,6 +112,10 @@ describe("repository package helpers", () => {
     ["workspace:*", {}],
     ["next", {}],
     ["10.20", { major: 10, minor: 20 }],
+    ["^5", { major: 5 }],
+    ["5", { major: 5 }],
+    ["~5", { major: 5 }],
+    ["5.x", { major: 5 }],
   ])("parses TypeScript version spec %s", (versionSpec, expected) => {
     expect(parseTypeScriptVersionSpec(versionSpec)).toEqual(expected);
   });
@@ -124,6 +128,10 @@ describe("repository package helpers", () => {
     ["workspace:*", {}],
     ["10.20.30", { major: 10, minor: 20, patch: 30 }],
     ["10.20", { major: 10, minor: 20 }],
+    ["^5", { major: 5 }],
+    ["5", { major: 5 }],
+    ["~5", { major: 5 }],
+    ["5.x", { major: 5 }],
   ])("parses semver-like version spec %s", (versionSpec, expected) => {
     expect(parseSemverLikeVersionSpec(versionSpec)).toEqual(expected);
   });

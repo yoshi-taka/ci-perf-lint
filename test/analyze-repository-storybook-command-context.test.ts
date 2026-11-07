@@ -42,7 +42,12 @@ test.each([
   ["SB_TESTBUILD=true npx storybook build", false],
   ["storybook build && echo SB_TESTBUILD=true", true],
   ["echo 'storybook build'", false],
-  ["npm run build-storybook", false],
+  ["npm run build-storybook", true],
+  ["yarn build-storybook", true],
+  ["pnpm --filter app build-storybook", true],
+  ["bun run build-storybook", true],
+  ["npm run build-storybook --test", false],
+  ["npm run build", false],
   ["cat <<EOF\nstorybook build\nEOF", false],
   ["storybook build --help", false],
 ] as const)("integration command ownership: %s", async (command, expected) => {

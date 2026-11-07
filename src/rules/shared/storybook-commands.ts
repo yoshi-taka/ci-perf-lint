@@ -49,6 +49,27 @@ function buildTestMode(args: string[], environment: Record<string, unknown>): bo
   return flag || value === true || value === "true";
 }
 
+function packageManagerStorybookBuild(words: string[]): { args: string[] } | undefined {
+  if (!["npm", "pnpm", "yarn", "bun"].includes(words[0] ?? "")) {
+    return undefined;
+  }
+  let index = 1;
+  if (words[index] === "run" || words[index] === "run-script") {
+    index++;
+  }
+  while (["--filter", "-F", "--dir", "-C", "--workspace-root"].includes(words[index] ?? "")) {
+    index += ["--filter", "-F", "--dir", "-C"].includes(words[index] ?? "") ? 2 : 1;
+  }
+  const script = words[index];
+  if (script === "build-storybook") {
+    return { args: words.slice(index + 1) };
+  }
+  if (script === "storybook" && words[index + 1] === "build") {
+    return { args: words.slice(index + 2) };
+  }
+  return undefined;
+}
+
 export function collectStorybookCommands(
   text: string,
   environment: Record<string, unknown> = {},
@@ -125,10 +146,16 @@ export function collectStorybookCommands(
       words = words.slice(1);
     }
     const executable = (words[0] ?? "").split("/").at(-1);
+    const packageBuild = packageManagerStorybookBuild(words);
     const build =
-      executable === "build-storybook" || (executable === "storybook" && words[1] === "build");
+      executable === "build-storybook" ||
+      (executable === "storybook" && words[1] === "build") ||
+      packageBuild !== undefined;
     if (build) {
-      const mode = buildTestMode(words.slice(executable === "storybook" ? 2 : 1), localEnv);
+      const mode = buildTestMode(
+        packageBuild?.args ?? words.slice(executable === "storybook" ? 2 : 1),
+        localEnv,
+      );
       if (mode !== undefined) {
         result.builds.push(mode);
       }

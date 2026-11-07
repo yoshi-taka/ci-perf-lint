@@ -50,7 +50,8 @@ export function parseTypeScriptVersionSpec(versionSpec: string): {
 } {
   const match = versionSpec.match(/(\d+)\.(\d+)/);
   if (!match) {
-    return {};
+    const majorOnly = versionSpec.match(/(?:^|[^\d])(\d+)(?:\.(?:x|\*))?(?![.\d])/);
+    return majorOnly ? { major: Number.parseInt(majorOnly[1] ?? "", 10) } : {};
   }
 
   return {
@@ -68,7 +69,8 @@ export function parseSemverLikeVersionSpec(versionSpec: string): {
   if (!match) {
     const partialMatch = versionSpec.match(/(\d+)\.(\d+)/);
     if (!partialMatch) {
-      return {};
+      const majorOnly = versionSpec.match(/(?:^|[^\d])(\d+)(?:\.(?:x|\*))?(?![.\d])/);
+      return majorOnly ? { major: Number.parseInt(majorOnly[1] ?? "", 10) } : {};
     }
 
     return {

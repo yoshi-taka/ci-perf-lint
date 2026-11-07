@@ -9,6 +9,7 @@ import {
 import { createRestrictedImportRuleDefinitions } from "./imports-direct-import-rule-definitions.ts";
 import { looksLikeJavaScriptRepository, repositoryUsesMui } from "./imports-shared.ts";
 import type { EmbeddedOxlintDiagnostic } from "./embedded-oxlint.ts";
+import path from "node:path";
 
 function classifyDefinitions(definitions: RestrictedImportRuleDefinition[]): {
   exactSourceDefinitions: Map<string, RestrictedImportRuleDefinition[]>;
@@ -98,7 +99,37 @@ export async function collectRestrictedImportRepositoryDiagnostics(
     return [];
   }
 
-  const dependencyIndex = dependencyIndexResult.value;
+  const dependencyIndex = new Set(dependencyIndexResult.value);
+  const packageJsonFiles = await context.walkFiles(".", {
+    cacheKey: "restricted-import-package-json",
+    include: (file) =>
+      path.basename(file) === "package.json" &&
+      !/(?:^|\/)(?:node_modules|vendor|dist|build|coverage|\.next)\//.test(file),
+  });
+  for (const file of packageJsonFiles.sort().slice(0, 200)) {
+    if (file === "package.json") {
+      continue;
+    }
+    const entry = await context.loadPackageJson(file);
+    const value = entry.value;
+    if (!value || typeof value !== "object") {
+      continue;
+    }
+    for (const sectionName of [
+      "dependencies",
+      "devDependencies",
+      "peerDependencies",
+      "optionalDependencies",
+    ] as const) {
+      const section = value[sectionName];
+      if (!section || typeof section !== "object" || Array.isArray(section)) {
+        continue;
+      }
+      for (const name of Object.keys(section)) {
+        dependencyIndex.add(name);
+      }
+    }
+  }
   const usesMui = usesMuiResult.value;
   const indexedDiagnostics = indexedDiagnosticsResult.value;
   const definitions = createRestrictedImportRuleDefinitions(
