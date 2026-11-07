@@ -14,7 +14,10 @@ const meta = {
 function stepLooksHeavy(step: PipelineStep): boolean {
   const text =
     `${step.label ?? ""} ${step.command ?? ""} ${(step.commands ?? []).join(" ")}`.toLowerCase();
-  return /(build|publish|release|deploy|upload|npm|pnpm|yarn|bun|cargo|gradle|maven|pytest|jest|vitest|tauri|electron|docker|test|lint)/.test(
+  if (/buildkite-agent\s+pipeline\s+upload|upload\s+.*pipeline/.test(text)) {
+    return false;
+  }
+  return /\b(build|publish|release|deploy|upload|npm|pnpm|yarn|bun|cargo|gradle|maven|pytest|jest|vitest|tauri|electron|docker|test|lint)\b/.test(
     text,
   );
 }

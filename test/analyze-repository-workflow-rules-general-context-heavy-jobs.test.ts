@@ -481,3 +481,54 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
     ).toBe(false);
   });
 });
+
+test("does not treat shell pipefail as a heavy pip signal", async () => {
+  const root = await tempDirs.create("apl-pipefail-heavy-");
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(
+    path.join(root, ".github", "workflows", "ci.yml"),
+    [
+      "name: checks",
+      "on: push",
+      "jobs:",
+      "  checks:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/checkout@v4",
+      "      - run: |",
+      "          set -o pipefail",
+      "          echo ok",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+  expect(report.findings.some((f) => f.ruleId === "ungated-heavy-job")).toBe(false);
+});
+
+test("does not treat a lightweight npm view poller as heavy", async () => {
+  const root = await tempDirs.create("apl-npm-view-heavy-");
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(
+    path.join(root, ".github", "workflows", "poll.yml"),
+    [
+      "name: poll",
+      "on:",
+      "  schedule:",
+      "    - cron: '*/5 * * * *'",
+      "jobs:",
+      "  poll:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - run: npm view next version",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+  expect(report.findings.some((f) => f.ruleId === "ungated-heavy-job")).toBe(false);
+});

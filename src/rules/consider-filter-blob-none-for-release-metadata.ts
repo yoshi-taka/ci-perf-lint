@@ -14,7 +14,7 @@ const wideRepoAccessPattern =
 const heavyBuildOrInstallPattern =
   /(\bnpm\b\s+(?:\S+\s+)*?(?:ci\b|install\b|run\s+build\b)|\b(?:pnpm|yarn)\b\s+(?:\S+\s+)*?(?:install\b|build\b)|\bbun\b\s+(?:\S+\s+)*?(?:install\b|run\s+build\b)|\bpytest\b|\bjest\b|\bvitest\b|\bcargo\s+(?:build|check|clippy|test|bench|doc|package|publish|install|b|c|t|ck|br|cl|rr)\b|\bgradle\b|\bmvn\b|tauri|electron-builder|docker build)/;
 const blobHungryReleasePattern =
-  /(install-code-deps["']?\s*:\s*(?:["']?true|true)|\brelease:publish\b|changeset\s+version\b|\b(?:npm|pnpm|yarn|bun)\b\s+(?:\S+\s+)*?(?:run\s+)?(?:build\b|compile\b|pack\b|publish\b)|\byarn\s+task\b[\s\S]*\bcompile\b)/;
+  /(install-code-deps["']?\s*:\s*(?:["']?true|true)|\brelease:publish\b|changeset\s+version\b|\b(?:npm|pnpm|yarn|bun)\b\s+(?:\S+\s+)*?(?:run\s+)?(?:build\b|bump\b|compile\b|pack\b|publish\b)|\byarn\s+task\b[\s\S]*\bcompile\b)/;
 const gitCheckoutPublishBuildPattern = /\bgit\s+(?:checkout|pull|merge)\b/;
 const publishCompileBuildPattern = /\b(?:publish|compile|build)\b/;
 const agenticToolPattern =

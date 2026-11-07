@@ -1,7 +1,10 @@
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
+import {
+  getTriggerSemantics,
+  workflowPullRequestTriggersOnlyOnClosed,
+} from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import {
@@ -29,6 +32,10 @@ export const missingPathIgnoreForNonCodeRule = {
     const ts = getTriggerSemantics(workflow);
 
     if ((!ts.hasPullRequest && !ts.hasBranchPush) || ts.hasTagOnlyPush) {
+      return [];
+    }
+
+    if (workflowPullRequestTriggersOnlyOnClosed(workflow)) {
       return [];
     }
 

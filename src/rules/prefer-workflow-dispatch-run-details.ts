@@ -47,7 +47,12 @@ function pollsForDispatchedRun(text: string): DispatchKind | undefined {
       }
       continue;
     }
-    command = command.replace(/^do\s+/, "");
+    command = command
+      .replace(/^do\s+/, "")
+      .replace(/^if\s+!?\s*/, "")
+      .replace(/^!\s*/, "")
+      .replace(/^(?:(?:sudo|command|exec|nohup|time)\s+)+/, "")
+      .replace(/^(?:[A-Za-z_]\w*=(?!["']?\$\()\S*\s+)+/, "");
 
     if (
       GH_COMMAND.test(command) &&

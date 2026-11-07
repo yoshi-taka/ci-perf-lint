@@ -2,7 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { getWorkflowStepText } from "./shared/workflow-step-text.ts";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
 import {
   jobRunsOnArmLikeRunner,
   jobRunsOnStandardX64Ubuntu,
@@ -45,7 +45,7 @@ function jobRunsInContainer(job: WorkflowJob): boolean {
 }
 
 function getStepText(step: WorkflowStep): string {
-  return getWorkflowStepText(step);
+  return `${step.name ?? ""} ${step.uses ?? ""} ${shellCommandSegments(step.run ?? "").join(" ")}`;
 }
 
 function analyzePortableToolingJob(job: WorkflowJob): {

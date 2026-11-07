@@ -486,3 +486,62 @@ describe("analyzeRepository workflow and execution rules: docker and runner heur
     ).toBe(false);
   });
 });
+
+test("does not treat shellcheck in a comment as portable tooling", async () => {
+  const root = await tempDirs.create("apl-arm-comment-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "ci.yml"),
+    `name: tool
+on: push
+jobs:
+  tool:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          # shellcheck disable=SC2086
+          echo hi
+`,
+  );
+  const report = await memoizedAnalyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+  expect(
+    report.findings.some(
+      (finding) => finding.ruleId === "prefer-standard-arm-runner-for-portable-tooling",
+    ),
+  ).toBe(false);
+});
+
+test("does not treat local terraform fmt/validate as API CLI work", async () => {
+  const root = await tempDirs.create("apl-terraform-local-fmt-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "ci.yml"),
+    `name: lint
+on: push
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: terraform fmt -check -recursive
+      - run: terraform validate
+`,
+  );
+  const report = await memoizedAnalyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+  expect(report.findings.some((f) => f.ruleId === "prefer-standard-arm-runner-for-api-cli")).toBe(
+    false,
+  );
+});

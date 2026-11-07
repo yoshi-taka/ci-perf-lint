@@ -661,3 +661,34 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
     });
   });
 });
+
+test("matrix sharding checks the consuming test step, not a browser install", async () => {
+  const root = await tempDirs.create("apl-matrix-shard-step-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "ci.yml"),
+    [
+      "name: e2e",
+      "on: push",
+      "jobs:",
+      "  test:",
+      "    runs-on: ubuntu-latest",
+      "    strategy:",
+      "      matrix:",
+      "        shard: [1, 2, 3]",
+      "    steps:",
+      "      - run: npx playwright install --with-deps",
+      "      - run: npx playwright test --shard=${{ matrix.shard }}/3",
+    ].join("\n"),
+  );
+  const report = await memoizedAnalyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+  expect(report.findings.some((f) => f.ruleId === "matrix-test-job-without-test-sharding")).toBe(
+    false,
+  );
+});

@@ -122,3 +122,55 @@ describe("analyzeRepository Buildkite pipeline rules", () => {
     ).toBe(true);
   });
 });
+
+test("does not treat a .buildkite path substring as a heavy build step", async () => {
+  const root = await tempDirs.create("apl-buildkite-path-heavy-");
+  const dir = path.join(root, ".buildkite");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "pipeline.yml"),
+    [
+      "steps:",
+      "  - label: Check",
+      "    command: .buildkite/steps/check-version-string.sh",
+      "  - label: Build",
+      "    command: make build",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 10,
+    mode: "exploratory",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain('Step "Build"');
+});
+
+test("does not treat a release pipeline upload step as a heavy build", async () => {
+  const root = await tempDirs.create("apl-buildkite-upload-pipeline-");
+  const dir = path.join(root, ".buildkite");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "pipeline.yml"),
+    [
+      "steps:",
+      "  - label: Upload Release Pipeline",
+      "    command: buildkite-agent pipeline upload .buildkite/release.yml",
+      "  - label: Build Release",
+      "    command: ./build-release.sh",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 10,
+    mode: "exploratory",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain('Step "Build Release"');
+});

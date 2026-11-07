@@ -248,3 +248,36 @@ describe("analyzeRepository workflow and execution rules: general context", () =
     expect(ruleIds.has("missing-path-ignore-for-non-code")).toBe(true);
   });
 });
+
+test("does not require path filters for pull_request closed-only workflows", async () => {
+  const root = await tempDirs.create("apl-pr-closed-paths-");
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(
+    path.join(root, ".github", "workflows", "pr-closed.yml"),
+    [
+      "name: pr closed",
+      "on:",
+      "  pull_request:",
+      "    types: [closed]",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/checkout@v4",
+      "      - run: npm ci",
+      "      - run: npm run build",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+  expect(
+    report.findings.some(
+      (finding) =>
+        finding.ruleId === "missing-paths-filter" ||
+        finding.ruleId === "missing-path-ignore-for-non-code",
+    ),
+  ).toBe(false);
+});

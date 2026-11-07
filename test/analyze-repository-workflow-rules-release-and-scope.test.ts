@@ -59,6 +59,21 @@ describe("analyzeRepository workflow and execution rules: release and scope", ()
   const discovery = `for attempt in 1 2 3; do\n  sleep 5\n  ${listing}\ndone`;
   test.each([
     {
+      name: "guarded gh workflow run with discovery",
+      run: `if ! gh workflow run ci.yml --ref main; then exit 1; fi\n${discovery}`,
+      expected: true,
+    },
+    {
+      name: "negated gh workflow run with discovery",
+      run: `! gh workflow run ci.yml --ref main\n${discovery}`,
+      expected: true,
+    },
+    {
+      name: "wrapped gh workflow run with discovery",
+      run: `command gh workflow run ci.yml --ref main\n${discovery}`,
+      expected: true,
+    },
+    {
       name: "gh workflow run with discovery",
       run: `gh workflow run ci.yml --ref main\n${discovery}`,
       expected: true,

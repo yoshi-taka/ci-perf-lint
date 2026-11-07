@@ -5,7 +5,10 @@ import {
   withRepositoryPathsFilterPrecedent,
   withSimilarWorkflowPathsFilterConsensus,
 } from "./shared/similar-workflow-consensus.ts";
-import { getTriggerSemantics } from "./shared/workflow-triggers.ts";
+import {
+  getTriggerSemantics,
+  workflowPullRequestTriggersOnlyOnClosed,
+} from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
@@ -26,6 +29,10 @@ export const missingPathsFilterRule = {
     const ts = getTriggerSemantics(workflow);
 
     if ((!ts.hasPullRequest && !ts.hasBranchPush) || ts.hasTagOnlyPush) {
+      return [];
+    }
+
+    if (workflowPullRequestTriggersOnlyOnClosed(workflow)) {
       return [];
     }
 

@@ -535,3 +535,33 @@ describe("analyzeRepository workflow and execution rules: sparse checkout and bl
     expect(finding?.why).toContain(".github/workflows/blob-none.yml:notes");
   });
 });
+
+test("does not flag a release bump script as blob-hungry metadata", async () => {
+  const root = await tempDirs.create("apl-blob-bump-");
+  await mkdir(path.join(root, ".github", "workflows"), { recursive: true });
+  await writeFile(
+    path.join(root, ".github", "workflows", "release.yml"),
+    [
+      "name: release",
+      "on: workflow_dispatch",
+      "jobs:",
+      "  create-release-pr:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/checkout@v4",
+      "        with:",
+      "          fetch-depth: 0",
+      "      - run: pnpm run bump",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+  expect(
+    report.findings.some(
+      (finding) => finding.ruleId === "consider-filter-blob-none-for-release-metadata",
+    ),
+  ).toBe(false);
+});

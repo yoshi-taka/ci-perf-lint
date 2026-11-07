@@ -490,3 +490,28 @@ describe("migrations: python and platform tooling", () => {
     );
   });
 });
+
+test("does not treat a hyphenated brew-like string in echo as brew update", async () => {
+  const root = await tempDirs.create("apl-brew-echo-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "ci.yml"),
+    `name: macos
+on: pull_request
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - run: echo "brew update-portable-ruby"
+      - run: echo "brew upgrade"
+`,
+  );
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+  expect(report.findings.some((f) => f.ruleId === "avoid-brew-update-on-hosted-macos")).toBe(false);
+});

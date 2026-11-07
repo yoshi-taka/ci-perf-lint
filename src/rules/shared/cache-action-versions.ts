@@ -23,6 +23,11 @@ export function cacheActionVersionIsBelow(
       : minimum[2] === 0
         ? /^v(\d+)\.(\d+)(?:\.(\d+))?$/
         : /^v(\d+)\.(\d+)\.(\d+)$/;
+  // A bare major tag below the minimum major cannot contain the patch fix.
+  const bareMajor = /^v(\d+)$/.exec(ref);
+  if (bareMajor) {
+    return Number(bareMajor[1]) < minimum[0];
+  }
   const version =
     pattern.exec(ref) ?? (/^[a-f\d]{40}$/i.test(ref) ? pattern.exec(annotatedRef ?? "") : null);
   if (!version) {

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { fixtures } from "./fixtures.ts";
 import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
 
@@ -59,4 +61,30 @@ describe("analyzeRepository GitLab CI rules", () => {
     expect(report.workflowCount).toBe(1);
     expect(ruleIds).not.toContain("missing-timeout-in-minutes-gitlab-ci");
   });
+});
+
+test("does not flag hidden GitLab CI templates", async () => {
+  const root = await tempDirs.create("apl-gitlab-hidden-template-");
+  await mkdir(path.join(root), { recursive: true });
+  await writeFile(
+    path.join(root, ".gitlab-ci.yml"),
+    [
+      ".test-default:",
+      "  script:",
+      "    - go test -race ./...",
+      "tests:",
+      "  script:",
+      "    - go test -race ./...",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 10,
+    mode: "exploratory",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "missing-timeout-in-minutes-gitlab-ci",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain('Job "tests"');
 });

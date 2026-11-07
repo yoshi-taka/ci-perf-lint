@@ -177,6 +177,7 @@ for (const format of [
   });
 }
 cases["reporter-minor"] = workflow(reporter, "v2.2");
+cases["reporter-major"] = workflow(reporter, "v1");
 cases["reporter-missing"] = workflow(reporter, reporter.old, {
   inputs: "          path: results/*.xml",
 });
@@ -270,6 +271,7 @@ describe("analyzeRepository: third-party Action performance milestones", () => {
     ["install-nextest-alias", install.id],
     ["install-nextest-unpinned", install.id],
     ["reporter-minor", reporter.id],
+    ["reporter-major", reporter.id],
     ["reporter-dotnet-nunit", reporter.id],
     ["reporter-dotnet-trx", reporter.id],
     ["reporter-java-junit", reporter.id],

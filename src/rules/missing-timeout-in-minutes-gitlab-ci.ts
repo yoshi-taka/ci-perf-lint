@@ -31,6 +31,9 @@ export const missingTimeoutInMinutesGitlabCiRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of doc.jobs) {
+      if (job.name.startsWith(".")) {
+        continue;
+      }
       if (job.timeoutNode !== undefined) {
         continue;
       }

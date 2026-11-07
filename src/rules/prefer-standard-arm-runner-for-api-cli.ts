@@ -38,7 +38,7 @@ function getJobText(job: WorkflowJob): string {
 function findApiCliTool(job: WorkflowJob): string | undefined {
   const text = getJobText(job);
   const candidates: [string, RegExp][] = [
-    ["Terraform", /\bterraform\s+(?:init|plan|apply|destroy|validate|fmt|providers|workspace)\b/],
+    ["Terraform", /\bterraform\s+(?:init|plan|apply|destroy)\b/],
     [
       "AWS CDK",
       /\b(?:npx\s+)?cdk\s+(?:synth|diff|deploy|destroy|bootstrap)\b|\baws-cdk\s+(?:synth|diff|deploy|destroy|bootstrap)\b/,

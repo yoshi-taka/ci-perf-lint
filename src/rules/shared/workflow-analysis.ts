@@ -15,9 +15,9 @@ import { collectCommandEntries } from "./any-step.ts";
 const dockerBuildxBakePattern = /\bdocker\s+buildx\s+bake\b|\bdocker-buildx\s+bake\b/i;
 const dockerBuildPattern = /\bdocker\s+build\b/i;
 const heavyStepSignalPattern =
-  /(npm|pnpm|yarn|bun|pip|poetry|\buv\b|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|\bclaude\b|\bcodex\b|\bgemini\b|\bbuild\b)/;
+  /\b(?:(?:npm(?!\s+(?:view|info|search|ping)\b))|pnpm|yarn|bun|(?:pip(?!\s+(?:index|show|list|freeze|search)\b))|pipenv|poetry|bundle|bundler|uv|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|claude|codex|gemini|build)\b/;
 const directHeavySignalPattern =
-  /(npm|pnpm|yarn|bun|pip|poetry|\buv\b|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|\bclaude\b|\bcodex\b|\bgemini\b|integration|e2e|benchmark|bench|\bbuild\b|\btest\b)/;
+  /\b(?:(?:npm(?!\s+(?:view|info|search|ping)\b))|pnpm|yarn|bun|(?:pip(?!\s+(?:index|show|list|freeze|search)\b))|pipenv|poetry|bundle|bundler|uv|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|claude|codex|gemini|integration|e2e|benchmark|bench|build|test)\b/;
 const historyDependentCommandPattern =
   /(git fetch|git pull|git rebase|git merge|git push|git describe|git diff|git log|git rev-list|git tag|commitlint|semantic-release|lerna changed|nx affected|turbo run|get-release-version|release notes|changelog|previous tag|release-it|changeset)/i;
 const opaqueRepoScriptExecutionPattern =

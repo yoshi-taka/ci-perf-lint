@@ -50,6 +50,9 @@ function getShardLikeMatrixKeys(job: WorkflowJob): string[] {
 }
 
 function stepLooksLikeTestRun(step: WorkflowStep): boolean {
+  if (/\b(?:install|setup|download|browser)\b/i.test(step.name ?? "")) {
+    return false;
+  }
   const text = `${step.name ?? ""} ${step.run ?? ""}`.trim();
   return /\b(jest|vitest|playwright|cypress|pytest|go test|cargo test|npm test|pnpm test|yarn test|bun test)\b/i.test(
     text,
@@ -89,12 +92,12 @@ export const matrixTestJobWithoutTestShardingRule = {
         continue;
       }
 
-      const testStep = getRepresentativeTestStep(job);
-      if (!testStep) {
+      if (job.steps.some((step) => stepConsumesShardKey(step, shardKeys))) {
         continue;
       }
 
-      if (stepConsumesShardKey(testStep, shardKeys)) {
+      const testStep = getRepresentativeTestStep(job);
+      if (!testStep) {
         continue;
       }
 

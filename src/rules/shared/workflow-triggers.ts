@@ -37,6 +37,27 @@ export function getTriggerSemantics(workflow: WorkflowDocument): TriggerSemantic
   };
 }
 
+export function workflowPullRequestTriggersOnlyOnClosed(workflow: WorkflowDocument): boolean {
+  const tf = getTriggerFacts(workflow);
+  if (!tf.hasPullRequest || tf.hasPush) {
+    return false;
+  }
+  const on = workflow.on;
+  if (!on || typeof on !== "object" || Array.isArray(on)) {
+    return false;
+  }
+  const pullRequest = (on as Record<string, unknown>).pull_request;
+  if (!pullRequest || typeof pullRequest !== "object" || Array.isArray(pullRequest)) {
+    return false;
+  }
+  const types = (pullRequest as Record<string, unknown>).types;
+  return (
+    Array.isArray(types) &&
+    types.length > 0 &&
+    types.every((type) => typeof type === "string" && type === "closed")
+  );
+}
+
 export function workflowHasManualOnlyTrigger(workflow: WorkflowDocument): boolean {
   return getTriggerFacts(workflow).isManualOnly;
 }
