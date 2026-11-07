@@ -816,3 +816,35 @@ describe("analyzeRepository workflow and execution rules: docker misc", () => {
     expect(finding?.message).toContain("git");
   });
 });
+
+test("does not warn when load: true is consumed by a repository script", async () => {
+  const root = await tempDirs.create("apl-docker-load-script-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "ci.yml"),
+    [
+      "name: docker",
+      "on: push",
+      "jobs:",
+      "  test:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: docker/build-push-action@v6",
+      "        with:",
+      "          context: .",
+      "          load: true",
+      "          tags: app:test",
+      "      - run: ./bin/run-tests-in-docker.sh",
+    ].join("\n"),
+  );
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  expect(
+    report.findings.some((finding) => finding.ruleId === "docker-build-load-true-unnecessary"),
+  ).toBe(false);
+});

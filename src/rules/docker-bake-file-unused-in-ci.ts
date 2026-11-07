@@ -18,10 +18,23 @@ const meta = {
 
 const bakeInvocationPattern = /\bdocker\s+buildx\s+bake\b/i;
 
+function docUsesBakeAction(doc: CIDocument): boolean {
+  return (
+    doc.kind === "github-actions" &&
+    doc.jobs.some((job) =>
+      job.steps.some((step) => step.uses?.toLowerCase().startsWith("docker/bake-action@")),
+    )
+  );
+}
+
 export const dockerBakeFileUnusedInCiRule = {
   meta,
   check(doc: CIDocument, context: RuleContext): Diagnostic[] {
     if (!hasBakeFile.select(context.repository)) {
+      return [];
+    }
+
+    if (docUsesBakeAction(doc)) {
       return [];
     }
 

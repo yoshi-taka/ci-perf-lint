@@ -2,6 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { hasOpaqueRepoScriptExecution } from "./shared/workflow-jobs.ts";
 
 const meta = {
   id: "docker-build-load-true-unnecessary",
@@ -38,6 +39,15 @@ function imageUsedAfterStep(job: WorkflowJob, stepIndex: number, tags: string[])
     }
 
     if (/\bdocker\s+(?:run|compose|tag|save)\b/i.test(runText)) {
+      return true;
+    }
+
+    if (
+      hasOpaqueRepoScriptExecution(job) ||
+      /\b(?:make|just|task)\b|\.sh\b|(?:bash|sh|zsh)\s+\S+|(?:node|bun|python|python3)\s+\S+\.(?:[cm]?[jt]sx?|py)\b/i.test(
+        runText,
+      )
+    ) {
       return true;
     }
 

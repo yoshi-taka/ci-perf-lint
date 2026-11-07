@@ -96,6 +96,7 @@ describe("Docker build and runtime separation", () => {
     'FROM golang:1.24\nRUN go build -o /app .\nCMD ["sh", "-c", "exec /app"]\n',
     'FROM rust:1.85\nWORKDIR /src\nRUN rustc main.rs -o app\nCMD ["./app"]\n',
     'FROM golang:1.24\nRUN --mount=type=cache,target=/root/.cache/go-build go build -o /app .\nCMD ["/app"]\n',
+    'FROM golang:1.24 AS builder\nRUN go build -o /app .\nCMD ["/app"]\n',
   ])("matches explicit compile and execution paths", async (dockerfile) => {
     const report = await analyzeDockerfile(dockerfile);
     expect(report.findings.filter((finding) => finding.ruleId === ruleId)).toHaveLength(1);
@@ -149,7 +150,6 @@ describe("Docker build and runtime separation", () => {
     'FROM golang:1.24 AS builder\nRUN go build -o /app .\nFROM alpine\nCOPY --from=builder /app /app\nCMD ["/app"]\n',
     'FROM golang:1.24 AS unused\nRUN go build -o /app .\nFROM golang:1.24\nCMD ["/app"]\n',
     'FROM golang:1.24 AS base\nFROM base AS builder\nRUN go build -o /app .\nFROM base AS runtime\nCMD ["/app"]\n',
-    'FROM golang:1.24 AS builder\nRUN go build -o /app .\nCMD ["/app"]\n',
     'FROM golang:1.24 AS test\nRUN go build -o /app .\nCMD ["/app"]\n',
     'FROM golang:1.24 AS builder\nRUN go build -o /app .\nCMD ["/app"]\nFROM builder AS runtime\nCMD ["/other"]\n',
   ])("does not infer ambiguous, independent, or non-runtime layouts", async (dockerfile) => {

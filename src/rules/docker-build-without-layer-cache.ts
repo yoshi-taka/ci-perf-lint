@@ -24,6 +24,11 @@ function stepUsesDockerBuildPushAction(step: WorkflowStep): boolean {
   return uses.startsWith("docker/build-push-action@");
 }
 
+function stepHasCacheFrom(step: WorkflowStep): boolean {
+  const cacheFrom = step.with?.["cache-from"];
+  return typeof cacheFrom === "string" && cacheFrom.trim() !== "";
+}
+
 function stepHasLayerCache(step: WorkflowStep): boolean {
   const cacheFrom = step.with?.["cache-from"];
   const cacheTo = step.with?.["cache-to"];
@@ -61,9 +66,12 @@ export const dockerBuildWithoutLayerCacheRule = {
         continue;
       }
 
+      const message = stepHasCacheFrom(step)
+        ? `Job "${job.id}" uses docker/build-push-action with cache-from but without cache-to; new layers may not be exported for future runs.`
+        : `Job "${job.id}" uses docker/build-push-action without cache-from and cache-to configuration.`;
       findings.push(
         buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
-          message: `Job "${job.id}" uses docker/build-push-action without cache-from and cache-to configuration.`,
+          message,
           why: "Without layer caching, every CI run rebuilds all Docker layers from scratch, adding minutes per build. docker/build-push-action supports cache-from and cache-to natively; the simplest setup uses the GitHub Actions cache backend.",
           suggestion:
             "Add cache-from and cache-to to the docker/build-push-action step. For example: `cache-from: type=gha` and `cache-to: type=gha,mode=max`.",

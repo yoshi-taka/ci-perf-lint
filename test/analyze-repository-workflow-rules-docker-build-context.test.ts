@@ -714,3 +714,34 @@ describe("analyzeRepository workflow and execution rules: docker build and docke
     expect(allDockerFindings.length).toBeGreaterThan(0);
   });
 });
+
+test("uses the docker build context, not a later docker push argument", async () => {
+  const root = await tempDirs.create("apl-docker-build-then-push-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "docker.yml"),
+    [
+      "name: docker",
+      "on: push",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - run: docker build -t app . && docker push app",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(root, "Dockerfile"),
+    ["FROM node:22", "COPY . .", "RUN npm ci"].join("\n"),
+  );
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  expect(
+    report.findings.some((finding) => finding.ruleId === "dockerfile-copies-all-before-deps"),
+  ).toBe(true);
+});

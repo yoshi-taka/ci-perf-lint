@@ -4,7 +4,7 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import type { DockerBuildTarget } from "./docker-build-targets.ts";
+import { normalizeRelativePath, type DockerBuildTarget } from "./docker-build-targets.ts";
 
 const meta = {
   id: "docker-cache-copy-path-mismatch",
@@ -103,7 +103,7 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
       diagnostics.push(
         buildRepositoryDiagnostic(repository, meta, {
           location: {
-            path: target.dockerfilePath,
+            path: normalizeRelativePath(repoRoot, target.dockerfilePath),
             line: instruction.startLine,
             column: 1,
           },

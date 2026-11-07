@@ -13,7 +13,7 @@ const meta = {
 const nonRuntimePathPattern =
   /(?:^|[/.\s_-])(?:dev|development|tests?|ci|debug|tools?|bench(?:mark)?)(?:$|[/.\s_-])/i;
 const nonRuntimeAliasPattern =
-  /(?:^|[.\s_-])(?:build(?:er)?|dev|development|tests?|ci|debug|tools?|bench(?:mark)?)(?:$|[.\s_-])/i;
+  /(?:^|[.\s_-])(?:dev|development|tests?|ci|debug|tools?|bench(?:mark)?)(?:$|[.\s_-])/i;
 
 export async function collectDockerBuildRuntimeSeparationDiagnostics(
   context: RepositoryDiagnosticContext,

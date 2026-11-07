@@ -3,8 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { CIDocument } from "./shared/any-step.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { extractSemanticSteps } from "./shared/semantic-adapter.ts";
-
-const LEGACY_DOCKER_BUILD = /\bdocker\s+build\b/i;
+import { shellCommandSegments, staticShellWords } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "prefer-buildx-build-over-docker-build",
@@ -14,6 +13,23 @@ const meta = {
   scope: "all",
 } satisfies RuleMeta;
 
+function runsLegacyDockerBuild(text: string): boolean {
+  return shellCommandSegments(text).some((command) => {
+    const words = staticShellWords(command);
+    if (!words) {
+      return false;
+    }
+    let index = 0;
+    while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
+      index++;
+    }
+    if (words[index] === "sudo") {
+      index++;
+    }
+    return words[index] === "docker" && words[index + 1] === "build";
+  });
+}
+
 export const preferBuildxBuildOverDockerBuildRule = {
   meta,
   check(doc: CIDocument, _context: RuleContext): Diagnostic[] {
@@ -21,7 +37,7 @@ export const preferBuildxBuildOverDockerBuildRule = {
     const steps = extractSemanticSteps(doc);
 
     for (const step of steps) {
-      if (!LEGACY_DOCKER_BUILD.test(step.text)) {
+      if (!runsLegacyDockerBuild(step.text)) {
         continue;
       }
 

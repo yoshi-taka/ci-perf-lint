@@ -492,3 +492,35 @@ describe("analyzeRepository workflow and execution rules: dockerfile package and
     });
   });
 });
+
+test("describes cache-to as the missing piece when cache-from is present", async () => {
+  const root = await tempDirs.create("apl-docker-cache-from-only-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "docker.yml"),
+    [
+      "name: docker",
+      "on: push",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: docker/build-push-action@v6",
+      "        with:",
+      "          context: .",
+      "          cache-from: type=registry,ref=example/cache",
+    ].join("\n"),
+  );
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  const finding = report.findings.find(
+    (candidate) => candidate.ruleId === "docker-build-without-layer-cache",
+  );
+  expect(finding?.message).toContain("cache-to");
+  expect(finding?.message).not.toContain("without cache-from");
+});

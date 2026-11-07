@@ -2,6 +2,7 @@ import path from "node:path";
 import { parseDocument } from "../yaml.ts";
 import type { AnalysisWarning } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
+import { shellCommandSegments } from "../rules/shared/command-patterns.ts";
 import type { AnyWorkflowDocument } from "../ci-types.ts";
 import { collectPersistentCacheDockerTargets } from "./docker-persistent-cache-targets.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
@@ -135,48 +136,51 @@ function extractFromRunStep(repoRoot: string, workflow: WorkflowDocument): Docke
 
   for (const job of workflow.jobs) {
     for (const step of job.steps) {
-      const run = step.run ?? "";
-      if (!/\bdocker\s+(?:buildx\s+build|build)\b/i.test(run)) {
-        continue;
+      for (const segment of shellCommandSegments(step.run ?? "")) {
+        if (!/\bdocker\s+(?:buildx\s+build|build)\b/i.test(segment)) {
+          continue;
+        }
+
+        const normalizedRun = segment.replace(/\\\r?\n/g, " ").replace(/\s+/g, " ");
+        const dockerfileMatch = normalizedRun.match(
+          /(?:^|\s)-f\s+([^\s]+)|(?:^|\s)--file(?:=|\s+)([^\s]+)/i,
+        );
+        const dockerfileValue = normalizeDockerfileValue(
+          dockerfileMatch?.[1] ?? dockerfileMatch?.[2],
+        );
+        const commandMatch = normalizedRun.match(
+          /\bdocker\s+(?:buildx\s+build|build)\b([\s\S]*)$/i,
+        );
+        const argsText = commandMatch?.[1] ?? "";
+        const targetStage = argsText
+          .match(/(?:^|\s)--target(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|]+)/)?.[1]
+          ?.replace(/^['"]|['"]$/g, "");
+        const tokens = argsText
+          .split(/\s+/)
+          .map((token) => token.trim())
+          .filter((token) => token.length > 0 && !["&&", "||", "|", ";"].includes(token));
+        const positionalTokens = tokens.filter(
+          (token, index) =>
+            !token.startsWith("-") && tokens[index - 1] !== "-f" && tokens[index - 1] !== "--file",
+        );
+        const contextValue = normalizeContextValue(positionalTokens.at(-1)) ?? ".";
+
+        if (!contextValue) {
+          continue;
+        }
+
+        const contextPath = path.resolve(repoRoot, contextValue);
+        const dockerfilePath = dockerfileValue
+          ? path.resolve(repoRoot, dockerfileValue)
+          : path.join(contextPath, "Dockerfile");
+        targets.push({
+          workflow: workflow.relativePath,
+          jobId: job.id,
+          contextPath,
+          dockerfilePath,
+          targetStage,
+        });
       }
-
-      const normalizedRun = run.replace(/\\\r?\n/g, " ").replace(/\s+/g, " ");
-      const dockerfileMatch = normalizedRun.match(
-        /(?:^|\s)-f\s+([^\s]+)|(?:^|\s)--file(?:=|\s+)([^\s]+)/i,
-      );
-      const dockerfileValue = normalizeDockerfileValue(
-        dockerfileMatch?.[1] ?? dockerfileMatch?.[2],
-      );
-      const commandMatch = normalizedRun.match(/\bdocker\s+(?:buildx\s+build|build)\b([\s\S]*)$/i);
-      const argsText = commandMatch?.[1] ?? "";
-      const targetStage = argsText
-        .match(/(?:^|\s)--target(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|]+)/)?.[1]
-        ?.replace(/^['"]|['"]$/g, "");
-      const tokens = argsText
-        .split(/\s+/)
-        .map((token) => token.trim())
-        .filter((token) => token.length > 0 && !["&&", "||", "|", ";"].includes(token));
-      const positionalTokens = tokens.filter(
-        (token, index) =>
-          !token.startsWith("-") && tokens[index - 1] !== "-f" && tokens[index - 1] !== "--file",
-      );
-      const contextValue = normalizeContextValue(positionalTokens.at(-1)) ?? ".";
-
-      if (!contextValue) {
-        continue;
-      }
-
-      const contextPath = path.resolve(repoRoot, contextValue);
-      const dockerfilePath = dockerfileValue
-        ? path.resolve(repoRoot, dockerfileValue)
-        : path.join(contextPath, "Dockerfile");
-      targets.push({
-        workflow: workflow.relativePath,
-        jobId: job.id,
-        contextPath,
-        dockerfilePath,
-        targetStage,
-      });
     }
   }
 

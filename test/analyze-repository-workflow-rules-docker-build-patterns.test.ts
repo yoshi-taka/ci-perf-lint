@@ -423,3 +423,125 @@ describe("analyzeRepository workflow and execution rules: docker build patterns"
     ).toBe(false);
   });
 });
+
+test("detects action-level no-cache and reports every disabling step", async () => {
+  const root = await tempDirs.create("apl-docker-cache-action-no-cache-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "docker.yml"),
+    [
+      "name: docker",
+      "on: push",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: docker/build-push-action@v6",
+      "        with:",
+      "          context: .",
+      "          no-cache: true",
+      "      - run: docker buildx build --no-cache -t app .",
+      "      - run: docker build --no-cache -t other .",
+    ].join("\n"),
+  );
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "docker-build-cache-disabled-in-ci",
+  );
+  expect(findings).toHaveLength(3);
+});
+
+test("does not report an unused bake file when docker/bake-action is used", async () => {
+  const root = await tempDirs.create("apl-docker-bake-action-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(root, "docker-bake.hcl"), 'target "app" {}\n');
+  await writeFile(
+    path.join(dir, "docker.yml"),
+    [
+      "name: docker",
+      "on: push",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: docker/bake-action@v6",
+      "      - run: docker build .",
+    ].join("\n"),
+  );
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  expect(
+    report.findings.some((finding) => finding.ruleId === "docker-bake-file-unused-in-ci"),
+  ).toBe(false);
+});
+
+test("ignores docker build in echo/comment and detects real commands", async () => {
+  const root = await tempDirs.create("apl-docker-build-prose-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "docker.yml"),
+    [
+      "name: docker",
+      "on: push",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      '      - run: echo "Docker Build: passed"',
+      "      - run: |",
+      "          # docker build should not count",
+      "          docker buildx build -t app .",
+    ].join("\n"),
+  );
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "prefer-buildx-build-over-docker-build",
+  );
+  expect(findings).toHaveLength(0);
+});
+
+test("does not count echoed docker build text toward multiple-image bake advice", async () => {
+  const root = await tempDirs.create("apl-bake-multi-prose-");
+  const dir = path.join(root, ".github", "workflows");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "docker.yml"),
+    [
+      "name: docker",
+      "on: push",
+      "jobs:",
+      "  build:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      '      - run: echo "docker build one"',
+      '      - run: echo "docker build two"',
+      "      - run: docker build -t app .",
+    ].join("\n"),
+  );
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 20,
+    mode: "strict",
+  });
+  expect(
+    report.findings.some((finding) => finding.ruleId === "prefer-buildx-bake-for-multiple-images"),
+  ).toBe(false);
+});

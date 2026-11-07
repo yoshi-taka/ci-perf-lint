@@ -3,15 +3,6 @@ import type { AnyStep } from "./any-step.ts";
 import { getJobFacts } from "./workflow-analysis.ts";
 import { getStepCommandText } from "./any-step.ts";
 
-export function stepRunsDockerBuild(step: WorkflowStep | AnyStep): boolean {
-  const uses = "uses" in step ? (step.uses?.toLowerCase() ?? "") : "";
-  if (uses.startsWith("docker/build-push-action@")) {
-    return true;
-  }
-
-  return /\bdocker\s+(?:buildx\s+build|build)\b/i.test(getStepCommandText(step));
-}
-
 export function stepDisablesDockerBuildCache(step: WorkflowStep | AnyStep): boolean {
   const uses = "uses" in step ? (step.uses?.toLowerCase() ?? "") : "";
   if (uses.startsWith("docker/build-push-action@") || uses.startsWith("depot/build-push-action@")) {
