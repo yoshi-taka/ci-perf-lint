@@ -8,7 +8,7 @@ No controlled ElasticMQ JVM-versus-native benchmark was independently reproduced
 
 ## What it flags
 
-Enabled GitHub Actions jobs with simple `softwaremill/elasticmq` service images (optionally `docker.io/`), without explicit service `env`, `volumes`, `options`, or `command`. Supports stable tags at 1.6.7 or newer, `latest`, and untagged references. Already-native images are skipped.
+Enabled GitHub Actions jobs with simple `softwaremill/elasticmq` service images (optionally `docker.io/`), without explicit service `env`, `volumes`, `command`, or runtime-changing `options`. Port, name, healthcheck, network, DNS, hostname, logging and stop/restart options are preserved and allowed. Supports stable tags at 1.6.7 or newer, `latest`, and untagged references. Already-native images are skipped.
 
 The 1.6.7 compatibility floor incorporates native-specific fixes: [1.4.7](https://github.com/softwaremill/elasticmq/releases/tag/v1.4.7) corrects config-file paths, [1.6.3](https://github.com/softwaremill/elasticmq/releases/tag/v1.6.3) fixes reflection configuration for message persistence, and [1.6.7](https://github.com/softwaremill/elasticmq/releases/tag/v1.6.7) fixes native `list_dead_letter_source_queues`. It is not a native-performance introduction threshold. [1.4.6](https://github.com/softwaremill/elasticmq/releases/tag/v1.4.6) adds ARM64 support.
 

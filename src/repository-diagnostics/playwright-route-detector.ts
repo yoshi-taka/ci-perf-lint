@@ -114,8 +114,100 @@ const fixtureMethods = new Set([
   "afterAll",
 ]);
 
-/** Same-file lexical provenance only; no type guesses or cross-file fixture resolution. */
-export function findPlaywrightRoutes(filename: string, source: string): number[] {
+export interface PlaywrightModuleFacts {
+  importsPlaywrightTest: boolean;
+  localImports: string[];
+  localTestImports: string[];
+  exportsTest: boolean;
+}
+
+/**
+ * Lightweight module facts for locating common custom-fixture modules. This is
+ * not a full type resolver: a module is trusted only when it exports a binding
+ * named `test` and either imports Playwright directly or imports another trusted
+ * local fixture module (handled by the collector's transitive walk).
+ */
+export function playwrightModuleFacts(
+  filename: string,
+  source: string,
+): PlaywrightModuleFacts | undefined {
+  const parsed = parseSync(filename, source, { preserveParens: false });
+  if (parsed.errors.length > 0) {
+    return undefined;
+  }
+  let importsPlaywrightTest = false;
+  let exportsTest = false;
+  const localImports = new Set<string>();
+  const localTestImports = new Set<string>();
+  for (const statement of parsed.program.body) {
+    if (statement.type === "ImportDeclaration") {
+      const playwrightEntrypoint = ["@playwright/test", "playwright/test"].includes(
+        statement.source.value,
+      );
+      if (statement.source.value.startsWith(".")) {
+        localImports.add(statement.source.value);
+      }
+      if (
+        playwrightEntrypoint &&
+        statement.importKind !== "type" &&
+        statement.specifiers.some(
+          (specifier) => specifier.type !== "ImportSpecifier" || specifier.importKind !== "type",
+        )
+      ) {
+        importsPlaywrightTest = true;
+      }
+      for (const specifier of statement.specifiers) {
+        if (
+          specifier.type !== "ImportSpecifier" ||
+          specifier.importKind === "type" ||
+          specifier.imported.type !== "Identifier" ||
+          specifier.imported.name !== "test"
+        ) {
+          continue;
+        }
+        if (statement.source.value.startsWith(".")) {
+          localTestImports.add(statement.source.value);
+        }
+      }
+      continue;
+    }
+    if (statement.type === "ExportNamedDeclaration") {
+      if (statement.declaration?.type === "VariableDeclaration") {
+        for (const declaration of statement.declaration.declarations) {
+          if (declaration.id.type === "Identifier" && declaration.id.name === "test") {
+            exportsTest = true;
+          }
+        }
+      }
+      for (const specifier of statement.specifiers) {
+        if (specifier.exported.type === "Identifier" && specifier.exported.name === "test") {
+          exportsTest = true;
+        }
+      }
+      continue;
+    }
+    if (
+      statement.type === "ExportDefaultDeclaration" &&
+      statement.declaration.type === "Identifier" &&
+      statement.declaration.name === "test"
+    ) {
+      exportsTest = true;
+    }
+  }
+  return {
+    importsPlaywrightTest,
+    localImports: [...localImports],
+    localTestImports: [...localTestImports],
+    exportsTest,
+  };
+}
+
+/** Same-file lexical provenance plus explicitly trusted local fixture modules. */
+export function findPlaywrightRoutes(
+  filename: string,
+  source: string,
+  localFixtureSpecs: ReadonlySet<string> = new Set(),
+): number[] {
   const parsed = parseSync(filename, source, { preserveParens: false });
   if (parsed.errors.length > 0) {
     return [];
@@ -191,6 +283,9 @@ export function findPlaywrightRoutes(filename: string, source: string): number[]
       }
     }
     if (node.type === "ImportDeclaration") {
+      const playwrightEntrypoint = ["@playwright/test", "playwright/test"].includes(
+        node.source.value,
+      );
       for (const specifier of node.specifiers) {
         const isTest =
           node.importKind !== "type" &&
@@ -198,7 +293,8 @@ export function findPlaywrightRoutes(filename: string, source: string): number[]
           specifier.importKind !== "type" &&
           specifier.imported.type === "Identifier" &&
           specifier.imported.name === "test" &&
-          ["@playwright/test", "playwright/test"].includes(node.source.value);
+          (playwrightEntrypoint ||
+            (node.source.value.startsWith(".") && localFixtureSpecs.has(node.source.value)));
         scope.bindings.set(specifier.local.name, { scope, kind: isTest ? "test" : undefined });
       }
     }

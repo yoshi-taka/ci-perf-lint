@@ -54,6 +54,14 @@ describe("Playwright route provenance", () => {
     expect(findPlaywrightRoutes("api.spec.js", source)).toEqual([source.indexOf(route)]);
   });
 
+  test("trusts an explicitly supplied local fixture module", () => {
+    const source = `import { test as e2e } from './fixtures'; e2e('api', async ({ page }) => { ${route}; });`;
+    expect(findPlaywrightRoutes("api.spec.js", source, new Set(["./fixtures"]))).toEqual([
+      source.indexOf(route),
+    ]);
+    expect(findPlaywrightRoutes("api.spec.js", source)).toEqual([]);
+  });
+
   test.each([
     `import { test } from 'vitest';`,
     `import { test } from './fixtures';`,

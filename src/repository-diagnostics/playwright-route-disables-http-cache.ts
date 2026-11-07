@@ -1,7 +1,8 @@
+import nodePath from "node:path";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import { findPlaywrightRoutes } from "./playwright-route-detector.ts";
+import { findPlaywrightRoutes, playwrightModuleFacts } from "./playwright-route-detector.ts";
 
 const meta = {
   id: "playwright-route-disables-http-cache",
@@ -10,11 +11,103 @@ const meta = {
   docsPath: "docs/rules/playwright-route-disables-http-cache.md",
 } satisfies RuleMeta;
 
+const sourceSuffixes = ["", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"];
+
 export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
   const diagnostics: Diagnostic[] = [];
-  for (const path of (await context.scanContext.walkFiles(".")).sort()) {
+  const files = (await context.scanContext.walkFiles(".")).sort();
+  const fileSet = new Set(files);
+  const sourceCache = new Map<string, string | undefined>();
+
+  async function read(path: string): Promise<string | undefined> {
+    if (!sourceCache.has(path)) {
+      sourceCache.set(path, await context.fileIndex.readTextFile(path));
+    }
+    return sourceCache.get(path);
+  }
+
+  function resolveLocalImport(fromPath: string, specifier: string): string | undefined {
+    if (!specifier.startsWith(".")) {
+      return undefined;
+    }
+    const base = nodePath.posix.normalize(
+      nodePath.posix.join(nodePath.posix.dirname(fromPath), specifier),
+    );
+    const candidates: string[] = [];
+    for (const suffix of sourceSuffixes) {
+      candidates.push(base + suffix);
+    }
+    // TypeScript ESM commonly writes './module.js' for a './module.ts' source.
+    const replaced = base.replace(/\.(?:m?js|jsx|cjs)$/, (extension) => {
+      switch (extension) {
+        case ".js":
+          return ".ts";
+        case ".jsx":
+          return ".tsx";
+        case ".mjs":
+          return ".mts";
+        case ".cjs":
+          return ".cts";
+        default:
+          return extension;
+      }
+    });
+    if (replaced !== base) {
+      for (const suffix of sourceSuffixes) {
+        candidates.push(replaced + suffix);
+      }
+    }
+    for (const suffix of sourceSuffixes) {
+      candidates.push(nodePath.posix.join(base, `index${suffix}`));
+    }
+    return candidates.find((candidate) => fileSet.has(candidate));
+  }
+
+  const fixtureCache = new Map<string, boolean>();
+
+  async function isFixtureModule(
+    modulePath: string,
+    requireTestExport: boolean,
+    seen = new Set<string>(),
+  ): Promise<boolean> {
+    const cacheKey = `${requireTestExport ? "test" : "dependency"}:${modulePath}`;
+    const cached = fixtureCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+    if (seen.has(modulePath)) {
+      return false;
+    }
+    const source = await read(modulePath);
+    if (!source) {
+      fixtureCache.set(cacheKey, false);
+      return false;
+    }
+    const facts = playwrightModuleFacts(modulePath, source);
+    if (!facts || (requireTestExport && !facts.exportsTest)) {
+      fixtureCache.set(cacheKey, false);
+      return false;
+    }
+    if (facts.importsPlaywrightTest) {
+      fixtureCache.set(cacheKey, true);
+      return true;
+    }
+    const nextSeen = new Set(seen);
+    nextSeen.add(modulePath);
+    for (const specifier of facts.localImports) {
+      const target = resolveLocalImport(modulePath, specifier);
+      if (target && (await isFixtureModule(target, false, nextSeen))) {
+        fixtureCache.set(cacheKey, true);
+        return true;
+      }
+    }
+    fixtureCache.set(cacheKey, false);
+    return false;
+  }
+
+  for (const path of files) {
     if (
       !/\.(?:[cm]?[jt]sx?)$/.test(path) ||
       /\.d\.[cm]?ts$/.test(path) ||
@@ -22,12 +115,25 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
     ) {
       continue;
     }
-    const source = await context.fileIndex.readTextFile(path);
-    // Cheap prefilter avoids parsing repositories without direct Playwright imports.
-    if (!source || !source.includes("playwright/test") || !source.includes("route")) {
+    const source = await read(path);
+    if (!source || !source.includes("route")) {
       continue;
     }
-    for (const offset of findPlaywrightRoutes(path, source)) {
+    const facts = playwrightModuleFacts(path, source);
+    if (!facts) {
+      continue;
+    }
+    const localFixtureSpecs = new Set<string>();
+    for (const specifier of facts.localTestImports) {
+      const target = resolveLocalImport(path, specifier);
+      if (target && (await isFixtureModule(target, true))) {
+        localFixtureSpecs.add(specifier);
+      }
+    }
+    if (!source.includes("playwright/test") && localFixtureSpecs.size === 0) {
+      continue;
+    }
+    for (const offset of findPlaywrightRoutes(path, source, localFixtureSpecs)) {
       const before = source.slice(0, offset);
       diagnostics.push(
         buildRepositoryDiagnostic(context.repository, meta, {

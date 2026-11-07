@@ -30,6 +30,28 @@ ${image ? `    services:\n      aws:\n        image: '${image}'\n` : ""}    step
   return report.findings.filter((finding) => finding.ruleId === rule.id);
 }
 
+async function analyzeRun(image: string, disabled = false) {
+  const root = await tempDirs.create("apl-moto-run-");
+  const workflow = `name: Moto run
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    ${disabled ? "if: false" : "timeout-minutes: 10"}
+    steps:
+      - run: docker run -d --rm -p 5000:5000 ${image}
+      - run: pytest
+`;
+  await mkdir(path.join(root, ".github/workflows"), { recursive: true });
+  await writeFile(path.join(root, ".github/workflows/ci.yml"), workflow);
+  await writeFile(path.join(root, "requirements.txt"), "pytest\n");
+  const report = await analyzeRepositoryForRule(
+    { cwd: root, targetPath: ".", mode: "strict", topCount: 100 },
+    rule,
+  );
+  return report.findings.filter((finding) => finding.ruleId === rule.id);
+}
+
 describe("Moto 5.1.21 performance baseline", () => {
   test.each(["1.3.16", "2.2.6", "3.1.0", "4.1.13", "4.2.3", "5.0.0", "5.1.9", "5.1.20"])(
     "warns for image %s without DynamoDB evidence",
@@ -63,6 +85,21 @@ describe("Moto 5.1.21 performance baseline", () => {
       expect(await analyze({}, image)).toHaveLength(1);
     },
   );
+  test.each(["motoserver/moto:5.1.20", "ghcr.io/getmoto/motoserver:5.1.20"])(
+    "warns for docker run %s",
+    async (image) => {
+      expect(await analyzeRun(image)).toHaveLength(1);
+    },
+  );
+  test.each(["motoserver/moto:5.1.21", "motoserver/moto:latest"])(
+    "skips docker run %s",
+    async (image) => {
+      expect(await analyzeRun(image)).toHaveLength(0);
+    },
+  );
+  test("skips disabled docker run jobs", async () => {
+    expect(await analyzeRun("motoserver/moto:5.1.20", true)).toHaveLength(0);
+  });
   test("skips mirrors, lookalikes, and disabled jobs", async () => {
     expect(await analyze({}, "example.com/motoserver/moto:5.1.20")).toHaveLength(0);
     expect(await analyze({}, "motoserver/moto-extra:5.1.20")).toHaveLength(0);

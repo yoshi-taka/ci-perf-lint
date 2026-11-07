@@ -8,7 +8,7 @@ The motivating [issue #646](https://github.com/softwaremill/elasticmq/issues/646
 
 ## What it flags
 
-Enabled GitHub Actions service images `softwaremill/elasticmq:x.y.z` and `softwaremill/elasticmq-native:x.y.z` below 1.3.5, optionally prefixed with `docker.io/`.
+Enabled GitHub Actions service images or explicit `docker run` commands using `softwaremill/elasticmq:x.y.z` and `softwaremill/elasticmq-native:x.y.z` below 1.3.5, optionally prefixed with `docker.io/`.
 
 ## Suggested action
 

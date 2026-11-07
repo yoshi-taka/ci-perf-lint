@@ -24,6 +24,18 @@ ${config}
 `;
 }
 
+function runWorkflow(image: string): string {
+  return `name: ElasticMQ run
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: docker run -d --rm -p 9324:9324 ${image}
+`;
+}
+
 const cases = [
   ["softwaremill/elasticmq:0.15.8", true, false],
   ["softwaremill/elasticmq:1.3.3", true, false],
@@ -71,6 +83,22 @@ describe("ElasticMQ performance guidance", () => {
         "        volumes:\n          - ./elasticmq.conf:/opt/elasticmq.conf",
       ),
       options: workflow("softwaremill/elasticmq:1.6.16", "        options: --memory=512m"),
+      optionsSafe: workflow(
+        "softwaremill/elasticmq:1.6.16",
+        "        options: -p 9324:9324 --name elasticmq",
+      ),
+      optionsHealth: workflow(
+        "softwaremill/elasticmq:1.6.16",
+        '        options: --health-cmd "curl -f http://localhost:9324/health || exit 1" --health-interval 10s',
+      ),
+      optionsVolume: workflow(
+        "softwaremill/elasticmq:1.6.16",
+        "        options: -v ./elasticmq.conf:/opt/elasticmq.conf",
+      ),
+      runOld: runWorkflow("softwaremill/elasticmq:1.3.4"),
+      runNativeOld: runWorkflow("softwaremill/elasticmq-native:1.3.4"),
+      runTarget: runWorkflow("softwaremill/elasticmq:1.3.5"),
+      runLatest: runWorkflow("softwaremill/elasticmq:latest"),
       ports: workflow("softwaremill/elasticmq:1.6.16", "        ports:\n          - 9324:9324"),
       oldCustomized: workflow(
         "softwaremill/elasticmq:1.3.4",
@@ -101,16 +129,28 @@ describe("ElasticMQ performance guidance", () => {
       expect(findings(`case-${index}`, nativeRule.id)).toHaveLength(native ? 1 : 0);
     });
   }
-  test.each(["disabled", "env", "emptyEnv", "volumes", "options", "comments"])(
+  test.each(["disabled", "env", "emptyEnv", "volumes", "options", "optionsVolume", "comments"])(
     "does not blindly switch customized or disabled service %s",
     (name) => {
       expect(findings(name, nativeRule.id)).toHaveLength(0);
+    },
+  );
+  test.each(["optionsSafe", "optionsHealth"])(
+    "preserves port, name and health options when comparing %s",
+    (name) => {
+      expect(findings(name, nativeRule.id)).toHaveLength(1);
     },
   );
   test("preserves version advice for customized old image", () => {
     expect(findings("oldCustomized", versionRule.id)).toHaveLength(1);
     expect(findings("disabledOld", versionRule.id)).toHaveLength(0);
     expect(findings("comments", versionRule.id)).toHaveLength(0);
+  });
+  test.each(["runOld", "runNativeOld"])("warns for docker run %s", (name) => {
+    expect(findings(name, versionRule.id)).toHaveLength(1);
+  });
+  test.each(["runTarget", "runLatest"])("skips current or floating docker run %s", (name) => {
+    expect(findings(name, versionRule.id)).toHaveLength(0);
   });
   test("simple published ports are compatible candidate evidence", () => {
     const matches = findings("ports", nativeRule.id);

@@ -82,6 +82,29 @@ export const test = base.extend({ mock: async ({ page }, use) => {
     expect(findings[0]!.location.path).toBe("support/fixtures.ts");
   });
 
+  test("follows a local test fixture module", async () => {
+    const findings = await scan({
+      "e2e/pageTest.ts": `import { test as base } from '@playwright/test';
+export const test = base.extend({});`,
+      "e2e/api.spec.ts": `import { test as it } from './pageTest';
+it('api', async ({ page }) => { await page.route('**/api', r => r.fulfill({ body: '{}' })); });`,
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.location.path).toBe("e2e/api.spec.ts");
+  });
+
+  test("follows a transitive local fixture module", async () => {
+    const findings = await scan({
+      "e2e/baseTest.ts": `import { test } from '@playwright/test';
+export const baseTest = test.extend({});`,
+      "e2e/pageTest.ts": `import { baseTest } from './baseTest';
+export const test = baseTest;`,
+      "e2e/api.spec.ts": `import { test as it } from './pageTest';
+it('api', async ({ page }) => { await page.route('**/api', r => r.fulfill({ body: '{}' })); });`,
+    });
+    expect(findings).toHaveLength(1);
+  });
+
   test("does not warn for fetch patches, unrelated routes, comments, or custom cross-file imports", async () => {
     const findings = await scan({
       "e2e/api.spec.ts": `import { test } from '@playwright/test';

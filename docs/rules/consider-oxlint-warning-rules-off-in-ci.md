@@ -5,10 +5,10 @@ Exploratory-only suggestion to review local-only Oxlint warning rules in CI. No 
 ## What it detects
 
 - GitHub Actions (including Depot syntax) runs Oxlint from the repository root, directly or through root package scripts (up to eight nested calls).
-- Root `.oxlintrc.json` explicitly enables at least one rule with `"warn"`, `1`, or an options array starting with either severity.
+- Root `.oxlintrc.json` explicitly enables at least one rule or category with `"warn"`, `1`, or an options array starting with either severity.
 - The invocation has no warning failure threshold, fix mode, report format, or custom rule/config flags.
 
-Calls using `--deny-warnings`, `--max-warnings`, or `--fix` are excluded. **`--quiet` and `--silent` are not excluded:** they only hide output and do not skip warning analysis. Warning gates, fixes and report/config flags remain exclusions even when combined with quiet/silent. Dynamic commands, directory changes, script arguments, extended configs, overrides, config options, JSONC and executable configs are conservatively skipped. Implicit default warnings, categories, workspace scripts and other CI platforms are not inspected.
+Calls using `--deny-warnings`, `--max-warnings`, or `--fix` are excluded. **`--quiet` and `--silent` are not excluded:** they only hide output and do not skip warning analysis. Warning gates, fixes and report/config flags remain exclusions even when combined with quiet/silent. Dynamic commands, directory changes, script arguments, extended configs, overrides, config options, JSONC and executable configs are conservatively skipped. Warning-level `categories` are counted alongside `rules` because they still execute warning analysis. Implicit default warnings, workspace scripts and other CI platforms are not inspected.
 
 ## Why it matters
 

@@ -145,11 +145,19 @@ describe("Oxlint warning rules in CI", () => {
     expect(await findings({ run })).toHaveLength(0);
   });
 
+  test.each(["warn", 1])("detects warning category severity %j", async (severity) => {
+    const result = await findings({
+      config: JSON.stringify({ categories: { correctness: "error", perf: severity } }),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.message).toContain("category");
+  });
+
   test.each([
     {},
     { rules: { "no-debugger": "error" } },
     { rules: { "no-debugger": "off" } },
-    { categories: { correctness: "warn" } },
+    { categories: { correctness: "error" } },
     { rules: { "no-debugger": "warn" }, options: { denyWarnings: true } },
     { rules: { "no-debugger": "warn" }, extends: ["./base.json"] },
     { rules: { "no-debugger": "warn" }, overrides: [] },

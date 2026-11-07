@@ -16,7 +16,7 @@ Sources: [official changelog](https://github.com/getmoto/moto/blob/master/CHANGE
 
 ## What it flags
 
-- GitHub Actions service images `motoserver/moto` (also prefixed with `docker.io/`) and `ghcr.io/getmoto/motoserver` with explicit stable three-component tags below 5.1.21. Disabled jobs are skipped.
+- GitHub Actions service images `motoserver/moto` (also prefixed with `docker.io/`) and `ghcr.io/getmoto/motoserver` with explicit stable three-component tags below 5.1.21, or explicit `docker run` commands using the same pinned images. Disabled jobs are skipped.
 - Root `uv.lock` or `poetry.lock` Moto package versions below 5.1.21 in Python-heavy CI repositories. `uv.lock` takes priority when both exist. All detected Moto resolutions must be older; unknown or mixed old/current resolutions suppress the finding.
 - Without those lockfiles, exact `moto==x.y.z` requirements, including extras and environment markers, in root `requirements.txt`, `requirements-dev.txt`, or `dev-requirements.txt`.
 

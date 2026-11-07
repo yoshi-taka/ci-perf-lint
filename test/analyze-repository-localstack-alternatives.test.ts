@@ -51,6 +51,18 @@ ${secondService}
 `;
 }
 
+function runWorkflow(image: string): string {
+  return `name: local AWS run
+on: push
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: docker run -d --rm -p 4566:4566 ${image}
+`;
+}
+
 describe("LocalStack emulator alternatives", () => {
   let report: Awaited<ReturnType<typeof analyzeRepositoryForRule>>;
   beforeAll(async () => {
@@ -71,6 +83,8 @@ describe("LocalStack emulator alternatives", () => {
       "comment-only":
         "on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    # image: localstack/localstack:4.14.0\n    steps:\n      - run: echo localstack/localstack:4.14.0\n",
       coexist: workflow("localstack/localstack:1.1.0"),
+      "docker-run-positive": runWorkflow("localstack/localstack:2.0.0"),
+      "docker-run-negative": runWorkflow("example.com/localstack/localstack:2.0.0"),
     };
     await Promise.all(
       Object.entries(cases).map(([name, source]) =>
@@ -126,5 +140,11 @@ describe("LocalStack emulator alternatives", () => {
           finding.ruleId === "prefer-localstack-performance-milestone",
       ),
     ).toBe(true);
+  });
+  test("warns for docker run and ignores mirrors", () => {
+    const matches = findings("docker-run-positive");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.message).toContain("docker run");
+    expect(findings("docker-run-negative")).toHaveLength(0);
   });
 });

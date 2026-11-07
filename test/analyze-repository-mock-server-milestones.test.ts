@@ -40,6 +40,18 @@ ${moreServices}
 `;
 }
 
+function runWorkflow(image: string): string {
+  return `name: HTTP mock run
+on: push
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: docker run -d --rm -p 8080:8080 ${image}
+`;
+}
+
 describe("HTTP mock server performance milestones", () => {
   let report: Awaited<ReturnType<typeof analyzeRepositoryForRule>>;
   beforeAll(async () => {
@@ -50,6 +62,7 @@ describe("HTTP mock server performance milestones", () => {
     for (const config of milestones) {
       const refs = {
         old: `${config.image}:${config.old}`,
+        revision: `${config.image}:${config.old}-1`,
         major: `${config.image}:2.0.0`,
         dockerio: `docker.io/${config.image}:${config.old}`,
         target: `${config.image}:${config.target}`,
@@ -66,6 +79,15 @@ describe("HTTP mock server performance milestones", () => {
       for (const [name, image] of Object.entries(refs)) {
         files[`${config.id}-${name}`] = workflow(image);
       }
+      files[`${config.id}-docker-run-old`] = runWorkflow(refs.old);
+      files[`${config.id}-docker-run-wrapped`] = runWorkflow(refs.old).replace(
+        "run: docker",
+        "run: nohup docker",
+      );
+      files[`${config.id}-docker-run-revision`] = runWorkflow(refs.revision);
+      files[`${config.id}-docker-run-target`] = runWorkflow(refs.target);
+      files[`${config.id}-docker-run-latest`] = runWorkflow(refs.latest);
+      files[`${config.id}-docker-run-expression`] = runWorkflow(refs.expression);
       files[`${config.id}-disabled`] = workflow(refs.old, "if: false");
       files[`${config.id}-disabled-string`] = workflow(refs.old, "if: 'false'");
       files[`${config.id}-multiple`] = workflow(
@@ -93,7 +115,7 @@ describe("HTTP mock server performance milestones", () => {
     );
   }
   for (const config of milestones) {
-    for (const name of ["old", "major", "dockerio"]) {
+    for (const name of ["old", "revision", "major", "dockerio"]) {
       test(`${config.id}: warns for ${name}`, () => {
         const matches = findings(`${config.id}-${name}`, config.id);
         expect(matches).toHaveLength(1);
@@ -129,6 +151,20 @@ describe("HTTP mock server performance milestones", () => {
         9, 11,
       ]);
     });
+    test.each(["docker-run-old", "docker-run-wrapped", "docker-run-revision"])(
+      `${config.id}: warns for %s`,
+      (name) => {
+        const matches = findings(`${config.id}-${name}`, config.id);
+        expect(matches).toHaveLength(1);
+        expect(matches[0]?.message).toContain("runs");
+      },
+    );
+    test.each(["docker-run-target", "docker-run-latest", "docker-run-expression"])(
+      `${config.id}: skips %s`,
+      (name) => {
+        expect(findings(`${config.id}-${name}`, config.id)).toHaveLength(0);
+      },
+    );
     test(`${config.id}: does not scan comments or arbitrary step text`, () => {
       expect(findings("comments", config.id)).toHaveLength(0);
     });

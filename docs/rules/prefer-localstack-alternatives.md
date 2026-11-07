@@ -14,7 +14,7 @@ These results support evaluating startup and resource overhead. The adoption PRs
 
 ## What it flags
 
-An enabled GitHub Actions job with an official `localstack/localstack` or `localstack/localstack-pro` service image, optionally prefixed with `docker.io/`. Emits once per job, even when several LocalStack services exist. Stable, floating, prerelease, calendar-versioned, and SHA-256 digest references are eligible: this is a tool-selection rule, not a version check.
+An enabled GitHub Actions job with an official `localstack/localstack` or `localstack/localstack-pro` service image or explicit `docker run` command, optionally prefixed with `docker.io/`. Emits once per job, even when several LocalStack services exist. Stable, floating, prerelease, calendar-versioned, and SHA-256 digest references are eligible: this is a tool-selection rule, not a version check.
 
 ## Suggested action
 

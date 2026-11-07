@@ -47,6 +47,18 @@ jobs:
 `;
 }
 
+function runWorkflow(image: string, services: string): string {
+  return `name: localstack run
+on: push
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: docker run -d --rm -e SERVICES=${services} -p 4566:4566 ${image}
+`;
+}
+
 describe("LocalStack runtime performance milestones", () => {
   let report: Awaited<ReturnType<typeof analyzeRepositoryForRule>>;
   beforeAll(async () => {
@@ -72,6 +84,22 @@ describe("LocalStack runtime performance milestones", () => {
     await writeFile(
       path.join(dir, "mirror.yml"),
       workflow("example.com/localstack/localstack:1.1.0", ""),
+    );
+    await writeFile(
+      path.join(dir, "run-1.1.yml"),
+      runWorkflow("localstack/localstack:1.1.0", "sqs"),
+    );
+    await writeFile(
+      path.join(dir, "run-2.0-s3.yml"),
+      runWorkflow("localstack/localstack:2.0.0", "s3"),
+    );
+    await writeFile(
+      path.join(dir, "run-4.5-appsync.yml"),
+      runWorkflow("localstack/localstack:4.5.9", "appsync"),
+    );
+    await writeFile(
+      path.join(dir, "run-4.6-appsync.yml"),
+      runWorkflow("localstack/localstack:4.6.0", "appsync"),
     );
     report = await analyzeRepositoryForRule(
       { cwd: root, targetPath: ".", mode: "strict", topCount: 500 },
@@ -101,5 +129,25 @@ describe("LocalStack runtime performance milestones", () => {
     expect(files).toContain(".github/workflows/pro.yml");
     expect(files).not.toContain(".github/workflows/disabled.yml");
     expect(files).not.toContain(".github/workflows/mirror.yml");
+  });
+  test.each([
+    ["run-1.1", "2.0"],
+    ["run-2.0-s3", "3.0"],
+    ["run-4.5-appsync", "4.6"],
+  ])("warns for docker run %s", (name, target) => {
+    const matches = report.findings.filter(
+      (finding) =>
+        finding.ruleId === rule.id && finding.workflow === `.github/workflows/${name}.yml`,
+    );
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.message).toContain(`LocalStack ${target}`);
+    expect(matches[0]?.message).toContain("runs");
+  });
+  test("skips a docker run already on the milestone", () => {
+    const matches = report.findings.filter(
+      (finding) =>
+        finding.ruleId === rule.id && finding.workflow === ".github/workflows/run-4.6-appsync.yml",
+    );
+    expect(matches).toHaveLength(0);
   });
 });

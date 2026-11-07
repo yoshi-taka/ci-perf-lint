@@ -6,7 +6,7 @@ LocalStack runtime releases contain concrete image-size and service-execution im
 
 ## What it flags
 
-Explicit stable `major.minor.patch` tags on GitHub Actions service images `localstack/localstack` and `localstack/localstack-pro` (also with `docker.io/`). The next applicable milestone is selected:
+Explicit stable `major.minor.patch` tags on GitHub Actions service images or `docker run` commands using `localstack/localstack` and `localstack/localstack-pro` (also with `docker.io/`). For `docker run`, `SERVICES` is read from `-e SERVICES=...` / `--env SERVICES=...`. The next applicable milestone is selected:
 
 - Below 2.0: smaller split Community/Pro images and the new Lambda provider.
 - Below 3.0, with `s3` or `dynamodb` in the service's `env.SERVICES`: native S3 by default and DynamoDB write-performance improvements.

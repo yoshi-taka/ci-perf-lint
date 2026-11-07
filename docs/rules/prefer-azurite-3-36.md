@@ -10,7 +10,7 @@ The default **LokiJS metadata backend** is in memory even when its state is pers
 
 ## What it flags
 
-- Enabled GitHub Actions jobs with official `mcr.microsoft.com/azure-storage/azurite:x.y.z` service-image tags below 3.36.0.
+- Enabled GitHub Actions jobs with official `mcr.microsoft.com/azure-storage/azurite:x.y.z` service-image tags below 3.36.0, or explicit `docker run` commands using the same pinned image.
 - A root npm `azurite` dependency below 3.36.0 in JavaScript-heavy CI repositories. The existing dependency-version resolver prefers root lockfile evidence (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`); without a resolution, the whole supported range must remain below the milestone.
 
 Both surfaces share the rule ID and warning severity. Azure Storage SDK versions are not Azurite runtime versions.

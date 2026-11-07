@@ -8,7 +8,7 @@
 
 ## What it flags
 
-Enabled GitHub Actions jobs with `mockserver/mockserver:x.y.z` service images below 9.1.0, optionally prefixed with `docker.io/`. Emits a warning even for old major versions, with migration requirements rather than a claim that updating is risk-free.
+Enabled GitHub Actions jobs with `mockserver/mockserver:x.y.z` service images or explicit `docker run` commands below 9.1.0, optionally prefixed with `docker.io/`. Emits a warning even for old major versions, with migration requirements rather than a claim that updating is risk-free.
 
 ## Suggested action
 
@@ -22,4 +22,4 @@ Measure image pull, readiness, memory, matching latency, and total test duration
 
 ## What the scanner does
 
-Only stable three-component official service-image tags are compared. Floating tags, partial versions, prereleases, digests, suffixed image variants, mirrors, expressions, shell commands, Compose files, and client-library/Maven/Gradle versions are outside this first detector. A client version is not proof of the running server version.
+Only stable three-component official service-image tags are compared. A numeric Debian revision suffix (for example `9.0.0-1`) is accepted in service images and explicit `docker run` commands; floating tags, partial versions, prereleases, digests, suffixed image variants, mirrors, expressions, non-`docker run` shell commands, Compose files, and client-library/Maven/Gradle versions are outside this first detector. A client version is not proof of the running server version.

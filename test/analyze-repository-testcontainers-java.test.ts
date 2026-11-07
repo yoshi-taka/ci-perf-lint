@@ -78,6 +78,10 @@ const instanceField =
   '@Container private final GenericContainer<?> database = new GenericContainer<>("postgres:16");';
 const lifecycleCases: Record<string, string> = {
   instance: source("", instanceField),
+  importCollision: source("", instanceField).replace(
+    "import org.junit.jupiter.api.Test;",
+    "import org.junit.jupiter.api.Test;\nimport redis.clients.jedis.Jedis;",
+  ),
   typedModule: source(
     "",
     instanceField.replaceAll("GenericContainer", "PostgreSQLContainer"),

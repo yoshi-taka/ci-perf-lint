@@ -73,12 +73,21 @@ function initializedContainers(code: string, types: string[]) {
     `\\b(${typePattern})\\s*(?:<[^;={}()]*>)?\\s+([A-Za-z_]\\w*)\\s*=\\s*new\\s+\\1\\s*(?:<[^;={}()]*>)?\\s*\\(`,
     "g",
   );
+  // Import/package paths can share the container variable name (for example
+  // `import redis.clients.jedis.Jedis;` and a `redis` container). They are not
+  // variable declarations and must not make an otherwise unambiguous name look
+  // ambiguous.
+  const declarationSource = code.replace(/\b(?:import|package)\s+[^;]+;/g, (statement) =>
+    " ".repeat(statement.length),
+  );
   return [...code.matchAll(pattern)].filter((match) => {
     const name = match[2]!;
     // Ambiguous declarations, parameters, and reassignment are not proof of
     // which object start() refers to. False negatives are preferable here.
     const declarations =
-      code.match(new RegExp(`\\b[A-Za-z_]\\w*\\s*(?:<[^;={}()]*>)?\\s+${name}\\b`, "g")) ?? [];
+      declarationSource.match(
+        new RegExp(`\\b[A-Za-z_]\\w*\\s*(?:<[^;={}()]*>)?\\s+${name}\\b`, "g"),
+      ) ?? [];
     const assignments = code.match(new RegExp(`\\b${name}\\s*=`, "g")) ?? [];
     return declarations.length === 1 && assignments.length === 1;
   });

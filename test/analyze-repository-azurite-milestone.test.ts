@@ -20,6 +20,18 @@ ${image ? `    services:\n      storage:\n        image: '${image}'\n` : ""}    
 `;
 }
 
+function runWorkflow(image: string, disabled = false): string {
+  return `name: Azurite run
+on: push
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    ${disabled ? "if: false" : "timeout-minutes: 10"}
+    steps:
+      - run: docker run -d --rm -p 10000:10000 ${image} azurite-blob --blobHost 0.0.0.0
+`;
+}
+
 describe("Azurite image performance milestone", () => {
   let report: Awaited<ReturnType<typeof analyzeRepositoryForRule>>;
   const refs = {
@@ -47,6 +59,14 @@ describe("Azurite image performance milestone", () => {
       ),
     );
     await writeFile(path.join(dir, "disabled.yml"), workflow(refs.old, true));
+    await writeFile(path.join(dir, "run-old.yml"), runWorkflow(refs.old));
+    await writeFile(path.join(dir, "run-target.yml"), runWorkflow(refs.target));
+    await writeFile(path.join(dir, "run-disabled.yml"), runWorkflow(refs.old, true));
+    await writeFile(path.join(dir, "run-expression.yml"), runWorkflow(refs.expression));
+    await writeFile(
+      path.join(dir, "run-text.yml"),
+      `on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo docker run ${refs.old}\n`,
+    );
     await writeFile(
       path.join(dir, "text.yml"),
       `on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    # image: ${refs.old}\n    steps:\n      - run: echo ${refs.old}\n`,
@@ -71,6 +91,18 @@ describe("Azurite image performance milestone", () => {
     expect(matches[0]?.suggestion).toContain("3.36.0");
     expect(matches[0]?.suggestion).toContain("Node.js >=21");
   });
+  test("warns for a docker run command", () => {
+    const matches = findings("run-old");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.message).toContain("runs");
+    expect(matches[0]?.message).toContain(refs.old);
+  });
+  test.each(["run-target", "run-disabled", "run-expression", "run-text"])(
+    "skips docker run %s",
+    (name) => {
+      expect(findings(name)).toHaveLength(0);
+    },
+  );
   test.each([
     "target",
     "future",

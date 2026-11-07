@@ -165,9 +165,6 @@ describe("ESLint warning rules in CI", () => {
     'export default [{rules: {"no-debugger": "error"}}];',
     'export default []; // rules: {"no-debugger": "warn"}',
     'export default [{name: \'rules: {"no-debugger": "warn"}\'}];',
-    'import js from "@eslint/js"; export default [js.configs.recommended, {rules: {"no-debugger": "warn"}}];',
-    'const config = [{rules: {"no-debugger": "warn"}}]; export default config;',
-    'export default [{files: ["**/*.js"], rules: {"no-debugger": "warn"}}];',
     'export default [{rules: {"no-debugger": "warn"}}, ...other];',
     'export default [{rules: {"no-debugger": "warn", ...other}}];',
     'export default [{rules: {"no-debugger": "warn"}, extends: [other]}];',
@@ -177,6 +174,51 @@ describe("ESLint warning rules in CI", () => {
     "export default broken syntax",
   ])("does not guess config %s", async (config) => {
     expect(await findings({ config })).toHaveLength(0);
+  });
+
+  test.each([
+    'import js from "@eslint/js"; export default [js.configs.recommended, {rules: {"no-debugger": "warn"}}];',
+    'export default [{files: ["**/*.js"], rules: {"no-debugger": "warn"}}];',
+    'export default [{languageOptions: {sourceType: "module"}, rules: {"no-debugger": "warn"}}];',
+    'const config = [{rules: {"no-debugger": "warn"}}]; export default config;',
+  ])("reads literal warn rules from common flat config shape %s", async (config) => {
+    expect(await findings({ config })).toHaveLength(1);
+  });
+
+  test("reads literal warn rules after a spread", async () => {
+    expect(
+      await findings({
+        config:
+          'export default [{rules: {...base.rules, "no-debugger": "warn"}}, {files: ["**/*.js"]}];',
+      }),
+    ).toHaveLength(1);
+  });
+
+  test("reads literal warn rules from a config helper call", async () => {
+    expect(
+      await findings({
+        config:
+          'import tseslint from "typescript-eslint"; export default tseslint.config({rules: {"no-debugger": "warn"}});',
+      }),
+    ).toHaveLength(1);
+  });
+
+  test("scoped off does not erase a global warning", async () => {
+    expect(
+      await findings({
+        config:
+          'export default [{rules: {"no-debugger": "warn"}}, {files: ["**/*.test.js"], rules: {"no-debugger": "off"}}];',
+      }),
+    ).toHaveLength(1);
+  });
+
+  test("global off erases a scoped warning", async () => {
+    expect(
+      await findings({
+        config:
+          'export default [{files: ["**/*.js"], rules: {"no-debugger": "warn"}}, {rules: {"no-debugger": "off"}}];',
+      }),
+    ).toHaveLength(0);
   });
 
   test("does not infer flat config from legacy config on ESLint 10", async () => {

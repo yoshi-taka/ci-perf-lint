@@ -13,7 +13,7 @@ These benefits depend on the current version and matching/template workload. A u
 
 ## What it flags
 
-Enabled GitHub Actions jobs with `wiremock/wiremock:x.y.z` service images below 3.11.0, optionally prefixed with `docker.io/`. Warning severity; no requirement to prove XML usage because this is one cumulative baseline, not an XML-only recommendation.
+Enabled GitHub Actions jobs with `wiremock/wiremock:x.y.z` service images or explicit `docker run` commands below 3.11.0, optionally prefixed with `docker.io/`. Warning severity; no requirement to prove XML usage because this is one cumulative baseline, not an XML-only recommendation.
 
 ## Suggested action
 
@@ -27,4 +27,4 @@ Compare startup, image pull, request-matching latency, memory, and full integrat
 
 ## What the scanner does
 
-Only stable three-component official service-image tags are compared. Floating tags, partial versions, prereleases, digests, mirrors, expressions, shell commands, Compose files, and Maven/Gradle dependencies are not interpreted in this first detector.
+Only stable three-component official service-image tags are compared. A numeric Debian revision suffix (for example `3.10.0-1`) is accepted in service images and explicit `docker run` commands; floating tags, partial versions, prereleases (`-rc.1`), image variants (`-alpine`), digests, mirrors, expressions, non-`docker run` shell commands, Compose files, and Maven/Gradle dependencies are not interpreted in this first detector.
