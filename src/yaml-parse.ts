@@ -3512,6 +3512,9 @@ class Parser {
         !recover &&
         this.flowDepth === 0 &&
         contentPos < this.n &&
+        this.src[contentPos] !== "#" &&
+        this.src[contentPos] !== '"' &&
+        this.src[contentPos] !== "'" &&
         (startAtFirst
           ? this.lineIndentOf(contentPos) >= this.lineIndentOf(start)
           : this.lineIndentOf(contentPos) >
