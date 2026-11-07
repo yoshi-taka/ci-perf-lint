@@ -82,6 +82,7 @@ for (const asyncFailure of [false, true]) {
           "npm install",
         ]),
         "pom.xml": "<project/>",
+        "package-lock.json": '{"lockfileVersion":3,"packages":{}}',
       });
       expect(
         report.analysisWarnings.some(
@@ -142,6 +143,17 @@ test.each([
   expect(findings).toHaveLength(1);
   expect(findings[0]?.message).toContain("two/.terraform.lock.hcl");
   expect(findings[0]?.location.line).toBeGreaterThan(1);
+});
+
+test("does not flag an ephemeral Terraform module that removes its lockfile", async () => {
+  const report = await analyze({
+    ".github/workflows/ci.yml": workflow([
+      "touch main.tf",
+      "terraform init",
+      "rm main.tf && rm .terraform.lock.hcl && rm -rf .terraform",
+    ]),
+  });
+  expect(report.findings.some((f) => f.ruleId === "terraform-lockfile-missing")).toBe(false);
 });
 
 test("esbuild/tsup root externals cover imported subpaths", async () => {

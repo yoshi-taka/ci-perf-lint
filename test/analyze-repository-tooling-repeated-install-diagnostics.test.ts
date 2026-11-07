@@ -24,6 +24,18 @@ const workflows: Record<string, string> = {
     "      - run: npm ci",
     "      - run: npm test",
   ].join("\n"),
+  "repeated-bundler": [
+    "name: CI",
+    "on: push",
+    "jobs:",
+    "  test:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - uses: actions/checkout@v4",
+    "      - run: bundle install",
+    "      - run: bundle exec rake test",
+    "      - run: bundle install",
+  ].join("\n"),
   "repeated-pnpm": [
     "name: CI",
     "on: push",
@@ -204,6 +216,12 @@ describe("analyzeRepository repo-aware and tooling rules: repeated install diagn
     expect(f[0]!.severity).toBe("warning");
     expect(f[0]!.message).toContain('Job "build"');
     expect(f[0]!.message).toContain("npm install 2 times");
+  });
+
+  test("flags repeated bundler install commands within the same job", () => {
+    const f = findings("repeated-bundler", "repeated-install-in-same-job");
+    expect(f).toHaveLength(1);
+    expect(f[0]!.message).toContain("bundler install 2 times");
   });
 
   test("flags repeated pnpm install commands within the same job", () => {

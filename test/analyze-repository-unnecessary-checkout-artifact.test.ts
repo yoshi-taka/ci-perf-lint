@@ -172,3 +172,82 @@ describe("unnecessary-checkout-when-only-using-artifacts rule", () => {
     expect(ruleIds).not.toContain("unnecessary-checkout-when-only-using-artifacts");
   });
 });
+
+test.each([
+  "pnpm --filter app build",
+  "node -e \"require('./config')\"",
+  "cargo llvm-cov",
+  "find documentation -type f",
+  'cp "$source" out',
+  'dotnet test --project="$GITHUB_WORKSPACE/app"',
+])("skips checkout when the job needs repository tooling: %s", async (run) => {
+  const fixtureRoot = await tempDirs.create("apl-chk-art-tooling-");
+  const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+  await mkdir(workflowDir, { recursive: true });
+  await writeFile(
+    path.join(workflowDir, "ci.yml"),
+    [
+      "name: process",
+      "on: pull_request",
+      "jobs:",
+      "  process:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/checkout@v4",
+      "      - uses: actions/download-artifact@v4",
+      "        with:",
+      "          name: data",
+      `      - run: ${JSON.stringify(run)}`,
+      "      - uses: actions/upload-artifact@v4",
+      "        with:",
+      "          name: output",
+      "          path: output",
+    ].join("\n"),
+  );
+
+  const report = await analyzeRepository({
+    cwd: fixtureRoot,
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+
+  const ruleIds = report.findings.map((finding) => finding.ruleId);
+  expect(ruleIds).not.toContain("unnecessary-checkout-when-only-using-artifacts");
+});
+
+test("skips checkout when the job uses a repository-local $/ action", async () => {
+  const fixtureRoot = await tempDirs.create("apl-chk-art-local-dollar-");
+  const workflowDir = path.join(fixtureRoot, ".github", "workflows");
+  await mkdir(workflowDir, { recursive: true });
+  await writeFile(
+    path.join(workflowDir, "ci.yml"),
+    [
+      "name: process",
+      "on: pull_request",
+      "jobs:",
+      "  process:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/checkout@v4",
+      "      - uses: actions/download-artifact@v4",
+      "        with:",
+      "          name: data",
+      "      - uses: $/.github/actions/process",
+      "      - uses: actions/upload-artifact@v4",
+      "        with:",
+      "          name: output",
+      "          path: output",
+    ].join("\n"),
+  );
+
+  const report = await analyzeRepository({
+    cwd: fixtureRoot,
+    targetPath: ".",
+    topCount: 20,
+    mode: "exploratory",
+  });
+
+  const ruleIds = report.findings.map((finding) => finding.ruleId);
+  expect(ruleIds).not.toContain("unnecessary-checkout-when-only-using-artifacts");
+});

@@ -59,6 +59,12 @@ function jobLooksLikeLightweightNodeTooling(job: WorkflowJob): boolean {
   return hasToolingSignals && !hasNonLightweightSignals;
 }
 
+function jobUsesNodeToolRunner(job: WorkflowJob): boolean {
+  return job.steps.some((step) =>
+    /\b(?:npx|bunx|npm\s+exec|pnpm\s+(?:exec|dlx)|yarn\s+(?:exec|dlx))\b/i.test(step.run ?? ""),
+  );
+}
+
 function getNodePackageManager(job: WorkflowJob): "npm" | "yarn" | "pnpm" | "bun" | undefined {
   for (const step of job.steps) {
     const install = detectInstallCommand(step);
@@ -89,6 +95,9 @@ export const preferSetupBunForLightweightNodeToolingRule = {
 
       const packageManager = getNodePackageManager(job);
       if (packageManager === "bun" || packageManager === "pnpm") {
+        continue;
+      }
+      if (!packageManager && !jobUsesNodeToolRunner(job)) {
         continue;
       }
 

@@ -4,6 +4,7 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { isManualCacheStep, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 import { textRunsBundlerInstall } from "./shared/bundler-commands.ts";
+import { workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "ruby-setup-ruby-missing-bundler-cache",
@@ -50,6 +51,14 @@ function jobRunsInsideContainer(job: WorkflowJob): boolean {
   return Boolean(job.raw.container);
 }
 
+function jobInstallsOutsideRepository(workflow: WorkflowDocument, job: WorkflowJob): boolean {
+  return job.steps.some((step) =>
+    /\bRUNNER_TEMP\b|\$\{\{\s*runner\.temp\s*\}\}|(?:^|\s)\/tmp(?:\/|\b)/i.test(
+      `${step.run ?? ""} ${workflowWorkingDirectory(workflow, job, step)}`,
+    ),
+  );
+}
+
 function jobHasCustomBundlerCache(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
     if (!isManualCacheStep(step) || step.uses?.toLowerCase().startsWith("actions/cache/save@")) {
@@ -80,6 +89,10 @@ export const rubySetupRubyMissingBundlerCacheRule = {
       }
 
       if (jobRunsInsideContainer(job)) {
+        continue;
+      }
+
+      if (jobInstallsOutsideRepository(workflow, job)) {
         continue;
       }
 

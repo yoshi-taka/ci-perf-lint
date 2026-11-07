@@ -140,3 +140,10 @@ describe("Ruby setup and installed-gem cache coverage", () => {
     ).toEqual([]);
   });
 });
+
+test("does not warn for a downloaded tool bundled outside the repository", async () => {
+  const { findings } = await scan({
+    steps: [setup(), { run: "cd $RUNNER_TEMP/licensed-5.0.4 && bundle install" }],
+  });
+  expect(findings).toEqual([]);
+});

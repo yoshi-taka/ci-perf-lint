@@ -125,16 +125,29 @@ export async function collectSetupNodeCacheDependencyPathUnsetDiagnostics(
           let cwd = workflowWorkingDirectory(workflow, job, candidate);
           for (const command of shellCommandSegments(candidate.run ?? "")) {
             const words = staticShellWords(command);
-            if (words?.[0] === "cd" && words[1]) {
+            if (!words) {
+              continue;
+            }
+            if (words[0] === "cd" && words[1]) {
               cwd = path.posix.join(cwd, words[1]);
               continue;
             }
+            const prefixIndex = words.findIndex(
+              (word) => word === "--prefix" || word.startsWith("--prefix="),
+            );
+            const prefix =
+              prefixIndex >= 0
+                ? words[prefixIndex] === "--prefix"
+                  ? words[prefixIndex + 1]
+                  : words[prefixIndex]!.slice("--prefix=".length)
+                : undefined;
+            const installCwd = prefix ? path.posix.normalize(path.posix.join(cwd, prefix)) : cwd;
             if (
               detectInstallCommandFromText(command) !== manager ||
-              cwd === "." ||
-              cwd.includes("${{") ||
-              path.isAbsolute(cwd) ||
-              cwd.startsWith("..")
+              installCwd === "." ||
+              installCwd.includes("${{") ||
+              path.isAbsolute(installCwd) ||
+              installCwd.startsWith("..")
             ) {
               continue;
             }
@@ -142,7 +155,7 @@ export async function collectSetupNodeCacheDependencyPathUnsetDiagnostics(
               (
                 await Promise.all(
                   matchingNames.map((name) =>
-                    scanContext.pathExists(scanContext.resolve(cwd, name)),
+                    scanContext.pathExists(scanContext.resolve(installCwd, name)),
                   ),
                 )
               ).some(Boolean)

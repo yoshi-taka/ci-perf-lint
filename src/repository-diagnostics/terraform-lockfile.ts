@@ -4,6 +4,7 @@ import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { collectTerraformCommands } from "./terraform-commands.ts";
 import { getLocation } from "../workflow.ts";
+import { shellCommandSegments, staticShellWords } from "../rules/shared/command-patterns.ts";
 
 const meta = {
   id: "terraform-lockfile-missing",
@@ -11,6 +12,34 @@ const meta = {
   confidence: "high",
   docsPath: "docs/rules/terraform-lockfile-missing.md",
 } satisfies RuleMeta;
+
+function removesTerraformLockfile(command: {
+  job: { steps: readonly { run?: string }[] };
+  step: { run?: string };
+}): boolean {
+  const index = command.job.steps.indexOf(command.step);
+  for (const step of command.job.steps.slice(Math.max(0, index))) {
+    for (const segment of shellCommandSegments(step.run ?? "")) {
+      const words = staticShellWords(segment);
+      if (words?.[0] !== "rm") {
+        continue;
+      }
+      const targets = words.slice(1).filter((word) => !word.startsWith("-"));
+      if (
+        targets.some(
+          (target) =>
+            target === ".terraform.lock.hcl" ||
+            target.endsWith("/.terraform.lock.hcl") ||
+            target === ".terraform" ||
+            target.endsWith("/.terraform"),
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 export async function collectTerraformLockfileDiagnostics(
   context: RepositoryDiagnosticContext,
@@ -22,6 +51,9 @@ export async function collectTerraformLockfileDiagnostics(
       continue;
     }
     seen.add(command.directory);
+    if (removesTerraformLockfile(command)) {
+      continue;
+    }
     const lockfile = path.posix.join(command.directory, ".terraform.lock.hcl");
     if (await context.scanContext.pathExists(context.scanContext.resolve(lockfile))) {
       continue;

@@ -43,7 +43,7 @@ function jobUsesKnownHistoryRequiringAction(job: WorkflowJob): boolean {
 function jobUsesLocalAction(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
     const uses = step.uses ?? "";
-    return uses.startsWith("./");
+    return uses.startsWith("./") || uses.startsWith("$/");
   });
 }
 
@@ -88,15 +88,26 @@ function jobHasRepoFileOperations(job: WorkflowJob): boolean {
   });
 }
 
+const repositoryExecutionPatterns = [
+  /(?:^|[\s;&|])(?:npm\s+(?:run(?:-script)?|test)|(?:yarn|pnpm|bun)\s+(?!(?:--version|--help|global|dlx|add)\b)[A-Za-z][\w:-]*|npx\s+npq\s+install)\b/,
+  /\b(?:pnpm|yarn|bun)\s+(?:--filter(?:=|\s)|-F\s|--dir(?:=|\s)|-C\s|--workspace-root\b)/,
+  /\b(?:require|import)\s*\(\s*['"]\./,
+  /\bfrom\s+['"]\./,
+  /\bcargo\s+(?:build|test|run|llvm-cov|nextest|clippy|fmt|check)\b/,
+  /\bgo\s+(?:build|test|run|generate|mod)\b/,
+  /\bfind\s+[^\s/]/,
+  /\bGITHUB_WORKSPACE\b/i,
+  /\b(?:cp|mv|rm|cat|chmod|chown|ln|rsync|tar|install)\s+[^\n]*\$[A-Za-z_]/,
+  /\b(?:node|bun|python|python3)\s+(?:\.\/)?\S+\.(?:[cm]?[jt]sx?|py)\b/,
+];
+
 function jobHasRepositoryTooling(workflow: WorkflowDocument, job: WorkflowJob): boolean {
   return job.steps.some(
     (step) =>
       Boolean(step.with?.["node-version-file"]) ||
       Boolean(step.with?.["python-version-file"]) ||
       (step.run !== undefined && workflowWorkingDirectory(workflow, job, step) !== ".") ||
-      /(?:^|[\s;&|])(?:npm\s+(?:run(?:-script)?|test)|(?:yarn|pnpm|bun)\s+(?!(?:--version|--help|global|dlx|add)\b)[A-Za-z][\w:-]*|npx\s+npq\s+install)\b/.test(
-        step.run ?? "",
-      ),
+      repositoryExecutionPatterns.some((pattern) => pattern.test(step.run ?? "")),
   );
 }
 

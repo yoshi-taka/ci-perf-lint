@@ -3,10 +3,25 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { CIDocument } from "./shared/any-step.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { extractSemanticSteps, groupStepsByJob } from "./shared/semantic-adapter.ts";
-import { shellCommandSegments } from "./shared/command-patterns.ts";
+import { shellCommandSegments, staticShellWords } from "./shared/command-patterns.ts";
 
 const npmGlobalUpdate = /\bnpm\s+(?:install|i|update|upgrade)\s+(?:-g|--global)\s+npm\b/i;
 const yarnPnpmBunInstall = /\b(?:yarn\s+install|pnpm\s+install|bun\s+install)\b/i;
+
+function runsNpmCommand(command: string): boolean {
+  const words = staticShellWords(command);
+  if (!words) {
+    return false;
+  }
+  let index = 0;
+  while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
+    index++;
+  }
+  if (["command", "env", "exec", "nohup", "sudo", "time"].includes(words[index] ?? "")) {
+    index++;
+  }
+  return words[index] === "npm";
+}
 
 const meta = {
   id: "wasteful-npm-global-install",
@@ -26,7 +41,7 @@ export const wastefulNpmGlobalInstallRule = {
       }
       const commands = steps.flatMap((step) => shellCommandSegments(step.text));
       // npm can be a compatibility-test client or tool installer even when root deps use Yarn.
-      if (commands.some((command) => /\bnpm\s+/.test(command) && !npmGlobalUpdate.test(command))) {
+      if (commands.some((command) => runsNpmCommand(command) && !npmGlobalUpdate.test(command))) {
         continue;
       }
       for (const step of steps) {

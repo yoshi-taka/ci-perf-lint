@@ -21,23 +21,39 @@ function jobRunsTurboTasks(job: WorkflowJob): boolean {
   );
 }
 
+function turboCachePathText(step: WorkflowStep): string {
+  const pathValue = step.with?.path;
+  return Array.isArray(pathValue)
+    ? pathValue.filter((entry): entry is string => typeof entry === "string").join("\n")
+    : typeof pathValue === "string"
+      ? pathValue
+      : "";
+}
+
+function isTurboCacheArtifactStep(step: WorkflowStep): boolean {
+  const uses = step.uses?.toLowerCase() ?? "";
+  if (
+    !uses.startsWith("actions/upload-artifact@") &&
+    !uses.startsWith("actions/download-artifact@")
+  ) {
+    return false;
+  }
+  const name = typeof step.with?.name === "string" ? step.with.name : "";
+  return /\.turbo\b|node_modules\/\.cache\/turbo\b/i.test(`${turboCachePathText(step)}\n${name}`);
+}
+
 function workflowHasTurboLocalCache(workflow: WorkflowDocument): boolean {
   return workflow.jobs.some(
     (job) =>
       jobAllowsActionsCacheRestore(workflow, job) &&
       job.steps.some((step) => {
+        if (isTurboCacheArtifactStep(step)) {
+          return true;
+        }
         if (!isManualCacheStep(step)) {
           return false;
         }
-
-        const pathValue = step.with?.path;
-        const pathText = Array.isArray(pathValue)
-          ? pathValue.filter((entry): entry is string => typeof entry === "string").join("\n")
-          : typeof pathValue === "string"
-            ? pathValue
-            : "";
-
-        return /\.turbo\b|node_modules\/\.cache\/turbo\b/i.test(pathText);
+        return /\.turbo\b|node_modules\/\.cache\/turbo\b/i.test(turboCachePathText(step));
       }),
   );
 }

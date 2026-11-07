@@ -9,7 +9,7 @@ import { hasSetupUvStep } from "./shared/workflow-analysis.ts";
 const lightweightPythonToolingMatcher =
   /\b(ruff|black|isort|flake8|pylint|bandit|yamllint|markdownlint|codespell|textlint|sphinx-build|check|verify|quality|repo-health|static-analysis)\b/i;
 const nonLightweightPythonWorkMatcher =
-  /\b(pytest|tox|nox|test|build|compile|package|publish|release|deploy)\b/i;
+  /\b(pytest|tox|nox|tests?|testing|build|compile|package|publish|release|deploy)\b/i;
 
 // Sources:
 // - https://docs.astral.sh/uv/guides/integration/github/

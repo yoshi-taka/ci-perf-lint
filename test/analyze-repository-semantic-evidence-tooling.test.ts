@@ -150,3 +150,46 @@ test("custom checkout path does not make a source-root lock a workspace-root cac
   expect(finding?.message).toContain("outside the workspace root");
   expect(finding?.suggestion).toContain("source/yarn.lock");
 });
+
+test("setup-node cache detects a nested npm --prefix install", async () => {
+  const withNestedLock = await analyze({
+    "package.json": "{}",
+    "package-lock.json": "",
+    "sub/package.json": "{}",
+    "sub/package-lock.json": "",
+    ".github/workflows/ci.yml": `on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          cache: npm
+      - run: npm ci --prefix sub
+`,
+  });
+  expect(
+    withNestedLock.findings.some((f) => f.ruleId === "setup-node-cache-dependency-path-unset"),
+  ).toBe(true);
+
+  const withoutNestedLock = await analyze({
+    "package.json": "{}",
+    "package-lock.json": "",
+    "sub/package.json": "{}",
+    ".github/workflows/ci.yml": `on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          cache: npm
+      - run: npm ci --prefix sub
+`,
+  });
+  expect(
+    withoutNestedLock.findings.some((f) => f.ruleId === "setup-node-cache-dependency-path-unset"),
+  ).toBe(false);
+});

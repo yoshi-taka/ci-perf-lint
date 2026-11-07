@@ -269,3 +269,44 @@ test.each([
   const report = await analyze([run]);
   expect(report.findings.some((f) => f.ruleId === "prefer-npm-ci")).toBe(false);
 });
+
+test("standalone npm global upgrade is not a project install", async () => {
+  const report = await analyze(["npm install -g npm@latest"]);
+  expect(
+    report.findings.some((f) => f.ruleId === "unnecessary-npm-global-upgrade-before-npm-install"),
+  ).toBe(false);
+});
+
+test("npm global upgrade before npm ci still fires", async () => {
+  const report = await analyze(["npm install -g npm@latest", "npm ci"]);
+  expect(
+    report.findings.filter((f) => f.ruleId === "unnecessary-npm-global-upgrade-before-npm-install"),
+  ).toHaveLength(1);
+});
+
+test("npm publish text inside echo does not suppress wasteful global install", async () => {
+  const report = await analyze([
+    "npm install -g npm@latest",
+    "pnpm install",
+    'echo "::warning::npm publish failed"',
+  ]);
+  expect(report.findings.filter((f) => f.ruleId === "wasteful-npm-global-install")).toHaveLength(1);
+});
+
+test("a real npm publish still suppresses wasteful global install", async () => {
+  const report = await analyze(["npm install -g npm@latest", "pnpm install", "npm publish"]);
+  expect(report.findings.some((f) => f.ruleId === "wasteful-npm-global-install")).toBe(false);
+});
+
+test("npm ci advice requires a lockfile in the install directory", async () => {
+  const withLock = await analyze(["cd sub && npm install"], {
+    "sub/package.json": "{}",
+    "sub/package-lock.json": '{"lockfileVersion":3,"packages":{}}',
+  });
+  expect(withLock.findings.filter((f) => f.ruleId === "prefer-npm-ci")).toHaveLength(1);
+
+  const withoutLock = await analyze(["cd sub && npm install"], {
+    "sub/package.json": "{}",
+  });
+  expect(withoutLock.findings.some((f) => f.ruleId === "prefer-npm-ci")).toBe(false);
+});

@@ -101,7 +101,8 @@ export const repeatedInstallInSameJobRule = {
         }
 
         const words = staticShellWords(step.text.trim());
-        if (!words || words[0] !== manager) {
+        const executable = manager === "bundler" ? "bundle" : manager;
+        if (!words || words[0] !== executable) {
           continue;
         }
         const isInstall =
