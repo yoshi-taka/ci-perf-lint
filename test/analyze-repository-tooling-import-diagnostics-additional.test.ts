@@ -141,6 +141,14 @@ describe("import diagnostics: utility, component, and svg imports", () => {
       );
       expect(findings.every((finding) => finding.docsPath === testCase.docsPath)).toBe(true);
       expect(findings.some((finding) => finding.message.includes(testCase.message))).toBe(true);
+      if (testCase.ruleId === "prefer-direct-headlessui-react-imports") {
+        expect(findings[0]?.suggestion).toContain("public exports");
+        expect(findings[0]?.suggestion).toContain("keep root imports");
+        expect(findings[0]?.aiHandoff).toContain("Never invent deep imports");
+        expect(findings[0]?.aiHandoff).toContain(
+          "only when a documented public component subpath exists",
+        );
+      }
     },
   );
 

@@ -117,10 +117,19 @@ export const repeatedInstallInSameJobRule = {
             ? scopeKey
             : JSON.stringify(words.slice(2));
         let envKey = "";
+        let checkoutGeneration = 0;
         if (doc.kind === "github-actions") {
           const job = doc.jobs.find((candidate) => candidate.id === jobName);
           const original = job?.steps.find((candidate) => candidate.runNode === step.node);
           if (job && original) {
+            for (const candidate of job.steps) {
+              if (candidate === original) {
+                break;
+              }
+              if (candidate.uses?.toLowerCase().startsWith("actions/checkout@")) {
+                checkoutGeneration++;
+              }
+            }
             envKey = JSON.stringify(
               Object.entries(workflowStepEnv(doc, job, original)).sort(([a], [b]) =>
                 a.localeCompare(b),
@@ -128,7 +137,7 @@ export const repeatedInstallInSameJobRule = {
             );
           }
         }
-        const compositeKey = `${manager}:${scopeKey}:${targetKey}:${step.workingDirectory ?? "."}:${envKey}`;
+        const compositeKey = `${manager}:${scopeKey}:${targetKey}:${step.workingDirectory ?? "."}:${envKey}:${checkoutGeneration}`;
 
         const entries = seen.get(compositeKey) ?? [];
         entries.push({ step, index: i });

@@ -18,6 +18,21 @@ const DB_INFO: Record<DbType, { name: string; dataDir: string }> = {
   postgres: { name: "PostgreSQL", dataDir: "/var/lib/postgresql/data" },
 };
 
+function postgresTmpfsAdvice(image: string, env?: Record<string, unknown>): string {
+  const pgdata = env?.PGDATA;
+  if (typeof pgdata === "string" && /^\/[\w/.-]+$/.test(pgdata)) {
+    return `--tmpfs ${pgdata}`;
+  }
+  if (pgdata !== undefined) {
+    return "a tmpfs mount at the resolved PGDATA directory";
+  }
+  const major = /^(?:docker\.io\/)?(?:library\/)?postgres:(\d+)(?:[.-]|$)/i.exec(image)?.[1];
+  if (major) {
+    return `--tmpfs ${Number(major) >= 18 ? "/var/lib/postgresql" : "/var/lib/postgresql/data"}`;
+  }
+  return "a tmpfs mount at the image's verified data directory (official PostgreSQL 18+: /var/lib/postgresql; 17 and earlier: /var/lib/postgresql/data); check PGDATA overrides";
+}
+
 function detectDbType(image: string): DbType | undefined {
   const n = image.toLowerCase();
   if (
@@ -135,13 +150,15 @@ function checkServiceContainers(workflow: WorkflowDocument, meta: RuleMeta, job:
     }
 
     const info = DB_INFO[dbType];
+    const tmpfs =
+      dbType === "postgres" ? postgresTmpfsAdvice(image, env) : `--tmpfs ${info.dataDir}`;
     findings.push(
       buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
         message: `Job "${job.id}" uses ${info.name} service container "${serviceName}" without disk I/O optimization`,
         why: `${info.name} containers in CI write to disk by default. On GitHub Actions hosted runners this causes unnecessary I/O overhead that can slow down test suites.`,
-        suggestion: `Add tmpfs mount to services.${serviceName}.options: --tmpfs ${info.dataDir}, or set ${dbType === "mysql" ? "innodb_flush_log_at_trx_commit=2" : "PGOPTIONS: '-c fsync=off'"} to reduce disk writes.`,
+        suggestion: `For disposable test data only, add ${tmpfs} to services.${serviceName}.options. Alternatively, configure ${dbType === "mysql" ? "innodb_flush_log_at_trx_commit=2" : "fsync=off in postgresql.conf or the PostgreSQL server command line, not client PGOPTIONS"}. Verify memory limits and preserve durability tests.`,
         measurementHint: `Compare test duration before and after adding tmpfs or DB config to the "${serviceName}" service in ${workflow.relativePath}.`,
-        aiHandoff: `In ${workflow.relativePath}, job "${job.id}", add disk I/O optimization to the "${serviceName}" ${info.name} service container. Either add \`options: --tmpfs ${info.dataDir}\` to the service definition, or configure ${dbType === "mysql" ? "innodb_flush_log_at_trx_commit" : "fsync=off"} via environment variables or config.`,
+        aiHandoff: `In ${workflow.relativePath}, job "${job.id}", verify the "${serviceName}" service contains only disposable test data. Check image version, data directory overrides and memory limits before adding ${tmpfs}. ${dbType === "postgres" ? "Configure fsync=off only in postgresql.conf or the server command line, never through client PGOPTIONS. GitHub service options are Docker options, not postgres server arguments." : "Review innodb_flush_log_at_trx_commit in server configuration."} Preserve durability tests.`,
         score: 65,
       }),
     );
@@ -175,9 +192,9 @@ function checkDockerRunSteps(workflow: WorkflowDocument, meta: RuleMeta, job: Wo
       buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
         message: `Job "${job.id}" starts ${info.name} via \`docker run\` without disk I/O optimization`,
         why: `${info.name} containers in CI write to disk by default. On GitHub Actions hosted runners this causes unnecessary I/O overhead that can slow down test suites.`,
-        suggestion: `Add --tmpfs ${info.dataDir} to the docker run options, or pass ${dbType === "mysql" ? "--innodb_flush_log_at_trx_commit=2" : "-c fsync=off"} as a ${info.name} argument.`,
+        suggestion: `For disposable test data only, add ${dbType === "postgres" ? postgresTmpfsAdvice("") : `--tmpfs ${info.dataDir}`} to the docker run options, or pass ${dbType === "mysql" ? "--innodb_flush_log_at_trx_commit=2" : "-c fsync=off"} as a ${info.name} server argument after the image. Check memory limits and preserve durability tests.`,
         measurementHint: `Compare test duration before and after adding tmpfs or DB config to the docker run step in ${workflow.relativePath}.`,
-        aiHandoff: `In ${workflow.relativePath}, job "${job.id}", the step "${stepDisplayName(step)}" starts ${info.name} via \`docker run\` without disk I/O optimization. Add \`--tmpfs ${info.dataDir}\` to the docker run options.`,
+        aiHandoff: `In ${workflow.relativePath}, job "${job.id}", review the step "${stepDisplayName(step)}". For disposable data only, verify the image version, PGDATA or other data directory overrides and memory limits before adding ${dbType === "postgres" ? postgresTmpfsAdvice("") : `--tmpfs ${info.dataDir}`}. Preserve durability tests.`,
         score: 60,
       }),
     );

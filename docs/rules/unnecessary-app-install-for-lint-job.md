@@ -10,10 +10,11 @@ Why this rule exists:
 
 Current MVP heuristic:
 
-- the job runs at least one install command
-- the job runs at least one lint or check tool
+- the job runs at least one JavaScript application install (`npm`, `pnpm`, `yarn`, or `bun`); installing a Python/native toolchain alone is not evidence of a full application install
+- the job visibly executes a lint tool, directly or through a supported wrapper; names in step labels, printed strings or build arguments such as `-p oxlint` do not count
 - the job runs no build, test, dev, or serve commands
 - reusable workflow jobs are ignored
+- native Cargo/cross/NAPI work and dynamically selected executables are not considered lint-only; ordinary `cargo fmt` does not establish a native build
 - **eslint jobs are skipped when the repository has an eslint config** (config files usually reference plugins, parsers, or sharable configs that need `node_modules`)
 - **prettier jobs are skipped when the repository uses prettier plugins** (plugins must be resolved from `node_modules`)
 

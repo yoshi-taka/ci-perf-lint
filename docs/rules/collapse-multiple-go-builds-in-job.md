@@ -4,15 +4,15 @@ Detects CI jobs that run multiple separate `go build` commands.
 
 This rule looks for:
 
-- two or more `go build` invocations in the same job
+- two or more `go build` invocations in the same job with matching visible compilation flags, command/step environment, working directory and step condition
 
 Only direct executable commands count, including literal environment-assignment prefixes, `env`, Go executable paths and `go -C <directory> build`. Echoed examples, comments, help/dry-run invocations, heredoc scripts, dynamic arguments and opaque shell control flow are not treated as builds. Package scripts and interpreter command strings are not expanded.
 
-Targets are parsed per invocation. Output paths and values of build options such as `-ldflags`, `-tags` and `-modfile` are not packages; neither are arguments of a later command. A job with a visible build already passing multiple targets is excluded, as before. This is a same-job heuristic, not proof that every build shares its environment, compilation options or output layout.
+Targets are parsed per invocation. Output paths and values of build options such as `-ldflags`, `-tags` and `-modfile` are not packages; neither are arguments of a later command. Different build tags or other compilation flags are not grouped. A job with a visible build already passing multiple targets is excluded, as before. Literal `-o` output paths may differ, but output layout still requires manual review before consolidation. Shell state changes such as `cd` or `export` within a run block make that block ineligible; arbitrary scripts are not evaluated.
 
 Why it matters:
 
-- Building multiple Go packages or binaries in one command can reuse compiler work and cache state more efficiently.
+- Go already shares its build cache across processes; separate invocations do not prove repeated compilation.
 - Separate sequential `go build` commands can repeat setup and scheduling work.
 - This matters when Docker image packaging builds several Go binaries before creating images.
 

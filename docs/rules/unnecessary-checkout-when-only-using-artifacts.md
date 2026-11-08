@@ -14,6 +14,8 @@ This rule skips reporting when the job:
 - Runs build or install commands (`npm ci`, `pnpm install`, `cargo build`, etc.)
 - Contains git operations that need the working tree (`git apply`, `git log`, `git diff`, etc.)
 - Executes repository scripts (`./scripts/...`, `node scripts/...`, etc.)
+- Loads local modules from `actions/github-script`'s `with.script` (for example `require('./.github/scripts/prefetch')`), not just from `run` commands
+- Invokes an interpreter helper through an unresolved variable-based path (for example `bash "${RUNNER_TEMP}/.../save_config.sh"`); the helper may consume checked-out configuration, so artifact-only behavior is not proven
 - Reads repository version files such as `node-version-file: .nvmrc`
 - Executes package scripts (`npm run`, `yarn unit`, `yarn integration`, etc.) or a wrapped dependency install such as `npx npq install`
 - Runs commands with a repository working-directory override

@@ -11,6 +11,7 @@ import { getRunsOnSpec } from "./runs-on-facts.ts";
 import { detectLintTool, detectPythonTool } from "./tools.ts";
 import { detectToolPresence } from "./tool-presence-automaton.ts";
 import { collectCommandEntries } from "./any-step.ts";
+import { shellInvocations } from "./shell-invocations.ts";
 
 const dockerBuildxBakePattern = /\bdocker\s+buildx\s+bake\b|\bdocker-buildx\s+bake\b/i;
 const dockerBuildPattern = /\bdocker\s+build\b/i;
@@ -216,8 +217,42 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     const loweredStepText = facts.loweredStepText;
     loweredStepTexts.push(loweredStepText);
     const stepText = facts.stepText;
-    const loweredRunNameText = `${step.name ?? ""} ${step.run ?? ""}`.toLowerCase();
     const run = step.run ?? "";
+    // Data passed to echo/printf/grep and assignment-only regexes are not work.
+    const executableSignals = shellInvocations(run, false)
+      .map((words) => {
+        const tool = words[0] ?? "";
+        if (
+          [
+            "echo",
+            "printf",
+            "grep",
+            "egrep",
+            "fgrep",
+            "[",
+            "[[",
+            "test",
+            "true",
+            "false",
+            "exit",
+            "fi",
+            "then",
+            "else",
+            "do",
+            "done",
+            "}",
+            "set",
+          ].includes(tool)
+        ) {
+          return "";
+        }
+        return words.slice(0, 3).join(" ");
+      })
+      .join(" ")
+      .toLowerCase();
+    const workName = executableSignals || step.uses ? (step.name ?? "") : "";
+    const loweredRunNameText = `${workName} ${executableSignals}`.toLowerCase();
+    const heavyStepText = `${step.uses ?? ""} ${loweredRunNameText}`.toLowerCase();
     const lintTool = detectLintTool(step);
     const pythonTool = detectPythonTool(step);
 
@@ -243,7 +278,7 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
 
     hasBuildxBake ||= dockerBuildxBakePattern.test(run);
     hasDockerBuild ||= dockerBuildPattern.test(run);
-    hasHeavyStepSignal ||= heavyStepSignalPattern.test(loweredStepText);
+    hasHeavyStepSignal ||= heavyStepSignalPattern.test(heavyStepText);
     hasDirectHeavySignals ||= directHeavySignalPattern.test(loweredRunNameText);
     hasHistoryDependentCommand ||= historyDependentCommandPattern.test(stepText);
     hasOpaqueRepoScriptExecution ||= opaqueRepoScriptExecutionPattern.test(run);

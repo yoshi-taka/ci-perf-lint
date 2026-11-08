@@ -2,6 +2,8 @@
 
 Detects Docker build contexts where a `.dockerignore` file exists but still allows noisy root paths into the build context.
 
+When a broad-copy Docker build runs Cargo and the context package's enabled build script visibly reads Git history, `.git` is not proposed for exclusion. Other noisy paths remain eligible. A Cargo manifest alone is not an exemption.
+
 This rule looks for visible paths such as:
 
 - `.git`

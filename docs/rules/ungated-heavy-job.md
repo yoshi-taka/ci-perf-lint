@@ -2,6 +2,8 @@
 
 Detects heavy jobs with no visible `if` condition inside broadly triggered workflows.
 
+Shared heavy-work evidence ignores command data printed by `echo`/`printf`, search patterns, comments and assignment-only regexes. A PR-title validator does not become a build/test job merely because its error message lists `build` and `test`. Actual package-manager build/test commands remain evidence.
+
 Why this rule exists:
 
 - expensive jobs often do not need to run for every branch, event, or change type

@@ -2,7 +2,8 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { detectInstallCommand, detectLintTool } from "./shared/tools.ts";
+import { detectInstallCommand, detectLintToolFromText } from "./shared/tools.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 const meta = {
   id: "unnecessary-app-install-for-lint-job",
@@ -24,22 +25,37 @@ export const unnecessaryAppInstallForLintJobRule = {
         continue;
       }
 
-      const hasInstall = job.steps.some((step) => detectInstallCommand(step));
+      const hasInstall = job.steps.some((step) =>
+        ["npm", "pnpm", "yarn", "bun"].includes(detectInstallCommand(step) ?? ""),
+      );
       if (!hasInstall) {
         continue;
       }
 
-      const hasAppStep = job.steps.some((step) => appConsumingPattern.test(step.run ?? ""));
+      const hasAppStep = job.steps.some(
+        (step) =>
+          appConsumingPattern.test(step.run ?? "") ||
+          shellInvocations(step.run ?? "").some(
+            ([tool, action]) =>
+              /^(?:\$|`)/.test(tool ?? "") ||
+              (tool === "cargo" && action !== "fmt") ||
+              /^(?:cross|napi|node-gyp)$/.test(tool ?? ""),
+          ),
+      );
       if (hasAppStep) {
         continue;
       }
 
-      const lintStep = job.steps.find((step) => detectLintTool(step));
+      const lintStep = job.steps.find((step) =>
+        shellInvocations(step.run ?? "").some(([tool]) => detectLintToolFromText("", tool ?? "")),
+      );
       if (!lintStep) {
         continue;
       }
 
-      const lintTool = detectLintTool(lintStep);
+      const lintTool = shellInvocations(lintStep.run ?? "")
+        .map(([tool]) => detectLintToolFromText("", tool ?? ""))
+        .find(Boolean);
 
       // Stricter condition: eslint and prettier often need project-specific plugins,
       // parsers, or sharable configs that must be resolved from node_modules.
@@ -50,7 +66,9 @@ export const unnecessaryAppInstallForLintJobRule = {
         continue;
       }
 
-      const firstInstallStep = job.steps.find((step) => detectInstallCommand(step))!;
+      const firstInstallStep = job.steps.find((step) =>
+        ["npm", "pnpm", "yarn", "bun"].includes(detectInstallCommand(step) ?? ""),
+      )!;
       findings.push(
         buildDiagnostic(workflow, meta, firstInstallStep.runNode ?? firstInstallStep.node, {
           message: `Job "${job.id}" installs application dependencies but only runs check or lint steps.`,

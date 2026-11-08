@@ -1,5 +1,7 @@
 # `repeated-install-in-same-job`
 
+GitHub Actions checkout steps separate dependency-state groups. Installs across a checkout are not compared; duplicates within either group remain eligible. This does not prove that arbitrary scripts preserve lockfiles or installed dependencies, so review each proposed deletion.
+
 Detects the same install command running multiple times within one job.
 
 Why this rule exists:

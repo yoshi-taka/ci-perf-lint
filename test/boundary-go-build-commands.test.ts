@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
 import { collectGoBuildCommands } from "../src/rules/shared/go-build-commands.ts";
-import { goBuildOccurrenceCountInRun } from "../src/rules/shared/job-step-analysis.ts";
 
 test.each([
   ["go build ./cmd/a", [["./cmd/a"]]],
@@ -40,5 +39,4 @@ test.each([
   expect(collectGoBuildCommands(text).map((command) => command.targets)).toEqual(
     expected.map((targets) => [...targets]),
   );
-  expect(goBuildOccurrenceCountInRun(text)).toBe(expected.length);
 });

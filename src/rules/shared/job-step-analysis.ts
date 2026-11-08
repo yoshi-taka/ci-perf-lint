@@ -29,7 +29,7 @@ function stepRunsBroadSerialGoTest(run: string): boolean {
   );
 }
 
-export function goBuildOccurrenceCountInRun(run: string): number {
+function goBuildOccurrenceCountInRun(run: string): number {
   return collectGoBuildCommands(run).length;
 }
 

@@ -2,6 +2,8 @@
 
 Detects `actions/checkout` configured with `fetch-depth: 0` when the job does not appear to need full git history.
 
+A Cargo build/test command in the package directory is retained when its enabled build script visibly invokes Git history commands (for example, a literal `git describe` command array). Cargo presence alone does not suppress the rule. This is narrow static evidence, not full Rust execution analysis.
+
 Why this rule exists:
 
 - full-history checkout increases clone time and network transfer

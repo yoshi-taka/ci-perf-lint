@@ -2,8 +2,9 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { getJobStepAnalysis, goBuildOccurrenceCountInRun } from "./shared/job-step-analysis.ts";
+import { getJobStepAnalysis } from "./shared/job-step-analysis.ts";
 import { collectGoBuildCommands } from "./shared/go-build-commands.ts";
+import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "collapse-multiple-go-builds-in-job",
@@ -34,17 +35,33 @@ export const collapseMultipleGoBuildsInJobRule = {
         continue;
       }
 
-      const firstBuildStep = job.steps.find(
-        (step) => goBuildOccurrenceCountInRun(step.run ?? "") > 0,
-      );
+      const groups = new Map<string, WorkflowStep[]>();
+      for (const step of job.steps) {
+        const env = Object.entries(workflowStepEnv(workflow, job, step)).sort(([a], [b]) =>
+          a.localeCompare(b),
+        );
+        for (const command of collectGoBuildCommands(step.run ?? "")) {
+          const key = JSON.stringify([
+            command.variant,
+            workflowWorkingDirectory(workflow, job, step),
+            env,
+            step.if ?? "",
+          ]);
+          const group = groups.get(key) ?? [];
+          group.push(step);
+          groups.set(key, group);
+        }
+      }
+      const compatible = [...groups.values()].find((group) => group.length >= 2);
+      const firstBuildStep = compatible?.[0];
       if (!firstBuildStep) {
         continue;
       }
 
       findings.push(
         buildDiagnostic(workflow, meta, firstBuildStep.runNode ?? firstBuildStep.node, {
-          message: `Job "${job.id}" runs ${analysis.goBuildOccurrenceTotal} separate \`go build\` commands.`,
-          why: "Building multiple Go packages or binaries in one go command can reuse compiler work and module/cache state more efficiently than separate sequential go build invocations.",
+          message: `Job "${job.id}" runs ${compatible.length} separate \`go build\` commands.`,
+          why: "These Go builds have matching visible compilation flags, environment, working directory and step conditions. Combining compatible targets may reduce invocation overhead; Go's build cache already reuses compiler results across separate processes, so repeated commands alone do not prove recompilation.",
           suggestion:
             "Collapse separate Go binary builds into one `go build` command where output layout allows it, or use one scripted build step that builds packages together before Docker packaging.",
           measurementHint:

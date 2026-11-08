@@ -16,6 +16,7 @@ import {
   runInstructionModifiesPath,
 } from "./dockerfile-instructions.ts";
 import { experimentalArtifactDirs } from "./waste-patterns.ts";
+import { cargoBuildScriptReadsHistory } from "../rules/shared/cargo-git-history.ts";
 
 const missingDockerignoreDocsPath = "docs/rules/missing-dockerignore-for-build-context.md";
 const weakDockerignoreDocsPath = "docs/rules/dockerignore-misses-noisy-build-context-paths.md";
@@ -103,8 +104,17 @@ export async function collectDockerignoreDiagnostics(
         ...experimentalArtifactDirs,
       ]);
       const noisyRoots = [...setIntersection(visibleFiles, noisyRootNames)];
+      let gitRequired = false;
+      if (noisyRoots.includes(".git") && (await context.pathExists(target.dockerfilePath))) {
+        const dockerfile = await context.readTextFileOrWarn(target.dockerfilePath);
+        gitRequired =
+          /\bcargo\s+(?:build|test|check|run|clippy|rustc|bench)\b/.test(dockerfile ?? "") &&
+          /^\s*COPY\s+\.\s+\./im.test(dockerfile ?? "") &&
+          (await cargoBuildScriptReadsHistory(context, target.contextPath));
+      }
       const uncoveredRoots = noisyRoots.filter(
-        (name) => !dockerignoreCoversRoot(dockerignoreText, name),
+        (name) =>
+          !(name === ".git" && gitRequired) && !dockerignoreCoversRoot(dockerignoreText, name),
       );
       if (uncoveredRoots.length === 0) {
         continue;

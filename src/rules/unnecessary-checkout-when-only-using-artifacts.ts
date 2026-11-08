@@ -107,6 +107,11 @@ function jobHasRepositoryTooling(workflow: WorkflowDocument, job: WorkflowJob): 
       Boolean(step.with?.["node-version-file"]) ||
       Boolean(step.with?.["python-version-file"]) ||
       (step.run !== undefined && workflowWorkingDirectory(workflow, job, step) !== ".") ||
+      // Unresolved helper paths may consume the checked-out config; artifact-only is unproven.
+      /\b(?:bash|sh|node|python3?)\s+["']?\$[^\n]*\.(?:sh|[cm]?js|py)\b/.test(step.run ?? "") ||
+      (step.uses?.toLowerCase().startsWith("actions/github-script@") === true &&
+        typeof step.with?.script === "string" &&
+        repositoryExecutionPatterns.some((pattern) => pattern.test(step.with?.script as string))) ||
       repositoryExecutionPatterns.some((pattern) => pattern.test(step.run ?? "")),
   );
 }

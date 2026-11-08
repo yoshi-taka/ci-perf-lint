@@ -7,7 +7,10 @@ Optimise by either:
 1. **Using `--tmpfs`** to mount the database data directory as an in-memory filesystem.
 2. **Configuring the database to reduce disk I/O** (disk flushes are a major source of I/O overhead on CI runners):
    - **MySQL**: Set `innodb_flush_log_at_trx_commit=2`.
-   - **PostgreSQL**: Set `fsync=off` (acceptable for ephemeral CI environments).
+   - **PostgreSQL**: Set `fsync=off` in `postgresql.conf` or the server command line, not client `PGOPTIONS`.
+
+Use these options only for disposable, reproducible test data. Check memory limits and retain normal durability settings for durability/recovery tests.
+For the official PostgreSQL image, mount `/var/lib/postgresql/data` through version 17 and `/var/lib/postgresql` for version 18 and later. An explicit `PGDATA` overrides this advice; verify the actual directory for custom images or unpinned tags.
 
 ## Scope
 
@@ -45,13 +48,15 @@ services:
       MYSQL_ALLOW_EMPTY_PASSWORD: yes
 ```
 
-### Optimal (config flag)
+### PostgreSQL 18 service (tmpfs)
 
 ```yaml
 services:
   postgres:
-    image: postgres:14
+    image: postgres:18
+    options: --tmpfs /var/lib/postgresql
     env:
       POSTGRES_PASSWORD: password
-      PGOPTIONS: "-c fsync=off"
 ```
+
+For `docker run`, a server configuration alternative is `docker run postgres:18 -c fsync=off` (with credentials and other required options added). GitHub Actions service `options` accepts Docker flags, not PostgreSQL server arguments; use a mounted server configuration or a suitable image for server settings.

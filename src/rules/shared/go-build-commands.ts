@@ -7,6 +7,7 @@ import {
 
 interface GoBuildCommand {
   targets: string[];
+  variant: string;
 }
 
 const valueFlags = new Set([
@@ -50,7 +51,21 @@ export function collectGoBuildCommands(text: string): GoBuildCommand[] {
     /\$\(|`/.test(text) ||
     hasShellInputDocument(text) ||
     shellCommands(text).some((words) =>
-      ["if", "then", "else", "for", "while", "until", "case", "function"].includes(words[0] ?? ""),
+      [
+        "if",
+        "then",
+        "else",
+        "for",
+        "while",
+        "until",
+        "case",
+        "function",
+        "cd",
+        "export",
+        "unset",
+        "source",
+        ".",
+      ].includes(words[0] ?? ""),
     )
   ) {
     return [];
@@ -62,15 +77,20 @@ export function collectGoBuildCommands(text: string): GoBuildCommand[] {
       continue;
     }
     let index = words[0] === "env" ? 1 : 0;
+    const environment: string[] = [];
     while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
+      environment.push(words[index]!);
       index++;
     }
     if ((words[index++] ?? "").split("/").at(-1) !== "go") {
       continue;
     }
+    const flags: string[] = [];
     if (words[index] === "-C") {
+      flags.push("-C", words[index + 1] ?? "");
       index += 2;
     } else if (words[index]?.startsWith("-C=")) {
+      flags.push("-C", words[index]!.slice(3));
       index++;
     }
     if (words[index++] !== "build") {
@@ -91,17 +111,23 @@ export function collectGoBuildCommands(text: string): GoBuildCommand[] {
         if (!value) {
           opaque = true;
         }
+        // Distinct output files can still be reviewed for a shared output directory.
+        // All compilation flags, cwd overrides and environment must match.
+        if (name !== "-o") {
+          flags.push(name, value ?? "");
+        }
       } else if (options && word.startsWith("-")) {
         if (!booleanFlags.has(name)) {
           // Includes help, dry-run and unknown options that may not execute a build.
           opaque = true;
         }
+        flags.push(word);
       } else {
         targets.push(word);
       }
     }
     if (!opaque) {
-      builds.push({ targets });
+      builds.push({ targets, variant: JSON.stringify([environment, flags]) });
     }
   }
   return builds;

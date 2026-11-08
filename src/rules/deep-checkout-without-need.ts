@@ -14,6 +14,8 @@ import {
   withSimilarWorkflowDeepCheckoutConsensus,
 } from "./shared/similar-workflow-consensus.ts";
 import { jobMayMutateRepository } from "./shared/workflow-mutation.ts";
+import { cargoBuildScriptReadsHistory } from "./shared/cargo-git-history.ts";
+import { workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "deep-checkout-without-need",
@@ -46,10 +48,34 @@ function jobUsesKnownHistoryRequiringAction(job: WorkflowJob): boolean {
 
 export const deepCheckoutWithoutNeedRule = {
   meta,
-  check(workflow: WorkflowDocument, _context: RuleContext) {
+  async check(workflow: WorkflowDocument, _context: RuleContext) {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
+      let cargoNeedsHistory = false;
+      if (_context.scanContext) {
+        for (const command of job.steps) {
+          if (
+            !/^\s*cargo\s+(?:build|test|check|run|clippy|rustc|bench)\b/.test(command.run ?? "")
+          ) {
+            continue;
+          }
+          // Dynamic paths and manifest overrides need separate resolution; do not guess.
+          const cwd = workflowWorkingDirectory(workflow, job, command);
+          if (cwd.includes("$") || /--manifest-path\b/.test(command.run ?? "")) {
+            continue;
+          }
+          if (
+            await cargoBuildScriptReadsHistory(
+              _context.scanContext,
+              _context.scanContext.resolve(cwd),
+            )
+          ) {
+            cargoNeedsHistory = true;
+            break;
+          }
+        }
+      }
       for (const step of job.steps) {
         if (!usesSetupAction(step.uses, "actions/checkout@")) {
           continue;
@@ -71,6 +97,7 @@ export const deepCheckoutWithoutNeedRule = {
         if (
           (hasHistoryDependentCommand(job) && !usesNxSetShas) ||
           hasOpaqueRepoScriptExecution(job) ||
+          cargoNeedsHistory ||
           jobMayMutateRepository(workflow, job) ||
           workflowLooksReleaseLike(workflow, job) ||
           jobUsesKnownHistoryRequiringAction(job)

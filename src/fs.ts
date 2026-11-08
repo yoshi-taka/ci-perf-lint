@@ -1,17 +1,13 @@
 import type { Stats } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
+import { buildkiteDirectoryForPath, collectBuildkiteWorkflowFiles } from "./buildkite-discovery.ts";
 
 interface WorkflowTarget {
   repoRoot: string;
   workflowDirs: string[];
   selectedWorkflowFile?: string;
   rootWorkflowFiles?: string[];
-}
-
-function isBuildkiteWorkflowDir(workflowDir: string): boolean {
-  const baseName = path.basename(workflowDir);
-  return baseName === ".buildkite" || baseName === "buildkite";
 }
 
 async function isDirectory(targetPath: string): Promise<boolean> {
@@ -105,35 +101,6 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
     };
   }
 
-  // Buildkite: .buildkite directory
-  if (baseName === ".buildkite" && targetIsDir) {
-    return {
-      repoRoot: path.dirname(normalizedPath),
-      workflowDirs: [normalizedPath],
-    };
-  }
-
-  // Buildkite: buildkite directory (non-hidden)
-  if (baseName === "buildkite" && targetIsDir) {
-    return {
-      repoRoot: path.dirname(normalizedPath),
-      workflowDirs: [normalizedPath],
-    };
-  }
-
-  // Buildkite: specific pipeline file
-  if (
-    (parentName === ".buildkite" || parentName === "buildkite") &&
-    /pipeline\.(ya?ml|json)$/i.test(baseName) &&
-    targetIsFile
-  ) {
-    return {
-      repoRoot: path.dirname(path.dirname(normalizedPath)),
-      workflowDirs: [path.dirname(normalizedPath)],
-      selectedWorkflowFile: normalizedPath,
-    };
-  }
-
   // Depot CI: .depot/workflows directory
   if (baseName === "workflows" && parentName === ".depot" && targetIsDir) {
     return {
@@ -205,6 +172,15 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
     };
   }
 
+  const buildkiteDirectory = buildkiteDirectoryForPath(normalizedPath);
+  if (buildkiteDirectory && (targetIsDir || /\.(?:ya?ml|json)$/i.test(baseName))) {
+    return {
+      repoRoot: path.dirname(buildkiteDirectory),
+      workflowDirs: [targetIsDir ? normalizedPath : path.dirname(normalizedPath)],
+      selectedWorkflowFile: targetIsFile ? normalizedPath : undefined,
+    };
+  }
+
   // Default: scan repo root for CI dirs and repo-root CI files
   const ciDirs = await findCiDirs(normalizedPath);
   const gitlabCiYml = path.join(normalizedPath, ".gitlab-ci.yml");
@@ -238,10 +214,14 @@ export async function resolveWorkflowTarget(inputPath: string): Promise<Workflow
 }
 
 async function listWorkflowFiles(workflowDir: string): Promise<string[]> {
+  if (
+    ![".github", ".depot"].includes(path.basename(path.dirname(workflowDir))) &&
+    buildkiteDirectoryForPath(workflowDir)
+  ) {
+    return collectBuildkiteWorkflowFiles(workflowDir);
+  }
   const entries = await readdir(workflowDir, { withFileTypes: true }).catch(() => []);
-  const filePattern = isBuildkiteWorkflowDir(workflowDir)
-    ? /(?:pipeline\.(?:ya?ml|json)|.+\.ya?ml)$/i
-    : /\.(ya?ml)$/i;
+  const filePattern = /\.(ya?ml)$/i;
 
   return entries
     .filter((entry) => entry.isFile() && filePattern.test(entry.name))

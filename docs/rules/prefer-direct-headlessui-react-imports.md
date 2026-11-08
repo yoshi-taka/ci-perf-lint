@@ -42,9 +42,9 @@ When this tool sees a JavaScript or TypeScript repository that depends on `@head
 
 ## Suggested action
 
-Replace root named imports with direct component imports supported by the installed `@headlessui/react` version, or rely on framework-supported import optimization where available.
+Inspect the installed version's public `exports` and framework import optimization first. Replace root imports only if a documented public component subpath exists and measurement shows a benefit. Some versions, including 1.7.15, export only the root; keep root imports in that case and evaluate framework-supported optimization instead.
 
-Because direct subpaths may vary by package version and bundler configuration, verify the exported path before applying the rewrite broadly.
+Do not invent deep imports into `dist` or other internals. Detection of a root import is a comparison candidate, not proof that it can be safely rewritten or that existing framework optimization is insufficient.
 
 ## Verification
 

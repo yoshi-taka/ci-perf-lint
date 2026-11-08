@@ -17,6 +17,7 @@ This rule only fires when all of the following are visible:
 - the job looks like commitlint, release metadata, tag, changelog, or versioning work
 - `actions/checkout` is used
 - checkout does not already set `filter: blob:none`
+- checkout visibly fetches more than one revision (`fetch-depth: 0` or a literal depth greater than 1), or the job explicitly fetches deeper history later; default depth 1 alone does not establish avoidable historical blob transfer
 - the job appears history-aware through `fetch-depth: 0` or history-dependent git commands
 - the job does not visibly do broad repo scans
 - the job does not visibly do heavy build or install work

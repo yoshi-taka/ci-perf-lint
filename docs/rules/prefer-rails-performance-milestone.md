@@ -3,6 +3,8 @@
 Detects repositories that use Rails 7.0.x or 7.1.x with an active CI pipeline
 and recommends upgrading to Rails 7.2.x for CI performance improvements.
 
+Rails 7.2 and later majors are outside this rule's upgrade scope; Rails 8 is not treated as older than 7.2.
+
 ## Why This Matters
 
 Rails 7.2 enables YJIT by default in development and test environments

@@ -14,6 +14,8 @@ Event comparisons, upstream outputs, or `skipped` results alone do not prove fai
 
 Failure-only or cancellation-only follow-up jobs like notifications are out of scope.
 
+A conjunction requiring `needs.<job>.result != 'success'` is also a non-success path, not a missing success guard. This exemption does not cover an OR branch that could run on success. Status-only jobs consisting of conditional `exit 1` checks of upstream failure/cancellation (and optional `exit 0`) are excluded based on their steps, not their names. Adding publish or other work makes that status-only exemption inapplicable.
+
 Reporting, upload, aggregation, and observability jobs (Datadog, Codecov, Coveralls, artifact uploads) are also excluded — these jobs intentionally need `always()` to capture results even when upstream tests fail.
 
 For those jobs, it usually expects a visible guard that combines:

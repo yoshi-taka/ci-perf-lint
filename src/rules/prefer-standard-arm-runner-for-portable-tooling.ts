@@ -2,7 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { shellCommandSegments } from "./shared/command-patterns.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 import {
   jobRunsOnArmLikeRunner,
   jobRunsOnStandardX64Ubuntu,
@@ -44,10 +44,6 @@ function jobRunsInContainer(job: WorkflowJob): boolean {
   return Boolean(job.raw.container);
 }
 
-function getStepText(step: WorkflowStep): string {
-  return `${step.name ?? ""} ${step.uses ?? ""} ${shellCommandSegments(step.run ?? "").join(" ")}`;
-}
-
 function analyzePortableToolingJob(job: WorkflowJob): {
   portableTool?: { name: string; step: WorkflowStep };
   hasArchitectureSensitiveWork: boolean;
@@ -56,14 +52,26 @@ function analyzePortableToolingJob(job: WorkflowJob): {
   let hasArchitectureSensitiveWork = false;
 
   for (const step of job.steps) {
-    const text = getStepText(step);
+    const commands = shellInvocations(step.run ?? "");
+    const text = `${step.uses ?? ""} ${commands.map((words) => words.join(" ")).join(" ")}`;
 
-    if (!hasArchitectureSensitiveWork && architectureSensitiveWorkPattern.test(text)) {
+    if (
+      !hasArchitectureSensitiveWork &&
+      (architectureSensitiveWorkPattern.test(text) ||
+        commands.some(
+          ([tool, action]) =>
+            /^(?:\$|`)/.test(tool ?? "") ||
+            (tool === "cargo" && action !== "fmt") ||
+            /^(?:cross|napi|node-gyp)$/.test(tool ?? ""),
+        ))
+    ) {
       hasArchitectureSensitiveWork = true;
     }
 
     if (!portableTool) {
-      const match = portableToolMatchers.find(([, pattern]) => pattern.test(text));
+      const match = portableToolMatchers.find(([, pattern]) =>
+        commands.some(([tool]) => pattern.test(tool ?? "")),
+      );
       if (match) {
         portableTool = { name: match[0], step };
       }

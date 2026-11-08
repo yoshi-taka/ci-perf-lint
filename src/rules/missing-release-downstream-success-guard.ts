@@ -7,6 +7,7 @@ import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositoryReleaseDownstreamGuardPrecedent } from "./shared/similar-workflow-consensus.ts";
 import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
+import { staticShellWords } from "./shared/command-patterns.ts";
 
 function isYamlMap(node: unknown): node is YAMLMap<unknown, unknown> {
   return Boolean(node && typeof node === "object" && "items" in (node as Record<string, unknown>));
@@ -66,6 +67,15 @@ function hasPositiveStatusFunction(ifText: string, name: "failure" | "cancelled"
 }
 
 function isFailureOrCancellationOnlyPath(ifText: string): boolean {
+  const expression = ifText.trim().replace(/^\$\{\{\s*|\s*\}\}$/g, "");
+  if (
+    !expression.includes("||") &&
+    expression
+      .split("&&")
+      .some((part) => /^\s*needs\.[\w-]+\.result\s*!=\s*['"]success['"]\s*$/.test(part))
+  ) {
+    return true;
+  }
   const hasFailurePath = hasPositiveStatusFunction(ifText, "failure");
   const hasCancelledPath = hasPositiveStatusFunction(ifText, "cancelled");
   return (
@@ -73,6 +83,32 @@ function isFailureOrCancellationOnlyPath(ifText: string): boolean {
     !/!failure\(\)|!cancelled\(\)|\bsuccess\(\)/.test(ifText) &&
     !hasNeedsSuccessGuard(ifText)
   );
+}
+
+function isStatusAggregationJob(job: WorkflowJob): boolean {
+  let checksFailure = false;
+  if (job.steps.length === 0) {
+    return false;
+  }
+  for (const step of job.steps) {
+    if (step.uses || !step.run) {
+      return false;
+    }
+    const words = staticShellWords(step.run);
+    if (words?.[0] !== "exit" || words.length !== 2 || !/^[01]$/.test(words[1]!)) {
+      return false;
+    }
+    if (words[1] === "1") {
+      if (
+        !/needs\.(?:\*|[\w-]+)\.result/.test(step.if ?? "") ||
+        !/['"](?:failure|cancelled)['"]/.test(step.if ?? "")
+      ) {
+        return false;
+      }
+      checksFailure = true;
+    }
+  }
+  return checksFailure;
 }
 
 function hasOptionalSkipBypass(ifText: string): boolean {
@@ -124,7 +160,7 @@ export const missingReleaseDownstreamSuccessGuardRule = {
         continue;
       }
 
-      if (isReportingOrUploadJob(job)) {
+      if (isReportingOrUploadJob(job) || isStatusAggregationJob(job)) {
         continue;
       }
 

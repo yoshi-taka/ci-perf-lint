@@ -21,7 +21,7 @@ const agenticToolPattern =
   /(sst\/opencode\/github@|claude|codex|openai|anthropic|gemini|ai agent|agentic|autofix|code review)/;
 const docsPattern =
   /(content\/docs|docs\/|documentation|update docs|write docs|edit docs|changed files|modified files)/;
-const gitFetchDepthPattern = /\bgit\s+fetch\b(?=[\s\S]*--depth[=\s]\d+)/;
+const gitFetchDepthPattern = /\bgit\s+fetch\b(?=[\s\S]*--depth[=\s](\d+))/;
 const releaseNotesChangelogTagPattern =
   /\b(release notes|changelog|tag|version|release|commitlint)\b/;
 const releaseNotesChangelogTagJobPattern =
@@ -108,7 +108,8 @@ function jobLooksLikeRepoEditingAgenticDocsJob(job: WorkflowJob): boolean {
 function jobHasExplicitFilteredFetchCandidate(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
     const text = getLoweredWorkflowStepText(step);
-    return gitFetchDepthPattern.test(text) && !text.includes("--filter=");
+    const depth = gitFetchDepthPattern.exec(text)?.[1];
+    return depth !== undefined && Number(depth) > 1 && !text.includes("--filter=");
   });
 }
 
@@ -160,6 +161,15 @@ function evaluateJobForBlobNone(
 
   const checkout = getCheckoutStep(job);
   if (!checkout || hasBlobNoneFilter(checkout)) {
+    return undefined;
+  }
+
+  const depth = checkout.with?.["fetch-depth"] ?? 1;
+  const hasHistoricalBlobs =
+    (typeof depth === "number" || typeof depth === "string") &&
+    /^\d+$/.test(String(depth)) &&
+    (Number(depth) === 0 || Number(depth) > 1);
+  if (!hasHistoricalBlobs && !jobHasExplicitFilteredFetchCandidate(job)) {
     return undefined;
   }
 

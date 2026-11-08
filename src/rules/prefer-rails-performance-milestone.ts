@@ -29,7 +29,7 @@ export const preferRailsPerformanceMilestoneRule = {
       return [];
     }
 
-    if (railsMajor < 7 || (railsMajor === 7 && railsMinor >= 2)) {
+    if (railsMajor !== 7 || railsMinor >= 2) {
       return [];
     }
 

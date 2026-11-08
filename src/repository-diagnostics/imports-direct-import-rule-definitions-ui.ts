@@ -133,11 +133,11 @@ const standardUiDefs: UiEntryData[] = [
     flaggedDescription: "a top-level @headlessui/react import",
     why: "Next.js optimizes `@headlessui/react` by default because its top-level entry exposes many components. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
-      "Replace top-level `@headlessui/react` named imports with direct component imports supported by the installed package version, or rely on framework-supported import optimization where available.",
+      "Check the installed @headlessui/react version's public exports before considering component subpaths. If none are exported, keep root imports and evaluate framework-supported import optimization instead.",
     measurementHint:
-      "Compare Jest, TypeScript, lint, or build wall-clock time before and after replacing top-level Headless UI React imports with direct component imports.",
+      "Compare Jest, TypeScript, lint, or build wall-clock time before and after a supported import or framework optimization change; keep root imports if there is no supported improvement.",
     aiHandoff:
-      "Find imports from the `@headlessui/react` package root and rewrite named component imports to direct component subpath imports supported by the installed package version. Preserve already-direct Headless UI imports.",
+      "Inspect the installed @headlessui/react package's public exports and framework optimization first. Rewrite imports only when a documented public component subpath exists and measurement shows a benefit. Never invent deep imports into dist or internal files; keep root imports when no supported replacement exists. Preserve already-direct imports.",
     score: 72,
   },
   {

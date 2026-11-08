@@ -2,6 +2,8 @@
 
 Flags lightweight lint or format tooling jobs that run on standard x64 Ubuntu GitHub-hosted runners and may be good candidates for the matching standard arm64 Ubuntu runner.
 
+Tool evidence must appear in command position, directly or through a supported wrapper. Step labels and arguments such as `cargo bloat -p oxlint` do not establish an Oxlint invocation. Native Cargo extensions, cross/NAPI builds and dynamically selected executables prevent this recommendation even if another step really runs a portable linter. `cargo fmt` alone is not treated as a native build.
+
 ## Why it matters
 
 This is an arm64 runner recommendation, not a recommendation to replace the detected tool. The detected tool is evidence that the job is likely lightweight and architecture-portable.
