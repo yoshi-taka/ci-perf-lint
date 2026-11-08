@@ -7,7 +7,7 @@ import {
 } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 
-const npmAuditPattern = /\bnpm\s+audit\b/i;
+const npmAuditPattern = /\bnpm\s+audit\b(?!\s+signatures\b)/i;
 
 const securityWorkflowName =
   /\b(security|audit|vulnerability|dependabot|snyk|trivy|secret|scan)\b/i;

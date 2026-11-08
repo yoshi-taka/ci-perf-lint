@@ -200,7 +200,7 @@ export async function collectCdkBucketDeploymentMemoryDiagnostics(
       continue;
     }
 
-    const callRe = /new\s+BucketDeployment\s*\(/g;
+    const callRe = /new\s+(?:[A-Za-z_$][\w$]*\.)*BucketDeployment\s*\(/g;
     let match: RegExpExecArray | null;
 
     while ((match = callRe.exec(content)) !== null) {

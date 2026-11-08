@@ -599,4 +599,23 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     const ruleIds = report.findings.map((f) => f.ruleId);
     expect(ruleIds).not.toContain("npm-audit-in-ci");
   });
+
+  test("does not flag npm audit signatures verification", async () => {
+    const repoRoot = await tempDirs.create("apl-npm-audit-signatures-");
+    await mkdir(path.join(repoRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(path.join(repoRoot, "package.json"), '{"name":"audit-signatures"}');
+    await writeFile(
+      path.join(repoRoot, ".github", "workflows", "ci.yml"),
+      "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm audit signatures\n",
+    );
+
+    const report = await analyzeRepository({
+      cwd: repoRoot,
+      targetPath: ".",
+      topCount: 10,
+      mode: "exploratory",
+    });
+
+    expect(report.findings.map((f) => f.ruleId)).not.toContain("npm-audit-in-ci");
+  });
 });

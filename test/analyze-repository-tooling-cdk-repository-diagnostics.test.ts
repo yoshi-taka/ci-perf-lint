@@ -40,6 +40,32 @@ describe("analyzeRepository repo-aware and tooling rules: cdk repository diagnos
     expect(finding?.message).toContain("without memoryLimit");
   });
 
+  test("detects namespace-qualified BucketDeployment constructors", async () => {
+    const fixtureRoot = await tempDirs.create("apl-cdk-bucket-namespaced-");
+    await mkdir(path.join(fixtureRoot, "lib"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "package.json"),
+      '{"name": "test-cdk", "dependencies": {"aws-cdk-lib": "2.260.0"}}',
+    );
+    await writeFile(
+      path.join(fixtureRoot, "lib", "stack.ts"),
+      [
+        'import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";',
+        "new s3Deploy.BucketDeployment(this, 'DeploySite', { destinationBucket: bucket, sources: [] });",
+      ].join("\n"),
+    );
+
+    const report = await getFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 20,
+      mode: "strict",
+    });
+
+    expect(
+      report.findings.some((c) => c.ruleId === "cdk-bucket-deployment-memory-unconfigured"),
+    ).toBe(true);
+  });
+
   test("does not flag BucketDeployment with memoryLimit set", async () => {
     const report = await getFixtureReport(fixtures.cdkBucketDeploymentMemoryOk, {
       targetPath: ".",
