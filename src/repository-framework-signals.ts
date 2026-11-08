@@ -346,6 +346,13 @@ export async function collectFrameworkSignals(
     }
   }
 
+  const rubyVersionPath = context.resolve(".ruby-version");
+  const rubyVersionText = (await context.pathExists(rubyVersionPath))
+    ? await context.readTextFileOrWarn(rubyVersionPath)
+    : undefined;
+  const rubyVersionFileMatch = rubyVersionText?.match(/(\d+\.\d+(?:\.\d+)?)/);
+  const rubyVersionFileSpec = rubyVersionFileMatch?.[1];
+
   const gemfilePath = context.resolve("Gemfile");
   if (await context.pathExists(gemfilePath)) {
     const gemfileText = await context.readTextFileOrWarn(gemfilePath);
@@ -359,17 +366,12 @@ export async function collectFrameworkSignals(
     }
   }
 
-  if (!rubyVersionSpec) {
-    const rubyVersionPath = context.resolve(".ruby-version");
-    const rubyVersionText = (await context.pathExists(rubyVersionPath))
-      ? await context.readTextFileOrWarn(rubyVersionPath)
-      : undefined;
-    if (rubyVersionText) {
-      const m = rubyVersionText.match(/(\d+\.\d+(?:\.\d+)?)/);
-      if (m) {
-        rubyVersionSpec = m[1];
-      }
-    }
+  // A Gemfile range such as `ruby ">= 3.0.0"` is a compatibility floor, not the
+  // interpreter CI actually runs; prefer the pinned .ruby-version in that case.
+  if (rubyVersionSpec && /[<>=!~^]/.test(rubyVersionSpec)) {
+    rubyVersionSpec = rubyVersionFileSpec ?? rubyVersionSpec;
+  } else {
+    rubyVersionSpec ??= rubyVersionFileSpec;
   }
 
   const parsedNextjsVersion = nextjsVersionSpec

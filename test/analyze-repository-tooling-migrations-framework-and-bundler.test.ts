@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { fixtures } from "./fixtures.ts";
-import { memoizedAnalyzeRepository } from "./helpers.ts";
+import {
+  createTempDirTracker,
+  memoizedAnalyzeRepository,
+  writeRepositoryFiles,
+} from "./helpers.ts";
+
+const tempDirs = createTempDirTracker();
 
 function getFixtureReport(
   cwd: string,
@@ -361,5 +367,19 @@ describe("migrations: framework milestones and bundler migration", () => {
 
       expect(report.findings.some((c) => c.ruleId === "prefer-storybook-test-flag")).toBe(false);
     });
+  });
+});
+
+describe("Ruby version precedence", () => {
+  test("prefers .ruby-version over a Gemfile range constraint", async () => {
+    const root = await tempDirs.create("apl-ruby-version-precedence-");
+    await writeRepositoryFiles(root, {
+      Gemfile: 'source "https://rubygems.org"\nruby ">= 3.0.0"\n',
+      ".ruby-version": "3.2.2\n",
+      ".github/workflows/ci.yml":
+        "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: ruby/setup-ruby@v1\n      - run: bundle install\n      - run: bundle exec rspec\n",
+    });
+    const report = await getFixtureReport(root, baseOptions);
+    expect(report.findings.some((finding) => finding.ruleId === "prefer-ruby-3-yjit")).toBe(true);
   });
 });
