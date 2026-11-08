@@ -65,7 +65,7 @@
   },
   "dependencies": {
     "oxc-parser": "^0.155.0",
-    "oxlint": "^1.90.0"
+    "oxlint": "^1.91.0"
   },
   "devDependencies": {
     "@astrojs/sitemap": "^3.7.4",
