@@ -10,6 +10,7 @@ Current MVP heuristic:
 
 - the workflow is classified as "heavy"
 - no `paths-ignore` entry looks like docs or markdown exclusions
+- workflows or jobs explicitly named for docs/documentation are excluded: documentation is their input, not an unrelated change. Generic `missing-paths-filter` advice remains independent.
 
 Typical remediation:
 

@@ -10,6 +10,7 @@ import {
   type TestWorkerCommand,
 } from "./shared/test-worker-commands.ts";
 import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
+import { playwrightConfigTunesWorkers } from "./shared/test-worker-config.ts";
 
 const meta = {
   id: "missing-test-worker-tuning-for-standard-runner",
@@ -44,7 +45,10 @@ function workerTuningExamples(tool: TestTool): string {
   return testToolWorkerTuningRules.find((rule) => rule.tool === tool)?.examples ?? "worker flags";
 }
 
-function hasApplicableConfig(command: TestWorkerCommand, context: RuleContext): boolean {
+async function hasApplicableConfig(
+  command: TestWorkerCommand,
+  context: RuleContext,
+): Promise<boolean> {
   if (command.configOverridden || command.config === null || command.directory === undefined) {
     return false;
   }
@@ -53,26 +57,54 @@ function hasApplicableConfig(command: TestWorkerCommand, context: RuleContext): 
     if (path.posix.isAbsolute(command.config)) {
       return false;
     }
-    return configs.includes(
-      path.posix.normalize(path.posix.join(command.directory, command.config)),
-    );
+    if (
+      configs.includes(path.posix.normalize(path.posix.join(command.directory, command.config)))
+    ) {
+      return true;
+    }
+  } else if (path.posix.normalize(command.directory) === "." && configs.length > 0) {
+    return true;
   }
-  // Root config evidence cannot prove tuning for a command in another package.
-  return path.posix.normalize(command.directory) === "." && configs.length > 0;
+  // Inspect only the selected Playwright config, never a sibling package's config.
+  const scan = context.scanContext;
+  if (command.tool !== "playwright" || !scan || path.posix.isAbsolute(command.directory)) {
+    return false;
+  }
+  const candidates =
+    command.config !== undefined
+      ? [command.config]
+      : [
+          "playwright.config.ts",
+          "playwright.config.js",
+          "playwright.config.mts",
+          "playwright.config.mjs",
+        ];
+  for (const candidate of candidates) {
+    const relativePath = path.posix.normalize(path.posix.join(command.directory, candidate));
+    if (relativePath === ".." || relativePath.startsWith("../")) {
+      continue;
+    }
+    const filePath = scan.resolve(relativePath);
+    if (await scan.pathExists(filePath)) {
+      const text = await scan.readTextFileOrWarn(filePath);
+      return text !== undefined && playwrightConfigTunesWorkers(text);
+    }
+  }
+  return false;
 }
 
-function getUntunedTestStep(
+async function getUntunedTestStep(
   workflow: WorkflowDocument,
   job: WorkflowJob,
   context: RuleContext,
-): { step: WorkflowStep; tool: TestTool } | undefined {
+): Promise<{ step: WorkflowStep; tool: TestTool } | undefined> {
   for (const step of job.steps) {
     for (const command of collectTestWorkerCommands(
       step.run ?? "",
       workflowStepEnv(workflow, job, step),
       workflowWorkingDirectory(workflow, job, step),
     )) {
-      if (!command.tuned && !hasApplicableConfig(command, context)) {
+      if (!command.tuned && !(await hasApplicableConfig(command, context))) {
         return { step, tool: command.tool };
       }
     }
@@ -83,14 +115,14 @@ function getUntunedTestStep(
 
 export const missingTestWorkerTuningForStandardRunnerRule = {
   meta,
-  check(workflow: WorkflowDocument, context: RuleContext) {
+  async check(workflow: WorkflowDocument, context: RuleContext) {
     const findings: Diagnostic[] = [];
     for (const job of workflow.jobs) {
       if (!jobRunsOnStandardHostedRunner(job) || job.usesReusableWorkflow) {
         continue;
       }
 
-      const untuned = getUntunedTestStep(workflow, job, context);
+      const untuned = await getUntunedTestStep(workflow, job, context);
       if (!untuned) {
         continue;
       }

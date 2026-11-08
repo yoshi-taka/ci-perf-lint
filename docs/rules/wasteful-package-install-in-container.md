@@ -46,3 +46,5 @@ This rule fires only for jobs with a `container:` field. It checks whether the
 installed package name appears in any later step's `name`, `run`, or `uses`
 text. If the package name is referenced but the binary is used indirectly (e.g.
 via a wrapper script), the rule may not fire.
+
+Shell line continuations are joined before extracting package names. The continuation marker is not a package, and a following shell operator ends the install's package list.

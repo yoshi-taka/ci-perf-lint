@@ -27,8 +27,7 @@ function isAtOrAboveModern([major, minor]: VersionPair): boolean {
 
 /**
  * Detects whether a uv version or version constraint forces an effective uv
- * below 0.12. Bare versions and lower bounds are treated as the floor; an
- * upper bound below 0.12 also forces an outdated uv.
+ * below 0.12. An open lower bound permits modern releases and is not a pin.
  */
 export function uvVersionSpecIsBelowModern(spec: string | undefined): boolean {
   if (!spec) {
@@ -46,16 +45,21 @@ export function uvVersionSpecIsBelowModern(spec: string | undefined): boolean {
   const lowerBounds: VersionPair[] = [];
   const upperExclusive: VersionPair[] = [];
   const upperInclusive: VersionPair[] = [];
-  const pattern = /(>=|<=|==|~=|\^|>|<)?\s*v?(\d+)\.(\d+)(?:\.(\d+))?/g;
+  const pattern = /(!=|>=|<=|==|~=|\^|>|<)?\s*v?(\d+)\.(\d+)(?:\.(\d+))?/g;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text))) {
     const operator = match[1] ?? "";
     const pair: VersionPair = [Number(match[2]), Number(match[3])];
-    if (operator === "<") {
+    if (operator === "!=") {
+      continue;
+    } else if (operator === "<") {
       upperExclusive.push(pair);
     } else if (operator === "<=") {
       upperInclusive.push(pair);
-    } else {
+    } else if (
+      isAtOrAboveModern(pair) ||
+      (![">=", ">"].includes(operator) && (operator !== "~=" || match[4] !== undefined))
+    ) {
       lowerBounds.push(pair);
     }
   }

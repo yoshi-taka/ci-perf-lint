@@ -17,7 +17,7 @@ The rule reports jobs and repository configuration that resolve to a uv below 0.
 - Shell steps that pin uv during install, such as `pip install uv==0.11.5` or `pipx install "uv<0.12"`.
 - Repository configuration that constrains uv below 0.12: `required-version` in `[tool.uv]` or `uv.toml`, `uv`/`uv_build` requirement strings in `pyproject.toml`, and a `.uv-version` file.
 
-Version constraints are read as a floor. A lower bound at or above `0.12` is accepted, and an upper bound that cannot reach `0.12` (for example `<0.12`) is flagged. `latest` and unpinned uv installs are not flagged because they already resolve to a current release.
+Only constraints that force an older release are reported. An open lower bound such as `>=0.9.0` permits current uv and is not an old version pin; `>=0.9.0,<0.12` is reported because of the upper bound. `latest` and unpinned uv installs are not flagged. Repository compatibility constraints do not establish which uv version a CI job actually installs.
 
 ## Suggested action
 

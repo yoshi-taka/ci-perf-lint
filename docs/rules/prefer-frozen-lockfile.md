@@ -11,6 +11,7 @@ Explicit flags are unnecessary when the package manager already enables equivale
 - pnpm installs without an enabled frozen flag or an applicable CI default. pnpm defaults to frozen in CI when its lockfile is present.
 - Yarn Classic installs without `--frozen-lockfile`, and modern Yarn installs whose immutable behavior is disabled. Modern Yarn defaults to immutable in CI; unknown versions are not assumed to be Classic.
 - Flags are recognized anywhere after `install`/`i`, including `=true`, `=false` and negated forms. Visible CI and package-manager settings are considered.
+- Literal `cd` commands are resolved within each step when locating lockfiles and package-manager settings. Dynamic or conditional directory changes do not prove a CI default, and directory changes do not carry into another step.
 
 The separate `prefer-npm-ci` rule covers npm. `pnpm ci` is not the recommended pnpm command.
 

@@ -29,6 +29,19 @@ export const missingPathIgnoreForNonCodeRule = {
   meta,
   nodeTypes: ["trigger"],
   check(workflow: WorkflowDocument, _context: RuleContext) {
+    // Documentation is an input to docs workflows, not an unrelated non-code change.
+    const documentationPurpose = /(?:^|[\s/_.-])(?:docs?|documentation)(?=$|[\s/_.-])/i;
+    if (
+      documentationPurpose.test(workflow.name ?? "") ||
+      documentationPurpose.test(workflow.relativePath) ||
+      workflow.jobs.some((job) =>
+        documentationPurpose.test(
+          `${job.id} ${typeof job.raw.name === "string" ? job.raw.name : ""}`,
+        ),
+      )
+    ) {
+      return [];
+    }
     const ts = getTriggerSemantics(workflow);
 
     if ((!ts.hasPullRequest && !ts.hasBranchPush) || ts.hasTagOnlyPush) {

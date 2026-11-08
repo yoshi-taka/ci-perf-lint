@@ -37,6 +37,8 @@ Config evidence is specific to the test runner. Jest settings do not suppress Pl
 
 Config paths use the same argument parser, including quoted paths and later overrides. Literal `cd` changes are resolved per command. Jest inline JSON configs are inspected for `maxWorkers`; pytest `-o addopts=...` overrides prevent unrelated file tuning from suppressing a finding.
 
+For Playwright, the selected config is also read from the command's package directory, including a literal `cd` or `working-directory`. A tuned sibling config, a different explicit `--config`, or commented-out `workers` does not suppress a finding. Config files are inspected, not executed.
+
 ## When to ignore it
 
 Ignore this finding when:

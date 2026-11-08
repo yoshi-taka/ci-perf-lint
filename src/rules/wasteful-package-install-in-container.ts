@@ -4,6 +4,7 @@ import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobUsesContainer } from "./shared/workflow-jobs.ts";
 import { setDifference } from "../set-algebra.ts";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "wasteful-package-install-in-container",
@@ -24,23 +25,25 @@ const installPatterns = [
 function extractPackagesFromInstall(run: string): string[] {
   const packages: string[] = [];
 
-  for (const pattern of installPatterns) {
-    for (const match of run.matchAll(pattern)) {
-      if (!match[1]) {
-        continue;
-      }
+  for (const command of shellCommandSegments(run.replace(/\\\r?\n/g, " "))) {
+    for (const pattern of installPatterns) {
+      for (const match of command.matchAll(pattern)) {
+        if (!match[1]) {
+          continue;
+        }
 
-      const tokens = match[1].trim().split(/\s+/);
-      for (const token of tokens) {
-        if (token.startsWith("-")) {
-          continue;
-        }
-        if (shellOperators.has(token)) {
-          continue;
-        }
-        const pkg = token.split("=")[0]!;
-        if (pkg.length > 0) {
-          packages.push(pkg);
+        const tokens = match[1].trim().split(/\s+/);
+        for (const token of tokens) {
+          if (token.startsWith("-") || token === "\\") {
+            continue;
+          }
+          if (shellOperators.has(token)) {
+            break;
+          }
+          const pkg = token.split("=")[0]!;
+          if (pkg.length > 0) {
+            packages.push(pkg);
+          }
         }
       }
     }

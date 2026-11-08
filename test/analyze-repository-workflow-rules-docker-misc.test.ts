@@ -3,7 +3,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { analyzeRepository } from "../src/repo.ts";
 import { fixtures } from "./fixtures.ts";
-import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
+import {
+  analyzeRepositoryForRule,
+  createTempDirTracker,
+  memoizedAnalyzeRepository,
+  writeRepositoryFiles,
+} from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 
@@ -12,6 +17,36 @@ afterEach(async () => {
 });
 
 describe("analyzeRepository workflow and execution rules: docker misc", () => {
+  test.each(["\n", "\r\n"])(
+    "package installs do not count shell continuations: %j",
+    async (newline) => {
+      const cwd = await tempDirs.create("apl-package-continuation-");
+      await writeRepositoryFiles(cwd, {
+        ".github/workflows/ci.yml": `on: push
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    steps:
+      - run: ${JSON.stringify(`apt-get install -y jq \\${newline} curl && apt-get install -y gh && echo ready`)}
+      - run: echo done
+`,
+      });
+      const report = await analyzeRepositoryForRule(
+        { cwd, targetPath: ".", topCount: 100 },
+        { id: "wasteful-package-install-in-container", severity: "warning" },
+      );
+      const finding = report.findings.find(
+        (f) => f.ruleId === "wasteful-package-install-in-container",
+      );
+      expect(finding).toBeDefined();
+      expect(finding?.message).toContain("installs jq, curl, gh,");
+      expect(finding?.message).not.toContain("\\");
+      expect(finding?.message).not.toContain("echo");
+      expect(finding?.message).not.toContain("ready");
+    },
+  );
+
   test.each([
     { name: "article leading cd", body: "RUN cd /usr/src/app && git clone example", lines: [2] },
     { name: "standalone cd does not persist", body: "RUN cd /app", lines: [2] },

@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { CIDocument } from "./shared/any-step.ts";
@@ -6,6 +7,7 @@ import { extractSemanticSteps } from "./shared/semantic-adapter.ts";
 import {
   hasShellInputDocument,
   shellCommandSegments,
+  shellCommands,
   staticShellWords,
 } from "./shared/command-patterns.ts";
 import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
@@ -55,7 +57,7 @@ export const preferFrozenLockfileRule = {
         continue;
       }
       let env: Record<string, unknown> = {};
-      let cwd = step.workingDirectory ?? ".";
+      let cwd: string | undefined = step.workingDirectory ?? ".";
       if (doc.kind === "github-actions") {
         const job = doc.jobs.find((candidate) => candidate.id === step.jobName);
         const original = job?.steps.find((candidate) => candidate.runNode === step.node);
@@ -67,9 +69,38 @@ export const preferFrozenLockfileRule = {
       if (cwd.includes("${{")) {
         continue;
       }
+      const canTrackDirectory =
+        !/\|\||[()]/.test(step.text) &&
+        !shellCommands(step.text).some((words) =>
+          ["if", "then", "else", "for", "while", "until", "case", "function"].includes(
+            words[0] ?? "",
+          ),
+        );
       for (const command of shellCommandSegments(step.text)) {
         const words = staticShellWords(command);
         if (!words) {
+          if (shellCommands(command)[0]?.[0] === "cd") {
+            cwd = undefined;
+          }
+          continue;
+        }
+        if (words[0] === "cd") {
+          const args = words[1] === "--" ? words.slice(2) : words.slice(1);
+          const destination = args.length === 1 ? args[0] : undefined;
+          cwd =
+            canTrackDirectory && cwd !== undefined && destination && !destination.startsWith("-")
+              ? path.posix.normalize(path.posix.join(cwd, destination))
+              : undefined;
+          if (
+            destination &&
+            (path.posix.isAbsolute(destination) || cwd === ".." || cwd?.startsWith("../"))
+          ) {
+            cwd = undefined;
+          }
+          continue;
+        }
+        if (["pushd", "popd", "source", "."].includes(words[0] ?? "")) {
+          cwd = undefined;
           continue;
         }
         const commandEnv = { ...env };
@@ -98,7 +129,8 @@ export const preferFrozenLockfileRule = {
           frozen === undefined &&
           ciEnabled &&
           !disabled(commandEnv.npm_config_frozen_lockfile) &&
-          scan
+          scan &&
+          cwd !== undefined
         ) {
           const npmrc = (await scan.pathExists(scan.resolve(cwd, ".npmrc")))
             ? await scan.readTextFileOrWarn(scan.resolve(cwd, ".npmrc"))
@@ -119,16 +151,17 @@ export const preferFrozenLockfileRule = {
           }
         }
         if (manager === "yarn" && frozen === undefined && immutable === undefined) {
-          const pkg = scan
-            ? (await scan.loadPackageJson(scan.resolve(cwd, "package.json"))).value
-            : undefined;
+          const pkg =
+            scan && cwd !== undefined
+              ? (await scan.loadPackageJson(scan.resolve(cwd, "package.json"))).value
+              : undefined;
           const spec =
             pkg && typeof pkg === "object" && "packageManager" in pkg
               ? pkg.packageManager
               : undefined;
           const major = typeof spec === "string" ? /^yarn@(\d+)/.exec(spec)?.[1] : undefined;
           const yarnrc =
-            scan && (await scan.pathExists(scan.resolve(cwd, ".yarnrc.yml")))
+            scan && cwd !== undefined && (await scan.pathExists(scan.resolve(cwd, ".yarnrc.yml")))
               ? await scan.readTextFileOrWarn(scan.resolve(cwd, ".yarnrc.yml"))
               : undefined;
           const immutableDisabled =

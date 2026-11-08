@@ -2,7 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fixtures } from "./fixtures.ts";
-import { createTempDirTracker, getWorkflowFocusedFixtureReport } from "./helpers.ts";
+import {
+  analyzeRepositoryForRule,
+  createTempDirTracker,
+  getWorkflowFocusedFixtureReport,
+  writeRepositoryFiles,
+} from "./helpers.ts";
 import type { memoizedAnalyzeRepository } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
@@ -19,6 +24,42 @@ function getFixtureReport(
 }
 
 describe("analyzeRepository workflow and execution rules: general context", () => {
+  test.each([
+    ["Docs build", "ci.yml", "Build", false],
+    ["Build documentation", "ci.yml", "Build", false],
+    ["CI", "ci-docs.yml", "Build", false],
+    ["CI", "ci.yml", "Build documentation", false],
+    ["CI", "ci.yml", "Build", true],
+  ])(
+    "non-code ignore advice respects docs purpose: %s %s %s",
+    async (name, file, jobName, expected) => {
+      const cwd = await tempDirs.create("apl-docs-ignore-");
+      await writeRepositoryFiles(cwd, {
+        [`.github/workflows/${file}`]: `name: ${name}
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    name: ${jobName}
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm ci
+      - run: npm run build
+`,
+      });
+      const report = await analyzeRepositoryForRule(
+        { cwd, targetPath: ".", topCount: 100, mode: "exploratory" },
+        { id: "missing-path-ignore-for-non-code", severity: "suggestion" },
+      );
+      expect(report.findings.some((f) => f.ruleId === "missing-path-ignore-for-non-code")).toBe(
+        expected,
+      );
+      // Generic path scoping advice is independent and must remain available.
+      expect(report.findings.some((f) => f.ruleId === "missing-paths-filter")).toBe(true);
+    },
+  );
+
   test("does not flag deep checkout when tag publishing visibly needs history or tags", async () => {
     const report = await getFixtureReport(fixtures.deepCheckoutReleaseLike, {
       targetPath: ".",
