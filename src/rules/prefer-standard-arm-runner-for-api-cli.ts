@@ -2,6 +2,8 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { jobHasUnresolvedRunnerExecution } from "./shared/runner-execution-context.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 import {
   jobRunsOnArmLikeRunner,
   jobRunsOnStandardX64Ubuntu,
@@ -36,7 +38,6 @@ function getJobText(job: WorkflowJob): string {
 }
 
 function findApiCliTool(job: WorkflowJob): string | undefined {
-  const text = getJobText(job);
   const candidates: [string, RegExp][] = [
     ["Terraform", /\bterraform\s+(?:init|plan|apply|destroy)\b/],
     [
@@ -61,7 +62,13 @@ function findApiCliTool(job: WorkflowJob): string | undefined {
     ["Helm", /\bhelm\s+(?:template|lint|diff|upgrade|install|uninstall|status|list)\b/],
   ];
 
-  return candidates.find(([, pattern]) => pattern.test(text))?.[0];
+  return candidates.find(([, pattern]) =>
+    job.steps.some((step) =>
+      shellInvocations(step.run ?? "").some(
+        (words) => pattern.exec(words.join(" ").toLowerCase())?.index === 0,
+      ),
+    ),
+  )?.[0];
 }
 
 function hasArchitectureSensitiveWork(job: WorkflowJob): boolean {
@@ -79,7 +86,8 @@ export const preferStandardArmRunnerForApiCliRule = {
       if (
         !jobRunsOnStandardX64Ubuntu(job) ||
         jobRunsOnArmLikeRunner(job) ||
-        jobRunsInContainer(job)
+        jobRunsInContainer(job) ||
+        jobHasUnresolvedRunnerExecution(workflow, job)
       ) {
         continue;
       }

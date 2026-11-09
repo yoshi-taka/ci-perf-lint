@@ -31,6 +31,9 @@ This rule only fires when all of the following are visible:
 - the job is not configured with a job container
 - one of the portable fast tooling commands above is visible
 - no architecture-sensitive work is visible in the same job
+- no unresolved execution dispatcher, script, or action is present in the job
+
+Modal, Harbor, SSH, Buildkite agents and other dispatchers do not prove where their payload runs. Unknown scripts/actions also prevent a job-wide runner change recommendation. A separate visible local test can still receive worker-tuning advice; cache/install findings are not disabled. The check is bounded source inspection, not inspection of CLI internals or dependency lifecycle hooks, and does not infer runtime CPU or memory usage.
 
 Architecture-sensitive work includes Docker builds, native compilation, browser tests, heavy test runners, TypeScript typechecking, Electron, Tauri, and similar local CPU or platform-sensitive tasks.
 

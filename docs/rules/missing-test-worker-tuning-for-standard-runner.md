@@ -1,5 +1,7 @@
 # missing-test-worker-tuning-for-standard-runner
 
+Worker advice uses directly visible test invocations with a recognized local shell (including workflow/job shell defaults). It does not inspect commands passed to remote dispatchers or scripts, or infer their CPU limits from the calling runner. Unknown custom shells are skipped. A separate local test remains eligible even when the same job also dispatches remote work.
+
 ## What it flags
 
 Flags direct test-runner commands on standard GitHub-hosted runners when no visible worker tuning is present.

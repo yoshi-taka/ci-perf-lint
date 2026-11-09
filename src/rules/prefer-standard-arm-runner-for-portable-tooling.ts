@@ -3,6 +3,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { shellInvocations } from "./shared/shell-invocations.ts";
+import { jobHasUnresolvedRunnerExecution } from "./shared/runner-execution-context.ts";
 import {
   jobRunsOnArmLikeRunner,
   jobRunsOnStandardX64Ubuntu,
@@ -96,7 +97,8 @@ export const preferStandardArmRunnerForPortableToolingRule = {
       if (
         !jobRunsOnStandardX64Ubuntu(job) ||
         jobRunsOnArmLikeRunner(job) ||
-        jobRunsInContainer(job)
+        jobRunsInContainer(job) ||
+        jobHasUnresolvedRunnerExecution(workflow, job)
       ) {
         continue;
       }

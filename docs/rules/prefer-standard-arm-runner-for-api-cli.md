@@ -26,6 +26,9 @@ This rule only fires when all of the following are visible:
 - the job does not already run on an arm64-like runner
 - the job is not configured with a job container
 - a known API-bound CLI command is visible
+- no unresolved execution dispatcher, script, or action is present in the job
+
+Commands must be visible shell invocations, not tool names in labels or remote-command arguments. Remote dispatchers (including Modal, Harbor, SSH and Buildkite agents), custom scripts and unknown actions do not establish portability of the calling runner. Such jobs are withheld from this runner recommendation only; cache/install diagnostics remain independent. This bounded check does not inspect CLI internals or dependency lifecycle hooks, nor prove runtime CPU or memory usage.
 
 The severity drops to `suggestion` when architecture-sensitive work is also visible, such as Docker builds, native compilation, browser tests, Electron, or Tauri.
 

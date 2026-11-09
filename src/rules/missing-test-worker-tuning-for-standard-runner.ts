@@ -11,6 +11,7 @@ import {
 } from "./shared/test-worker-commands.ts";
 import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 import { playwrightConfigTunesWorkers } from "./shared/test-worker-config.ts";
+import { stepHasKnownRunnerShell } from "./shared/runner-execution-context.ts";
 
 const meta = {
   id: "missing-test-worker-tuning-for-standard-runner",
@@ -99,6 +100,9 @@ async function getUntunedTestStep(
   context: RuleContext,
 ): Promise<{ step: WorkflowStep; tool: TestTool } | undefined> {
   for (const step of job.steps) {
+    if (!stepHasKnownRunnerShell(workflow, job, step)) {
+      continue;
+    }
     for (const command of collectTestWorkerCommands(
       step.run ?? "",
       workflowStepEnv(workflow, job, step),
