@@ -294,6 +294,7 @@ export function parseCircleCi(
   fullPath: string,
   repoRoot: string,
   source: string,
+  fragmentJobName?: string,
 ): CircleCiDocument {
   if (source.length > MAX_CIRCLECI_SOURCE_BYTES) {
     throw new Error(`CircleCI source too large: ${fullPath}`);
@@ -329,7 +330,10 @@ export function parseCircleCi(
   const jobsNode = getMap(getNode(root, "jobs"));
 
   const jobs: CircleCiJob[] = [];
-  for (const item of jobsNode?.items ?? []) {
+  const jobEntries = fragmentJobName
+    ? [{ key: fragmentJobName, value: root }]
+    : (jobsNode?.items ?? []);
+  for (const item of jobEntries) {
     if (jobs.length >= MAX_CIRCLECI_JOBS) {
       throw new Error(`CircleCI job limit exceeded in ${relativePath}`);
     }

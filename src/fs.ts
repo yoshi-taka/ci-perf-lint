@@ -2,6 +2,17 @@ import type { Stats } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { buildkiteDirectoryForPath, collectBuildkiteWorkflowFiles } from "./buildkite-discovery.ts";
+import { collectGitlabLocalIncludes } from "./gitlab-ci-includes.ts";
+import { ciKindForPath, type CiKind } from "./ci-types.ts";
+import type { AnalysisWarning } from "./types.ts";
+import { collectCircleciConfigs } from "./circleci-config-discovery.ts";
+
+interface WorkflowInput {
+  path: string;
+  kind: CiKind;
+  circleciJobName?: string;
+  circleciDiscovered?: boolean;
+}
 
 interface WorkflowTarget {
   repoRoot: string;
@@ -229,20 +240,41 @@ async function listWorkflowFiles(workflowDir: string): Promise<string[]> {
     .sort((left, right) => left.localeCompare(right));
 }
 
+export async function collectWorkflowInputs(
+  target: WorkflowTarget,
+  warnings: AnalysisWarning[] = [],
+): Promise<WorkflowInput[]> {
+  const allFiles: string[] = target.selectedWorkflowFile ? [target.selectedWorkflowFile] : [];
+  if (!target.selectedWorkflowFile) {
+    for (const workflowDir of target.workflowDirs) {
+      const files = await listWorkflowFiles(workflowDir);
+      allFiles.push(...files);
+    }
+
+    if (target.rootWorkflowFiles) {
+      allFiles.push(...target.rootWorkflowFiles);
+    }
+  }
+  const inputs = new Map<string, WorkflowInput>(
+    allFiles.map((file) => [file, { path: file, kind: ciKindForPath(file) }]),
+  );
+  for (const file of allFiles) {
+    if (ciKindForPath(file) === "circleci") {
+      for (const config of await collectCircleciConfigs(file, target.repoRoot, warnings)) {
+        inputs.set(config.path, { ...config, kind: "circleci" });
+      }
+      continue;
+    }
+    if (ciKindForPath(file) !== "gitlab-ci") {
+      continue;
+    }
+    for (const included of await collectGitlabLocalIncludes(file, target.repoRoot, warnings)) {
+      inputs.set(included, { path: included, kind: "gitlab-ci" });
+    }
+  }
+  return [...inputs.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
 export async function collectWorkflowFiles(target: WorkflowTarget): Promise<string[]> {
-  if (target.selectedWorkflowFile) {
-    return [target.selectedWorkflowFile];
-  }
-
-  const allFiles: string[] = [];
-  for (const workflowDir of target.workflowDirs) {
-    const files = await listWorkflowFiles(workflowDir);
-    allFiles.push(...files);
-  }
-
-  if (target.rootWorkflowFiles) {
-    allFiles.push(...target.rootWorkflowFiles);
-  }
-
-  return allFiles.sort((left, right) => left.localeCompare(right));
+  return (await collectWorkflowInputs(target)).map((input) => input.path);
 }

@@ -3,9 +3,11 @@ import { readTextFile } from "./read-text-file.ts";
 import { buildAiHandoff } from "./ai-handoff.ts";
 import { parsePipeline } from "./buildkite-workflow.ts";
 import { parseGitlabCi } from "./gitlab-ci-workflow.ts";
+import { prepareGitlabIncludeDocuments } from "./gitlab-ci-include-context.ts";
+import { prepareDiscoveredCircleciConfig } from "./circleci-config-discovery.ts";
 import { parseCircleCi } from "./circleci-workflow.ts";
 import { toastifySource } from "./toastify.ts";
-import { collectWorkflowFiles, resolveWorkflowTarget } from "./fs.ts";
+import { collectWorkflowInputs, resolveWorkflowTarget } from "./fs.ts";
 import { aggregateFindingsWithMembers } from "./reporters.ts";
 import { RepositoryScanContext, LruMap } from "./repository-scan-context.ts";
 import type {
@@ -20,7 +22,7 @@ import type {
   WorkflowSummary,
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
-import { ciKindForPath, type AnyWorkflowDocument } from "./ci-types.ts";
+import type { AnyWorkflowDocument, CiKind } from "./ci-types.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
 import type { EmbeddedOxlintScanPlan } from "./repository-diagnostics/embedded-oxlint-config.ts";
 import { prewarmEmbeddedOxlint } from "./repository-diagnostics/embedded-oxlint.ts";
@@ -147,9 +149,11 @@ async function conservativeEmbeddedOxlintScanPlan(
 async function parseWorkflowFile(
   workflowPath: string,
   repoRoot: string,
+  kind: CiKind,
+  circleciJobName?: string,
 ): Promise<ParsedWorkflowDocument> {
   const source = await readTextFile(workflowPath);
-  const cacheKey = `${repoRoot}\0${workflowPath}`;
+  const cacheKey = `${repoRoot}\0${kind}\0${workflowPath}\0${circleciJobName ?? ""}`;
   const cached = parsedWorkflowCache.get(cacheKey);
   if (cached?.source === source) {
     return cached.parsedWorkflow;
@@ -157,13 +161,13 @@ async function parseWorkflowFile(
 
   // eslint-disable-next-line typescript-eslint/require-await
   const parsedWorkflow = (async () => {
-    switch (ciKindForPath(workflowPath)) {
+    switch (kind) {
       case "buildkite":
         return parsePipeline(workflowPath, repoRoot, source);
       case "gitlab-ci":
         return parseGitlabCi(workflowPath, repoRoot, source);
       case "circleci":
-        return parseCircleCi(workflowPath, repoRoot, source);
+        return parseCircleCi(workflowPath, repoRoot, source, circleciJobName);
       default:
         return parseWorkflow(workflowPath, repoRoot, source);
     }
@@ -208,7 +212,8 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     }
   }
 
-  const allWorkflowFiles = await collectWorkflowFiles(target);
+  const workflowInputs = await collectWorkflowInputs(target, analysisWarnings);
+  const allWorkflowFiles = workflowInputs.map((input) => input.path);
   timer.mark("list-workflows");
 
   const measureCompleteness: MeasureCompletenessTracker = {
@@ -235,9 +240,11 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   for (let i = 0; i < allWorkflowFiles.length; i += CONCURRENCY) {
     const end = Math.min(i + CONCURRENCY, allWorkflowFiles.length);
     const results = await Promise.allSettled(
-      allWorkflowFiles
+      workflowInputs
         .slice(i, end)
-        .map((workflowPath) => parseWorkflowFile(workflowPath, target.repoRoot)),
+        .map((input) =>
+          parseWorkflowFile(input.path, target.repoRoot, input.kind, input.circleciJobName),
+        ),
     );
     for (let j = 0; j < results.length; j++) {
       parsedWorkflowResults[i + j] = results[j]!;
@@ -248,7 +255,12 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   const parsedWorkflows: ParsedWorkflowDocument[] = [];
   for (const [index, result] of parsedWorkflowResults.entries()) {
     if (result.status === "fulfilled") {
-      parsedWorkflows.push(result.value);
+      const doc = result.value;
+      parsedWorkflows.push(
+        doc.kind === "circleci" && workflowInputs[index]?.circleciDiscovered
+          ? prepareDiscoveredCircleciConfig(doc, analysisWarnings)
+          : doc,
+      );
     } else {
       const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
       analysisWarnings.push({
@@ -260,7 +272,8 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     }
   }
 
-  const githubWorkflows = parsedWorkflows.filter(
+  const preparedWorkflows = prepareGitlabIncludeDocuments(parsedWorkflows, analysisWarnings);
+  const githubWorkflows = preparedWorkflows.filter(
     (w): w is WorkflowDocument => w.kind === "github-actions",
   );
 
@@ -282,13 +295,13 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     githubWorkflows,
     jobSummaries,
     scanContext,
-    parsedWorkflows,
+    preparedWorkflows,
   );
   timer.mark("collect-repository-signals");
   analysisWarnings.push(...repositoryAnalysis.warnings);
 
   return {
-    parsedWorkflows,
+    parsedWorkflows: preparedWorkflows,
     githubWorkflows,
     jobSummaries,
     signals: repositoryAnalysis.signals,

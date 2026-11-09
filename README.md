@@ -36,10 +36,6 @@ bun install -g ci-perf-lint
 npm install -g ci-perf-lint
 ```
 
-## Buildkite Discovery
-
-Static YAML/JSON pipelines are discovered recursively under `.buildkite/` and `buildkite/`, including named files such as `.buildkite/pipelines/test.yml`. Unrelated configuration YAML is excluded. Nested files or directories can also be targeted directly. Pipeline-generating scripts are never executed; see [discovery scope and limits](docs/buildkite-discovery.md).
-
 ## What You Get
 
 Each run returns:
