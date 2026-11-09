@@ -1,5 +1,7 @@
 # missing-gradle-build-cache
 
+Task evidence uses the shared Gradle argument parser. Comments, displayed commands, property values and options such as `--task build` or `--args build` are not build/test tasks. Dry-run/help and unresolved Gradle syntax are skipped; supported direct wrappers, scoped tasks and visible command substitutions remain detectable. Existing repository build-cache configuration gates are unchanged.
+
 Flags workflows that visibly run Gradle tasks while no repository-level Gradle build cache configuration is visible.
 
 ## Why it matters

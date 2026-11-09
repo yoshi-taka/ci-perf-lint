@@ -2,8 +2,11 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { railsCommands, railsCommandRunsTests } from "./shared/rails-commands.ts";
-import { shellInvocations } from "./shared/shell-invocations.ts";
+import {
+  railsCommands,
+  railsCommandRunsTests,
+  stepHasRubyWorkflowEvidence,
+} from "./shared/rails-commands.ts";
 
 const meta = {
   id: "rails-db-schema-load-over-migrate",
@@ -18,15 +21,7 @@ const migrationIntentPattern =
   /\b(?:migration|migrate|schema\s+check|rollback|upgrade|compatibility)\b/i;
 
 function jobUsesRubyOrRails(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    return (
-      Boolean(step.uses?.toLowerCase().startsWith("ruby/setup-ruby@")) ||
-      railsCommands(step.run ?? "").length > 0 ||
-      shellInvocations(step.run ?? "", false).some(
-        ([tool, action]) => tool === "bundle" && ["install", "exec"].includes(action ?? ""),
-      )
-    );
-  });
+  return job.steps.some(stepHasRubyWorkflowEvidence);
 }
 
 function jobHasEphemeralDbService(job: WorkflowJob): boolean {

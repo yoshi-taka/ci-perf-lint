@@ -1,5 +1,7 @@
 # prefer-ruby-3-yjit
 
+Ruby workflow evidence is shared with the Rails rules: recognized setup actions and actual Bundler/Rails/Rake/RSpec invocations count, while labels, comments and displayed commands do not. The existing Ruby-version range and score are unchanged.
+
 Detects repositories that use Ruby 3.2.x in CI and recommends upgrading to
 Ruby 3.4+ for faster YJIT.
 

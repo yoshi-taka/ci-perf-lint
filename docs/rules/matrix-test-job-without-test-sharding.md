@@ -1,5 +1,7 @@
 # matrix-test-job-without-test-sharding
 
+Test and shard evidence comes from executable commands, not labels, comments, printed examples or filenames containing `shard`. Visible test runners, shard options and command substitutions remain detectable. Matrix propagation through structured environment variables, shell assignments or recognized `$GITHUB_ENV` writes is conservatively retained; this is not proof of runtime test partitioning.
+
 ## What it flags
 
 Flags test jobs that use a shard-like matrix but do not visibly pass the matrix value into the test command.

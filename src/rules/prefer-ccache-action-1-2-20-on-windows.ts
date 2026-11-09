@@ -7,6 +7,7 @@ import { getRunsOnSpec } from "./shared/runs-on-facts.ts";
 import { jobIsStaticallyDisabled } from "./shared/workflow-jobs.ts";
 import { jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 import { workflowStepEnv } from "./shared/workflow-command-context.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 const meta = {
   id: "prefer-ccache-action-1-2-20-on-windows",
@@ -92,7 +93,16 @@ export const preferCcacheAction1220OnWindowsRule = {
       if (
         !anchor ||
         job.steps.some((step) =>
-          /\bccache\s+--set-config(?:=|\s+)compiler_check=content\b/.test(step.run ?? ""),
+          shellInvocations(step.run ?? "", false).some(
+            ([tool, ...args]) =>
+              tool === "ccache" &&
+              !args.some((arg) => ["--help", "-h", "--version"].includes(arg)) &&
+              args.some(
+                (arg, index) =>
+                  arg === "--set-config=compiler_check=content" ||
+                  (arg === "--set-config" && args[index + 1] === "compiler_check=content"),
+              ),
+          ),
         )
       ) {
         continue;

@@ -2,6 +2,11 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { PipelineDocument, PipelineStep } from "../buildkite-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { shellNonDisplayInvocations } from "./shared/shell-invocations.ts";
+import {
+  invocationWorkName,
+  invocationHasNativeOrOpaqueWork,
+} from "./shared/tooling-command-evidence.ts";
 
 const meta = {
   id: "missing-timeout-in-minutes-buildkite",
@@ -12,13 +17,29 @@ const meta = {
 } satisfies RuleMeta;
 
 function stepLooksHeavy(step: PipelineStep): boolean {
-  const text =
-    `${step.label ?? ""} ${step.command ?? ""} ${(step.commands ?? []).join(" ")}`.toLowerCase();
-  if (/buildkite-agent\s+pipeline\s+upload|upload\s+.*pipeline/.test(text)) {
-    return false;
-  }
-  return /\b(build|publish|release|deploy|upload|npm|pnpm|yarn|bun|cargo|gradle|maven|pytest|jest|vitest|tauri|electron|docker|test|lint)\b/.test(
-    text,
+  const heavyName =
+    /\b(build|publish|release|deploy|upload|npm|pnpm|yarn|bun|cargo|gradle|maven|pytest|jest|vitest|tauri|electron|docker|test|lint)\b/i;
+  const source = [step.command ?? "", ...(step.commands ?? [])].join("\n");
+  const commands = [
+    ...shellNonDisplayInvocations(source),
+    ...shellNonDisplayInvocations(source, true),
+  ];
+  return (
+    commands.some((words) => {
+      const [tool, action, subcommand] = words;
+      if (tool === "buildkite-agent" && action === "pipeline" && subcommand === "upload") {
+        return false;
+      }
+      if (["grep", "egrep", "fgrep", "test", "[", "[["].includes(tool ?? "")) {
+        return false;
+      }
+      return (
+        heavyName.test(invocationWorkName(words)) ||
+        (["make", "just", "task"].includes(tool ?? "") && heavyName.test(action ?? "")) ||
+        (invocationHasNativeOrOpaqueWork(words) && heavyName.test(step.label ?? ""))
+      );
+    }) ||
+    (Boolean(step.plugins?.length) && heavyName.test(step.label ?? ""))
   );
 }
 

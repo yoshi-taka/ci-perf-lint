@@ -1,5 +1,7 @@
 # missing-timeout-in-minutes-buildkite
 
+Heavy-work and pipeline-upload evidence use shared shell extraction. Printed commands and text-search arguments are not heavy work or upload exemptions. An actual `buildkite-agent pipeline upload` exempts only that invocation, not a build/test elsewhere in the same step. Labels remain hints for actual opaque scripts/plugins, not proof that an echo-only step builds or releases anything. Existing timeout/skip/control-step guards are retained.
+
 Buildkite pipeline steps do not have a default timeout. Without `timeout_in_minutes`, a hung or degraded step can run indefinitely and consume agent capacity.
 
 ## Why this matters

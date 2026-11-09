@@ -152,7 +152,8 @@ describe("migrations: python and platform tooling", () => {
     expect(hits.some((message) => message.includes('Job "macos_aws_job"'))).toBe(true);
     expect(hits.some((message) => message.includes('Job "ubuntu_az_job"'))).toBe(true);
     expect(hits.some((message) => message.includes('Job "ubuntu_helm_job"'))).toBe(true);
-    expect(hits.some((message) => message.includes('Job "ubuntu_kubectl_job"'))).toBe(true);
+    // This download explicitly pins v1.32.0 in its URL; preinstalled kubectl may differ.
+    expect(hits.some((message) => message.includes('Job "ubuntu_kubectl_job"'))).toBe(false);
     expect(hits.some((message) => message.includes('Job "macos_az_job"'))).toBe(true);
     expect(hits.some((message) => message.includes('Job "macos_azcopy_job"'))).toBe(true);
     expect(hits.some((message) => message.includes('Job "macos_yq_job"'))).toBe(true);

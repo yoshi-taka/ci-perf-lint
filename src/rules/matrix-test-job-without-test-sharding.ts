@@ -3,6 +3,11 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobHasMatrix } from "./shared/workflow-jobs.ts";
+import { shellNonDisplayInvocations } from "./shared/shell-invocations.ts";
+import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
+import { shellExecutionTexts } from "./shared/shell-execution-text.ts";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
+import { declaredShellEnvironmentNames } from "./shared/shell-environment-evidence.ts";
 
 const meta = {
   id: "matrix-test-job-without-test-sharding",
@@ -50,26 +55,65 @@ function getShardLikeMatrixKeys(job: WorkflowJob): string[] {
 }
 
 function stepLooksLikeTestRun(step: WorkflowStep): boolean {
-  if (/\b(?:install|setup|download|browser)\b/i.test(step.name ?? "")) {
-    return false;
-  }
-  const text = `${step.name ?? ""} ${step.run ?? ""}`.trim();
-  return /\b(jest|vitest|playwright|cypress|pytest|go test|cargo test|npm test|pnpm test|yarn test|bun test)\b/i.test(
-    text,
+  const run = step.run ?? "";
+  return [...shellNonDisplayInvocations(run), ...shellNonDisplayInvocations(run, true)].some(
+    ([tool, action, task, ...args]) => {
+      if (
+        [action, task, ...args].some((arg) => ["--help", "-h", "--version"].includes(arg ?? ""))
+      ) {
+        return false;
+      }
+      if (["jest", "vitest", "pytest"].includes(tool ?? "")) {
+        return true;
+      }
+      if (["playwright", "go", "cargo"].includes(tool ?? "")) {
+        return action === "test";
+      }
+      if (tool === "cypress") {
+        return action === "run" || action === "open";
+      }
+      return (
+        ["npm", "pnpm", "yarn", "bun"].includes(tool ?? "") &&
+        (action === "test" || (["run", "run-script"].includes(action ?? "") && task === "test"))
+      );
+    },
   );
 }
 
-function stepConsumesShardKey(step: WorkflowStep, shardKeys: string[]): boolean {
+function stepConsumesShardKey(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  step: WorkflowStep,
+  shardKeys: string[],
+): boolean {
   const run = step.run ?? "";
   if (!run) {
     return false;
   }
 
+  const commands = shellNonDisplayInvocations(run, false).filter(
+    ([tool]) => !["grep", "egrep", "fgrep", "test", "[", "[["].includes(tool ?? ""),
+  );
+  const configuration = shellExecutionTexts(run)
+    .flatMap(shellCommandSegments)
+    .filter((segment) => declaredShellEnvironmentNames(segment).size > 0);
+  const environment = commands.length
+    ? Object.values(effectiveStepEnvironment(workflow, job, step))
+    : [];
+  const evidence = [
+    ...commands.map((words) => words.join(" ")),
+    ...configuration,
+    ...environment.filter((value): value is string => typeof value === "string"),
+  ];
   return shardKeys.some((key) => {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return (
-      new RegExp(`matrix\\.${escapedKey}`, "i").test(run) ||
-      new RegExp(`\\b(shard|split|partition|chunk)\\b`, "i").test(run)
+      evidence.some((text) => new RegExp(`matrix\\.${escapedKey}(?![\\w-])`, "i").test(text)) ||
+      commands.some((words) =>
+        words.some((word) =>
+          /^(?:--(?:shard|split|partition|chunk)(?:[-_][\w-]+)?)(?:=|$)/i.test(word),
+        ),
+      )
     );
   });
 }
@@ -92,7 +136,7 @@ export const matrixTestJobWithoutTestShardingRule = {
         continue;
       }
 
-      if (job.steps.some((step) => stepConsumesShardKey(step, shardKeys))) {
+      if (job.steps.some((step) => stepConsumesShardKey(workflow, job, step, shardKeys))) {
         continue;
       }
 

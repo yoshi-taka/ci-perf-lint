@@ -2,6 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { stepHasRubyWorkflowEvidence } from "./shared/rails-commands.ts";
 
 const meta = {
   id: "prefer-ruby-3-yjit",
@@ -9,9 +10,6 @@ const meta = {
   confidence: "high",
   docsPath: "docs/rules/prefer-ruby-3-yjit.md",
 } satisfies RuleMeta;
-
-const rubyStepPattern =
-  /\b(?:ruby\/setup-ruby@|bundle\s+install|bundle\s+exec|rails|rake|rspec)\b/i;
 
 export const preferRuby3YjitRule = {
   meta,
@@ -30,27 +28,8 @@ export const preferRuby3YjitRule = {
       return [];
     }
 
-    const hasRubyJob = workflow.jobs.some(
-      (job) =>
-        !job.usesReusableWorkflow &&
-        job.steps.some((step) => {
-          const text = `${step.uses ?? ""} ${step.name ?? ""} ${step.run ?? ""}`;
-          return rubyStepPattern.test(text);
-        }),
-    );
-    if (!hasRubyJob) {
-      return [];
-    }
-
     return workflow.jobs
-      .filter(
-        (job) =>
-          !job.usesReusableWorkflow &&
-          job.steps.some((step) => {
-            const text = `${step.uses ?? ""} ${step.name ?? ""} ${step.run ?? ""}`;
-            return rubyStepPattern.test(text);
-          }),
-      )
+      .filter((job) => !job.usesReusableWorkflow && job.steps.some(stepHasRubyWorkflowEvidence))
       .map((job) =>
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs on Ruby ${rubyVersionSpec}, below the 3.4 YJIT milestone.`,

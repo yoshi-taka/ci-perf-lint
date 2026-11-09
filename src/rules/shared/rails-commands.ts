@@ -1,4 +1,5 @@
 import { shellInvocations } from "./shell-invocations.ts";
+import type { WorkflowStep } from "../../workflow.ts";
 
 interface RailsCommand {
   tool: "rails" | "rake" | "rspec";
@@ -33,4 +34,14 @@ export function railsCommands(text: string): RailsCommand[] {
 
 export function railsCommandRunsTests(command: RailsCommand): boolean {
   return command.tool === "rspec" || /^(?:test|spec)(?::|$)/.test(command.args[0] ?? "");
+}
+
+export function stepHasRubyWorkflowEvidence(step: WorkflowStep): boolean {
+  return (
+    Boolean(step.uses?.toLowerCase().startsWith("ruby/setup-ruby@")) ||
+    railsCommands(step.run ?? "").length > 0 ||
+    shellInvocations(step.run ?? "", false).some(
+      ([tool, action]) => tool === "bundle" && ["install", "exec"].includes(action ?? ""),
+    )
+  );
 }

@@ -71,8 +71,8 @@ export function shellInvocations(text: string, unwrapTools = true): string[][] {
 }
 
 /** Display arguments are data; substitutions within them remain separate invocations. */
-export function shellNonDisplayInvocations(text: string): string[][] {
-  return shellInvocations(text, false).filter(
+export function shellNonDisplayInvocations(text: string, unwrapTools = false): string[][] {
+  return shellInvocations(text, unwrapTools).filter(
     ([tool]) =>
       !["echo", "printf", "/bin/echo", "/usr/bin/echo", "/bin/printf", "/usr/bin/printf"].includes(
         tool ?? "",

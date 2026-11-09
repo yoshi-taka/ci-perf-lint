@@ -1,5 +1,7 @@
 # redundant-install-for-preinstalled-cli
 
+Install, subsequent use and version intent are extracted separately from executable commands. Step labels, plain logs and comments do not establish any of them; installer option values and downloader headers/bodies are not package/URL operands. Literal package/URL versions, structured environment variables, shell assignments and recognized writes to the relevant CLI's version variable in `$GITHUB_ENV` retain the pin exemption. A single-quoted literal `$GITHUB_ENV` filename or stderr redirection is not such a write. Host-image coverage, container guards and scoring are unchanged.
+
 ## What it flags
 
 Flags GitHub-hosted Ubuntu, Windows, or macOS jobs that visibly install a CLI already present on the runner image and then use that CLI later in the same job.

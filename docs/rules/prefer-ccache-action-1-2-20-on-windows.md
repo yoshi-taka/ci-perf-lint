@@ -1,5 +1,7 @@
 # prefer-ccache-action-1-2-20-on-windows
 
+The `compiler_check=content` workaround must belong to an executed ccache configuration command. Comments, printed examples and another command's arguments do not exempt an old action. Existing runner, condition and environment gates are unchanged.
+
 ## Why it matters
 
 The same Visual Studio compiler binary can have different modification times on

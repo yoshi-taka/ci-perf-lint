@@ -5,6 +5,7 @@ import { shellCommandSegments, shellCommands, staticShellWords } from "./command
 interface GradleCommand {
   directory?: string;
   lifecycle: boolean;
+  tasks: string[];
   parallelConfigured: boolean;
   userHome?: string | null;
 }
@@ -206,6 +207,17 @@ export function collectGradleCommands(
       const equals = assignment.indexOf("=");
       localEnv[assignment.slice(0, equals)] = assignment.slice(equals + 1);
     }
+    while (["sudo", "command", "exec", "time", "nohup"].includes(words[index] ?? "")) {
+      const wrapper = words[index++];
+      if (wrapper === "sudo" && words[index] === "-n") {
+        index++;
+      }
+      while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
+        const assignment = words[index++]!;
+        const equals = assignment.indexOf("=");
+        localEnv[assignment.slice(0, equals)] = assignment.slice(equals + 1);
+      }
+    }
     const executable = (words[index++] ?? "").replace(/\\/g, "/").split("/").at(-1);
     if (!/^(?:gradle|gradlew)(?:\.bat)?$/.test(executable ?? "")) {
       continue;
@@ -221,6 +233,7 @@ export function collectGradleCommands(
     let cliUserHome: string | null | undefined;
     let parallelConfigured = jvmOptions.parallelConfigured;
     let lifecycle = false;
+    const tasks: string[] = [];
     let inactive = false;
     let opaque = false;
     let globalOptions = true;
@@ -272,6 +285,7 @@ export function collectGradleCommands(
         opaque = true;
       } else if (!word.startsWith("-")) {
         const task = word.split(":").at(-1) ?? "";
+        tasks.push(task);
         lifecycle ||= /^(?:build|check|test|assemble|publish)(?:[A-Z]\w*)?$/.test(task);
         opaque ||= /[$`]/.test(word);
       }
@@ -279,6 +293,7 @@ export function collectGradleCommands(
     commands.push({
       directory: projectDirectory,
       lifecycle: lifecycle && !inactive && !opaque,
+      tasks,
       parallelConfigured,
       userHome: cliUserHome === undefined ? userHome : cliUserHome,
     });

@@ -4,6 +4,7 @@ import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobRunsOnHostedMacos, jobUsesContainer } from "./shared/workflow-jobs.ts";
 import { shellInvocations } from "./shared/shell-invocations.ts";
+import { downloadCommandUrls } from "./shared/download-command-arguments.ts";
 
 const meta = {
   id: "avoid-xcode-install-on-hosted-macos",
@@ -33,35 +34,11 @@ function getXcodeInstallStep(
       ) {
         return { step, command: args[0]! };
       }
-      if (["curl", "wget", "aria2c"].includes(tool ?? "")) {
-        const words = [action, ...args];
-        for (let index = 0; index < words.length; index++) {
-          const word = words[index] ?? "";
-          if (
-            [
-              "-H",
-              "--header",
-              "-d",
-              "--data",
-              "--data-raw",
-              "--data-binary",
-              "--post-data",
-              "-o",
-              "--output",
-              "-O",
-              "--output-document",
-              "-A",
-              "--user-agent",
-              "-e",
-              "--referer",
-            ].includes(word) &&
-            !(tool === "curl" && word === "-O")
-          ) {
-            index++;
-          } else if (/^(?:https?|ftp):\/\/[^\s]*\/Xcode[^\s/?#]*\.xip(?:[?#].*)?$/i.test(word)) {
-            return { step, command: word };
-          }
-        }
+      const url = downloadCommandUrls([tool ?? "", action ?? "", ...args]).find((word) =>
+        /^(?:https?|ftp):\/\/[^\s]*\/Xcode[^\s/?#]*\.xip(?:[?#].*)?$/i.test(word),
+      );
+      if (url) {
+        return { step, command: url };
       }
     }
   }

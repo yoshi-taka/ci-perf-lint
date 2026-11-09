@@ -2,6 +2,8 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { collectGradleCommands } from "./shared/gradle-commands.ts";
+import { shellExecutionTexts } from "./shared/shell-execution-text.ts";
 
 const meta = {
   id: "missing-gradle-build-cache",
@@ -11,10 +13,14 @@ const meta = {
 } satisfies RuleMeta;
 
 function jobRunsGradleTasks(job: WorkflowJob): boolean {
-  return job.steps.some(
-    (step) =>
-      step.run !== undefined &&
-      /(?:\.\/gradlew\b|gradle\b).*?\b(?:build|test|assemble|check)\b/i.test(step.run),
+  return job.steps.some((step) =>
+    shellExecutionTexts(step.run ?? "").some((source) =>
+      collectGradleCommands(source).some(
+        (command) =>
+          command.lifecycle &&
+          command.tasks.some((task) => /^(?:build|test|assemble|check)(?:[A-Z]\w*)?$/.test(task)),
+      ),
+    ),
   );
 }
 
