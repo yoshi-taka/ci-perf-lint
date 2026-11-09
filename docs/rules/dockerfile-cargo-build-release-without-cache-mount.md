@@ -2,6 +2,8 @@
 
 Warnings require a CI-discovered build with a [recognized persistent builder path](../docker-cache-mount-persistence.md): Depot, configured Blacksmith, or repository-visible Buildkite local Docker state persistence. Unknown/disposable builders are not flagged for missing cache mounts.
 
+Printed/commented builder commands or environment assignments do not disable recognized persistence. Actual overrides and environment-file writes still make persistence uncertain.
+
 Detects Rust Dockerfiles that run `cargo build --release` without a visible BuildKit cache mount on the same instruction.
 
 This rule looks for:

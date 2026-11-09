@@ -2,6 +2,8 @@
 
 Detects heavy workflows that respond to `push` or `pull_request` without `paths` or `paths-ignore`.
 
+Meta-workflow exclusions use executable tool/task identities, action references, and meaningful workflow/job intent. Printed examples, comments, and unrelated command arguments cannot turn a real build/lint workflow into a meta workflow and suppress this finding.
+
 Why this rule exists:
 
 - broad triggers make docs-only and unrelated changes run the same expensive workflow

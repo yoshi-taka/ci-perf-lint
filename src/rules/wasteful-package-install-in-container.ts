@@ -4,7 +4,12 @@ import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobUsesContainer } from "./shared/workflow-jobs.ts";
 import { setDifference } from "../set-algebra.ts";
-import { shellCommandSegments } from "./shared/command-patterns.ts";
+import {
+  toolInvocations,
+  invocationOperands,
+  invocationOptions,
+} from "./shared/tool-command-evidence.ts";
+import { dependencyInstallCommands } from "./shared/dependency-install-evidence.ts";
 
 const meta = {
   id: "wasteful-package-install-in-container",
@@ -13,47 +18,32 @@ const meta = {
   docsPath: "docs/rules/wasteful-package-install-in-container.md",
 } satisfies RuleMeta;
 
-const shellOperators = new Set(["&&", "||", ";", "|", "&"]);
-
-const installPatterns = [
-  /\b(?:sudo\s+)?(?:apt(?:-get)?|yum|dnf)\s+install\b(.+)$/gim,
-  /\b(?:sudo\s+)?apk\s+add\b(.+)$/gim,
-  /\b(?:sudo\s+)?brew\s+install\b(.+)$/gim,
-  /\b(?:sudo\s+)?choco\s+install\b(.+)$/gim,
-];
-
 function extractPackagesFromInstall(run: string): string[] {
-  const packages: string[] = [];
-
-  for (const command of shellCommandSegments(run.replace(/\\\r?\n/g, " "))) {
-    for (const pattern of installPatterns) {
-      for (const match of command.matchAll(pattern)) {
-        if (!match[1]) {
-          continue;
-        }
-
-        const tokens = match[1].trim().split(/\s+/);
-        for (const token of tokens) {
-          if (token.startsWith("-") || token === "\\") {
-            continue;
-          }
-          if (shellOperators.has(token)) {
-            break;
-          }
-          const pkg = token.split("=")[0]!;
-          if (pkg.length > 0) {
-            packages.push(pkg);
-          }
-        }
-      }
+  const normalized = run.replace(/\\\r?\n/g, " ");
+  const packages = dependencyInstallCommands(normalized)
+    .filter(({ tool }) => ["apt", "apt-get", "yum", "dnf", "apk"].includes(tool))
+    .flatMap(({ packages: names }) => names);
+  for (const words of toolInvocations(normalized)) {
+    if (
+      !["brew", "choco"].includes(words[0] ?? "") ||
+      invocationOptions(words).some(({ name }) =>
+        ["--help", "-h", "--version", "--dry-run"].includes(name),
+      )
+    ) {
+      continue;
+    }
+    const operands = invocationOperands(words);
+    if (operands[0] === "install") {
+      packages.push(...operands.slice(1));
     }
   }
-
-  return [...new Set(packages)];
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [
+    ...new Set(
+      packages
+        .map((pkg) => pkg.split("=")[0]!)
+        .filter((pkg) => /^[a-zA-Z0-9][\w.+:/-]*$/.test(pkg)),
+    ),
+  ];
 }
 
 function packagesUsedLater(
@@ -62,15 +52,18 @@ function packagesUsedLater(
   startIndex: number,
 ): Set<string> {
   const used = new Set<string>();
-  const laterText = steps
-    .slice(startIndex + 1)
-    .map((s) => [s.name ?? "", s.run ?? "", s.uses ?? ""].join(" "))
-    .join(" ")
-    .toLowerCase();
+  const laterTools = new Set(
+    steps
+      .slice(startIndex + 1)
+      .flatMap((step) =>
+        toolInvocations(step.run ?? "").map(([tool]) =>
+          (tool ?? "").split("/").at(-1)!.toLowerCase(),
+        ),
+      ),
+  );
 
   for (const pkg of packages) {
-    const pattern = new RegExp(`(?<=^|\\s)${escapeRegex(pkg)}(?=\\s|$)`);
-    if (pattern.test(laterText)) {
+    if (laterTools.has(pkg.toLowerCase())) {
       used.add(pkg);
     }
   }

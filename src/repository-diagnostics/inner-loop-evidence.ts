@@ -1,4 +1,6 @@
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
+import { toolInvocations, invocationOptions } from "../rules/shared/tool-command-evidence.ts";
+import { repositoryCommandHead } from "../rules/shared/repository-command-evidence.ts";
 
 // Root policy applies repository-wide; nested instructions may cover unrelated code.
 const policyPaths = [
@@ -11,6 +13,26 @@ const command = /(?:bun|npm|pnpm|yarn|npx|uv|ruff|cargo|go|make|just)\s+[^\n`]+/
 const timing =
   /before.{0,50}(?:commit|push|pull request|\bPR\b)|(?:commit|push|PR)前|コミット前|提出前/i;
 const verification = /\b(?:lint|fmt|format|validate|check|test)\b/i;
+
+function hookRunsValidation(text: string): boolean {
+  return toolInvocations(text).some((words) => {
+    if (
+      invocationOptions(words).some(({ name }) =>
+        ["--help", "-h", "--version", "-V", "-v"].includes(name),
+      )
+    ) {
+      return false;
+    }
+    const [tool, action, task] = repositoryCommandHead(words);
+    if (!/^(?:bun|npm|pnpm|yarn|uv|ruff|cargo|go|make|just)$/.test(tool ?? "")) {
+      return false;
+    }
+    const work = [tool, action, ...(["run", "run-script"].includes(action ?? "") ? [task] : [])]
+      .filter(Boolean)
+      .join(" ");
+    return command.test(work) && verification.test(work);
+  });
+}
 
 async function readExisting(context: RepositoryScanContext, file: string): Promise<string> {
   const absolute = context.resolve(file);
@@ -73,8 +95,7 @@ export async function collectInnerLoopEvidence(context: RepositoryScanContext): 
                     "command" in hook &&
                     hook.type === "command" &&
                     typeof hook.command === "string" &&
-                    command.test(hook.command) &&
-                    verification.test(hook.command),
+                    hookRunsValidation(hook.command),
                 )
               ) {
                 automation.push(".claude/settings.json");

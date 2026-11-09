@@ -1,9 +1,11 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
-import type { WorkflowJob } from "../workflow.ts";
+import type { WorkflowJob, WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "../rules/shared/diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { collectInnerLoopEvidence } from "./inner-loop-evidence.ts";
 import { collectInnerLoopActivity } from "./inner-loop-activity.ts";
+import { toolInvocations, invocationOptions } from "../rules/shared/tool-command-evidence.ts";
+import { stepHasKnownRunnerShell } from "../rules/shared/runner-execution-context.ts";
 
 const meta = {
   id: "prefer-inner-loop-checks",
@@ -27,6 +29,15 @@ function isCheck(
   if (/[`$|;&<>\\\n]/.test(text)) {
     return false;
   }
+  if (
+    toolInvocations(text).some((words) =>
+      invocationOptions(words).some(({ name }) =>
+        ["--help", "-h", "--version", "-V", "-v"].includes(name),
+      ),
+    )
+  ) {
+    return false;
+  }
   if (directCheck.test(text)) {
     return true;
   }
@@ -41,7 +52,11 @@ function isCheck(
   return isCheck(scripts[name], scripts, seen);
 }
 
-function checkOnlyJob(job: WorkflowJob, scripts: Record<string, unknown>): boolean {
+function checkOnlyJob(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  scripts: Record<string, unknown>,
+): boolean {
   if (
     job.usesReusableWorkflow ||
     job.raw.services ||
@@ -53,7 +68,7 @@ function checkOnlyJob(job: WorkflowJob, scripts: Record<string, unknown>): boole
   }
   let checks = 0;
   for (const step of job.steps) {
-    if (step.workingDirectory || step.if) {
+    if (step.workingDirectory || step.ifNode || !stepHasKnownRunnerShell(workflow, job, step)) {
       return false;
     }
     if (step.uses) {
@@ -101,7 +116,9 @@ export async function collectPreferInnerLoopChecksDiagnostics(
     if (workflow.parsed?.defaults) {
       continue;
     }
-    const jobs = workflow.jobs.filter((job) => !job.raw.defaults && checkOnlyJob(job, scriptMap));
+    const jobs = workflow.jobs.filter(
+      (job) => !job.raw.defaults && checkOnlyJob(workflow, job, scriptMap),
+    );
     if (jobs.length > 0) {
       candidates.set(
         workflow.relativePath,

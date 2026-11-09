@@ -2,6 +2,8 @@
 
 Shared shell extraction distinguishes actual tox runs and tox-uv package installs from comments/output. A package name used as an install option value (for example `--cache-dir tox-uv`) does not establish plugin setup. Separate install and tox commands in one step are considered independently.
 
+Workflow and repository collectors share that extraction. Repository configuration can independently establish tox use, but printed tox commands cannot claim CI execution, and printed/commented plugin installs cannot suppress the repository finding.
+
 ## What it flags
 
 Flags jobs that run `tox` without `tox-uv` installed.

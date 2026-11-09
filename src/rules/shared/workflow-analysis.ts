@@ -18,6 +18,7 @@ import {
   textHasOpaqueRepositoryExecution,
 } from "./repository-command-evidence.ts";
 import { workflowHasUnmodeledShell } from "./workflow-command-context.ts";
+import { workflowCommandWorkText } from "./workflow-step-text.ts";
 
 const heavyStepSignalPattern =
   /\b(?:(?:npm(?!\s+(?:view|info|search|ping)\b))|pnpm|yarn|bun|(?:pip(?!\s+(?:index|show|list|freeze|search)\b))|pipenv|poetry|bundle|bundler|uv|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|claude|codex|gemini|build)\b/;
@@ -217,38 +218,7 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     const loweredStepText = facts.loweredStepText;
     loweredStepTexts.push(loweredStepText);
     const run = step.run ?? "";
-    // Data passed to echo/printf/grep and assignment-only regexes are not work.
-    const executableSignals = shellInvocations(run, false)
-      .map((words) => {
-        const tool = words[0] ?? "";
-        if (
-          [
-            "echo",
-            "printf",
-            "grep",
-            "egrep",
-            "fgrep",
-            "[",
-            "[[",
-            "test",
-            "true",
-            "false",
-            "exit",
-            "fi",
-            "then",
-            "else",
-            "do",
-            "done",
-            "}",
-            "set",
-          ].includes(tool)
-        ) {
-          return "";
-        }
-        return words.slice(0, 3).join(" ");
-      })
-      .join(" ")
-      .toLowerCase();
+    const executableSignals = workflowCommandWorkText(run);
     const workName = executableSignals || step.uses ? (step.name ?? "") : "";
     const loweredRunNameText = `${workName} ${executableSignals}`.toLowerCase();
     const heavyStepText = `${step.uses ?? ""} ${loweredRunNameText}`.toLowerCase();
@@ -287,8 +257,8 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
       /(?:commitlint|semantic-release|release-it|changeset|changelog)/i.test(step.uses ?? "");
     hasOpaqueRepoScriptExecution ||=
       textHasOpaqueRepositoryExecution(run) || workflowHasUnmodeledShell(undefined, job, step);
-    looksMetaCheckLike ||= metaCheckLikePattern.test(loweredStepText);
-    looksAgenticLike ||= agenticLikePattern.test(loweredStepText);
+    looksMetaCheckLike ||= metaCheckLikePattern.test(heavyStepText);
+    looksAgenticLike ||= agenticLikePattern.test(heavyStepText);
     jobHasTest ||=
       /\b(test|tests|spec|jest|vitest|pytest|mocha|rspec|cargo test|go test|npm test|pnpm test|bun test)\b/i.test(
         loweredRunNameText,

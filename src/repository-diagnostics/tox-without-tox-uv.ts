@@ -3,6 +3,7 @@ import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryCorpusIndex } from "../rules/shared/repository-corpus-index.ts";
+import { stepIsToxRun, stepInstallsToxUv } from "../rules/shared/tox-commands.ts";
 
 const meta = {
   id: "tox-without-tox-uv",
@@ -10,14 +11,6 @@ const meta = {
   confidence: "medium",
   docsPath: "docs/rules/tox-without-tox-uv.md",
 } satisfies RuleMeta;
-
-const toxRunPattern = /(?:^|\s)(?:(?:python|python3)\s+-m\s+)?tox(?:\s|$)/i;
-const pipInstallPattern = /\b(?:pip|uv\s+pip)\s+install\b/i;
-const toxUvInstallPattern = /\b(?:pip|uv\s+pip)\s+install\b[\s\S]*?\btox-uv\b/i;
-
-function stepIsToxRun(run: string): boolean {
-  return toxRunPattern.test(run) && !pipInstallPattern.test(run);
-}
 
 function toxConfigFileLocation(text: string): { line: number; column: number } | undefined {
   const patterns = [/(?:^|\s)\[tox\]/i, /\[tool\.tox\]/i, /requires\s*=.*\btox\b/i];
@@ -50,13 +43,13 @@ export async function collectToxWithoutToxUvDiagnostics(
   let anyWorkflowRunsTox = false;
   let anyWorkflowHasToxUv = false;
 
-  const toxSteps = corpusIndex?.stepsMatchingText(toxRunPattern) ?? [];
+  const toxSteps = corpusIndex?.allSteps ?? [];
   for (const rs of toxSteps) {
     const run = rs.step.run ?? "";
     if (stepIsToxRun(run)) {
       anyWorkflowRunsTox = true;
     }
-    if (!anyWorkflowHasToxUv && toxUvInstallPattern.test(run)) {
+    if (!anyWorkflowHasToxUv && stepInstallsToxUv(run)) {
       anyWorkflowHasToxUv = true;
     }
   }

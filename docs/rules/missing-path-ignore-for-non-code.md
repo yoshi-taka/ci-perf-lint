@@ -2,6 +2,8 @@
 
 Detects heavy workflows that do not ignore obviously non-code changes such as docs and markdown.
 
+Meta-workflow exclusions distinguish executable work and explicit intent from printed examples or comments. Displaying a word such as `triage` does not exempt an otherwise heavy workflow.
+
 Why this rule exists:
 
 - documentation-only changes often should not spend the same CI budget as code changes

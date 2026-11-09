@@ -1,10 +1,14 @@
 # prefer-sparse-checkout-for-scoped-workflow
 
-Shared history/script evidence distinguishes execution from displayed text. Opaque scripts, unsupported shell syntax and custom shells (including workflow/job defaults) prevent narrowing advice, even in multi-checkout jobs. Existing agentic-inspection and scoring heuristics remain in place.
+Shared history/script evidence distinguishes execution from displayed text. Opaque scripts, unsupported shell syntax and custom shells (including workflow/job defaults) prevent narrowing advice, even in multi-checkout jobs. Scoring remains unchanged.
 
 Scope comes from modeled path operands, actual static redirection targets, step working directories and artifact-action paths, not printed paths, comments, API payloads or arbitrary action inputs. Dynamic/traversing paths and wildcard subtree names do not establish a narrow scope. Actual `find .`, `fd .` and other broad scans suppress the suggestion; displayed scan examples do not. Other intent/safety exclusions remain conservative.
 
+Workspace-install and quality-command exclusions require executable tool/task evidence, not log messages, comments, search patterns, or unrelated filename arguments. Agent-inspection evidence comes from tool/action identity and its relevant task inputs, not agent names printed by another command. Executable substitutions remain evidence. Explicit quality/agent labels remain conservative intent hints, and structured agent-action prompts and unknown-execution guards still apply.
+
 Flags build or release jobs that use only a narrow working tree and may still benefit from sparse checkout.
+
+History-specific wording requires actual history commands or explicit checkout/name intent, not displayed `git log` examples. Repository-local sparse-checkout precedents also distinguish real builds/scans from printed or commented examples; unrelated peer logs cannot erase valid structured precedents.
 
 ## Why it matters
 

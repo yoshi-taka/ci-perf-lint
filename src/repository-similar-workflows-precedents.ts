@@ -1,4 +1,4 @@
-import type { WorkflowDocument, WorkflowJob } from "./workflow.ts";
+import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "./workflow.ts";
 import type { YAMLMap } from "./yaml.ts";
 import { getScalarValue, getStringOrArrayValue } from "./workflow.ts";
 import { collectScopePrefixes } from "./rules/shared/workflow-path-prefixes.ts";
@@ -15,7 +15,16 @@ import {
   workflowLooksReleaseLike,
 } from "./rules/shared/workflow-jobs.ts";
 import { getCheckoutStep } from "./rules/shared/workflow-analysis.ts";
-import { getLoweredWorkflowStepText } from "./rules/shared/workflow-step-text.ts";
+import { workflowCommandWorkText } from "./rules/shared/workflow-step-text.ts";
+import {
+  textHasWideRepositoryAccess,
+  repositoryCommandHead,
+} from "./rules/shared/repository-command-evidence.ts";
+import {
+  toolInvocations,
+  invocationOptions,
+  invocationOperands,
+} from "./rules/shared/tool-command-evidence.ts";
 import {
   getWorkflowScheduleCrons,
   workflowHasManualOnlyTrigger,
@@ -165,18 +174,48 @@ function hasDeepHistory(step: WorkflowJob["steps"][number] | undefined): boolean
   return false;
 }
 
-function jobHasWideRepoAccess(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return /(find\s+\.\b|rg\s+(?:--files\b|\.)|fd\s+\.\b|git\s+grep\b|ls\s+-r\b|du\s+-|turbo\s+run\b|nx\s+affected\b|lerna\b)/.test(
-      text,
-    );
+function stepPrecedentEvidence(step: WorkflowStep): string {
+  const commands = workflowCommandWorkText(step.run ?? "");
+  const metadata = toolInvocations(step.run ?? "").flatMap((words) => {
+    const [tool, action, task] = repositoryCommandHead(words);
+    if (tool === "git") {
+      return [[tool, action].filter(Boolean).join(" ")];
+    }
+    if (tool === "gh" && action === "release") {
+      return [[tool, action, task].filter(Boolean).join(" ")];
+    }
+    if (tool === "gh" && action === "api") {
+      const operands = invocationOperands(words, [
+        "-f",
+        "-F",
+        "--field",
+        "--raw-field",
+        "-H",
+        "--header",
+        "-X",
+        "--method",
+        "--input",
+        "--hostname",
+        "-q",
+        "--jq",
+        "-t",
+        "--template",
+      ]);
+      return [`gh api ${operands[1] ?? ""}`];
+    }
+    return [];
   });
+  const name = commands || step.uses ? (step.name ?? "") : "";
+  return `${name} ${step.uses ?? ""} ${commands} ${metadata.join(" ")}`.toLowerCase();
+}
+
+function jobHasWideRepoAccess(job: WorkflowJob): boolean {
+  return job.steps.some((step) => textHasWideRepositoryAccess(step.run ?? ""));
 }
 
 function jobHasHeavyBuildOrInstall(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
+    const text = stepPrecedentEvidence(step);
     return /(\bnpm\s+(?:ci|install|run\s+build)\b|\bpnpm\s+(?:install|build)\b|\byarn\s+(?:install|build)\b|\bbun\s+(?:install|run\s+build)\b|\bpytest\b|\bjest\b|\bvitest\b|\bcargo\s+build\b|\bgradle\b|\bmvn\b|tauri|electron-builder|docker build)/.test(
       text,
     );
@@ -186,7 +225,7 @@ function jobHasHeavyBuildOrInstall(job: WorkflowJob): boolean {
 function jobLooksLikeBlobHungryReleasePipeline(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
     const text =
-      `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""} ${JSON.stringify(step.with ?? {})}`.toLowerCase();
+      `${stepPrecedentEvidence(step)} ${step.uses ? JSON.stringify(step.with ?? {}) : ""}`.toLowerCase();
     if (
       /(install-code-deps["']?\s*:\s*(?:["']?true|true)|\brelease:publish\b|\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|compile|pack|publish)\b|\byarn\s+task\b[\s\S]*\bcompile\b)/.test(
         text,
@@ -203,11 +242,18 @@ function jobLooksLikeBlobHungryReleasePipeline(job: WorkflowJob): boolean {
 
 function jobLooksLikeRepoEditingAgenticDocsJob(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
+    const identity = stepPrecedentEvidence(step);
+    const agent =
+      /(sst\/opencode\/github@|claude|codex|openai|anthropic|gemini|ai agent|agentic|autofix|code review)/;
+    const inputs = toolInvocations(step.run ?? "")
+      .filter(([tool]) => agent.test(tool ?? ""))
+      .map((words) => words.join(" "))
+      .join(" ");
     const text =
-      `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""} ${JSON.stringify(step.with ?? {})}`.toLowerCase();
+      `${identity} ${inputs} ${step.uses ? JSON.stringify(step.with ?? {}) : ""}`.toLowerCase();
     return (
       /(sst\/opencode\/github@|claude|codex|openai|anthropic|gemini|ai agent|agentic|autofix|code review)/.test(
-        text,
+        identity,
       ) &&
       /(content\/docs|docs\/|documentation|update docs|write docs|edit docs|changed files|modified files)/.test(
         text,
@@ -217,10 +263,19 @@ function jobLooksLikeRepoEditingAgenticDocsJob(job: WorkflowJob): boolean {
 }
 
 function jobHasExplicitFilteredFetchCandidate(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return /\bgit\s+fetch\b(?=[\s\S]*--depth[=\s]\d+)/.test(text) && !text.includes("--filter=");
-  });
+  return job.steps.some((step) =>
+    toolInvocations(step.run ?? "").some((words) => {
+      const [tool, action] = repositoryCommandHead(words);
+      if (tool !== "git" || action !== "fetch") {
+        return false;
+      }
+      const options = invocationOptions(words, ["--depth", "--filter"]);
+      return (
+        options.some(({ name, value }) => name === "--depth" && /^\d+$/.test(value ?? "")) &&
+        !options.some(({ name }) => name === "--filter")
+      );
+    }),
+  );
 }
 
 function jobLooksHistoryMetadataLike(workflow: WorkflowDocument, job: WorkflowJob): boolean {
@@ -236,7 +291,7 @@ function jobLooksHistoryMetadataLike(workflow: WorkflowDocument, job: WorkflowJo
   }
 
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
+    const text = stepPrecedentEvidence(step);
     return /(\bgh\s+release\s+(?:create|view|edit|upload)\b|\bgh\s+api\b.*\/releases\b|\bgit\s+(?:describe|tag|rev-list|log)\b|commitlint|commitlint-github-action|release notes|changelog|previous tag|semantic-release|release-it|changeset|git-cliff|conventional-changelog|changelogithub|release-please|googleapis\/release-please-action@|release-please-automation-action@|softprops\/action-gh-release@|ncipollo\/release-action@|release-drafter\/release-drafter@|actions\/create-release@)/.test(
       text,
     );
@@ -245,7 +300,7 @@ function jobLooksHistoryMetadataLike(workflow: WorkflowDocument, job: WorkflowJo
 
 function jobHasStrongReleaseMetadataSignal(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
+    const text = stepPrecedentEvidence(step);
     return /(\bgh\s+release\s+(?:create|view|edit|upload)\b|\bgh\s+api\b.*\/releases\b|release notes|changelog|git-cliff|conventional-changelog|changelogithub|release-please|googleapis\/release-please-action@|release-please-automation-action@|softprops\/action-gh-release@|ncipollo\/release-action@|release-drafter\/release-drafter@|actions\/create-release@)/.test(
       text,
     );
@@ -259,7 +314,7 @@ function jobLooksCommitMetadataLike(job: WorkflowJob): boolean {
   }
 
   return job.steps.some((step) =>
-    /(commitlint|commitlint-github-action)/.test(getLoweredWorkflowStepText(step)),
+    /(commitlint|commitlint-github-action)/.test(stepPrecedentEvidence(step)),
   );
 }
 

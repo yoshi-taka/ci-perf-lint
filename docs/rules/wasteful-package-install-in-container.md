@@ -6,6 +6,8 @@ Jobs that run inside a Docker container (`container:`) but install OS packages
 (`apt-get install`, `apk add`, `brew install`, etc.) in workflow steps where the
 installed packages are not referenced in later steps.
 
+Installs and later tool usage require executable command evidence. Labels, comments, displayed examples, and search patterns do not establish installation or use. Supported wrappers and executable substitutions still count; literal single-quoted substitutions do not. Package-to-executable mappings remain heuristic, so verify actual usage before removing or relocating dependencies.
+
 ## Why It Matters
 
 If the job already runs in a container, dependencies should be baked into the

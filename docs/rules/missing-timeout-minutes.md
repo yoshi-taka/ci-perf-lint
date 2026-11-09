@@ -21,6 +21,10 @@ Current MVP heuristic:
 
 Comment/review-triggered AI jobs are included even when a mention or other job-level condition gates them: once started, they still need a runtime ceiling. Non-agentic sibling jobs are not included solely because another job runs an AI action. This does not recommend cancellation or removing dependencies between jobs.
 
+Command evidence uses executable/tool and supported task positions, not printed examples, comments, search patterns, or arbitrary filenames such as `cat 'build notes.txt'`. Executable substitutions still count; single-quoted literal substitutions do not. Workflow/job intent names and structured agent actions remain signals, while a step label alone on a display-only command does not establish execution.
+
+A timed display-only step does not count as heavy-step timeout coverage or lower severity. Real build/publish/upload commands and actions can still provide that coverage; a meaningful label alongside real execution (for example `Build` with `make all`) remains an intent hint.
+
 Typical remediation:
 
 - set a job-level timeout that matches the expected runtime and failure budget

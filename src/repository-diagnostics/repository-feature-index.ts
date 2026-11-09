@@ -69,7 +69,6 @@ const DOCKER_BUILD_PUSH_ACTION_RE = /(?:docker|depot|useblacksmith)\/build-push-
 const DOCKER_CLI_BUILD_RE = /\b(?:docker\s+(?:buildx\s+build|build)|depot\s+build)\b/i;
 const DOCKER_COMPOSE_BUILD_RE = /\bdocker\s+compose\b[\s\S]*\bbuild\b/i;
 const TERRAFORM_INIT_RE = /\bterraform\s+init\b/i;
-const SPARSE_CHECKOUT_RE = /sparse-checkout/i;
 
 function computeDockerBuildPresence(blob: string): DockerBuildPresenceFeature {
   const hasActionBasedBuild = DOCKER_BUILD_PUSH_ACTION_RE.test(blob);
@@ -125,7 +124,14 @@ export function buildRepositoryFeatureIndex(
       sourceText: source,
       dockerBuild: computeDockerBuildPresence(blob),
       hasTerraformInit: TERRAFORM_INIT_RE.test(blob),
-      hasSparseCheckout: source ? SPARSE_CHECKOUT_RE.test(source) : false,
+      hasSparseCheckout: workflow.jobs.some((job) =>
+        job.steps.some(
+          (step) =>
+            step.uses?.toLowerCase().startsWith("actions/checkout@") &&
+            typeof step.with?.["sparse-checkout"] === "string" &&
+            step.with["sparse-checkout"].trim().length > 0,
+        ),
+      ),
     });
   }
 

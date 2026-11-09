@@ -10,6 +10,8 @@ The existing missing-cache-mount warnings for Cargo, Go, Maven, Gradle, and Bund
 
 The scanner follows build order within a job and attributes warnings to the workflow containing the qualifying build. A qualifying build of one Dockerfile does not enable cache-mount warnings for every Dockerfile in the repository.
 
+CLI targets come from executable build invocations, with file/context/target options owned by that command. Printed build/compose examples cannot create targets. Builder mutations and environment overrides likewise require actual commands, assignments, or recognized `GITHUB_ENV` writes; logs and comments do not reset persistent-builder state.
+
 This is configuration evidence, not a guarantee that every run hits a cache: vendor fallbacks, failed jobs, eviction, garbage collection, and storage misses can still occur. Buildkite storage must actually back the local daemon's standard data root. Queue names and hosted/self-hosted labels do not establish this.
 
 ## Paths that do not establish persistence

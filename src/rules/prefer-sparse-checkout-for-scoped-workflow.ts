@@ -9,7 +9,9 @@ import {
   workflowLooksReleaseLike,
 } from "./shared/workflow-jobs.ts";
 import { collectScopePrefixes } from "./shared/workflow-path-prefixes.ts";
-import { getLoweredWorkflowStepText } from "./shared/workflow-step-text.ts";
+import { workflowCommandWorkText } from "./shared/workflow-step-text.ts";
+import { dependencyInstallCommands } from "./shared/dependency-install-evidence.ts";
+import { toolInvocations, textRunsTool } from "./shared/tool-command-evidence.ts";
 import { usesSetupAction } from "./shared/workflow-setup-actions.ts";
 import { getCheckoutStep } from "./shared/workflow-analysis.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -65,9 +67,9 @@ function hasExplicitFullHistorySignal(
   }
 
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return /(git\s+log\b|git\s+rev-list\b|git\s+describe\b|git\s+tag\b|previous tag|release notes)/.test(
-      text,
+    return (
+      textRunsTool(step.run ?? "", "git", ["log", "rev-list", "describe", "tag"]) ||
+      /previous tag|release notes/.test(`${step.name ?? ""} ${step.uses ?? ""}`.toLowerCase())
     );
   });
 }
@@ -77,20 +79,19 @@ function hasWideRepoAccess(job: WorkflowJob): boolean {
 }
 
 function hasWorkspaceInstall(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return /(\bbun\s+install\b|\bnpm\s+(?:ci|install)\b|\bpnpm\s+install\b|\byarn\s+install\b)/.test(
-      text,
-    );
-  });
+  return job.steps.some((step) =>
+    dependencyInstallCommands(step.run ?? "").some(({ tool }) =>
+      ["npm", "pnpm", "yarn", "bun"].includes(tool),
+    ),
+  );
 }
 
 function hasRootQualityGate(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return /(\bbun\s+run\s+(?:lint|typecheck|test|check|build)\b|\bnpm\s+run\s+(?:lint|typecheck|test|check|build)\b|\bpnpm\s+run\s+(?:lint|typecheck|test|check|build)\b|\byarn\s+(?:lint|typecheck|test|check|build)\b|\b(?:lint|typecheck|test|check|build)\b)/.test(
-      text,
-    );
+    // Explicit quality-gate labels remain conservative intent hints.
+    const text =
+      `${step.name ?? ""} ${step.uses ?? ""} ${workflowCommandWorkText(step.run ?? "")}`.toLowerCase();
+    return /\b(?:lint|typecheck|test|check|build)\b/.test(text);
   });
 }
 
@@ -103,11 +104,16 @@ function hasOnlyScriptLikeScope(scopePrefixes: string[]): boolean {
 
 function hasAgenticRepositoryInspection(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text = `${step.name ?? ""} ${step.uses ?? ""} ${step.run ?? ""} ${JSON.stringify(
-      step.with ?? {},
-    )}`.toLowerCase();
+    const identity =
+      `${step.name ?? ""} ${step.uses ?? ""} ${workflowCommandWorkText(step.run ?? "")}`.toLowerCase();
+    const agentPattern = /\b(?:opencode|claude|codex|gemini|openai|anthropic|ai|agent)\b/;
+    const commands = toolInvocations(step.run ?? "").filter(([tool]) =>
+      agentPattern.test(tool ?? ""),
+    );
+    const text =
+      `${identity} ${commands.map((words) => words.join(" ")).join(" ")} ${step.uses ? JSON.stringify(step.with ?? {}) : ""}`.toLowerCase();
     return (
-      /(opencode|claude|codex|gemini|ai|agent)/.test(text) &&
+      agentPattern.test(identity) &&
       /(commit|changed files|changed|read the changed|review|docs|documentation|packages\/web\/src\/content\/docs)/.test(
         text,
       )

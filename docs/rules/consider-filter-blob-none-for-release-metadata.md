@@ -4,6 +4,8 @@ Positive metadata and explicit fetch evidence comes from executed commands or re
 
 Flags history-aware metadata jobs that may be able to use checkout `filter: blob:none`.
 
+Repository-local precedents use command-position metadata, fetch-option ownership, and real build/scan exclusions too. A peer's logs or comments cannot supply metadata execution or erase a valid structured `filter: blob:none` precedent.
+
 ## Why it matters
 
 Some metadata-oriented jobs need deep history for commit ranges, tags, changelogs, or release note generation, but still do not need most repository file contents eagerly downloaded into the checkout.

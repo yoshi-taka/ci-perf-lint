@@ -105,8 +105,9 @@ export async function collectLargeFileDiagnostics(
   const top5 = sorted.slice(0, 5);
   const top5List = top5.map((f) => `${f.path} (${formatSize(f.size)})`).join(", ");
 
-  const hasSparseCheckout =
-    (featureIndex?.workflowsMatchingSource(/sparse-checkout/i) ?? []).length > 0;
+  const hasSparseCheckout = [...(featureIndex?.workflowFeatures.values() ?? [])].some(
+    (feature) => feature.hasSparseCheckout,
+  );
   const parts: string[] = [];
 
   if (csvDataTotal > 0) {

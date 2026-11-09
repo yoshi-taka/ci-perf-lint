@@ -2,6 +2,8 @@
 
 Detects Node Dockerfiles that run project-level `npm install`-style commands while `package-lock.json` is available in the Docker build context.
 
+CLI build and compose targets require executable commands, not printed examples or comments. Dockerfile options belong to that same invocation; structured build-action inputs remain supported.
+
 This rule looks for:
 
 - a Docker build discovered from GitHub Actions

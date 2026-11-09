@@ -17,6 +17,7 @@ import {
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getTriggerFacts } from "./shared/trigger-facts.ts";
 import { getJobFacts } from "./shared/workflow-analysis.ts";
+import { workflowCommandWorkText } from "./shared/workflow-step-text.ts";
 import { identityDiagnosticTransform, pipe } from "./shared/diagnostic-transform.ts";
 import {
   withRepositoryTimeoutPrecedent,
@@ -31,7 +32,9 @@ const meta = {
 } satisfies RuleMeta;
 
 function stepLooksHeavy(step: WorkflowDocument["jobs"][number]["steps"][number]): boolean {
-  const text = `${step.name ?? ""} ${step.uses ?? ""} ${step.run ?? ""}`.toLowerCase();
+  const commands = workflowCommandWorkText(step.run ?? "");
+  const name = commands || step.uses ? (step.name ?? "") : "";
+  const text = `${name} ${step.uses ?? ""} ${commands}`.toLowerCase();
   return /(build|publish|release|deploy|upload|npm|pnpm|yarn|bun|cargo|gradle|maven|pytest|jest|vitest|tauri|electron)/.test(
     text,
   );

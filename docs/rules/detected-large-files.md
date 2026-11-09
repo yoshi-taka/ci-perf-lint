@@ -2,6 +2,8 @@
 
 This repository-wide finding flags excessive large data and binary files that bloat git clone and checkout operations.
 
+The "sparse checkout is configured" wording requires a non-empty `sparse-checkout` input on an `actions/checkout` step. The phrase appearing in a log, comment, or unrelated action input is not configuration evidence.
+
 ## What it flags
 
 The scanner walks the repository for files with these extensions:

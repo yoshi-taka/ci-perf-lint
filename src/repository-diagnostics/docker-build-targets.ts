@@ -2,9 +2,14 @@ import path from "node:path";
 import { parseDocument } from "../yaml.ts";
 import type { AnalysisWarning } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
-import { shellCommandSegments } from "../rules/shared/command-patterns.ts";
+import { shellInvocations } from "../rules/shared/shell-invocations.ts";
+import { invocationOperands, invocationOptions } from "../rules/shared/tool-command-evidence.ts";
+import { workflowWorkingDirectory } from "../rules/shared/workflow-command-context.ts";
 import type { AnyWorkflowDocument } from "../ci-types.ts";
-import { collectPersistentCacheDockerTargets } from "./docker-persistent-cache-targets.ts";
+import {
+  collectPersistentCacheDockerTargets,
+  parseDockerBuildCommand,
+} from "./docker-persistent-cache-targets.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
   collectDockerfileInstructions,
@@ -136,49 +141,29 @@ function extractFromRunStep(repoRoot: string, workflow: WorkflowDocument): Docke
 
   for (const job of workflow.jobs) {
     for (const step of job.steps) {
-      for (const segment of shellCommandSegments(step.run ?? "")) {
-        if (!/\bdocker\s+(?:buildx\s+build|build)\b/i.test(segment)) {
+      for (const words of shellInvocations(step.run ?? "")) {
+        const build = parseDockerBuildCommand(words);
+        if (
+          !build ||
+          build.depot ||
+          /[$`]|__shell_substitution__/.test(`${build.context} ${build.file ?? ""}`)
+        ) {
           continue;
         }
-
-        const normalizedRun = segment.replace(/\\\r?\n/g, " ").replace(/\s+/g, " ");
-        const dockerfileMatch = normalizedRun.match(
-          /(?:^|\s)-f\s+([^\s]+)|(?:^|\s)--file(?:=|\s+)([^\s]+)/i,
-        );
-        const dockerfileValue = normalizeDockerfileValue(
-          dockerfileMatch?.[1] ?? dockerfileMatch?.[2],
-        );
-        const commandMatch = normalizedRun.match(
-          /\bdocker\s+(?:buildx\s+build|build)\b([\s\S]*)$/i,
-        );
-        const argsText = commandMatch?.[1] ?? "";
-        const targetStage = argsText
-          .match(/(?:^|\s)--target(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|]+)/)?.[1]
-          ?.replace(/^['"]|['"]$/g, "");
-        const tokens = argsText
-          .split(/\s+/)
-          .map((token) => token.trim())
-          .filter((token) => token.length > 0 && !["&&", "||", "|", ";"].includes(token));
-        const positionalTokens = tokens.filter(
-          (token, index) =>
-            !token.startsWith("-") && tokens[index - 1] !== "-f" && tokens[index - 1] !== "--file",
-        );
-        const contextValue = normalizeContextValue(positionalTokens.at(-1)) ?? ".";
-
-        if (!contextValue) {
+        const directory = workflowWorkingDirectory(workflow, job, step);
+        if (/[$`]/.test(directory)) {
           continue;
         }
-
-        const contextPath = path.resolve(repoRoot, contextValue);
-        const dockerfilePath = dockerfileValue
-          ? path.resolve(repoRoot, dockerfileValue)
+        const contextPath = path.resolve(repoRoot, directory, build.context);
+        const dockerfilePath = build.file
+          ? path.resolve(repoRoot, directory, build.file)
           : path.join(contextPath, "Dockerfile");
         targets.push({
           workflow: workflow.relativePath,
           jobId: job.id,
           contextPath,
           dockerfilePath,
-          targetStage,
+          targetStage: build.targetStage,
         });
       }
     }
@@ -187,83 +172,51 @@ function extractFromRunStep(repoRoot: string, workflow: WorkflowDocument): Docke
   return targets;
 }
 
-function parseComposeCommand(run: string):
+function parseComposeCommand(words: string[]):
   | {
       composeFile?: string;
       services: string[];
     }
   | undefined {
-  if (!/\bdocker\s+compose\b[\s\S]*\bbuild\b/i.test(run)) {
+  if (words[0] !== "docker" || words[1] !== "compose") {
     return undefined;
   }
-
-  const normalizedRun = run.replace(/\\\r?\n/g, " ").replace(/\s+/g, " ");
-  const tokens = normalizedRun
-    .split(/\s+/)
-    .map((token) => token.trim())
-    .filter((token) => token.length > 0 && !["&&", "||", "|", ";"].includes(token));
-
-  let composeFile: string | undefined;
-  const services: string[] = [];
-
-  let searchFrom = 0;
-  while (searchFrom < tokens.length) {
-    const composeIndex = tokens.findIndex(
-      (token, index) =>
-        index >= searchFrom &&
-        token.toLowerCase() === "compose" &&
-        tokens[index - 1]?.toLowerCase() === "docker",
-    );
-    if (composeIndex === -1) {
-      break;
-    }
-
-    let buildIndex = -1;
-    for (let index = composeIndex + 1; index < tokens.length; index += 1) {
-      const token = tokens[index];
-      if (!token) {
-        continue;
-      }
-
-      if (token === "-f" || token === "--file") {
-        composeFile ??= normalizeDockerfileValue(tokens[index + 1]);
-        index += 1;
-        continue;
-      }
-
-      if (token.startsWith("--file=")) {
-        composeFile ??= normalizeDockerfileValue(token.slice("--file=".length));
-        continue;
-      }
-
-      if (token.toLowerCase() === "build") {
-        buildIndex = index;
-        break;
-      }
-
-      if (token.toLowerCase() === "docker") {
-        break;
-      }
-    }
-
-    if (buildIndex !== -1) {
-      const invocationServices = tokens
-        .slice(buildIndex + 1)
-        .filter((token) => !token.startsWith("-") && token.toLowerCase() !== "docker");
-      services.push(...invocationServices);
-    }
-
-    searchFrom = buildIndex !== -1 ? buildIndex + 1 : composeIndex + 1;
-  }
-
-  if (services.length === 0 && composeFile === undefined) {
+  const command = words.slice(1);
+  const values = [
+    "-f",
+    "--file",
+    "-p",
+    "--project-name",
+    "--project-directory",
+    "--env-file",
+    "--profile",
+    "--parallel",
+    "--ansi",
+    "--progress",
+    "--build-arg",
+    "--builder",
+    "--ssh",
+    ">",
+    "<",
+  ];
+  const operands = invocationOperands(command, values);
+  if (
+    invocationOptions(command, values).some(({ name }) =>
+      ["--help", "-h", "--version"].includes(name),
+    )
+  ) {
     return undefined;
   }
-
-  return {
-    composeFile: composeFile ?? undefined,
-    services,
-  };
+  if (operands[0] !== "build") {
+    return undefined;
+  }
+  const file = invocationOptions(command, values).find(
+    ({ name }) => name === "-f" || name === "--file",
+  )?.value;
+  if (file && /[$`]|__shell_substitution__/.test(file)) {
+    return undefined;
+  }
+  return { composeFile: file, services: operands.slice(1) };
 }
 
 async function resolveComposeTargets(
@@ -275,85 +228,87 @@ async function resolveComposeTargets(
 
   for (const job of workflow.jobs) {
     for (const step of job.steps) {
-      const composeCommand = parseComposeCommand(step.run ?? "");
-      if (!composeCommand) {
-        continue;
-      }
-
-      const composeFileCandidates = composeCommand.composeFile
-        ? [path.resolve(repoRoot, composeCommand.composeFile)]
-        : [
-            path.resolve(repoRoot, "compose.yaml"),
-            path.resolve(repoRoot, "compose.yml"),
-            path.resolve(repoRoot, "docker-compose.yml"),
-            path.resolve(repoRoot, "docker-compose.yaml"),
-          ];
-      const fallbackComposeFilePath = composeFileCandidates[0];
-      if (!fallbackComposeFilePath) {
-        continue;
-      }
-      const resolvedComposeFilePath = (
-        await Promise.allSettled(
-          composeFileCandidates.map(async (candidate) =>
-            (await context.pathExists(candidate)) ? candidate : undefined,
-          ),
-        )
-      )
-        .filter((result) => result.status === "fulfilled")
-        .map((result) => result.value)
-        .find((candidate): candidate is string => candidate !== undefined);
-      const composeFilePath = resolvedComposeFilePath ?? fallbackComposeFilePath;
-
-      if (!(await context.pathExists(composeFilePath))) {
-        continue;
-      }
-
-      const servicesRecord = await loadComposeServices(context, composeFilePath);
-      if (!servicesRecord) {
-        continue;
-      }
-
-      const serviceNames =
-        composeCommand.services.length > 0
-          ? composeCommand.services.filter((name) => name in servicesRecord)
-          : Object.keys(servicesRecord);
-
-      for (const serviceName of serviceNames) {
-        const serviceRecord = asRecord(servicesRecord[serviceName]);
-        const buildValue = serviceRecord?.build;
-        let contextValue: string | undefined;
-        let dockerfileValue: string | undefined;
-        let targetStage: string | undefined;
-
-        if (typeof buildValue === "string") {
-          contextValue = normalizeContextValue(buildValue);
-        } else {
-          const buildRecord = asRecord(buildValue);
-          targetStage = typeof buildRecord?.target === "string" ? buildRecord.target : undefined;
-          contextValue = normalizeContextValue(
-            typeof buildRecord?.context === "string" ? buildRecord.context : undefined,
-          );
-          dockerfileValue = normalizeDockerfileValue(
-            typeof buildRecord?.dockerfile === "string" ? buildRecord.dockerfile : undefined,
-          );
-        }
-
-        if (!contextValue) {
+      for (const words of shellInvocations(step.run ?? "")) {
+        const composeCommand = parseComposeCommand(words);
+        if (!composeCommand) {
           continue;
         }
 
-        const composeDir = path.dirname(composeFilePath);
-        const contextPath = path.resolve(composeDir, contextValue);
-        const dockerfilePath = dockerfileValue
-          ? path.resolve(composeDir, dockerfileValue)
-          : path.join(contextPath, "Dockerfile");
-        targets.push({
-          workflow: workflow.relativePath,
-          jobId: job.id,
-          contextPath,
-          dockerfilePath,
-          targetStage,
-        });
+        const composeFileCandidates = composeCommand.composeFile
+          ? [path.resolve(repoRoot, composeCommand.composeFile)]
+          : [
+              path.resolve(repoRoot, "compose.yaml"),
+              path.resolve(repoRoot, "compose.yml"),
+              path.resolve(repoRoot, "docker-compose.yml"),
+              path.resolve(repoRoot, "docker-compose.yaml"),
+            ];
+        const fallbackComposeFilePath = composeFileCandidates[0];
+        if (!fallbackComposeFilePath) {
+          continue;
+        }
+        const resolvedComposeFilePath = (
+          await Promise.allSettled(
+            composeFileCandidates.map(async (candidate) =>
+              (await context.pathExists(candidate)) ? candidate : undefined,
+            ),
+          )
+        )
+          .filter((result) => result.status === "fulfilled")
+          .map((result) => result.value)
+          .find((candidate): candidate is string => candidate !== undefined);
+        const composeFilePath = resolvedComposeFilePath ?? fallbackComposeFilePath;
+
+        if (!(await context.pathExists(composeFilePath))) {
+          continue;
+        }
+
+        const servicesRecord = await loadComposeServices(context, composeFilePath);
+        if (!servicesRecord) {
+          continue;
+        }
+
+        const serviceNames =
+          composeCommand.services.length > 0
+            ? composeCommand.services.filter((name) => name in servicesRecord)
+            : Object.keys(servicesRecord);
+
+        for (const serviceName of serviceNames) {
+          const serviceRecord = asRecord(servicesRecord[serviceName]);
+          const buildValue = serviceRecord?.build;
+          let contextValue: string | undefined;
+          let dockerfileValue: string | undefined;
+          let targetStage: string | undefined;
+
+          if (typeof buildValue === "string") {
+            contextValue = normalizeContextValue(buildValue);
+          } else {
+            const buildRecord = asRecord(buildValue);
+            targetStage = typeof buildRecord?.target === "string" ? buildRecord.target : undefined;
+            contextValue = normalizeContextValue(
+              typeof buildRecord?.context === "string" ? buildRecord.context : undefined,
+            );
+            dockerfileValue = normalizeDockerfileValue(
+              typeof buildRecord?.dockerfile === "string" ? buildRecord.dockerfile : undefined,
+            );
+          }
+
+          if (!contextValue) {
+            continue;
+          }
+
+          const composeDir = path.dirname(composeFilePath);
+          const contextPath = path.resolve(composeDir, contextValue);
+          const dockerfilePath = dockerfileValue
+            ? path.resolve(composeDir, dockerfileValue)
+            : path.join(contextPath, "Dockerfile");
+          targets.push({
+            workflow: workflow.relativePath,
+            jobId: job.id,
+            contextPath,
+            dockerfilePath,
+            targetStage,
+          });
+        }
       }
     }
   }

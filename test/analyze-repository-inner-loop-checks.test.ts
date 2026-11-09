@@ -26,6 +26,7 @@ async function scan(
     visibility?: "private" | "public" | "unknown";
     files?: Record<string, string>;
     run?: string;
+    step?: Record<string, unknown>;
     extraSteps?: Record<string, unknown>[];
     scripts?: Record<string, string>;
     job?: Record<string, unknown>;
@@ -51,7 +52,7 @@ async function scan(
             { uses: "actions/checkout@v4" },
             { uses: "oven-sh/setup-bun@v2" },
             { run: "bun install --frozen-lockfile" },
-            { run: options.run ?? "bun run lint" },
+            { run: options.run ?? "bun run lint", ...options.step },
             ...(options.extraSteps ?? []),
           ],
         },
@@ -178,6 +179,47 @@ test("Claude policy and actual agent hooks qualify without skills", async () => 
       })
     ).findings,
   ).toHaveLength(1);
+});
+
+test.each([
+  "echo 'bun run lint'",
+  "# bun run lint\necho audit",
+  "printf '%s' 'ruff check .'",
+  "grep 'bun run lint' README.md",
+  "echo '$(bun run lint)'",
+  "ruff check --help",
+])("display/comment hooks do not prove validation automation: %s", async (command) => {
+  const { findings } = await scan({
+    files: {
+      ".agents/skills/validate/SKILL.md": "",
+      ".claude/settings.json": JSON.stringify({
+        hooks: { Stop: [{ hooks: [{ type: "command", command }] }] },
+      }),
+    },
+  });
+  expect(findings).toEqual([]);
+});
+
+test.each(["oxlint --version", "npx prettier --help", "ruff check --help", "bun run lint"])(
+  "help/version are not checks (including scripts): %s",
+  async (run) => {
+    const { findings } = await scan({
+      run,
+      ...(run === "bun run lint" ? { scripts: { lint: "oxlint --version" } } : {}),
+    });
+    expect(findings).toEqual([]);
+  },
+);
+
+test.each(["ssh worker bash {0}", "python", "pwsh"])(
+  "unknown step shell cannot prove a local check-only job: %s",
+  async (shell) => {
+    expect((await scan({ step: { shell } })).findings).toEqual([]);
+  },
+);
+
+test("explicit local shell remains eligible", async () => {
+  expect((await scan({ step: { shell: "bash" } })).findings).toHaveLength(1);
 });
 
 test.each([

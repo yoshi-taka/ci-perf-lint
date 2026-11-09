@@ -15,6 +15,8 @@ A GitHub Actions job consisting exclusively of recognized lint/format commands a
 
 Both lint and formatting produce a medium-confidence **warning**, including in strict mode. No automatic deletion.
 
+Hook automation must contain an executable validation command, not an echo/printf example, comment, or search pattern. Help/version invocations are not lint/format checks, including when reached through package scripts. Unknown per-step shells are excluded just like unsupported workflow/job defaults; API visibility, activity, and setup-duration checks remain mandatory.
+
 ## Suggested action
 
 Review whether agent-local checks can replace the dedicated job. Measure fixed setup costs first. Confirm equivalent commands, tool versions, actual execution, and that every contributor uses the controlled agent environment. Instructions and skills are evidence of investment, not proof of enforcement.

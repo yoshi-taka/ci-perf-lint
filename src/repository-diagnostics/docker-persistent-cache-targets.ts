@@ -6,6 +6,10 @@ import {
   workflowWorkingDirectory,
 } from "../rules/shared/workflow-command-context.ts";
 import type { DockerBuildTarget } from "./docker-build-targets.ts";
+import { shellInvocations } from "../rules/shared/shell-invocations.ts";
+import { shellExecutionTexts } from "../rules/shared/shell-execution-text.ts";
+import { shellCommands } from "../rules/shared/command-patterns.ts";
+import { declaredShellEnvironmentNames } from "../rules/shared/shell-environment-evidence.ts";
 
 const valueOptions = new Set([
   "-f",
@@ -29,6 +33,24 @@ const valueOptions = new Set([
   "--network",
   "--provenance",
   "--sbom",
+  "--build-context",
+  "--attest",
+  "--annotation",
+  "--metadata-file",
+  "--iidfile",
+  "--no-cache-filter",
+  "--ulimit",
+  "--add-host",
+  "--allow",
+  "--call",
+  "--shm-size",
+  "--cgroup-parent",
+  "--memory",
+  "--memory-swap",
+  "--cpuset-cpus",
+  "--cpuset-mems",
+  "--cpu-period",
+  "--cpu-quota",
 ]);
 const booleanOptions = new Set([
   "--push",
@@ -38,6 +60,11 @@ const booleanOptions = new Set([
   "--quiet",
   "-q",
   "--check",
+  "--rm",
+  "--force-rm",
+  "--compress",
+  "--squash",
+  "--disable-content-trust",
 ]);
 
 function literalPath(value: unknown): value is string {
@@ -92,22 +119,33 @@ interface BuildCommand {
   targetStage?: string;
 }
 
-function parseBuildCommand(text: string): BuildCommand | undefined {
-  const match = text
-    .trim()
-    .match(/^(depot\s+build|docker\s+buildx\s+build|docker\s+build)\s+(.+)$/);
-  if (!match) {
+export function parseDockerBuildCommand(words: string[]): BuildCommand | undefined {
+  const [tool, action, subcommand] = words;
+  const buildx = tool === "docker" && action === "buildx" && subcommand === "build";
+  if (!buildx && !(["docker", "depot"].includes(tool ?? "") && action === "build")) {
     return undefined;
   }
-  const args = (match[2]?.match(/"[^"\n]*"|'[^'\n]*'|\S+/g) ?? []).map((arg) =>
-    arg.replace(/^['"]|['"]$/g, ""),
-  );
+  const args = words.slice(buildx ? 3 : 2);
   let context: string | undefined;
   let file: string | undefined;
   let builder: string | undefined;
   let targetStage: string | undefined;
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]!;
+    if ([">", "<"].includes(arg)) {
+      while (args[index + 1] === arg) {
+        index++;
+      }
+      index++;
+      continue;
+    }
+    if (arg === "--") {
+      if (context !== undefined || index + 2 !== args.length) {
+        return undefined;
+      }
+      context = args[index + 1];
+      break;
+    }
     if (arg.startsWith("--") && arg.includes("=")) {
       const [option, ...parts] = arg.split("=");
       if (!valueOptions.has(option!) && !booleanOptions.has(option!)) {
@@ -145,8 +183,8 @@ function parseBuildCommand(text: string): BuildCommand | undefined {
   }
   return context
     ? {
-        depot: match[1]?.startsWith("depot") ?? false,
-        buildx: match[1]?.includes("buildx") ?? false,
+        depot: tool === "depot",
+        buildx,
         context,
         file,
         builder,
@@ -155,15 +193,35 @@ function parseBuildCommand(text: string): BuildCommand | undefined {
     : undefined;
 }
 
-function commands(text: string): string[] {
+function commands(text: string): string[][] {
   // Do not infer shell cwd, branches, or external scripts.
   if (
-    /(?:^|[\s;])(?:cd|if|for|while|case)\s/.test(text) ||
-    /["'][^"']*[;\n&][^"']*["']/.test(text)
+    shellExecutionTexts(text)
+      .flatMap(shellCommands)
+      .some(([tool]) => ["cd", "if", "for", "while", "case"].includes(tool ?? ""))
   ) {
     return [];
   }
-  return text.replace(/\\\r?\n/g, " ").split(/\r?\n|&&|;/);
+  return shellInvocations(text);
+}
+
+function declaresBuilderOverride(text: string): boolean {
+  const names = declaredShellEnvironmentNames(text);
+  for (const words of shellExecutionTexts(text).flatMap(shellCommands)) {
+    let index = words[0] === "sudo" ? 1 : 0;
+    if (words[index] === "-n") {
+      index++;
+    }
+    if (words[index] === "env") {
+      index++;
+    }
+    while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
+      names.add(words[index++]!.split("=", 1)[0]!);
+    }
+  }
+  return ["BUILDX_BUILDER", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_BUILDKIT"].some((name) =>
+    names.has(name),
+  );
 }
 
 function hasBuilderOverride(env: Record<string, unknown>): boolean {
@@ -215,14 +273,18 @@ function githubTargets(repoRoot: string, workflow: WorkflowDocument): DockerBuil
       if (!step.run) {
         continue;
       }
-      if (/\b(?:BUILDX_BUILDER|DOCKER_HOST|DOCKER_CONTEXT|DOCKER_BUILDKIT)\s*=/.test(step.run)) {
+      if (declaresBuilderOverride(step.run)) {
         blacksmith = false;
       }
       for (const command of commands(step.run)) {
-        if (/\bdocker\s+(?:buildx|context)\s+(?:create|use|rm)\b/.test(command)) {
+        if (
+          command[0] === "docker" &&
+          ["buildx", "context"].includes(command[1] ?? "") &&
+          ["create", "use", "rm"].includes(command[2] ?? "")
+        ) {
           blacksmith = false;
         }
-        const build = parseBuildCommand(command);
+        const build = parseDockerBuildCommand(command);
         if (!build) {
           continue;
         }
@@ -283,10 +345,9 @@ export function collectPersistentCacheDockerTargets(
           env.DOCKER_BUILDKIT !== "0" &&
           env.DOCKER_BUILDKIT !== 0;
         const run = (step.commands ?? [step.command ?? ""]).join("\n");
-        const overridesHost =
-          /\b(?:DOCKER_HOST|DOCKER_CONTEXT|DOCKER_BUILDKIT|BUILDX_BUILDER)\s*=/.test(run);
+        const overridesHost = declaresBuilderOverride(run);
         for (const command of commands(run)) {
-          const build = parseBuildCommand(command);
+          const build = parseDockerBuildCommand(command);
           if (!build) {
             continue;
           }

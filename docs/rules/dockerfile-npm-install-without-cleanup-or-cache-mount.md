@@ -1,5 +1,7 @@
 # Dockerfile npm install without cleanup or cache mount
 
+Dockerfile targets must come from real build/compose commands or structured build-action inputs, not log messages containing build examples.
+
 ## Why it matters
 
 npm's download cache is separate from installed `node_modules` and can persist in image layers. Keeping it outside the layer preserves rebuild reuse without packaging the cache.
