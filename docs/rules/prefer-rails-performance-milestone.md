@@ -1,5 +1,7 @@
 # prefer-rails-performance-milestone
 
+Test/precompile workloads must be actual Rails/Rake/RSpec invocations, including supported Bundler and binstub forms. Step labels, comments and output strings do not establish work. The repository-version milestone, compatibility checks and scoring are unchanged.
+
 Detects repositories that use Rails 7.0.x or 7.1.x with an active CI pipeline
 and recommends upgrading to Rails 7.2.x for CI performance improvements.
 

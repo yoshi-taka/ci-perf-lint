@@ -2,7 +2,9 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { hasOpaqueRepoScriptExecution } from "./shared/workflow-jobs.ts";
+import { shellInvocations, shellNonDisplayInvocations } from "./shared/shell-invocations.ts";
+import { invocationHasNativeOrOpaqueWork } from "./shared/tooling-command-evidence.ts";
+import { stepHasKnownRunnerShell } from "./shared/runner-execution-context.ts";
 
 const meta = {
   id: "docker-build-load-true-unnecessary",
@@ -31,38 +33,62 @@ function getStaticTagsOrSkip(step: WorkflowStep): string[] | undefined {
     .filter((t) => t.length > 0);
 }
 
-function imageUsedAfterStep(job: WorkflowJob, stepIndex: number, tags: string[]): boolean {
+function imageUsedAfterStep(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  stepIndex: number,
+  tags: string[],
+): boolean {
   return job.steps.slice(stepIndex + 1).some((step) => {
+    if (step.uses) {
+      return !/^(?:actions\/(?:checkout|cache(?:\/restore|\/save)?|upload-artifact|download-artifact|setup-node|setup-python|setup-go|setup-java)|ruby\/setup-ruby)@/i.test(
+        step.uses,
+      );
+    }
     const runText = step.run ?? "";
     if (runText.length === 0) {
       return false;
     }
 
-    if (/\bdocker\s+(?:run|compose|tag|save)\b/i.test(runText)) {
+    if (!stepHasKnownRunnerShell(workflow, job, step)) {
       return true;
     }
-
+    const allCommands = shellInvocations(runText, false);
     if (
-      hasOpaqueRepoScriptExecution(job) ||
-      /\b(?:make|just|task)\b|\.sh\b|(?:bash|sh|zsh)\s+\S+|(?:node|bun|python|python3)\s+\S+\.(?:[cm]?[jt]sx?|py)\b/i.test(
-        runText,
-      )
+      allCommands.length === 0 &&
+      !runText.split(/\r?\n/).every((line) => !line.trim() || line.trim().startsWith("#"))
     ) {
       return true;
     }
-
-    if (/\$\{\{\s*steps\.[^}]+\.outputs\.(?:imageid|digest)\s*\}\}/i.test(runText)) {
-      return true;
-    }
-
-    for (const tag of tags) {
-      const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (new RegExp(escaped).test(runText)) {
+    return shellNonDisplayInvocations(runText).some((words) => {
+      const [tool, action] = words;
+      if (["grep", "egrep", "fgrep", "test", "[", "[["].includes(tool ?? "")) {
+        return false;
+      }
+      if (tool === "docker" && ["run", "compose", "tag", "save"].includes(action ?? "")) {
         return true;
       }
-    }
-
-    return false;
+      if (
+        invocationHasNativeOrOpaqueWork(words) ||
+        ["make", "just", "task", "zsh"].includes(tool ?? "")
+      ) {
+        return true;
+      }
+      if (
+        (["pixi", "uv", "poetry", "hatch", "pdm", "npm", "pnpm", "yarn", "bun"].includes(
+          tool ?? "",
+        ) &&
+          action === "run") ||
+        (["npm", "pnpm", "yarn", "bun"].includes(tool ?? "") &&
+          ["test", "build", "exec"].includes(action ?? ""))
+      ) {
+        return true;
+      }
+      if (/\$\{\{\s*steps\.[^}]+\.outputs\.(?:imageid|digest)\s*\}\}/i.test(words.join(" "))) {
+        return true;
+      }
+      return words.some((word) => tags.some((tag) => word.includes(tag)));
+    });
   });
 }
 
@@ -85,7 +111,7 @@ export const dockerBuildLoadTrueUnnecessaryRule = {
           continue;
         }
 
-        if (imageUsedAfterStep(job, index, tags)) {
+        if (imageUsedAfterStep(workflow, job, index, tags)) {
           continue;
         }
 

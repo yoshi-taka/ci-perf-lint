@@ -1,5 +1,7 @@
 # prefer-setup-uv-for-lightweight-python-tooling
 
+Shared shell extraction supplies executable/task names, not step labels, output, installed package names or argument filenames. Actual test/build work and unexpanded script/native execution prevent a lightweight-only recommendation. For example, `ruff check tests/build.py` remains tooling, whereas `python scripts/check.py` is not assumed lightweight from its filename.
+
 ## What it flags
 
 Flags jobs that:

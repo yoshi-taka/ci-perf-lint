@@ -1,5 +1,7 @@
 # prefer-setup-bun-for-lightweight-node-tooling
 
+Lightweight/heavy evidence comes from invoked executables and package-manager task names, not step labels, printed commands or argument filenames. Printed Nx commands do not supply an exemption. Actual application/native work, dynamic executable selection and unexpanded local scripts prevent the lightweight-only recommendation. Task names remain heuristic signals; script bodies are not compiled or executed.
+
 ## What it flags
 
 Flags jobs that:

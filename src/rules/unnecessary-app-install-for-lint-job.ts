@@ -4,6 +4,7 @@ import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { detectInstallCommand, detectLintToolFromText } from "./shared/tools.ts";
 import { shellInvocations } from "./shared/shell-invocations.ts";
+import { hasNativeOrOpaqueToolingWork } from "./shared/tooling-command-evidence.ts";
 
 const meta = {
   id: "unnecessary-app-install-for-lint-job",
@@ -34,13 +35,9 @@ export const unnecessaryAppInstallForLintJobRule = {
 
       const hasAppStep = job.steps.some(
         (step) =>
-          appConsumingPattern.test(step.run ?? "") ||
-          shellInvocations(step.run ?? "").some(
-            ([tool, action]) =>
-              /^(?:\$|`)/.test(tool ?? "") ||
-              (tool === "cargo" && action !== "fmt") ||
-              /^(?:cross|napi|node-gyp)$/.test(tool ?? ""),
-          ),
+          [...shellInvocations(step.run ?? "", false), ...shellInvocations(step.run ?? "")].some(
+            (words) => appConsumingPattern.exec(words.join(" "))?.index === 0,
+          ) || hasNativeOrOpaqueToolingWork(step.run ?? ""),
       );
       if (hasAppStep) {
         continue;

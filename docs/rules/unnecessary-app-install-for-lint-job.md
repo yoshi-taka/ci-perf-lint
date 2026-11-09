@@ -1,5 +1,7 @@
 # `unnecessary-app-install-for-lint-job`
 
+Application/native work must be visible in command position; comments, output and filenames do not create an exemption. Real compiler/test commands, dynamic executable selection and unexpanded local scripts still prevent declaring application dependencies unnecessary. Lint dependency/configuration safeguards remain unchanged.
+
 Detects jobs that install full application dependencies but only run lint or check tools.
 
 Why this rule exists:

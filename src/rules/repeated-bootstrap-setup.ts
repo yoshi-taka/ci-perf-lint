@@ -7,6 +7,7 @@ import { buildWorkflowSemantics } from "./shared/workflow-semantics.ts";
 import { workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
 import { detectInstallCommandFromText } from "./shared/tools.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) {
@@ -29,7 +30,13 @@ function bootstrapIdentity(workflow: WorkflowDocument, job: WorkflowJob): string
           step.uses ?? "",
         ) ||
         Boolean(detectInstallCommandFromText(step.run ?? "")) ||
-        /\b(?:corepack|npm\s+(?:i|install)\s+(?:-g|--global))\b/.test(step.run ?? ""),
+        shellInvocations(step.run ?? "", false).some(
+          ([tool, action, ...args]) =>
+            tool === "corepack" ||
+            (tool === "npm" &&
+              ["i", "install"].includes(action ?? "") &&
+              args.some((arg) => ["-g", "--global"].includes(arg))),
+        ),
     )
     .map((step) => ({
       uses: step.uses,

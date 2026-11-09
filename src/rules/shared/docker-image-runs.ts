@@ -4,6 +4,7 @@ import { collectCommandEntries } from "./any-step.ts";
 import { hasShellInputDocument, shellCommands } from "./command-patterns.ts";
 import { getScalarValue } from "../../workflow.ts";
 import { jobIsStaticallyDisabled } from "./workflow-jobs.ts";
+import { shellInvocations } from "./shell-invocations.ts";
 
 export interface DockerImageRun {
   image: string;
@@ -100,7 +101,14 @@ function activeCommandEntries(doc: CIDocument) {
 
 const commandWrappers = new Set(["command", "exec", "nohup", "sudo", "time"]);
 
-function dockerRunImage(words: string[]): { image: string; words: string[] } | undefined {
+interface ParsedDockerRun {
+  image: string;
+  words: string[];
+  options: Map<string, string>;
+  arguments: string[];
+}
+
+function dockerRunImage(words: string[]): ParsedDockerRun | undefined {
   let start = 0;
   while (start < words.length && commandWrappers.has(words[start]!)) {
     start++;
@@ -113,6 +121,7 @@ function dockerRunImage(words: string[]): { image: string; words: string[] } | u
     return undefined;
   }
   let index = 2;
+  const options = new Map<string, string>();
   for (; index < command.length; index++) {
     const word = command[index]!;
     if (word === "--") {
@@ -123,19 +132,32 @@ function dockerRunImage(words: string[]): { image: string; words: string[] } | u
       break;
     }
     if (word.includes("=")) {
+      const equals = word.indexOf("=");
+      options.set(word.slice(0, equals), word.slice(equals + 1));
       continue;
     }
     if (flagOptions.has(word)) {
+      options.set(word, "true");
       continue;
     }
     if (!valueOptions.has(word)) {
       // Unknown option: do not guess whether the next token is a value.
       return undefined;
     }
-    index++;
+    options.set(word, command[++index] ?? "");
   }
   const image = command[index];
-  return image ? { image, words: command } : undefined;
+  return image
+    ? { image, words: command, options, arguments: command.slice(index + 1) }
+    : undefined;
+}
+
+/** Reuse image/option ownership without confusing display arguments with Docker runs. */
+export function dockerRunCommands(text: string): ParsedDockerRun[] {
+  return shellInvocations(text, false).flatMap((words) => {
+    const run = dockerRunImage(words);
+    return run ? [run] : [];
+  });
 }
 
 /** Find `docker run <official image>` commands in any supported CI document. */

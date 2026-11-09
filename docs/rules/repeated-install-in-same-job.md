@@ -1,5 +1,7 @@
 # `repeated-install-in-same-job`
 
+Install scope is derived from parsed arguments, never comment text. Existing single-static-command, environment, working-directory and checkout-generation safeguards are retained. Global install prefixes and other options remain distinct. The existing registry-independent global-package review heuristic is retained: repeating the same package with a different registry can still be flagged for review, not asserted to produce identical artifacts.
+
 GitHub Actions checkout steps separate dependency-state groups. Installs across a checkout are not compared; duplicates within either group remain eligible. This does not prove that arbitrary scripts preserve lockfiles or installed dependencies, so review each proposed deletion.
 
 Detects the same install command running multiple times within one job.

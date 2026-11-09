@@ -55,6 +55,11 @@ export function shellInvocations(text: string, unwrapTools = true): string[][] {
         index += 2;
       } else if (runner === "uv" && words[index + 1] === "run") {
         index += 2;
+      } else if (runner === "npm" && words[index + 1] === "exec") {
+        index += 2;
+        while (["--yes", "-y", "--no", "--"].includes(words[index] ?? "")) {
+          index++;
+        }
       } else if (runner === "uv" && words[index + 1] === "tool" && words[index + 2] === "run") {
         index += 3;
       } else if (/^python(?:3(?:\.\d+)?)?$/.test(runner ?? "") && words[index + 1] === "-m") {
@@ -63,4 +68,14 @@ export function shellInvocations(text: string, unwrapTools = true): string[][] {
       const command = words.slice(index);
       return command.length && !command[0]!.startsWith("-") ? [command] : [];
     });
+}
+
+/** Display arguments are data; substitutions within them remain separate invocations. */
+export function shellNonDisplayInvocations(text: string): string[][] {
+  return shellInvocations(text, false).filter(
+    ([tool]) =>
+      !["echo", "printf", "/bin/echo", "/usr/bin/echo", "/bin/printf", "/usr/bin/printf"].includes(
+        tool ?? "",
+      ),
+  );
 }

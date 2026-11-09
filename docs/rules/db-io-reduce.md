@@ -1,5 +1,7 @@
 # `db-io-reduce`
 
+Shell starts use shared command extraction and Docker option/image ownership. A database name in a container label, name or display string is not a database image. Tmpfs options and server configuration must belong to the same run; printed settings or another container's settings do not optimize it. Explicit client/script commands and unknown entrypoints are not assumed to start a DB server. Compose still uses medium-confidence DB hints, but requires an actual Compose invocation; other commands' output is not a hint. Existing structured service-option/environment heuristics remain separate.
+
 Database service containers and ad-hoc `docker run` commands in CI write to disk by default. On GitHub Actions hosted runners, this causes unnecessary I/O overhead that can significantly slow down test suites.
 
 Optimise by either:

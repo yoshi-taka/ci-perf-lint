@@ -3,6 +3,8 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { stepDisplayName } from "./shared/any-step.ts";
+import { dockerRunCommands } from "./shared/docker-image-runs.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 const ruleMeta = {
   id: "db-io-reduce",
@@ -34,7 +36,10 @@ function postgresTmpfsAdvice(image: string, env?: Record<string, unknown>): stri
 }
 
 function detectDbType(image: string): DbType | undefined {
-  const n = image.toLowerCase();
+  const n = image
+    .toLowerCase()
+    .replace(/^(?:docker\.io\/)?(?:library\/)?/, "")
+    .split("@", 1)[0]!;
   if (
     n === "mysql" ||
     n.startsWith("mysql:") ||
@@ -95,28 +100,38 @@ function serviceIsOptimized(
   return false;
 }
 
-function stepIsDockerRunWithDb(step: WorkflowStep, dbType: DbType): boolean {
-  const run = step.run ?? "";
-  if (!run) {
-    return false;
-  }
-  const word = dbType === "mysql" ? "mysql" : "postgres";
-  return new RegExp(
-    `\\bdocker\\s+run\\b[\\s\\S]*?\\b${word}[:\\s\\/-]|\\bdocker\\s+run\\b[\\s\\S]*?\\b${word}\\b`,
-    "i",
-  ).test(run);
-}
-
-function stepIsDockerComposeWithDbHint(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
-  if (!run) {
-    return false;
-  }
-  if (!/\bdocker\s+compose\s+(?:up|start|run)\b/i.test(run)) {
-    return false;
-  }
-  const all = `${run} ${step.name ?? ""}`.toLowerCase();
-  return /\b(mysql|postgres)\b/.test(all);
+function composeCommandsWithDbHint(step: WorkflowStep): string[][] {
+  return shellInvocations(step.run ?? "", false).flatMap(([tool, action, ...args]) => {
+    if (tool !== "docker" || action !== "compose") {
+      return [];
+    }
+    let index = 0;
+    while (args[index]?.startsWith("-")) {
+      const arg = args[index++]!;
+      if (
+        [
+          "-f",
+          "--file",
+          "-p",
+          "--project-name",
+          "--project-directory",
+          "--env-file",
+          "--profile",
+        ].includes(arg)
+      ) {
+        index++;
+      } else if (
+        arg !== "--compatibility" &&
+        !/^--(?:file|project-name|project-directory|env-file|profile)=/.test(arg)
+      ) {
+        return [];
+      }
+    }
+    if (!["up", "start", "run"].includes(args[index] ?? "")) {
+      return [];
+    }
+    return /\b(mysql|postgres)\b/i.test(`${args.join(" ")} ${step.name ?? ""}`) ? [args] : [];
+  });
 }
 
 function checkServiceContainers(workflow: WorkflowDocument, meta: RuleMeta, job: WorkflowJob) {
@@ -171,21 +186,32 @@ function checkDockerRunSteps(workflow: WorkflowDocument, meta: RuleMeta, job: Wo
   const findings: Diagnostic[] = [];
 
   for (const step of job.steps) {
-    let dbType: DbType | undefined;
-    if (stepIsDockerRunWithDb(step, "mysql")) {
-      dbType = "mysql";
-    } else if (stepIsDockerRunWithDb(step, "postgres")) {
-      dbType = "postgres";
-    }
-
-    if (!dbType) {
+    const run = dockerRunCommands(step.run ?? "").find((command) => {
+      const type = detectDbType(command.image);
+      if (!type) {
+        return false;
+      }
+      const serverNames = type === "postgres" ? ["postgres"] : ["mysqld", "mariadbd"];
+      const entrypoint = command.options.get("--entrypoint");
+      if (entrypoint !== undefined && !serverNames.includes(entrypoint.split("/").at(-1) ?? "")) {
+        return false;
+      }
+      // An image used to run a client or an opaque script does not prove a DB server starts.
+      const first = command.arguments[0];
+      if (first && !first.startsWith("-") && ![...serverNames, ">", "<"].includes(first)) {
+        return false;
+      }
+      if (command.options.has("--tmpfs")) {
+        return false;
+      }
+      const redirect = command.arguments.findIndex((arg) => arg === ">" || arg === "<");
+      const serverArgs = command.arguments.slice(0, redirect < 0 ? undefined : redirect).join(" ");
+      return type === "mysql" ? !mysqlHasConfig(serverArgs) : !postgresHasConfig(serverArgs);
+    });
+    if (!run) {
       continue;
     }
-
-    const run = step.run ?? "";
-    if (serviceIsOptimized(dbType, run)) {
-      continue;
-    }
+    const dbType = detectDbType(run.image)!;
 
     const info = DB_INFO[dbType];
     findings.push(
@@ -207,12 +233,14 @@ function checkDockerComposeSteps(workflow: WorkflowDocument, meta: RuleMeta, job
   const findings: Diagnostic[] = [];
 
   for (const step of job.steps) {
-    if (!stepIsDockerComposeWithDbHint(step)) {
+    const commands = composeCommandsWithDbHint(step);
+    if (commands.length === 0) {
       continue;
     }
 
-    const run = step.run ?? "";
-    if (hasTmpfs(run)) {
+    if (
+      !commands.some((args) => !args.some((arg) => arg === "--tmpfs" || arg.startsWith("--tmpfs=")))
+    ) {
       continue;
     }
 

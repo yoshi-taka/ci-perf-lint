@@ -10,6 +10,11 @@ import {
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
 import { hasSetupBunStep, hasSetupPnpmStep } from "./shared/workflow-analysis.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
+import {
+  toolingWorkNames,
+  hasNativeOrOpaqueToolingWork,
+} from "./shared/tooling-command-evidence.ts";
 
 const lightweightToolingMatcher =
   /\b(prettier|oxfmt|eslint|oxlint|biome|markdownlint|markdownlint-cli2?|cspell|actionlint|shellcheck|yamllint|commitlint|textlint|check|verify|quality|repo-health|static-analysis)\b/i;
@@ -28,17 +33,19 @@ const meta = {
 } satisfies RuleMeta;
 
 function stepLooksLightweightTooling(step: WorkflowStep): boolean {
-  const text = `${step.name ?? ""} ${step.run ?? ""}`.trim();
   return (
     Boolean(detectLintTool(step)) ||
     Boolean(detectRedundantBootstrapTool(step)) ||
-    lightweightToolingMatcher.test(text)
+    toolingWorkNames(step.run ?? "").some((name) => lightweightToolingMatcher.test(name))
   );
 }
 
 function stepLooksNonLightweightNodeWork(step: WorkflowStep): boolean {
-  const text = `${step.name ?? ""} ${step.run ?? ""}`.trim();
-  return Boolean(detectBuildTool(step)) || nonLightweightNodeWorkMatcher.test(text);
+  return (
+    Boolean(detectBuildTool(step)) ||
+    hasNativeOrOpaqueToolingWork(step.run ?? "") ||
+    toolingWorkNames(step.run ?? "").some((name) => nonLightweightNodeWorkMatcher.test(name))
+  );
 }
 
 function jobUsesNodeSetup(job: WorkflowJob): boolean {
@@ -47,8 +54,9 @@ function jobUsesNodeSetup(job: WorkflowJob): boolean {
 
 function jobRunsNx(job: WorkflowJob): boolean {
   return job.steps.some((step) =>
-    /\bnx\s+(?:affected\b|run-many\b|run\b|graph\b|show\b)/i.test(
-      `${step.name ?? ""} ${step.run ?? ""}`,
+    shellInvocations(step.run ?? "").some(
+      ([tool, action]) =>
+        tool === "nx" && ["affected", "run-many", "run", "graph", "show"].includes(action ?? ""),
     ),
   );
 }
@@ -61,7 +69,12 @@ function jobLooksLikeLightweightNodeTooling(job: WorkflowJob): boolean {
 
 function jobUsesNodeToolRunner(job: WorkflowJob): boolean {
   return job.steps.some((step) =>
-    /\b(?:npx|bunx|npm\s+exec|pnpm\s+(?:exec|dlx)|yarn\s+(?:exec|dlx))\b/i.test(step.run ?? ""),
+    shellInvocations(step.run ?? "", false).some(
+      ([tool, action]) =>
+        ["npx", "bunx"].includes(tool ?? "") ||
+        (tool === "npm" && action === "exec") ||
+        (["pnpm", "yarn"].includes(tool ?? "") && ["exec", "dlx"].includes(action ?? "")),
+    ),
   );
 }
 

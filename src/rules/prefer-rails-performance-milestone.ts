@@ -2,6 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { railsCommands, railsCommandRunsTests } from "./shared/rails-commands.ts";
 
 const meta = {
   id: "prefer-rails-performance-milestone",
@@ -10,13 +11,12 @@ const meta = {
   docsPath: "docs/rules/prefer-rails-performance-milestone.md",
 } satisfies RuleMeta;
 
-const railsCIPattern = /\b(?:rspec|rails\s+test|rake\s+test|assets:precompile)\b/i;
-
 function jobRunsRailsCI(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const text = `${step.name ?? ""} ${step.run ?? ""}`;
-    return railsCIPattern.test(text);
-  });
+  return job.steps.some((step) =>
+    railsCommands(step.run ?? "").some(
+      (command) => railsCommandRunsTests(command) || command.args[0] === "assets:precompile",
+    ),
+  );
 }
 
 export const preferRailsPerformanceMilestoneRule = {

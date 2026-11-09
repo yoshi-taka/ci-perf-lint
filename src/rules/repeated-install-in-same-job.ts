@@ -19,64 +19,79 @@ const meta = {
   scope: "all",
 } satisfies RuleMeta;
 
-function getInstallScopeKey(manager: string, run: string): string {
+function getInstallScopeKey(manager: string, words: string[]): string {
+  const end = words.indexOf("--");
+  const args = words.slice(2, end < 0 ? undefined : end);
+  const optionValue = (...names: string[]): string | undefined => {
+    for (let index = 0; index < args.length; index++) {
+      const arg = args[index]!;
+      if (names.includes(arg)) {
+        return args[index + 1];
+      }
+      for (const name of names) {
+        if (arg.startsWith(`${name}=`)) {
+          return arg.slice(name.length + 1);
+        }
+      }
+    }
+    return undefined;
+  };
   if (manager === "pnpm") {
-    if (/(?:^|\s)--ignore-workspace\b/i.test(run)) {
+    if (args.includes("--ignore-workspace")) {
       return "ignore-workspace";
     }
-    const filterMatch = run.match(/(?:^|\s)--filter\s+(\S+)/i);
-    if (filterMatch) {
-      return `filter:${filterMatch[1]}`;
+    const filter = optionValue("--filter");
+    if (filter !== undefined) {
+      return `filter:${filter}`;
     }
-    if (/(?:^|\s)--prod\b|(?:^|\s)--production\b/i.test(run)) {
+    if (args.some((arg) => ["--prod", "--production"].includes(arg))) {
       return "production";
     }
   }
   if (manager === "npm") {
-    if (/(?:^|\s)--global\b|(?:\s|^)-g\b(?!\w)/i.test(run)) {
-      const globalRegex = /(?:\s|^)-g\b(?!\w)|(?:\s|^)--global\b/i;
-      const match = globalRegex.exec(run);
-      if (!match) {
-        return "global";
-      }
-      const after = run.slice(match.index + match[0].length).trim();
-      const packages: string[] = [];
-      for (const part of after.split(/\s+/)) {
-        if (!part) {
-          continue;
-        }
-        if (part.startsWith("--")) {
-          break;
-        }
-        if (/^-[a-zA-Z]$/.test(part)) {
-          continue;
-        }
-        if (/^https?:\/\//.test(part)) {
-          continue;
-        }
-        packages.push(part);
-      }
-      return packages.length > 0 ? `global:${packages.sort().join(",")}` : "global";
+    if (args.some((arg) => ["--global", "-g", "--global=true"].includes(arg))) {
+      return "global";
     }
-    const wsMatch = run.match(/(?:^|\s)--workspace\s+(\S+)|(?:\s|^)-w\s+(\S+)/i);
-    if (wsMatch) {
-      return `workspace:${wsMatch[1] ?? wsMatch[2]}`;
+    const workspace = optionValue("--workspace", "-w");
+    if (workspace !== undefined) {
+      return `workspace:${workspace}`;
     }
     if (
-      /(?:^|\s)--omit=\S+|(?:^|\s)--include=\S+|(?:^|\s)--production\b|(?:^|\s)--only=\S+/i.test(
-        run,
-      )
+      args.includes("--production") ||
+      optionValue("--omit", "--include", "--only") !== undefined
     ) {
       return "filtered";
     }
-    if (/\bnpm\s+ci\b/i.test(run)) {
+    if (words[1] === "ci") {
       return "frozen";
     }
   }
-  if (/--frozen-lockfile\b/i.test(run)) {
+  if (args.includes("--frozen-lockfile")) {
     return "frozen";
   }
   return "";
+}
+
+function getInstallTargetKey(manager: string, scope: string, args: string[]): string {
+  if (manager !== "npm" || scope !== "global") {
+    return JSON.stringify(args);
+  }
+  // Keep the existing registry-independent global-package review heuristic.
+  // Location/other options still distinguish installations, unlike display text.
+  const target: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]!;
+    if (arg === "--") {
+      target.push(...args.slice(index));
+      break;
+    }
+    if (arg === "--registry") {
+      index++;
+    } else if (!arg.startsWith("--registry=")) {
+      target.push(arg);
+    }
+  }
+  return JSON.stringify(target);
 }
 
 export const repeatedInstallInSameJobRule = {
@@ -111,11 +126,8 @@ export const repeatedInstallInSameJobRule = {
         if (!isInstall) {
           continue;
         }
-        const scopeKey = getInstallScopeKey(manager, step.text);
-        const targetKey =
-          manager === "npm" && scopeKey.startsWith("global")
-            ? scopeKey
-            : JSON.stringify(words.slice(2));
+        const scopeKey = getInstallScopeKey(manager, words);
+        const targetKey = getInstallTargetKey(manager, scopeKey, words.slice(2));
         let envKey = "";
         let checkoutGeneration = 0;
         if (doc.kind === "github-actions") {

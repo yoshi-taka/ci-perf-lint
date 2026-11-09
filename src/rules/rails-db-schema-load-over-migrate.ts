@@ -2,6 +2,8 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { railsCommands, railsCommandRunsTests } from "./shared/rails-commands.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 const meta = {
   id: "rails-db-schema-load-over-migrate",
@@ -10,24 +12,20 @@ const meta = {
   docsPath: "docs/rules/rails-db-schema-load-over-migrate.md",
 } satisfies RuleMeta;
 
-const rubyRailsStepPattern =
-  /\b(?:ruby\/setup-ruby@|bundle\s+install|bundle\s+exec|rails|rake|rspec|bin\/rails)\b/i;
-
 const dbServicePattern = /\b(?:postgres|mysql|mariadb)\b/i;
-
-const testCommandPattern = /\b(?:rails\s+test|rake\s+test|rspec|bundle\s+exec\s+rspec)\b/i;
-
-const dbMigratePattern = /\b(?:bundle\s+exec\s+)?(?:rails|bin\/rails|rake)\s+db:migrate\b/i;
-
-const dbMigrateExcludePattern = /\bdb:migrate:(?:redo|down|up)\b/i;
 
 const migrationIntentPattern =
   /\b(?:migration|migrate|schema\s+check|rollback|upgrade|compatibility)\b/i;
 
 function jobUsesRubyOrRails(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text = `${step.uses ?? ""} ${step.name ?? ""} ${step.run ?? ""}`.toLowerCase();
-    return rubyRailsStepPattern.test(text);
+    return (
+      Boolean(step.uses?.toLowerCase().startsWith("ruby/setup-ruby@")) ||
+      railsCommands(step.run ?? "").length > 0 ||
+      shellInvocations(step.run ?? "", false).some(
+        ([tool, action]) => tool === "bundle" && ["install", "exec"].includes(action ?? ""),
+      )
+    );
   });
 }
 
@@ -53,24 +51,16 @@ function jobIsInTestContext(job: WorkflowJob): boolean {
       return true;
     }
   }
-  return job.steps.some((step) => {
-    const text = `${step.name ?? ""} ${step.run ?? ""}`;
-    return testCommandPattern.test(text);
-  });
+  return job.steps.some((step) => railsCommands(step.run ?? "").some(railsCommandRunsTests));
 }
 
 function findDbMigrateStep(job: WorkflowJob): { step: WorkflowStep; match: string } | undefined {
   for (const step of job.steps) {
-    const run = step.run ?? "";
-    if (!run) {
-      continue;
-    }
-    if (dbMigrateExcludePattern.test(run)) {
-      continue;
-    }
-    const m = run.match(dbMigratePattern);
-    if (m) {
-      return { step, match: m[0] };
+    const command = railsCommands(step.run ?? "").find(
+      (candidate) => candidate.tool !== "rspec" && candidate.args[0] === "db:migrate",
+    );
+    if (command) {
+      return { step, match: `${command.prefix} db:migrate` };
     }
   }
   return undefined;

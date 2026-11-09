@@ -1,5 +1,7 @@
 # `repeated-bootstrap-setup`
 
+Bootstrap selection uses shared shell invocation evidence for corepack and global installers. Printed commands/comments do not become setup steps or split otherwise-identical fingerprints. Actual setup commands, environment, working directory and structured action inputs remain part of the fingerprint; command bodies are not rewritten to force equivalence.
+
 Detects multiple non-matrix jobs within a workflow that share an identical bootstrap fingerprint (checkout + install + cache pattern).
 
 Why this rule exists:

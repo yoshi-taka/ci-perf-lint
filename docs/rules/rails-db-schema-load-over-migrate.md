@@ -1,5 +1,7 @@
 # rails-db-schema-load-over-migrate
 
+Rails/Rake/RSpec command evidence is shared with the Rails performance rule. Known `bundle exec` and binstub invocations are supported; labels, comments and printed tasks are not execution evidence. Migration and test tasks are checked per invocation, so a printed or separate `db:migrate:redo` does not hide a real `db:migrate`. Explicit test environments and migration-intent names remain intentional context/guard signals.
+
 Detects GitHub Actions jobs that initialize an ephemeral Rails test database by
 replaying all migrations with `rails db:migrate`, and recommends loading the
 schema directly instead.

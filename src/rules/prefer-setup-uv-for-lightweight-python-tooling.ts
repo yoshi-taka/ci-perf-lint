@@ -5,6 +5,10 @@ import { detectInstallCommand, detectPythonTool } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
 import { hasSetupUvStep } from "./shared/workflow-analysis.ts";
+import {
+  toolingWorkNames,
+  hasNativeOrOpaqueToolingWork,
+} from "./shared/tooling-command-evidence.ts";
 
 const lightweightPythonToolingMatcher =
   /\b(ruff|black|isort|flake8|pylint|bandit|yamllint|markdownlint|codespell|textlint|sphinx-build|check|verify|quality|repo-health|static-analysis)\b/i;
@@ -22,13 +26,17 @@ const meta = {
 } satisfies RuleMeta;
 
 function stepLooksLightweightPythonTooling(step: WorkflowStep): boolean {
-  const text = `${step.name ?? ""} ${step.run ?? ""}`.trim();
-  return Boolean(detectPythonTool(step)) || lightweightPythonToolingMatcher.test(text);
+  return (
+    Boolean(detectPythonTool(step)) ||
+    toolingWorkNames(step.run ?? "").some((name) => lightweightPythonToolingMatcher.test(name))
+  );
 }
 
 function stepLooksNonLightweightPythonWork(step: WorkflowStep): boolean {
-  const text = `${step.name ?? ""} ${step.run ?? ""}`.trim();
-  return nonLightweightPythonWorkMatcher.test(text);
+  return (
+    hasNativeOrOpaqueToolingWork(step.run ?? "") ||
+    toolingWorkNames(step.run ?? "").some((name) => nonLightweightPythonWorkMatcher.test(name))
+  );
 }
 
 function jobUsesPythonSetup(job: WorkflowJob): boolean {
