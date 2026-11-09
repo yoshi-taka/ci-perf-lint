@@ -4886,6 +4886,7 @@ class Parser {
   private scanMappingIndicator(start: number): boolean {
     let depth = 0;
     let quote = "";
+    let quotedNode = false;
     let plainStarted = false;
     let propertyToken = false;
     let j = start;
@@ -4903,6 +4904,7 @@ class Parser {
           }
           quote = "";
           plainStarted = true;
+          quotedNode = true;
         }
         j += 1;
         continue;
@@ -4936,6 +4938,7 @@ class Parser {
         continue;
       }
       if (ch === "[" || ch === "{") {
+        quotedNode = false;
         if (!plainStarted) {
           depth += 1;
           j += 1;
@@ -4945,6 +4948,7 @@ class Parser {
         continue;
       }
       if (ch === "]" || ch === "}") {
+        quotedNode = false;
         if (depth > 0) {
           depth -= 1;
           plainStarted = false;
@@ -4955,20 +4959,25 @@ class Parser {
         j += 1;
         continue;
       }
-      if (ch === ":" && (j + 1 >= this.n || this.isSep(j + 1))) {
+      // Flow quoted keys allow JSON-style adjacency: {"key":"]"}.
+      // Start a new value token so quoted delimiters cannot change flow depth.
+      if (ch === ":" && (j + 1 >= this.n || this.isSep(j + 1) || (depth > 0 && quotedNode))) {
         if (depth === 0) {
           return true;
         }
         plainStarted = false;
+        quotedNode = false;
         j += 1;
         continue;
       }
       if (ch === "," && depth > 0) {
         plainStarted = false;
+        quotedNode = false;
         j += 1;
         continue;
       }
       plainStarted = true;
+      quotedNode = false;
       j += 1;
     }
     return false;

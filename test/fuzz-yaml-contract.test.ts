@@ -66,6 +66,44 @@ function astProjection(node: unknown): unknown {
 }
 
 describe("fuzz: YAML replacement compatibility contract", () => {
+  test.each([
+    '[{"":"]"," ":false},{": ":null}]',
+    '[{"key":"]"},{": ":null}]',
+    '[{"key":"}"},{": ":null}]',
+    '{"nested":[{"key":"]"},{": ":null}]}',
+    '[{"key":"\\\"]"},{": ":null}]',
+    "[{'key':']'},{': ':null}]",
+    '[{"key" : "]"},{": ":null}]',
+    '[{"key": {"nested": "]"}},{": ":null}]',
+    '[{"key":"]"},{": ":null}]: value',
+  ])("quoted flow keys keep adjacent values inside their collection: %s", (source) => {
+    const reference = referenceParse(source);
+    const candidate = parseDocument(source);
+    expect(reference.errors).toEqual([]);
+    expect(candidate.errors).toEqual([]);
+    expect(candidate.toJSON()).toEqual(reference.toJSON());
+    expect(astProjection(candidate.contents)).toEqual(astProjection(reference.contents));
+  });
+
+  test("JSON-adjacent quoted keys preserve nested delimiter values", () => {
+    fc.assert(
+      fc.property(
+        fc.string({ maxLength: 20 }),
+        fc.constantFrom("]", "}", "[", "{", ": ", '\\"]', "'", "\\"),
+        (key, value) => {
+          const source = JSON.stringify([{ [key]: value }, { ": ": null }]);
+          const reference = referenceParse(source);
+          const candidate = parseDocument(source);
+          expect(reference.errors).toEqual([]);
+          expect(candidate.errors).toEqual([]);
+          expect(candidate.toJSON()).toEqual(reference.toJSON());
+          expect(astProjection(candidate.contents)).toEqual(astProjection(reference.contents));
+        },
+      ),
+      options,
+    );
+  });
+
   test("generated values retain decoded values and the AST/range projection", () => {
     fc.assert(
       fc.property(valueArbitrary(2), fc.constantFrom("block", "json"), (value, style) => {
