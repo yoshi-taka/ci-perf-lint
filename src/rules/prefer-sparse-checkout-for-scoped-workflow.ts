@@ -15,6 +15,7 @@ import { getCheckoutStep } from "./shared/workflow-analysis.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositorySparseCheckoutPrecedent } from "./shared/similar-workflow-consensus.ts";
+import { workflowHasUnmodeledShell } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "prefer-sparse-checkout-for-scoped-workflow",
@@ -158,7 +159,11 @@ export const preferSparseCheckoutForScopedWorkflowRule = {
         continue;
       }
 
-      if (hasOnlyScriptLikeScope(scopePrefixes) || hasOpaqueRepoScriptExecution(job)) {
+      if (
+        hasOnlyScriptLikeScope(scopePrefixes) ||
+        hasOpaqueRepoScriptExecution(job) ||
+        job.steps.some((step) => workflowHasUnmodeledShell(workflow, job, step))
+      ) {
         continue;
       }
 

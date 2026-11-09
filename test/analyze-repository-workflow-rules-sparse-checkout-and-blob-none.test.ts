@@ -90,7 +90,7 @@ describe("analyzeRepository workflow and execution rules: sparse checkout and bl
         "    runs-on: ubuntu-latest",
         "    steps:",
         "      - uses: actions/checkout@v4",
-        "      - run: .github/scripts/use-cla-approved-bot.sh",
+        "      - run: cat .github/approved-bot.json",
         "      - uses: actions/checkout@v4",
         "        with:",
         "          ref: cloudfoundry",

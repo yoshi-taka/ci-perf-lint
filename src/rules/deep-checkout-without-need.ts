@@ -15,7 +15,10 @@ import {
 } from "./shared/similar-workflow-consensus.ts";
 import { jobMayMutateRepository } from "./shared/workflow-mutation.ts";
 import { cargoBuildScriptReadsHistory } from "./shared/cargo-git-history.ts";
-import { workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
+import {
+  workflowWorkingDirectory,
+  workflowHasUnmodeledShell,
+} from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "deep-checkout-without-need",
@@ -97,6 +100,7 @@ export const deepCheckoutWithoutNeedRule = {
         if (
           (hasHistoryDependentCommand(job) && !usesNxSetShas) ||
           hasOpaqueRepoScriptExecution(job) ||
+          job.steps.some((command) => workflowHasUnmodeledShell(workflow, job, command)) ||
           cargoNeedsHistory ||
           jobMayMutateRepository(workflow, job) ||
           workflowLooksReleaseLike(workflow, job) ||

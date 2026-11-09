@@ -61,7 +61,11 @@ export function shellExecutionTexts(text: string, depth = 0): string[] {
       if (end >= text.length) {
         return [];
       }
-      nested.push(...shellExecutionTexts(text.slice(start, end), depth + 1));
+      const extracted = shellExecutionTexts(text.slice(start, end), depth + 1);
+      if (extracted.length === 0) {
+        return [];
+      }
+      nested.push(...extracted);
       outer += "__shell_substitution__";
       i = end;
       continue;

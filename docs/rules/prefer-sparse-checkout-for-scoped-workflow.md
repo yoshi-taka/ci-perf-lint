@@ -1,5 +1,7 @@
 # prefer-sparse-checkout-for-scoped-workflow
 
+Shared history/script evidence distinguishes execution from displayed text. Opaque scripts, unsupported shell syntax and custom shells (including workflow/job defaults) prevent narrowing advice, even in multi-checkout jobs. Existing scope, agentic-inspection and scoring heuristics remain in place.
+
 Flags build or release jobs that use only a narrow working tree and may still benefit from sparse checkout.
 
 ## Why it matters

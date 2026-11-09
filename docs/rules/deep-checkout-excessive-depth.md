@@ -1,5 +1,7 @@
 # `deep-checkout-excessive-depth`
 
+Shared history/script evidence ignores names, comments and displayed examples, but preserves executed substitutions. Opaque scripts, unsupported shell syntax and custom shells (including workflow/job defaults) conservatively prevent depth-reduction advice. Scores and known history-action gates are unchanged.
+
 Detects `actions/checkout` configured with `fetch-depth >= 1000` when the job does not appear to need that much history.
 
 Why this rule exists:

@@ -4,20 +4,24 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositoryBlobNoneReleasePrecedent } from "./shared/similar-workflow-consensus.ts";
-import { getLoweredWorkflowStepText } from "./shared/workflow-step-text.ts";
 import { hasHistoryDependentCommand } from "./shared/workflow-jobs.ts";
 import { collectScopePrefixes } from "./shared/workflow-path-prefixes.ts";
 import { getCheckoutStep } from "./shared/workflow-analysis.ts";
 import { shellNonDisplayInvocations } from "./shared/shell-invocations.ts";
+import {
+  repositoryInvocations,
+  repositoryCommandHead,
+  textHasOpaqueRepositoryExecution,
+} from "./shared/repository-command-evidence.ts";
+import { workflowHasUnmodeledShell } from "./shared/workflow-command-context.ts";
+import { detectInstallCommandFromText } from "./shared/tools-text.ts";
+import { getStepFacts } from "./shared/step-facts.ts";
+import { invocationWorkName } from "./shared/tooling-command-evidence.ts";
 
-const wideRepoAccessPattern =
-  /(find\s+\.(?=\s|\/|$)|rg\s+(?:--files\b|\.)|fd\s+\.(?=\s|\/|$)|git\s+grep\b|ls\s+-r\b|du\s+-|turbo\s+run\b|nx\s+affected\b|lerna\b)/;
 const heavyBuildOrInstallPattern =
   /(\bnpm\b\s+(?:\S+\s+)*?(?:ci\b|install\b|run\s+build\b)|\b(?:pnpm|yarn)\b\s+(?:\S+\s+)*?(?:install\b|build\b)|\bbun\b\s+(?:\S+\s+)*?(?:install\b|run\s+build\b)|\bpytest\b|\bjest\b|\bvitest\b|\bcargo\s+(?:build|check|clippy|test|bench|doc|package|publish|install|b|c|t|ck|br|cl|rr)\b|\bgradle\b|\bmvn\b|tauri|electron-builder|docker build)/;
 const blobHungryReleasePattern =
   /(install-code-deps["']?\s*:\s*(?:["']?true|true)|\brelease:publish\b|changeset\s+version\b|\b(?:npm|pnpm|yarn|bun)\b\s+(?:\S+\s+)*?(?:run\s+)?(?:build\b|bump\b|compile\b|pack\b|publish\b)|\byarn\s+task\b[\s\S]*\bcompile\b)/;
-const gitCheckoutPublishBuildPattern = /\bgit\s+(?:checkout|pull|merge)\b/;
-const publishCompileBuildPattern = /\b(?:publish|compile|build)\b/;
 const agenticToolPattern =
   /(sst\/opencode\/github@|claude|codex|openai|anthropic|gemini|ai agent|agentic|autofix|code review)/;
 const docsPattern =
@@ -129,37 +133,100 @@ function jobUsesLocalAction(job: WorkflowJob): boolean {
 }
 
 function jobHasWideRepoAccess(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return wideRepoAccessPattern.test(text);
-  });
+  return job.steps.some((step) =>
+    repositoryInvocations(step.run ?? "").some((words) => {
+      const [tool, action] = repositoryCommandHead(words);
+      if (["find", "fd"].includes(tool ?? "")) {
+        return words.slice(1).some((word) => word === "." || word.startsWith("./"));
+      }
+      if (tool === "rg") {
+        return words.includes("--files") || words.includes(".");
+      }
+      if (tool === "git") {
+        return action === "grep";
+      }
+      if (tool === "ls") {
+        return words.slice(1).some((word) => /^-[a-z]*r/i.test(word) || word === "--recursive");
+      }
+      if (tool === "du") {
+        return words.slice(1).some((word) => word.startsWith("-"));
+      }
+      return (
+        tool === "lerna" ||
+        (tool === "turbo" && action === "run") ||
+        (tool === "nx" && action === "affected")
+      );
+    }),
+  );
 }
 
 function jobHasHeavyBuildOrInstall(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return heavyBuildOrInstallPattern.test(text);
+    const run = step.run ?? "";
+    return (
+      Boolean(detectInstallCommandFromText(run)) ||
+      repositoryInvocations(run).some(
+        (words) =>
+          heavyBuildOrInstallPattern.exec(repositoryCommandHead(words).join(" "))?.index === 0,
+      ) ||
+      heavyBuildOrInstallPattern.test(step.uses ?? "")
+    );
   });
 }
 
 function jobLooksLikeBlobHungryReleasePipeline(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text =
-      `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""} ${JSON.stringify(step.with ?? {})}`.toLowerCase();
-    if (blobHungryReleasePattern.test(text)) {
+    const installCodeDeps = step.with?.["install-code-deps"];
+    if (step.uses && (installCodeDeps === true || installCodeDeps === "true")) {
       return true;
     }
-
-    return gitCheckoutPublishBuildPattern.test(text) && publishCompileBuildPattern.test(text);
+    return repositoryInvocations(step.run ?? "").some((words) => {
+      const head = repositoryCommandHead(words);
+      if (invocationWorkName(head) === "release:publish") {
+        return true;
+      }
+      if (blobHungryReleasePattern.exec(head.join(" "))?.index === 0) {
+        return true;
+      }
+      // Task flags belong to this yarn task invocation, not a separate command or label.
+      return (
+        head[0] === "yarn" &&
+        head[1] === "task" &&
+        words.slice(2).some((word) => /(?:^|=)compile$/.test(word))
+      );
+    });
   });
 }
 
 function jobLooksLikeRepoEditingAgenticDocsJob(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
+    const isAgent =
+      agenticToolPattern.test(step.uses ?? "") ||
+      repositoryInvocations(step.run ?? "").some(([tool]) => agenticToolPattern.test(tool ?? ""));
+    if (!isAgent) {
+      return false;
+    }
     const text =
       `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""} ${JSON.stringify(step.with ?? {})}`.toLowerCase();
-    return agenticToolPattern.test(text) && docsPattern.test(text);
+    return docsPattern.test(text);
   });
+}
+
+function jobHasUnmodeledRepositoryWork(workflow: WorkflowDocument, job: WorkflowJob): boolean {
+  return job.steps.some(
+    (step) =>
+      workflowHasUnmodeledShell(workflow, job, step) ||
+      textHasOpaqueRepositoryExecution(step.run ?? "") ||
+      (Boolean(step.uses) &&
+        ![
+          "actions/checkout@",
+          "actions/upload-artifact@",
+          "actions/download-artifact@",
+          "actions/cache@",
+        ].some((prefix) => step.uses!.toLowerCase().startsWith(prefix)) &&
+        !historyMetadataPattern.test(step.uses!.toLowerCase()) &&
+        !getStepFacts(step).setupActionKind),
+  );
 }
 
 function jobHasExplicitFilteredFetchCandidate(job: WorkflowJob): boolean {
@@ -281,6 +348,7 @@ function evaluateJobForBlobNone(
     jobHasHeavyBuildOrInstall(job) ||
     jobLooksLikeBlobHungryReleasePipeline(job) ||
     jobLooksLikeRepoEditingAgenticDocsJob(job) ||
+    jobHasUnmodeledRepositoryWork(workflow, job) ||
     jobUsesLocalAction(job)
   ) {
     return undefined;

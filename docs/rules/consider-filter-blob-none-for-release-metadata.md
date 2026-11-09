@@ -1,6 +1,6 @@
 # consider-filter-blob-none-for-release-metadata
 
-Positive metadata and explicit fetch evidence comes from executed commands or recognized action references. Names, comments, printed examples and unrelated arguments do not establish it. Fetch depth and filter options belong to the same fetch invocation; help and dry-run fetches are excluded. Repository-content, build, local-action and agentic-edit exclusions remain conservative; the repository-scan guard also recognizes `find .` and `fd .` at whitespace/end boundaries.
+Positive metadata and explicit fetch evidence comes from executed commands or recognized action references. Names, comments, printed examples and unrelated arguments do not establish it. Fetch depth and filter options belong to the same fetch invocation; help and dry-run fetches are excluded. Build, broad-scan and publish exclusions likewise require command-position evidence, not printed warnings. Actual agent invocations retain prompt/context hints, and structured `install-code-deps` action inputs remain guarded. Unknown actions/scripts, custom shells and unsupported shell syntax withhold the recommendation.
 
 Flags history-aware metadata jobs that may be able to use checkout `filter: blob:none`.
 

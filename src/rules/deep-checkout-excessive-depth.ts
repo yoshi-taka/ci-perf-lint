@@ -14,6 +14,7 @@ import {
   withSimilarWorkflowDeepCheckoutConsensus,
 } from "./shared/similar-workflow-consensus.ts";
 import { jobMayMutateRepository } from "./shared/workflow-mutation.ts";
+import { workflowHasUnmodeledShell } from "./shared/workflow-command-context.ts";
 
 const meta = {
   id: "deep-checkout-excessive-depth",
@@ -72,6 +73,7 @@ export const deepCheckoutExcessiveDepthRule = {
         if (
           hasHistoryDependentCommand(job) ||
           hasOpaqueRepoScriptExecution(job) ||
+          job.steps.some((command) => workflowHasUnmodeledShell(workflow, job, command)) ||
           jobMayMutateRepository(workflow, job) ||
           workflowLooksReleaseLike(workflow, job) ||
           jobUsesKnownHistoryRequiringAction(job)

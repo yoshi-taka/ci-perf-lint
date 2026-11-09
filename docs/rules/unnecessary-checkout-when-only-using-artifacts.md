@@ -1,5 +1,7 @@
 # unnecessary-checkout-when-only-using-artifacts
 
+Shell evidence excludes labels, comments and displayed command examples, while preserving executed substitutions and real file redirections. Writes to GitHub's environment/output communication files are not repository-file writes. Artifact-only proof is limited to modeled artifact actions, the existing github-script checks and simple artifact comparison/display operations. Unknown commands/actions, custom shells and unsupported shell syntax withhold checkout-removal advice; repository scripts and local actions remain guarded.
+
 Detects `actions/checkout` steps in jobs that only use artifact actions (`actions/download-artifact@` or `actions/upload-artifact@`) without any visible dependency on repository files.
 
 ## Why

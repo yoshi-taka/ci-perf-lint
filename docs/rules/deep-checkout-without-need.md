@@ -1,5 +1,7 @@
 # `deep-checkout-without-need`
 
+Shared history/script evidence uses command positions, not step names, comments or displayed examples. Executed substitutions count. Unsupported shell syntax, opaque scripts/interpreters and custom shells (including workflow/job defaults) conservatively prevent history-reduction advice. Scores and known history-action gates are unchanged.
+
 Detects `actions/checkout` configured with `fetch-depth: 0` when the job does not appear to need full git history.
 
 A Cargo build/test command in the package directory is retained when its enabled build script visibly invokes Git history commands (for example, a literal `git describe` command array). Cargo presence alone does not suppress the rule. This is narrow static evidence, not full Rust execution analysis.

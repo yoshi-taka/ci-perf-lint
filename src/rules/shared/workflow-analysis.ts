@@ -13,15 +13,16 @@ import { detectToolPresence } from "./tool-presence-automaton.ts";
 import { collectCommandEntries } from "./any-step.ts";
 import { shellInvocations } from "./shell-invocations.ts";
 import { textRunsDockerBake } from "./docker-build-commands.ts";
+import {
+  textHasHistoryDependentExecution,
+  textHasOpaqueRepositoryExecution,
+} from "./repository-command-evidence.ts";
+import { workflowHasUnmodeledShell } from "./workflow-command-context.ts";
 
 const heavyStepSignalPattern =
   /\b(?:(?:npm(?!\s+(?:view|info|search|ping)\b))|pnpm|yarn|bun|(?:pip(?!\s+(?:index|show|list|freeze|search)\b))|pipenv|poetry|bundle|bundler|uv|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|claude|codex|gemini|build)\b/;
 const directHeavySignalPattern =
   /\b(?:(?:npm(?!\s+(?:view|info|search|ping)\b))|pnpm|yarn|bun|(?:pip(?!\s+(?:index|show|list|freeze|search)\b))|pipenv|poetry|bundle|bundler|uv|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|claude|codex|gemini|integration|e2e|benchmark|bench|build|test)\b/;
-const historyDependentCommandPattern =
-  /(git fetch|git pull|git rebase|git merge|git push|git describe|git diff|git log|git rev-list|git tag|commitlint|semantic-release|lerna changed|nx affected|turbo run|get-release-version|release notes|changelog|previous tag|release-it|changeset)/i;
-const opaqueRepoScriptExecutionPattern =
-  /(?:^|\s)(?:\.\/(?:script|scripts|dev|tools|bin|hack|tasks)\/\S+|(?:script|scripts|dev|tools|bin|hack|tasks)\/\S+|(?:bash|sh)\s+(?:\.\/)?(?:script|scripts|dev|tools|bin|hack|tasks)\/\S+|(?:node|bun|python|python3)\s+(?:\.\/)?(?:script|scripts|dev|tools|bin|hack|tasks)\/\S+|(?:pixi|uv|poetry|hatch|pdm)\s+run\b|(?:python(?:\d+(?:\.\d+)?)?\s+-m\s+)?pip\s+install\b[^\n]*\s-[a-z]*e[a-z]*\s+\.|python(?:\d+(?:\.\d+)?)?\s+-m\s+build\b|pyodide\s+build\b)/i;
 const metaCheckLikePattern =
   /(danger|commitlint|label|triage|stale|no-response|markdown-link-check|issue|pull request|pull-request)/;
 const agenticLikePattern =
@@ -215,7 +216,6 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
 
     const loweredStepText = facts.loweredStepText;
     loweredStepTexts.push(loweredStepText);
-    const stepText = facts.stepText;
     const run = step.run ?? "";
     // Data passed to echo/printf/grep and assignment-only regexes are not work.
     const executableSignals = shellInvocations(run, false)
@@ -282,8 +282,11 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     );
     hasHeavyStepSignal ||= heavyStepSignalPattern.test(heavyStepText);
     hasDirectHeavySignals ||= directHeavySignalPattern.test(loweredRunNameText);
-    hasHistoryDependentCommand ||= historyDependentCommandPattern.test(stepText);
-    hasOpaqueRepoScriptExecution ||= opaqueRepoScriptExecutionPattern.test(run);
+    hasHistoryDependentCommand ||=
+      textHasHistoryDependentExecution(run) ||
+      /(?:commitlint|semantic-release|release-it|changeset|changelog)/i.test(step.uses ?? "");
+    hasOpaqueRepoScriptExecution ||=
+      textHasOpaqueRepositoryExecution(run) || workflowHasUnmodeledShell(undefined, job, step);
     looksMetaCheckLike ||= metaCheckLikePattern.test(loweredStepText);
     looksAgenticLike ||= agenticLikePattern.test(loweredStepText);
     jobHasTest ||=

@@ -7,7 +7,15 @@ import {
   jobPublishesScorecardResults,
 } from "./shared/workflow-jobs.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
+import {
+  workflowWorkingDirectory,
+  workflowHasUnmodeledShell,
+} from "./shared/workflow-command-context.ts";
+import {
+  repositoryInvocations,
+  repositoryCommandHead,
+  textHasShellFileRedirection,
+} from "./shared/repository-command-evidence.ts";
 
 const meta = {
   id: "unnecessary-checkout-when-only-using-artifacts",
@@ -48,25 +56,29 @@ function jobUsesLocalAction(job: WorkflowJob): boolean {
 }
 
 function jobRunsMake(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const run = step.run ?? "";
-    return /\bmake\b/.test(run);
-  });
+  return job.steps.some((step) =>
+    repositoryInvocations(step.run ?? "").some(([tool]) =>
+      ["make", "gmake", "nmake"].includes(tool ?? ""),
+    ),
+  );
 }
 
 function jobRunsGitApply(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const run = step.run ?? "";
-    return /\bgit\s+apply\b/i.test(run);
-  });
+  return job.steps.some((step) =>
+    repositoryInvocations(step.run ?? "").some((words) => {
+      const [tool, action] = repositoryCommandHead(words);
+      return tool === "git" && action === "apply";
+    }),
+  );
 }
 
 function jobHasHeavyBuildOrInstall(job: WorkflowJob): boolean {
   const heavyPattern =
     /(npm\s+(ci|install)|pnpm\s+(install|add)|yarn\s+install|bun\s+install|pip\s+install|poetry\s+install|\buv\s+sync|cargo\s+build|go\s+(build|test)|make\s+build|\bbuild\b)/i;
   return job.steps.some((step) => {
-    const text = `${step.name ?? ""} ${step.run ?? ""}`;
-    return heavyPattern.test(text);
+    return repositoryInvocations(step.run ?? "").some(
+      (words) => heavyPattern.exec(repositoryCommandHead(words).join(" "))?.index === 0,
+    );
   });
 }
 
@@ -78,13 +90,16 @@ function jobHasRepoFileOperations(job: WorkflowJob): boolean {
     /\b(?:rm|cp|mv|cat|chmod|chown|ln|rsync|tar|install)\s+(?:-[a-zA-Z]+\s+)*(?:\.\/)?[a-zA-Z_][a-zA-Z0-9_@.-]*\.[a-zA-Z0-9]+\b/,
     // tee writes to files
     /\btee\s+(?:-[a-zA-Z]+\s+)*(?:\.\/)?[a-zA-Z_][a-zA-Z0-9_@./-]+/,
-    // shell redirection to a repo file
-    /(?:>>?)\s*(?:\.\/)?[a-zA-Z_][a-zA-Z0-9_@.-]*\.[a-zA-Z0-9]+\b/,
   ];
 
   return job.steps.some((step) => {
     const run = step.run ?? "";
-    return patterns.some((pattern) => pattern.test(run));
+    return (
+      textHasShellFileRedirection(run) ||
+      repositoryInvocations(run).some((words) =>
+        patterns.some((pattern) => pattern.exec(words.join(" "))?.index === 0),
+      )
+    );
   });
 }
 
@@ -106,14 +121,51 @@ function jobHasRepositoryTooling(workflow: WorkflowDocument, job: WorkflowJob): 
     (step) =>
       Boolean(step.with?.["node-version-file"]) ||
       Boolean(step.with?.["python-version-file"]) ||
+      workflowHasUnmodeledShell(workflow, job, step) ||
       (step.run !== undefined && workflowWorkingDirectory(workflow, job, step) !== ".") ||
       // Unresolved helper paths may consume the checked-out config; artifact-only is unproven.
-      /\b(?:bash|sh|node|python3?)\s+["']?\$[^\n]*\.(?:sh|[cm]?js|py)\b/.test(step.run ?? "") ||
+      repositoryInvocations(step.run ?? "").some((words) =>
+        /^(?:bash|sh|node|python3?)\s+["']?\$[^\n]*\.(?:sh|[cm]?js|py)\b/.test(words.join(" ")),
+      ) ||
       (step.uses?.toLowerCase().startsWith("actions/github-script@") === true &&
         typeof step.with?.script === "string" &&
         repositoryExecutionPatterns.some((pattern) => pattern.test(step.with?.script as string))) ||
-      repositoryExecutionPatterns.some((pattern) => pattern.test(step.run ?? "")),
+      repositoryInvocations(step.run ?? "").some((words) =>
+        repositoryExecutionPatterns.some((pattern) => pattern.test(words.join(" "))),
+      ),
   );
+}
+
+function jobHasUnknownArtifactWork(job: WorkflowJob): boolean {
+  return job.steps.some((step) => {
+    const uses = step.uses?.toLowerCase();
+    // Unknown actions may read checked-out inputs/configuration even without visible shell work.
+    if (
+      uses &&
+      !["actions/checkout@", "actions/github-script@", ...ARTIFACT_ACTIONS].some((prefix) =>
+        uses.startsWith(prefix),
+      )
+    ) {
+      return true;
+    }
+    return repositoryInvocations(step.run ?? "").some(
+      ([tool]) =>
+        ![
+          "diff",
+          "tar",
+          "true",
+          "false",
+          "exit",
+          "sleep",
+          "set",
+          "fi",
+          "done",
+          "}",
+          "export",
+          "readonly",
+        ].includes(tool ?? ""),
+    );
+  });
 }
 
 function jobLooksLikeArtifactOnly(workflow: WorkflowDocument, job: WorkflowJob): boolean {
@@ -122,6 +174,7 @@ function jobLooksLikeArtifactOnly(workflow: WorkflowDocument, job: WorkflowJob):
     !jobUsesLocalAction(job) &&
     !jobUsesKnownHistoryRequiringAction(job) &&
     !jobPublishesScorecardResults(job) &&
+    !jobHasUnknownArtifactWork(job) &&
     !jobHasHeavyBuildOrInstall(job) &&
     !jobRunsMake(job) &&
     !jobRunsGitApply(job) &&
