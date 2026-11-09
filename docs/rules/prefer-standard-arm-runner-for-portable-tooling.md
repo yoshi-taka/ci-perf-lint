@@ -37,6 +37,8 @@ Modal, Harbor, SSH, Buildkite agents and other dispatchers do not prove where th
 
 Architecture-sensitive work includes Docker builds, native compilation, browser tests, heavy test runners, TypeScript typechecking, Electron, Tauri, and similar local CPU or platform-sensitive tasks.
 
+Printed examples, comments, labels, and unrelated command arguments do not establish architecture-sensitive work or suppress the recommendation. Recognized build actions and the conservative unknown-execution guard still apply.
+
 ## Suggested fix
 
 Test changing only the runner label to the corresponding standard arm64 Ubuntu label, then keep the change only if the CLI install path, cache behavior, and output remain compatible.

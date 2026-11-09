@@ -84,6 +84,51 @@ test("labels and quoted arguments cannot establish API CLI work", async () => {
   expect(report.findings.some((finding) => runnerRules.has(finding.ruleId))).toBe(false);
 });
 
+test.each([
+  { run: "echo 'docker build .'" },
+  { run: "printf '%s\\n' 'cargo build'" },
+  { run: "# docker build .\necho audit" },
+  { name: "docker build .", run: "echo audit" },
+  { run: "ruff check --config 'docker build .' ." },
+])("display/labels/options do not suppress portable runner advice: %j", async (step) => {
+  const report = await scan([{ run: "ruff check ." }, step]);
+  expect(
+    report.findings.some((f) => f.ruleId === "prefer-standard-arm-runner-for-portable-tooling"),
+  ).toBe(true);
+});
+
+test.each([
+  { run: "echo 'docker build .'" },
+  { run: "# cargo build\necho audit" },
+  { name: "playwright", run: "echo audit" },
+  { run: "kubectl get pods --namespace 'docker build .'" },
+])("data does not downgrade API runner severity: %j", async (step) => {
+  const report = await scan([{ run: "kubectl get pods" }, step]);
+  const finding = report.findings.find(
+    (f) => f.ruleId === "prefer-standard-arm-runner-for-api-cli",
+  );
+  expect(finding?.severity).toBe("warning");
+  const baseline = await scan([{ run: "kubectl get pods" }, { run: "echo audit" }]);
+  expect(finding?.score).toBe(
+    baseline.findings.find((f) => f.ruleId === "prefer-standard-arm-runner-for-api-cli")?.score,
+  );
+});
+
+test("real native builds retain runner safety evidence", async () => {
+  const report = await scan([
+    { run: "ruff check ." },
+    { run: "kubectl get pods" },
+    { run: "docker build ." },
+  ]);
+  expect(
+    report.findings.some((f) => f.ruleId === "prefer-standard-arm-runner-for-portable-tooling"),
+  ).toBe(false);
+  const finding = report.findings.find(
+    (f) => f.ruleId === "prefer-standard-arm-runner-for-api-cli",
+  );
+  expect(finding?.severity).toBe("suggestion");
+});
+
 test("remote payloads do not inherit caller CPU limits", async () => {
   const report = await scan([
     { run: "ssh worker 'pytest'" },

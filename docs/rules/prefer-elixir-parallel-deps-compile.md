@@ -14,6 +14,8 @@ Commands that do not compile dependencies (`mix local.hex`, `mix deps.get`, `mix
 
 Commands are checked separately even when dependency download and compilation share a step. Workflow, job, and step environment values follow their normal override order; shell assignments are recognized too. Comments, values 0/1, and settings on another job do not prove parallel compilation.
 
+Mix tasks must occur in executable command position, not in printed text or a search pattern. Inline partition assignments affect only their invocation; exported assignments affect subsequent commands in the step. Executable substitutions remain evidence, while single-quoted literal substitutions do not.
+
 ## Why it matters
 
 Elixir 1.19 can compile a dependency graph across multiple OS processes. Compiling dependencies with native code, downloading assets, or uneven compile times used to leave cores idle; with partitioning the Elixir team reports up to 4x faster compilation on large projects. Parallel dependency compilation is opt-in, so upgrading to Elixir 1.19 alone does not capture the speedup.

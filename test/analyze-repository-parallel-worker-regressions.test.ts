@@ -297,6 +297,55 @@ describe("Elixir parallel dependency compilation", () => {
     );
   const ruleId = "prefer-elixir-parallel-deps-compile";
 
+  test.each([
+    "echo 'mix compile'",
+    "printf '%s\\n' 'mix test'",
+    "grep 'mix compile' README.md",
+    "echo '$(mix compile)'",
+    "# mix compile\necho audit",
+    "mix format --check-formatted",
+    "mix deps.get",
+  ])("does not infer compilation from data/non-compile task: %s", async (command) => {
+    const report = await scan(
+      {},
+      beamJob(`|\n          ${command.replaceAll("\n", "\n          ")}`),
+    );
+    expect(report.findings.some((f) => f.ruleId === ruleId)).toBe(false);
+  });
+
+  test.each([
+    'echo "$(mix compile)"',
+    "env MIX_ENV=test mix test",
+    "mix compile --label 'mix format'",
+    "echo 'MIX_OS_DEPS_COMPILE_PARTITION_COUNT=4'\nmix compile",
+    "MIX_OS_DEPS_COMPILE_PARTITION_COUNT=4 echo audit\nmix compile",
+    "export MIX_OS_DEPS_COMPILE_PARTITION_COUNT=4\nexport MIX_OS_DEPS_COMPILE_PARTITION_COUNT=$COUNT\nmix compile",
+  ])("retains actual compilation without effective partition count: %s", async (command) => {
+    const report = await scan(
+      {},
+      beamJob(`|\n          ${command.replaceAll("\n", "\n          ")}`),
+    );
+    expect(report.findings.some((f) => f.ruleId === ruleId)).toBe(true);
+  });
+
+  test("an inline partition count belongs to its Mix invocation", async () => {
+    const report = await scan(
+      {},
+      beamJob(
+        "|\n          MIX_OS_DEPS_COMPILE_PARTITION_COUNT=4 mix compile\n          mix compile",
+      ),
+    );
+    expect(report.findings.some((f) => f.ruleId === ruleId)).toBe(true);
+  });
+
+  test.each([
+    "MIX_OS_DEPS_COMPILE_PARTITION_COUNT=4 mix compile",
+    "env MIX_OS_DEPS_COMPILE_PARTITION_COUNT=4 mix deps.compile",
+  ])("honors invocation-local partition count: %s", async (command) => {
+    const report = await scan({}, beamJob(command));
+    expect(report.findings.some((f) => f.ruleId === ruleId)).toBe(false);
+  });
+
   test.each([0, 1, 4])("checks partition count %s", async (count) => {
     const report = await scan(
       {},

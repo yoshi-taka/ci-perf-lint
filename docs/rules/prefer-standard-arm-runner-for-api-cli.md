@@ -32,6 +32,8 @@ Commands must be visible shell invocations, not tool names in labels or remote-c
 
 The severity drops to `suggestion` when architecture-sensitive work is also visible, such as Docker builds, native compilation, browser tests, Electron, or Tauri.
 
+Architecture-sensitive evidence must be an executable command or a recognized build action, not a log message, comment, step label, or another command's argument.
+
 ## Suggested fix
 
 Test the job on the corresponding standard arm64 Ubuntu label, then keep the change only if all actions, CLIs, credentials, and command behavior remain compatible.

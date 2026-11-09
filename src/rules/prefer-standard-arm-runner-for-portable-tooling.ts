@@ -39,7 +39,7 @@ const portableToolMatchers: [string, RegExp][] = [
 ];
 
 const architectureSensitiveWorkPattern =
-  /(docker\s+build|docker\/build-push-action@|docker\/setup-qemu-action@|cargo\s+(?:build|test)|go\s+(?:build|test)|mvn\s|gradle\s|electron|tauri|make\s|cmake|native module|node-gyp|playwright|cypress|vitest|jest|pytest|tsc|typecheck|next\s+build|vite\s+build|webpack|rollup)/i;
+  /^(?:docker\s+build\b|cargo\s+(?:build|test)\b|go\s+(?:build|test)\b|(?:mvn|gradle|electron|tauri|make|cmake|node-gyp|playwright|cypress|vitest|jest|pytest|tsc|typecheck|webpack|rollup)\b|(?:next|vite)\s+build\b)/i;
 
 function jobRunsInContainer(job: WorkflowJob): boolean {
   return Boolean(job.raw.container);
@@ -54,11 +54,13 @@ function analyzePortableToolingJob(job: WorkflowJob): {
 
   for (const step of job.steps) {
     const commands = shellInvocations(step.run ?? "");
-    const text = `${step.uses ?? ""} ${commands.map((words) => words.join(" ")).join(" ")}`;
 
     if (
       !hasArchitectureSensitiveWork &&
-      (architectureSensitiveWorkPattern.test(text) ||
+      (/^docker\/(?:build-push-action|setup-qemu-action)@/i.test(step.uses ?? "") ||
+        commands.some((words) =>
+          architectureSensitiveWorkPattern.test(words.slice(0, 2).join(" ")),
+        ) ||
         commands.some(
           ([tool, action]) =>
             /^(?:\$|`)/.test(tool ?? "") ||

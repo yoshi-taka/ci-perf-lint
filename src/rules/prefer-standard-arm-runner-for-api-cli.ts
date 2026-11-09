@@ -21,22 +21,6 @@ function jobRunsInContainer(job: WorkflowJob): boolean {
   return Boolean(job.raw.container);
 }
 
-const jobTextCache = new WeakMap<WorkflowJob, string>();
-
-function getJobText(job: WorkflowJob): string {
-  const cached = jobTextCache.get(job);
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  const text = job.steps
-    .map((step) => `${step.name ?? ""} ${step.uses ?? ""} ${step.run ?? ""}`)
-    .join("\n")
-    .toLowerCase();
-  jobTextCache.set(job, text);
-  return text;
-}
-
 function findApiCliTool(job: WorkflowJob): string | undefined {
   const candidates: [string, RegExp][] = [
     ["Terraform", /\bterraform\s+(?:init|plan|apply|destroy)\b/],
@@ -72,9 +56,14 @@ function findApiCliTool(job: WorkflowJob): string | undefined {
 }
 
 function hasArchitectureSensitiveWork(job: WorkflowJob): boolean {
-  const text = getJobText(job);
-  return /(docker\s+build|docker\/build-push-action@|docker\/setup-qemu-action@|cargo\s+(?:build|test)|go\s+(?:build|test)|mvn\s|gradle\s|electron|tauri|make\s|cmake|native module|node-gyp|playwright|cypress)/.test(
-    text,
+  return job.steps.some(
+    (step) =>
+      /^docker\/(?:build-push-action|setup-qemu-action)@/i.test(step.uses ?? "") ||
+      shellInvocations(step.run ?? "").some((words) =>
+        /^(?:docker\s+build\b|(?:cargo|go)\s+(?:build|test)\b|(?:mvn|gradle|electron|tauri|make|cmake|node-gyp|playwright|cypress)\b)/i.test(
+          words.slice(0, 2).join(" "),
+        ),
+      ),
   );
 }
 

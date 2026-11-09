@@ -9,7 +9,10 @@ import {
   textHasCdkCommandWithoutExpress,
   textHasCdkDeployCommandWithoutMethod,
   textHasCdkDeployCommandWithoutAssetBuildConcurrency,
+  textHasCdkHotswapCommand,
 } from "./cdk-deploy-commands.ts";
+import { dependencyInstallCommands } from "./dependency-install-evidence.ts";
+import { toolInvocations } from "./tool-command-evidence.ts";
 
 const AWS_CDK_CLI_PACKAGE = "aws-cdk";
 
@@ -23,9 +26,7 @@ const CDK_HOTSWAP_MIN: SemverTuple = [2, 1125, 0];
 
 const CDK_METHOD_DIRECT_MIN: SemverTuple = [2, 118, 0];
 
-const CDK_DEPLOY_VERB = /\b(?:aws-cdk|cdk)\s+(?:deploy|destroy|bootstrap)\b/;
-
-const CDK_INSTALL_VERSION = /\b(?:aws-cdk|cdk)@(\d+\.\d+(?:\.\d+)?)/;
+const CDK_INSTALL_VERSION = /^(?:aws-cdk|cdk)@(\d+\.\d+(?:\.\d+)?)$/;
 
 const EXACT_VERSION_SPEC = /^[=v]?\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/;
 
@@ -51,7 +52,13 @@ function parseDependencyVersionSpec(spec: string | undefined): SemverTuple | und
 }
 
 function extractCdkCliVersionFromText(text: string): SemverTuple | undefined {
-  const match = CDK_INSTALL_VERSION.exec(text);
+  const installedPackages = dependencyInstallCommands(text)
+    .filter(({ tool }) => ["npm", "pnpm", "yarn", "bun"].includes(tool))
+    .flatMap(({ packages }) => packages);
+  const tools = toolInvocations(text).map(([tool]) => tool ?? "");
+  const match = [...installedPackages, ...tools]
+    .map((word) => CDK_INSTALL_VERSION.exec(word))
+    .find(Boolean);
   return match?.[1] ? parseDependencyVersionSpec(match[1]) : undefined;
 }
 
@@ -76,15 +83,8 @@ export function textDeploysCdkWithoutExpress(text: string): boolean {
   return textHasCdkCommandWithoutExpress(text);
 }
 
-const CDK_WATCH_VERB = /\b(?:aws-cdk|cdk)\s+watch\b/;
-
-const HOTSWAP_FLAG = /--hotswap(?:-fallback)?\b/;
-
 export function textUsesCdkHotswap(text: string): boolean {
-  if (CDK_WATCH_VERB.test(text)) {
-    return true;
-  }
-  return CDK_DEPLOY_VERB.test(text) && HOTSWAP_FLAG.test(text);
+  return textHasCdkHotswapCommand(text);
 }
 
 export function cdkCliVersionIsBelowHotswapFloor(version: SemverTuple | undefined): boolean {

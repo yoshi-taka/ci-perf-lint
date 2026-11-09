@@ -5,6 +5,32 @@ import {
   shellCommands,
   staticShellWords,
 } from "./command-patterns.ts";
+import { toolInvocations, invocationOperands, invocationOptions } from "./tool-command-evidence.ts";
+
+export function textHasCdkHotswapCommand(text: string): boolean {
+  return toolInvocations(text).some((words) => {
+    if (!/^(?:cdk|aws-cdk)(?:@\d[\w.+-]*)?$/.test(words[0] ?? "")) {
+      return false;
+    }
+    const end = words.indexOf("--");
+    const command = end < 0 ? words : words.slice(0, end);
+    const options = invocationOptions(command, [...valueOptions]);
+    if (options.some(({ name }) => ["--help", "-h", "--version"].includes(name))) {
+      return false;
+    }
+    const verb = invocationOperands(command, [...valueOptions])[0];
+    return (
+      verb === "watch" ||
+      (["deploy", "destroy", "bootstrap"].includes(verb ?? "") &&
+        options.some(
+          ({ name, value, index }) =>
+            ["--hotswap", "--hotswap-fallback"].includes(name) &&
+            value !== "false" &&
+            command[index + 1] !== "false",
+        ))
+    );
+  });
+}
 
 const valueOptions = new Set([
   "--app",

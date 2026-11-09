@@ -12,6 +12,7 @@ Flags CDK hotswap usage (`cdk deploy --hotswap`, `--hotswap-fallback`, or `cdk w
 
 - Workflow steps and package.json scripts that use CDK hotswap while the resolved `aws-cdk` CLI version is below 2.1125.0.
 - Usage on 2.1125.0 or later is not flagged. The CLI version is resolved from the committed lockfile when available, then from an exact pin in `package.json` or an install step. When it cannot be resolved (for example `npx cdk` with a caret range and no lockfile), the rule stays silent.
+- Watch/deploy evidence must be executable, and hotswap options belong to that CDK invocation. Printed commands, search patterns, option values, and another command's flags do not qualify. Workflow version overrides require an actual package install or a version-pinned CLI invocation, not a printed package name.
 
 ## Suggested action
 

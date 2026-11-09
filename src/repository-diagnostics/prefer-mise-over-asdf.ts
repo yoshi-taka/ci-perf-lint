@@ -1,6 +1,8 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { textRunsTool, toolInvocations } from "../rules/shared/tool-command-evidence.ts";
+import { repositoryCommandHead } from "../rules/shared/repository-command-evidence.ts";
 
 const meta = {
   id: "prefer-mise-over-asdf",
@@ -14,13 +16,6 @@ const miseConfigFiles = [
   ".mise.toml",
   "mise.lock",
   ".config/mise/config.toml",
-] as const;
-
-const miseCommandPatterns = [
-  /\bmise\s+install\b/,
-  /\bmise\s+use\b/,
-  /\bmise\s+exec\b/,
-  /\bmise\s+run\b/,
 ] as const;
 
 const asdfCommandPatterns = [
@@ -49,14 +44,14 @@ async function hasAsdfEvidence(context: RepositoryDiagnosticContext): Promise<bo
 
   for (const step of context.predicateIndex.allSteps) {
     const run = step.step.run;
-    if (run && stepTextContainsAny(run, asdfCommandPatterns)) {
-      return true;
-    }
-  }
-
-  for (const workflow of context.workflows) {
-    const source = workflow.source;
-    if (source && stepTextContainsAny(source, asdfCommandPatterns)) {
+    if (
+      run &&
+      (textRunsTool(run, "asdf", ["install", "exec", "reshim"]) ||
+        toolInvocations(run).some((words) => {
+          const [tool, action, task] = repositoryCommandHead(words);
+          return tool === "asdf" && action === "plugin" && task === "add";
+        }))
+    ) {
       return true;
     }
   }
@@ -92,14 +87,7 @@ async function hasMiseEvidence(context: RepositoryDiagnosticContext): Promise<bo
 
   for (const step of context.predicateIndex.allSteps) {
     const run = step.step.run;
-    if (run && stepTextContainsAny(run, miseCommandPatterns)) {
-      return true;
-    }
-  }
-
-  for (const workflow of context.workflows) {
-    const source = workflow.source;
-    if (source && stepTextContainsAny(source, miseCommandPatterns)) {
+    if (run && textRunsTool(run, "mise", ["install", "use", "exec", "run"])) {
       return true;
     }
   }

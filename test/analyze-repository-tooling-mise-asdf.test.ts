@@ -51,6 +51,42 @@ function hasMiseFinding(report: Awaited<ReturnType<typeof getReport>>): boolean 
 }
 
 describe("prefer-mise-over-asdf", () => {
+  test.each([
+    "echo 'mise install'",
+    "printf '%s\\n' 'mise use node'",
+    "grep 'mise exec' README.md",
+    "echo '$(mise install)'",
+    "# mise run check\necho audit",
+  ])("printed mise evidence cannot suppress real asdf docs: %s", async (run) => {
+    const root = await createFixture("mise-display", {
+      ".tool-versions": "nodejs 22\n",
+      "README.md": "Setup: `asdf install`\n",
+      ".github/workflows/ci.yml": `${baseWorkflow}\n      - name: mise install\n        run: |\n          ${run.replaceAll("\n", "\n          ")}\n`,
+    });
+    expect(hasMiseFinding(await getReport(root))).toBe(true);
+  });
+
+  test.each([
+    "echo 'asdf install'",
+    "grep 'asdf plugin add' README.md",
+    "# asdf install\necho audit",
+    "asdf plugin list",
+  ])("data is not workflow asdf setup: %s", async (run) => {
+    const root = await createFixture("asdf-display", {
+      ".tool-versions": "nodejs 22\n",
+      ".github/workflows/ci.yml": `${baseWorkflow}\n      - name: asdf install\n        run: |\n          ${run.replaceAll("\n", "\n          ")}\n`,
+    });
+    expect(hasMiseFinding(await getReport(root))).toBe(false);
+  });
+
+  test("executable substitutions still supply mise evidence", async () => {
+    const root = await createFixture("mise-substitution", {
+      ".tool-versions": "nodejs 22\n",
+      ".asdfrc": "legacy_version_file = yes\n",
+      ".github/workflows/ci.yml": `${baseWorkflow}\n      - run: echo "$(mise install)"\n`,
+    });
+    expect(hasMiseFinding(await getReport(root))).toBe(false);
+  });
   test("flags repo with .tool-versions and .asdfrc", async () => {
     const root = await createFixture("asdfrc", {
       ".tool-versions": "nodejs 22\n",

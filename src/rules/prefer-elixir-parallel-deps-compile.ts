@@ -2,7 +2,13 @@ import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { shellCommandSegments } from "./shared/command-patterns.ts";
+import { shellCommandSegments, shellCommands } from "./shared/command-patterns.ts";
+import { shellExecutionTexts } from "./shared/shell-execution-text.ts";
+import { shellNonDisplayInvocations } from "./shared/shell-invocations.ts";
+import {
+  declaredShellEnvironmentValues,
+  declaredShellEnvironmentNames,
+} from "./shared/shell-environment-evidence.ts";
 import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
 import {
   detectElixirContainer,
@@ -19,21 +25,33 @@ const meta = {
 
 const PARTITION_ENV = "MIX_OS_DEPS_COMPILE_PARTITION_COUNT";
 
-const MIX_COMMAND = /\bmix\b/;
-
 const NON_COMPILE_MIX_COMMAND =
-  /\bmix\s+(?:local\.(?:hex|rebar)|archive\.install|deps\.(?:get|update|unlock|clean|tree|list|check)|hex\.|format|help|new)\b/;
+  /^(?:local\.(?:hex|rebar)|archive\.install|deps\.(?:get|update|unlock|clean|tree|list|check)|hex\.[\w.]+|format|help|new)$/;
 
 function stepCompilesWithoutParallel(run: string, envValue: unknown): boolean {
-  let partitionCount = Number(envValue);
-  for (const command of shellCommandSegments(run)) {
-    const assignment = /\bMIX_OS_DEPS_COMPILE_PARTITION_COUNT=["']?(\d+)\b/.exec(command);
-    const count = assignment ? Number(assignment[1]) : partitionCount;
-    if (/^export\s+/.test(command) || /^MIX_OS_DEPS_COMPILE_PARTITION_COUNT=\S+$/.test(command)) {
-      partitionCount = count;
-    }
-    if (MIX_COMMAND.test(command) && !NON_COMPILE_MIX_COMMAND.test(command) && !(count > 1)) {
-      return true;
+  for (const source of shellExecutionTexts(run)) {
+    let partitionCount = Number(envValue);
+    for (const command of shellCommandSegments(source)) {
+      const declared = declaredShellEnvironmentValues(command);
+      const count = declaredShellEnvironmentNames(command).has(PARTITION_ENV)
+        ? Number(declared[PARTITION_ENV])
+        : partitionCount;
+      const raw = shellCommands(command)[0] ?? [];
+      if (
+        ["export", "readonly"].includes(raw[0] ?? "") ||
+        raw.every((word) => /^[A-Za-z_]\w*=/.test(word))
+      ) {
+        partitionCount = count;
+      }
+      if (
+        shellNonDisplayInvocations(command).some(
+          ([tool, task]) =>
+            tool === "mix" && task && !task.startsWith("-") && !NON_COMPILE_MIX_COMMAND.test(task),
+        ) &&
+        !(count > 1)
+      ) {
+        return true;
+      }
     }
   }
   return false;

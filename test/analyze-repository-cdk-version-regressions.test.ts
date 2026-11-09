@@ -37,6 +37,46 @@ async function scan(files: Record<string, string>, directRules: RuleModule[] = [
 }
 
 describe("CDK version-scoped findings", () => {
+  test.each([
+    ["npm install -g aws-cdk@2.1100.0\necho 'cdk watch'", 0],
+    ["npm install -g aws-cdk@2.1100.0\ngrep 'cdk watch' README.md", 0],
+    ["echo 'npm install -g aws-cdk@2.1100.0'\ncdk watch", 0],
+    ["grep 'aws-cdk@2.1100.0' README.md\ncdk watch", 0],
+    ["npm install --registry aws-cdk@2.1100.0 other\ncdk watch", 0],
+    ["npm install -g aws-cdk@2.1100.0\ncdk deploy\necho --hotswap", 0],
+    ["npm install -g aws-cdk@2.1100.0\ncdk deploy --context '--hotswap'", 0],
+    ["npm install -g aws-cdk@2.1100.0\ncdk deploy --hotswap=false", 0],
+    ["npm install -g aws-cdk@2.1100.0\ncdk deploy --hotswap false", 0],
+    ["npm install -g aws-cdk@2.1100.0\ncdk deploy -- --hotswap", 0],
+    ["npm install -g aws-cdk@2.1100.0\ncdk watch", 1],
+    ["npx aws-cdk@2.1100.0 watch", 1],
+    ["npm install -g aws-cdk@2.1100.0\ncdk --app 'node app.js' watch", 1],
+    ["npm install -g aws-cdk@2.1100.0\ncdk deploy --hotswap-fallback", 1],
+    ["npm install -g aws-cdk@2.1125.0\ncdk watch", 0],
+    ['npm install -g aws-cdk@2.1100.0\necho "$(cdk watch)"', 1],
+    ["npm install -g aws-cdk@2.1100.0\necho '$(cdk watch)'", 0],
+  ])("execution/version/option ownership: %s", async (run, count) => {
+    const report = await scan(
+      {
+        ".github/workflows/ci.yml": `on: pull_request\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          ${String(run).replaceAll("\n", "\n          ")}\n`,
+      },
+      [preferAwsCdkCli21125ForHotswapRule],
+    );
+    expect(report.findings).toHaveLength(Number(count));
+  });
+
+  test("printed upgrade cannot override the real old CLI version", async () => {
+    const report = await scan(
+      {
+        "package.json": JSON.stringify({ devDependencies: { "aws-cdk": "2.1100.0" } }),
+        ".github/workflows/ci.yml":
+          "on: pull_request\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          echo 'npm install -g aws-cdk@2.1138.0'\n          cdk watch\n",
+      },
+      [preferAwsCdkCli21125ForHotswapRule],
+    );
+    expect(report.findings).toHaveLength(1);
+    expect(report.findings[0]?.message).toContain("2.1100.0");
+  });
   test.each(["\n", " && ", "; "])(
     "resolves CLI versions in shell order across %j",
     async (separator) => {

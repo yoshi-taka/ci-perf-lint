@@ -27,3 +27,5 @@ Compare CI bootstrap duration before and after switching. mise typically resolve
 2. Checks for `.asdfrc` or asdf commands in CI workflow steps or documentation files.
 3. Checks that mise config files or mise CI commands are not already present.
 4. Emits a `suggestion`-level diagnostic when asdf evidence is strong and mise is not in use.
+
+Workflow evidence requires an executable command, including supported wrappers and executable substitutions. Printed examples, comments, and step labels do not establish asdf use or a mise exemption. Documentation may still establish asdf setup instructions; real mise configuration files still suppress the finding.
