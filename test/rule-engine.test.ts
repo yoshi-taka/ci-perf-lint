@@ -242,17 +242,18 @@ describe("evaluateRules", () => {
     ).toBe(0);
   });
 
-  test("prefer-buildx-bake-for-multiple-images precheck counts repeated builds", () => {
-    expect(
-      preferBuildxBakeForMultipleImagesRule.meta.precheck({
-        source: "- run: docker buildx build a\n- run: docker buildx build b\n",
-      }),
-    ).toBe(1);
-    expect(
-      preferBuildxBakeForMultipleImagesRule.meta.precheck({
-        source: "- run: docker buildx build a\n",
-      }),
-    ).toBe(0);
+  test("prefer-buildx-bake-for-multiple-images accepts structured builds without a raw-source precheck", async () => {
+    const { workflow, cleanup } = await createWorkflowDoc(
+      "on: push\njobs:\n  images:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: docker/build-push-action@v6\n      - uses: docker/build-push-action@v6\n",
+    );
+    try {
+      expect("precheck" in preferBuildxBakeForMultipleImagesRule.meta).toBe(false);
+      expect(
+        preferBuildxBakeForMultipleImagesRule.check(workflow, { repository: createSignals() }),
+      ).toHaveLength(1);
+    } finally {
+      await cleanup();
+    }
   });
 
   test("returns diagnostics for a valid workflow", async () => {

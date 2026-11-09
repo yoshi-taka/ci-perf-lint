@@ -4,6 +4,9 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { isHeavyJob } from "./shared/workflow-jobs.ts";
 import { getSetupActionKind } from "./shared/workflow-setup-actions.ts";
+import { toolInvocations } from "./shared/tool-command-evidence.ts";
+import { invocationWorkName } from "./shared/tooling-command-evidence.ts";
+import { repositoryCommandHead } from "./shared/repository-command-evidence.ts";
 import {
   preferTailwindV4UpgradeToolMeta as meta,
   checkTailwindV4UpgradeCandidate,
@@ -51,9 +54,14 @@ function jobRunsTailwindRelevantWork(job: WorkflowJob): boolean {
   }
 
   return job.steps.some((step) =>
-    /\b(?:tailwindcss|vite|next|astro|svelte-kit|npm\s+(?:run\s+)?(?:build|test|lint)|pnpm\s+(?:run\s+)?(?:build|test|lint)|yarn\s+(?:run\s+)?(?:build|test|lint)|bun\s+(?:run\s+)?(?:build|test|lint))\b/i.test(
-      `${step.name ?? ""} ${step.run ?? ""}`,
-    ),
+    toolInvocations(step.run ?? "").some((words) => {
+      const head = repositoryCommandHead(words);
+      return (
+        ["tailwindcss", "vite", "next", "astro", "svelte-kit"].includes(head[0] ?? "") ||
+        (["npm", "pnpm", "yarn", "bun"].includes(head[0] ?? "") &&
+          ["build", "test", "lint"].includes(invocationWorkName(head)))
+      );
+    }),
   );
 }
 

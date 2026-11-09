@@ -3,6 +3,7 @@ import { dependencySectionsOf } from "./repository-package-helpers.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
 import type { AnyWorkflowDocument } from "./ci-types.ts";
 import { collectCommandEntries } from "./rules/shared/any-step.ts";
+import { textRunsTool, toolInvocations } from "./rules/shared/tool-command-evidence.ts";
 import {
   extractPythonVersionLiteral,
   pythonVersionIsBelow311,
@@ -185,7 +186,7 @@ export async function collectPdmSignals(
     (await context.pathExists(context.resolve("pdm.toml"))) ||
     workflows.some((workflow) =>
       collectCommandEntries(workflow).some((entry) =>
-        /(?:^|\s)pdm\s+(?:install|sync|lock|add|run|update)\b/.test(entry.text),
+        textRunsTool(entry.text, "pdm", ["install", "sync", "lock", "add", "run", "update"]),
       ),
     );
   let usesUv = false;
@@ -198,7 +199,9 @@ export async function collectPdmSignals(
   }
   usesUv ||= workflows.some((workflow) =>
     collectCommandEntries(workflow).some((entry) =>
-      /\bpdm\s+config\s+(?:--local\s+)?use_uv\s+true\b/.test(entry.text),
+      toolInvocations(entry.text).some((words) =>
+        /^pdm config (?:--local )?use_uv true$/.test(words.join(" ")),
+      ),
     ),
   );
 

@@ -1,12 +1,12 @@
 # circleci-checkout-uses-full-clone
 
-CircleCI defaults to a blobless clone (`method: blobless`), which fetches only the reachable objects for the current commit. This is equivalent to `git clone --filter=blob:none` and is faster and uses less data than a full clone.
+CircleCI's blobless checkout (`method: blobless`) retains commit and tree metadata while fetching file contents lazily, like `git clone --filter=blob:none`. Blob filtering is not shallow history and does not remove the working-tree checkout. A full clone downloads historical file blobs eagerly.
 
 ## Why this matters
 
 - **Blobless is the default**: Omit `method` for the best performance
-- **Full clones are expensive**: Fetching all git history increases checkout time and storage
-- **Only needed for history-dependent tools**: Tools like `git describe`, `semantic-release`, `commitlint`, or `changeset` need history
+- **Full clones can be expensive**: Eager historical file-content transfer can increase checkout time and storage
+- **History is separate from blobs**: A history-aware tool does not inherently require every historical file blob up front. This rule conservatively skips visible history tools rather than assuming all their behavior is compatible with lazy fetching
 
 ## What to look for
 
@@ -16,11 +16,11 @@ steps:
       method: full
 ```
 
-When no step commands require git history.
+When no visible command establishes a requirement for eager historical file blobs. Executed commands and command substitutions are distinguished from logs and comments. Opaque scripts, unsupported shell syntax, unresolved commands/orbs/executors and custom shells withhold the suggestion; their absence from extracted history commands is not proof of safety.
 
 ## Recommended fix
 
-Remove `method: full` (or set `method: blobless`) when git history is not needed:
+Keep the checkout step. Test replacing `method: full` with `method: blobless` when the job can fetch blobs lazily. Compare total job time and validate repository-file, network and history operations:
 
 ```yaml
 steps:

@@ -176,9 +176,10 @@ export function textHasOpaqueRepositoryExecution(text: string): boolean {
   });
 }
 
-/** Unlike displayed '>' text, a real redirect may read/write checked-out files. */
-export function textHasShellFileRedirection(text: string): boolean {
-  return shellExecutionTexts(text).some((source) => {
+/** Raw target words of actual redirections, retaining quotes and unknown expansions. */
+export function shellFileRedirectionTargets(text: string): string[] {
+  const targets: string[] = [];
+  for (const source of shellExecutionTexts(text)) {
     let quote = "";
     for (let index = 0; index < source.length; index++) {
       const char = source[index]!;
@@ -200,17 +201,74 @@ export function textHasShellFileRedirection(text: string): boolean {
         while (source[index + 1] === char) {
           index++;
         }
-        const target = source.slice(index + 1).trimStart();
-        if (
-          /^(?:"\$(?:GITHUB_(?:ENV|OUTPUT|STATE|PATH|STEP_SUMMARY)|\{GITHUB_(?:ENV|OUTPUT|STATE|PATH|STEP_SUMMARY)\})"|\$(?:GITHUB_(?:ENV|OUTPUT|STATE|PATH|STEP_SUMMARY)|\{GITHUB_(?:ENV|OUTPUT|STATE|PATH|STEP_SUMMARY)\})|\/dev\/null)(?=\s|$)/.test(
-            target,
-          )
-        ) {
-          continue;
+        let start = index + 1;
+        while (/\s/.test(source[start] ?? "") && start < source.length) {
+          start++;
         }
-        return true;
+        let end = start;
+        let targetQuote = "";
+        for (; end < source.length; end++) {
+          const next = source[end]!;
+          if (next === "\\" && targetQuote !== "'") {
+            end++;
+            continue;
+          }
+          if (targetQuote) {
+            if (next === targetQuote) {
+              targetQuote = "";
+            }
+            continue;
+          }
+          if (next === "'" || next === '"') {
+            targetQuote = next;
+            continue;
+          }
+          if (/[\s;|<>()]/.test(next) || (next === "&" && end !== start)) {
+            break;
+          }
+        }
+        targets.push(source.slice(start, end));
+        index = Math.max(index, end - 1);
       }
     }
-    return false;
+  }
+  return targets;
+}
+
+/** Unlike displayed '>' text, a real redirect may read/write checked-out files. */
+export function textHasShellFileRedirection(text: string): boolean {
+  return shellFileRedirectionTargets(text).some(
+    (target) =>
+      !/^(?:"\$(?:GITHUB_(?:ENV|OUTPUT|STATE|PATH|STEP_SUMMARY)|\{GITHUB_(?:ENV|OUTPUT|STATE|PATH|STEP_SUMMARY)\})"|\$(?:GITHUB_(?:ENV|OUTPUT|STATE|PATH|STEP_SUMMARY)|\{GITHUB_(?:ENV|OUTPUT|STATE|PATH|STEP_SUMMARY)\})|\/dev\/null)$/.test(
+        target,
+      ),
+  );
+}
+
+export function textHasWideRepositoryAccess(text: string): boolean {
+  return repositoryInvocations(text).some((words) => {
+    const [tool, action] = repositoryCommandHead(words);
+    if (["find", "fd"].includes(tool ?? "")) {
+      return (
+        words.slice(1).some((word) => word === "." || word.startsWith("./")) || words.length === 1
+      );
+    }
+    if (tool === "rg") {
+      return words.includes("--files") || words.includes(".");
+    }
+    if (tool === "git") {
+      return action === "grep";
+    }
+    if (tool === "ls") {
+      return words.slice(1).some((word) => /^-[a-z]*r/i.test(word) || word === "--recursive");
+    }
+    if (tool === "du") {
+      return words.slice(1).some((word) => word.startsWith("-"));
+    }
+    return (
+      tool === "lerna" ||
+      (tool === "turbo" && action === "run") ||
+      (tool === "nx" && action === "affected")
+    );
   });
 }

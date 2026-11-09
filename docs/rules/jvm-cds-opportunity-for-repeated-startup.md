@@ -1,5 +1,7 @@
 # jvm-cds-opportunity-for-repeated-startup
 
+Startup evidence uses actual Java/Maven/Gradle invocations, not printed commands or comments. CDS intent comes from runtime options and recognized JVM environment variables, not arbitrary property values or application arguments after the Java launch target. Step/job names remain context hints only after actual JVM work is established. Existing step-count thresholds and score formula are retained.
+
 ## What It Does
 
 Detects Java repositories where short-lived JVM startup likely dominates CI runtime and suggests evaluating CDS/AppCDS or related startup amortization techniques.

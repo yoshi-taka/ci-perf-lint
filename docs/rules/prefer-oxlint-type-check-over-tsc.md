@@ -1,5 +1,7 @@
 # prefer-oxlint-type-check-over-tsc
 
+Workflow and package-script evidence requires an executed tsc invocation with its own explicit `--noEmit`. The last explicit true/false setting wins. Names, comments, displayed commands, project-option values and operands after `--` do not establish a no-emit check. Version/prerequisite advice is unchanged.
+
 ## Why it matters
 
 Oxlint's type-aware mode runs the TypeScript type checker (tsgolint) inside the same TypeScript program it uses for linting. That means one pass can both lint and report type errors, replacing a separate `tsc --noEmit` step and avoiding the duplicate program setup and analysis.

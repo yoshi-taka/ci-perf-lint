@@ -1,5 +1,7 @@
 # prefer-nextjs-16-minor-performance-milestone
 
+Workflow build evidence uses executed Next.js commands, not labels, comments or displayed examples. Supported wrappers/substitutions and independent repository version advice remain available; version gates and scoring are unchanged.
+
 Workflow findings use root dependency version evidence. Unresolved ranges crossing 16.3 are not treated as old installed versions.
 
 ## What it flags

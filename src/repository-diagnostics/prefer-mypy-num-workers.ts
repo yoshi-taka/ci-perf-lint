@@ -5,8 +5,15 @@ import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { parseSemverLikeVersionSpec } from "../repository-package-helpers.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import { detectInstalledMypyVersion } from "./mypy-version.ts";
-import { shellCommandSegments } from "../rules/shared/command-patterns.ts";
+import { shellCommandSegments, shellCommands } from "../rules/shared/command-patterns.ts";
 import { effectiveStepEnvironment } from "../rules/shared/workflow-env.ts";
+import { toolInvocations, invocationOptions } from "../rules/shared/tool-command-evidence.ts";
+import { shellExecutionTexts } from "../rules/shared/shell-execution-text.ts";
+import {
+  declaredShellEnvironmentValues,
+  declaredShellEnvironmentNames,
+  githubEnvironmentValues,
+} from "../rules/shared/shell-environment-evidence.ts";
 
 const meta = {
   id: "prefer-mypy-num-workers",
@@ -14,12 +21,6 @@ const meta = {
   confidence: "medium",
   docsPath: "docs/rules/prefer-mypy-num-workers.md",
 } satisfies RuleMeta;
-
-const INSTALL_COMMAND = /\b(?:pip|pip3|pipx|uv|poetry|pipenv)\s+(?:install|add|sync)\b/;
-
-const NON_CHECK_COMMAND = /(?:--version|--help)\b/;
-
-const PARALLEL_FLAG = /(?:^|\s)(?:--num-workers(?:=|\s+)|-n(?:=|\s+)?)(auto|\d+)(?=\s|$)/g;
 
 function parallelValue(value: unknown, supportsAuto: boolean): boolean {
   return (supportsAuto && value === "auto") || /^[1-9]\d*$/.test(String(value));
@@ -80,32 +81,64 @@ export async function collectPreferMypyNumWorkersDiagnostics(
 
   for (const workflow of workflows) {
     for (const job of workflow.jobs) {
+      const persisted: Record<string, string> = {};
       for (const step of job.steps) {
         const run = step.run ?? "";
-        const env = effectiveStepEnvironment(workflow, job, step);
-        let workerEnv = env.MYPY_NUM_WORKERS;
-        const untuned = shellCommandSegments(run).some((command) => {
-          const inlineEnv = /\bMYPY_NUM_WORKERS=["']?(auto|\d+)\b/.exec(command)?.[1];
-          if (
-            inlineEnv !== undefined &&
-            (/^export\s+/.test(command) || /^MYPY_NUM_WORKERS=\S+$/.test(command))
-          ) {
-            workerEnv = inlineEnv;
-          }
-          if (
-            !/\bmypy\b/.test(command) ||
-            INSTALL_COMMAND.test(command) ||
-            NON_CHECK_COMMAND.test(command)
-          ) {
-            return false;
-          }
-          const flag = [...command.matchAll(PARALLEL_FLAG)].at(-1)?.[1];
-          if (flag !== undefined) {
-            return !parallelValue(flag, supportsAuto);
-          }
-          const value = inlineEnv ?? workerEnv;
-          return value !== undefined ? !parallelValue(value, supportsAuto) : !configured;
+        const env = { ...persisted, ...effectiveStepEnvironment(workflow, job, step) };
+        const untuned = shellExecutionTexts(run).some((source) => {
+          let workerEnv = env.MYPY_NUM_WORKERS;
+          return shellCommandSegments(source).some((command) => {
+            const bindings = declaredShellEnvironmentValues(command);
+            const inlineWorkers =
+              bindings.MYPY_NUM_WORKERS ??
+              (declaredShellEnvironmentNames(command).has("MYPY_NUM_WORKERS")
+                ? "$__unknown_environment__"
+                : undefined);
+            const raw = shellCommands(command)[0] ?? [];
+            if (
+              ["export", "readonly"].includes(raw[0] ?? "") ||
+              raw.every((word) => /^[A-Za-z_]\w*=/.test(word))
+            ) {
+              workerEnv = inlineWorkers ?? workerEnv;
+            }
+            return toolInvocations(command).some((words) => {
+              if (words[0] !== "mypy") {
+                return false;
+              }
+              const flags = invocationOptions(words, [
+                "--num-workers",
+                "-n",
+                "--follow-imports",
+                "--cache-dir",
+                "--exclude",
+                "--module",
+                "-m",
+                "--package",
+                "--python-executable",
+                "--python-version",
+                "--custom-typeshed-dir",
+                "--config-file",
+                "--junit-xml",
+                "--txt-report",
+                "--html-report",
+                "--linecount-report",
+                "--json-report",
+              ]);
+              if (flags.some(({ name }) => ["--help", "-h", "--version", "-V"].includes(name))) {
+                return false;
+              }
+              const flag = flags
+                .filter(({ name }) => ["--num-workers", "-n"].includes(name))
+                .at(-1);
+              const value = flag ? flag.value : (inlineWorkers ?? workerEnv);
+              if (typeof value === "string" && /[$`]|__shell_substitution__/.test(value)) {
+                return false;
+              }
+              return value !== undefined ? !parallelValue(value, supportsAuto) : !configured;
+            });
+          });
         });
+        Object.assign(persisted, githubEnvironmentValues(run));
         if (!untuned) {
           continue;
         }

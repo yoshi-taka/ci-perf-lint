@@ -16,6 +16,7 @@ import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositorySparseCheckoutPrecedent } from "./shared/similar-workflow-consensus.ts";
 import { workflowHasUnmodeledShell } from "./shared/workflow-command-context.ts";
+import { textHasWideRepositoryAccess } from "./shared/repository-command-evidence.ts";
 
 const meta = {
   id: "prefer-sparse-checkout-for-scoped-workflow",
@@ -72,12 +73,7 @@ function hasExplicitFullHistorySignal(
 }
 
 function hasWideRepoAccess(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return /(find\s+\.\b|rg\s+(?:--files\b|\.)|fd\s+\.\b|git\s+grep\b|ls\s+-r\b|du\s+-|turbo\s+run\b|nx\s+affected\b|lerna\b)/.test(
-      text,
-    );
-  });
+  return job.steps.some((step) => textHasWideRepositoryAccess(step.run ?? ""));
 }
 
 function hasWorkspaceInstall(job: WorkflowJob): boolean {

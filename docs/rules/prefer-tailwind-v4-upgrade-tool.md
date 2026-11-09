@@ -1,5 +1,7 @@
 # prefer-tailwind-v4-upgrade-tool
 
+Workflow workload evidence uses executed frontend tools or package-manager build/test/lint scripts, not names, comments or displayed examples. Node/browser/plugin compatibility gates, repository configuration advice and scoring remain unchanged.
+
 Tailwind CSS v3 projects should usually start a v4 migration with the official upgrade tool, but only when the visible compatibility signals look reasonable.
 
 ## What it detects

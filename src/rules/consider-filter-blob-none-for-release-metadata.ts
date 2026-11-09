@@ -12,6 +12,7 @@ import {
   repositoryInvocations,
   repositoryCommandHead,
   textHasOpaqueRepositoryExecution,
+  textHasWideRepositoryAccess,
 } from "./shared/repository-command-evidence.ts";
 import { workflowHasUnmodeledShell } from "./shared/workflow-command-context.ts";
 import { detectInstallCommandFromText } from "./shared/tools-text.ts";
@@ -133,31 +134,7 @@ function jobUsesLocalAction(job: WorkflowJob): boolean {
 }
 
 function jobHasWideRepoAccess(job: WorkflowJob): boolean {
-  return job.steps.some((step) =>
-    repositoryInvocations(step.run ?? "").some((words) => {
-      const [tool, action] = repositoryCommandHead(words);
-      if (["find", "fd"].includes(tool ?? "")) {
-        return words.slice(1).some((word) => word === "." || word.startsWith("./"));
-      }
-      if (tool === "rg") {
-        return words.includes("--files") || words.includes(".");
-      }
-      if (tool === "git") {
-        return action === "grep";
-      }
-      if (tool === "ls") {
-        return words.slice(1).some((word) => /^-[a-z]*r/i.test(word) || word === "--recursive");
-      }
-      if (tool === "du") {
-        return words.slice(1).some((word) => word.startsWith("-"));
-      }
-      return (
-        tool === "lerna" ||
-        (tool === "turbo" && action === "run") ||
-        (tool === "nx" && action === "affected")
-      );
-    }),
-  );
+  return job.steps.some((step) => textHasWideRepositoryAccess(step.run ?? ""));
 }
 
 function jobHasHeavyBuildOrInstall(job: WorkflowJob): boolean {

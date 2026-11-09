@@ -1,5 +1,7 @@
 # missing-next-build-cache
 
+Build evidence uses executed Next.js invocations, including supported wrappers and visible substitutions. Labels, comments and printed commands do not count. Existing framework and structured cache gates are unchanged.
+
 Flags workflows that visibly run `next build` while no cache step for `.next/cache` is visible.
 
 ## Why it matters

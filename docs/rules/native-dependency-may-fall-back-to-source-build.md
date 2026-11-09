@@ -1,5 +1,7 @@
 # native-dependency-may-fall-back-to-source-build
 
+Source-build evidence comes from actual rebuild/install commands and their own package/option operands. Printed toolchains, labels and unrelated option values do not count. Relevant structured or literal shell environment settings are preserved; unresolved values are not treated as literal configuration. Existing package gates and score formula remain in place.
+
 ## What it flags
 
 Flags repositories that use native-heavy packages while the workflow also shows install conditions that may bypass wheels or prebuilt binaries.

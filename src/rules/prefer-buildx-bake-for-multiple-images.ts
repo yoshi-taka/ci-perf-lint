@@ -2,42 +2,20 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { jobRunsBuildxBake } from "./shared/docker.ts";
-import { shellCommandSegments, staticShellWords } from "./shared/command-patterns.ts";
+import { jobRunsBuildxBake, textRunsDockerBuild } from "./shared/docker.ts";
 
 const meta = {
   id: "prefer-buildx-bake-for-multiple-images",
   severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-buildx-bake-for-multiple-images.md",
-  precheck: (workflow) => {
-    const matches = workflow.source?.match(/\bdocker\s+(?:buildx\s+build|build)\b/gi)?.length ?? 0;
-    return matches >= 2 ? 1 : 0;
-  },
 } satisfies RuleMeta;
 
 function stepRunsDockerBuildCommand(step: WorkflowStep): boolean {
   if (step.uses?.toLowerCase().startsWith("docker/build-push-action@")) {
     return true;
   }
-  return shellCommandSegments(step.run ?? "").some((command) => {
-    const words = staticShellWords(command);
-    if (!words) {
-      return false;
-    }
-    let index = 0;
-    while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
-      index++;
-    }
-    if (words[index] === "sudo") {
-      index++;
-    }
-    return (
-      words[index] === "docker" &&
-      (words[index + 1] === "build" ||
-        (words[index + 1] === "buildx" && words[index + 2] === "build"))
-    );
-  });
+  return textRunsDockerBuild(step.run ?? "");
 }
 
 export const preferBuildxBakeForMultipleImagesRule = {

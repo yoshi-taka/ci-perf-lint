@@ -3,7 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { workflowHasCachePath, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
-import { getWorkflowStepText } from "./shared/workflow-step-text.ts";
+import { textRunsTool } from "./shared/tool-command-evidence.ts";
 
 const meta = {
   id: "missing-angular-cli-cache",
@@ -14,7 +14,7 @@ const meta = {
 
 function jobRunsAngularTasks(job: WorkflowJob): boolean {
   return job.steps.some((step) =>
-    /\bng\s+(?:build|test|serve|lint)\b/i.test(getWorkflowStepText(step)),
+    textRunsTool(step.run ?? "", "ng", ["build", "test", "serve", "lint"]),
   );
 }
 

@@ -1,23 +1,39 @@
 import type { RepositorySignals } from "../../repository-signals-types.ts";
+import { toolInvocations, invocationOptions } from "./tool-command-evidence.ts";
 
 const minOxlintMajor = 1;
 const minOxlintMinor = 51;
 
-const tscCommandPattern = /(?<![\w-])tsc\b([^\n;&|]*)/gi;
-const tscNoEmitPattern = /(?:^|\s)--noEmit(?:\s+(true|false))?(?=\s|$)/g;
-
 /** Only explicit --noEmit proves that replacing tsc will not remove build output. */
 export function textRunsTscTypeCheck(text: string): boolean {
-  tscCommandPattern.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = tscCommandPattern.exec(text))) {
-    const rest = match[1] ?? "";
-    const flags = [...rest.matchAll(tscNoEmitPattern)];
-    if (flags.length > 0 && flags.at(-1)?.[1] !== "false") {
-      return true;
+  return toolInvocations(text).some((words) => {
+    if (!/^tsc(?:@[^/]+)?$/.test(words[0] ?? "")) {
+      return false;
     }
-  }
-  return false;
+    const options = invocationOptions(words, [
+      "--outDir",
+      "--outFile",
+      "--rootDir",
+      "--baseUrl",
+      "--module",
+      "--target",
+      "--lib",
+      "--types",
+      "--moduleResolution",
+      "--jsx",
+      "--tsBuildInfoFile",
+    ]);
+    if (options.some(({ name }) => ["--help", "-h", "--version", "-v"].includes(name))) {
+      return false;
+    }
+    const last = options.filter(({ name }) => name === "--noEmit").at(-1);
+    if (!last) {
+      return false;
+    }
+    const next = words[last.index + 1];
+    const value = last.value ?? (["true", "false"].includes(next ?? "") ? next : "true");
+    return value === "true";
+  });
 }
 
 function meetsMinimumOxlint(eslint: RepositorySignals["eslint"]): boolean {

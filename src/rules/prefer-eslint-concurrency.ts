@@ -34,7 +34,7 @@ export const preferEslintConcurrencyRule = {
     const offendingSteps: { node: Node | undefined }[] = [];
     for (const job of workflow.jobs) {
       for (const step of job.steps) {
-        const text = `${step.name ?? ""} ${step.run ?? ""}`;
+        const text = step.run ?? "";
         if (textRunsEslintWithoutConcurrency(text)) {
           offendingSteps.push({ node: step.runNode ?? step.node });
         }

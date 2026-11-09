@@ -20,7 +20,7 @@ const meta = {
 } satisfies RuleMeta;
 
 function stepRunsTscTypeCheck(step: WorkflowStep): boolean {
-  return textRunsTscTypeCheck(`${step.name ?? ""} ${step.run ?? ""}`);
+  return textRunsTscTypeCheck(step.run ?? "");
 }
 
 function collectOffendingSteps(job: WorkflowJob): WorkflowStep[] {

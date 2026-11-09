@@ -1,5 +1,6 @@
 import { shellCommands, shellCommandSegments } from "./command-patterns.ts";
 import { shellExecutionTexts } from "./shell-execution-text.ts";
+import { shellFileRedirectionTargets } from "./repository-command-evidence.ts";
 
 function writesGithubEnvironment(text: string): boolean {
   let quote = "";
@@ -88,4 +89,47 @@ export function declaredShellEnvironmentNames(text: string): Set<string> {
     }
   }
   return names;
+}
+
+/** Literal assignment values only; printf substitutions and expansions remain unresolved. */
+export function declaredShellEnvironmentValues(text: string): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const source of shellExecutionTexts(text)) {
+    for (const segment of shellCommandSegments(source)) {
+      const names = declaredShellEnvironmentNames(segment);
+      const words = shellCommands(segment)[0] ?? [];
+      let index = ["export", "env", "readonly"].includes(words[0] ?? "") ? 1 : 0;
+      const assignments: string[] = [];
+      while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
+        assignments.push(words[index++]!);
+      }
+      if (["echo", "printf"].includes(words[0] ?? "") && writesGithubEnvironment(segment)) {
+        const redirect = words.findIndex((word) => word === ">");
+        if (redirect >= 0) {
+          assignments.push(...words.slice(1, redirect).flatMap((word) => word.split(/\r?\n/)));
+        }
+      }
+      for (const word of assignments) {
+        const match = /^([A-Za-z_]\w*)=(.*)$/.exec(word);
+        if (match && names.has(match[1]!) && !/[$`%]|__shell_substitution__/.test(match[2]!)) {
+          values[match[1]!] = match[2]!;
+        }
+      }
+    }
+  }
+  return values;
+}
+
+export function githubEnvironmentValues(text: string): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const segment of shellExecutionTexts(text).flatMap(shellCommandSegments)) {
+    if (
+      shellFileRedirectionTargets(segment).some((target) =>
+        ["$GITHUB_ENV", "${GITHUB_ENV}", '"$GITHUB_ENV"', '"${GITHUB_ENV}"'].includes(target),
+      )
+    ) {
+      Object.assign(values, declaredShellEnvironmentValues(segment));
+    }
+  }
+  return values;
 }

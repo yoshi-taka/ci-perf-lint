@@ -1,5 +1,7 @@
 # prefer-eslint-concurrency
 
+Workflow and package-script evidence share command-position extraction. Tuning/help flags must belong to the actual ESLint invocation, not an ignore pattern, rule value, printed example or another command. Supported wrappers and executed substitutions remain detectable; version gates and scores are unchanged.
+
 ## Why it matters
 
 ESLint v9.34.0 added multithread linting through the `--concurrency` CLI flag. Files are processed on several worker threads instead of a single main thread, and ESLint reports roughly 1.30x to 3.01x faster linting on large projects. The flag is **opt-in**: the default is `off`, equivalent to `--concurrency=1`, so existing configurations stay single-threaded until they ask for more.

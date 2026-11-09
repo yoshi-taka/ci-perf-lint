@@ -1,6 +1,8 @@
 # prefer-sparse-checkout-for-scoped-workflow
 
-Shared history/script evidence distinguishes execution from displayed text. Opaque scripts, unsupported shell syntax and custom shells (including workflow/job defaults) prevent narrowing advice, even in multi-checkout jobs. Existing scope, agentic-inspection and scoring heuristics remain in place.
+Shared history/script evidence distinguishes execution from displayed text. Opaque scripts, unsupported shell syntax and custom shells (including workflow/job defaults) prevent narrowing advice, even in multi-checkout jobs. Existing agentic-inspection and scoring heuristics remain in place.
+
+Scope comes from modeled path operands, actual static redirection targets, step working directories and artifact-action paths, not printed paths, comments, API payloads or arbitrary action inputs. Dynamic/traversing paths and wildcard subtree names do not establish a narrow scope. Actual `find .`, `fd .` and other broad scans suppress the suggestion; displayed scan examples do not. Other intent/safety exclusions remain conservative.
 
 Flags build or release jobs that use only a narrow working tree and may still benefit from sparse checkout.
 

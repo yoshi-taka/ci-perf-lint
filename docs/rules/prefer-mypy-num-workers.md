@@ -1,5 +1,7 @@
 # prefer-mypy-num-workers
 
+Only executed mypy invocations establish workload evidence. Worker options belong to that invocation, not exclude patterns, logs or another command. Structured environment, literal scoped assignments/exports and recognized `$GITHUB_ENV` writes are preserved. Unknown worker expansions withhold tuning advice; version-compatible recommendations remain unchanged.
+
 Detects repositories that install mypy 2.0 or newer but run it without parallel workers.
 
 ## What it detects

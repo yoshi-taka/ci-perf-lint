@@ -1,5 +1,7 @@
 # missing-angular-cli-cache
 
+Angular workload evidence comes from executed `ng` commands, not labels, comments or displayed examples. Supported wrappers and visible substitutions remain detectable. Workspace/cache configuration gates are unchanged.
+
 Flags workflows that visibly run Angular CLI tasks while Angular CLI cache is not fully wired for CI.
 
 ## Why it matters

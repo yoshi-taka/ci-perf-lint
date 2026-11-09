@@ -3,6 +3,11 @@ import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { effectiveStepEnvironment } from "../rules/shared/workflow-env.ts";
 import { jobHasMatrix } from "../rules/shared/workflow-jobs.ts";
+import {
+  toolInvocations,
+  invocationOptions,
+  invocationOperands,
+} from "../rules/shared/tool-command-evidence.ts";
 
 const meta = {
   id: "jvm-cds-opportunity-for-repeated-startup",
@@ -11,12 +16,105 @@ const meta = {
   docsPath: "docs/rules/jvm-cds-opportunity-for-repeated-startup.md",
 } satisfies RuleMeta;
 
-const JVM_COMMAND_PATTERNS: RegExp[] = [
-  /\bmvn\b/,
-  /\b(?:gradle|gradlew)\b/,
-  /\bjava\s+(?:-jar\b|-cp\b|-\w*)/,
-  /\bspring-boot:run\b/,
+const jvmValueOptions = [
+  "-f",
+  "--file",
+  "-s",
+  "--settings",
+  "-gs",
+  "--global-settings",
+  "-pl",
+  "--projects",
+  "-P",
+  "--activate-profiles",
+  "-D",
+  "--define",
+  "--tests",
+  "--args",
+  "-I",
+  "--init-script",
+  "-g",
+  "--gradle-user-home",
+  "--project-dir",
+  "--max-workers",
+  "--console",
+  "-jar",
+  "-cp",
+  "-classpath",
+  "--class-path",
+  "--module-path",
+  "--module",
+  "-m",
+  "--add-opens",
+  "--add-exports",
+  "--add-reads",
+  "--patch-module",
 ];
+
+function jvmCommands(text: string) {
+  return toolInvocations(text).flatMap((original) => {
+    const tool = original[0]?.split("/").at(-1) ?? "";
+    if (!["java", "mvn", "mvnw", "gradle", "gradlew"].includes(tool)) {
+      return [];
+    }
+    let words = [tool === "mvnw" ? "mvn" : tool, ...original.slice(1)];
+    if (tool === "java") {
+      for (let index = 1; index < words.length; index++) {
+        const arg = words[index]!;
+        if (["-jar", "-m", "--module"].includes(arg)) {
+          words = words.slice(0, index + 2);
+          break;
+        }
+        if (jvmValueOptions.includes(arg)) {
+          index++;
+          continue;
+        }
+        if (!arg.startsWith("-")) {
+          words = words.slice(0, index + 1);
+          break;
+        }
+      }
+    }
+    const options = invocationOptions(words, jvmValueOptions);
+    if (
+      options.some(({ name }) =>
+        ["--help", "-h", "-help", "--version", "-version", "-v"].includes(name),
+      )
+    ) {
+      return [];
+    }
+    const goals = invocationOperands(words, jvmValueOptions);
+    const runtime = options
+      .filter(
+        ({ name, value }) =>
+          /^-(?:Xshare:|XX:(?:SharedArchiveFile|ArchiveClassesAtExit|DumpLoadedClassList))/i.test(
+            name,
+          ) ||
+          (name === "-D" && /^(?:argLine|jvmArgs|org\.gradle\.jvmargs)=/.test(value ?? "")),
+      )
+      .map(({ name, value }) => `${name}${value === undefined ? "" : `=${value}`}`)
+      .join(" ");
+    const properties = options
+      .filter(
+        ({ name, value }) =>
+          name === "-D" && /^(?:forkCount|reuseForks|maxParallelForks)=/.test(value ?? ""),
+      )
+      .map(({ value }) => value)
+      .join(" ");
+    return [
+      {
+        words,
+        tool,
+        options,
+        runtime,
+        text: `${words[0]} ${goals.join(" ")} ${options.map(({ name }) => name).join(" ")} ${properties}`.toLowerCase(),
+        javaLaunch:
+          tool === "java" &&
+          options.some(({ name }) => ["-jar", "-cp", "-classpath", "--class-path"].includes(name)),
+      },
+    ];
+  });
+}
 
 const JVM_TEST_PATTERNS: RegExp[] = [
   /\bmvn\b.*\b(test|verify|surefire|failsafe|integration-test)\b/,
@@ -53,7 +151,7 @@ export function collectJvmCdsOpportunityDiagnostics(
   const { predicateIndex, repository } = context;
   const relevantSteps = predicateIndex.allSteps.filter(
     ({ step, workflow }) =>
-      JVM_COMMAND_PATTERNS.some((pattern) => pattern.test(step.run ?? "")) &&
+      jvmCommands(step.run ?? "").length > 0 &&
       !/\b(?:release|publish|deploy|rollback|promote|nightly|tag)\b/i.test(workflow.name ?? ""),
   );
 
@@ -68,7 +166,8 @@ export function collectJvmCdsOpportunityDiagnostics(
   let hasSpringBoot = false;
 
   for (const resolved of relevantSteps) {
-    const run = (resolved.step.run ?? "").toLowerCase();
+    const commands = jvmCommands(resolved.step.run ?? "");
+    const run = commands.map((command) => command.text).join("\n");
     const stepName = (resolved.step.name ?? "").toLowerCase();
     const jobId = resolved.job.id.toLowerCase();
     const combined = `${stepName} ${run} ${jobId}`;
@@ -77,16 +176,23 @@ export function collectJvmCdsOpportunityDiagnostics(
     const runtimeFlags = ["JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "GRADLE_OPTS", "MAVEN_OPTS"]
       .map((key) => (typeof env[key] === "string" ? env[key] : ""))
       .join(" ");
-    if (CDS_PATTERNS.some((p) => p.test(`${run} ${runtimeFlags}`))) {
+    if (
+      CDS_PATTERNS.some((p) =>
+        p.test(`${commands.map((command) => command.runtime).join(" ")} ${runtimeFlags}`),
+      )
+    ) {
       hasCds = true;
     }
 
-    if (NATIVE_IMAGE_PATTERNS.some((p) => p.test(run))) {
+    if (
+      NATIVE_IMAGE_PATTERNS.some((p) => p.test(run)) ||
+      toolInvocations(resolved.step.run ?? "").some(([tool]) => tool === "native-image")
+    ) {
       hasNativeImage = true;
       nativeImageStepCount++;
     }
 
-    if (JVM_COMMAND_PATTERNS.some((p) => p.test(run))) {
+    if (commands.length > 0) {
       jvmStepCount++;
       hasMatrixBuild ||= jobHasMatrix(resolved.job);
       if (JVM_TEST_PATTERNS.some((p) => p.test(combined))) {
@@ -117,7 +223,9 @@ export function collectJvmCdsOpportunityDiagnostics(
   if (
     jvmStepCount < 2 ||
     (jvmTestStepCount < 2 &&
-      !relevantSteps.every(({ step }) => /\bjava\s+(?:-jar|-cp)\b/.test(step.run ?? "")))
+      !relevantSteps.every(({ step }) =>
+        jvmCommands(step.run ?? "").some((command) => command.javaLaunch),
+      ))
   ) {
     return [];
   }

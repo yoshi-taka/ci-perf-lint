@@ -1,8 +1,11 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
-import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
+import { textRunsTool, toolInvocations } from "./shared/tool-command-evidence.ts";
+import { repositoryCommandHead } from "./shared/repository-command-evidence.ts";
+import { invocationWorkName } from "./shared/tooling-command-evidence.ts";
 
 // Sources:
 // - https://jestjs.io/ja/docs/upgrading-to-jest30
@@ -14,15 +17,17 @@ const meta = {
   docsPath: "docs/rules/prefer-jest-30-for-jest-29.md",
 } satisfies RuleMeta;
 
-function stepText(step: WorkflowStep): string {
-  return `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`;
-}
-
 function jobRunsJest(job: WorkflowJob): boolean {
-  return job.steps.some((step) =>
-    /\b(?:jest|npm\s+test|npm\s+run\s+test|pnpm\s+test|pnpm\s+run\s+test|yarn\s+test|bun\s+test)\b/i.test(
-      stepText(step),
-    ),
+  return job.steps.some(
+    (step) =>
+      textRunsTool(step.run ?? "", "jest") ||
+      toolInvocations(step.run ?? "").some((words) => {
+        const head = repositoryCommandHead(words);
+        return (
+          ["npm", "pnpm", "yarn", "bun"].includes(head[0] ?? "") &&
+          invocationWorkName(head) === "test"
+        );
+      }),
   );
 }
 

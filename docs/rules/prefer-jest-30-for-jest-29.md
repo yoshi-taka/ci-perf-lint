@@ -1,5 +1,7 @@
 # prefer-jest-30-for-jest-29
 
+Workflow workload evidence uses executed Jest commands or actual package-manager test-script invocations, not names, comments or printed examples. Independent repository version advice can legitimately remain when no workflow test executes. Version/compatibility gates and scores are unchanged.
+
 Root lockfile versions take precedence over declared lower bounds for Jest, TypeScript and JSDOM. An unresolved `^30.0.0` does not prove Jest is below 30.5.
 
 Jest 29 repositories should consider Jest 30, and Jest 30.x repositories below 30.5 should move to the 30.5 performance release.

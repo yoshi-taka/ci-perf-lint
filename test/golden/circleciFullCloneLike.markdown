@@ -7,7 +7,7 @@
 - Severity: `suggestion`
 - Confidence: `medium`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/circleci-checkout-uses-full-clone`
-- Message: Job "build" uses full checkout clone but does not need git history.
-- Why it matters: CircleCI defaults to blobless clone, which is faster and uses less data. Explicitly requesting a full clone is only necessary when the job accesses git history (e.g. git log, git describe, commitlint, semantic-release).
-- Suggested action: Remove checkout or set checkout method to blobless (or omit method, as blobless is the default).
-- Measurement hint: Full clones fetch all git history, which increases checkout time and storage.
+- Message: Job "build" explicitly requests a full checkout without a visible need for eager historical file blobs.
+- Why it matters: A blobless clone retains commit and tree metadata but fetches file contents lazily. A full clone downloads historical file blobs eagerly, which can add transfer time and storage. No visible command establishes that this job needs those blobs downloaded up front.
+- Suggested action: Keep the checkout step. If the job supports lazy blob fetching, test method: blobless (or omit method) and verify the same tools and repository-file operations still work.
+- Measurement hint: Compare checkout transfer size, lazy blob fetches, and total job time with the same commit history and checkout contents.

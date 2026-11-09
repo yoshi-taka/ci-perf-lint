@@ -1,16 +1,25 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
-import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 
-function stepText(step: WorkflowStep): string {
-  return `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`;
-}
+import { textRunsTool, toolInvocations } from "./shared/tool-command-evidence.ts";
+import { repositoryCommandHead } from "./shared/repository-command-evidence.ts";
+import { invocationWorkName } from "./shared/tooling-command-evidence.ts";
 
 function jobRunsStorybookBuild(job: WorkflowJob): boolean {
-  return job.steps.some((step) =>
-    /\b(?:build-storybook|storybook\s+build)\b/i.test(stepText(step)),
+  return job.steps.some(
+    (step) =>
+      textRunsTool(step.run ?? "", "build-storybook") ||
+      textRunsTool(step.run ?? "", "storybook", ["build"]) ||
+      toolInvocations(step.run ?? "").some((words) => {
+        const head = repositoryCommandHead(words);
+        return (
+          ["npm", "pnpm", "yarn", "bun"].includes(head[0] ?? "") &&
+          invocationWorkName(head) === "build-storybook"
+        );
+      }),
   );
 }
 

@@ -2,6 +2,10 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { dependencyInstallCommands } from "./shared/dependency-install-evidence.ts";
+import { toolInvocations } from "./shared/tool-command-evidence.ts";
+import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
+import { githubEnvironmentValues } from "./shared/shell-environment-evidence.ts";
 
 const meta = {
   id: "native-dependency-may-fall-back-to-source-build",
@@ -10,49 +14,61 @@ const meta = {
   docsPath: "docs/rules/native-dependency-may-fall-back-to-source-build.md",
 } satisfies RuleMeta;
 
-function workflowHasSourceBuildSmell(workflow: WorkflowDocument): boolean {
-  return workflow.jobs.some((job) =>
-    job.steps.some((step) => {
-      const text = `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`.trim();
-      return (
-        /\b(--no-binary|PIP_NO_BINARY|--build-from-source|node-gyp\s+rebuild|npm\s+rebuild|prebuild-install\b.*\|\|\s*node-gyp)\b/i.test(
-          text,
-        ) ||
-        /--no-optional\b|--omit=optional\b/i.test(text) ||
-        /\b(apt(?:-get)?\s+install|apk\s+add|dnf\s+install|yum\s+install)\b.*\b(build-essential|gcc|g\+\+|make|python3?-dev|libxml2-dev|libxslt-dev|cairo|pango|libvips|rust|cargo|musl-dev)\b/i.test(
-          text,
-        )
-      );
-    }),
-  );
-}
-
 function sourceBuildSmellSummary(workflow: WorkflowDocument): string[] {
   const labels = new Set<string>();
 
   for (const job of workflow.jobs) {
+    const persisted: Record<string, string> = {};
     for (const step of job.steps) {
-      const text = `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`.trim();
-      if (/\b(--no-binary|PIP_NO_BINARY)\b/i.test(text)) {
-        labels.add("pip no-binary path");
-      }
+      const run = step.run ?? "";
       if (
-        /\b(--build-from-source|node-gyp\s+rebuild|npm\s+rebuild|prebuild-install\b.*\|\|\s*node-gyp)\b/i.test(
-          text,
+        toolInvocations(run).some(
+          ([tool, action]) => ["node-gyp", "npm"].includes(tool ?? "") && action === "rebuild",
         )
       ) {
         labels.add("explicit native build path");
       }
-      if (/--no-optional\b|--omit=optional\b/i.test(text)) {
-        labels.add("optional dependency bypass");
+      for (const command of dependencyInstallCommands(run, {
+        ...persisted,
+        ...effectiveStepEnvironment(workflow, job, step),
+      })) {
+        if (
+          command.options.some(({ name, value }) => name === "--no-binary" && value !== ":none:") ||
+          (typeof command.environment.PIP_NO_BINARY === "string" &&
+            !/[$`]|__shell_substitution__/.test(command.environment.PIP_NO_BINARY) &&
+            command.environment.PIP_NO_BINARY !== ":none:" &&
+            command.environment.PIP_NO_BINARY !== "")
+        ) {
+          labels.add("pip no-binary path");
+        }
+        if (
+          command.options.some(
+            ({ name, value }) => name === "--build-from-source" && value !== "false",
+          )
+        ) {
+          labels.add("explicit native build path");
+        }
+        if (
+          command.options.some(
+            ({ name, value }) =>
+              (name === "--no-optional" && value !== "false") ||
+              (name === "--omit" && value?.split(",").includes("optional")),
+          )
+        ) {
+          labels.add("optional dependency bypass");
+        }
+        if (
+          ["apt", "apt-get", "apk", "dnf", "yum"].includes(command.tool) &&
+          command.packages.some((pkg) =>
+            /^(?:build-essential|gcc|g\+\+|make|python3?-dev|libxml2-dev|libxslt-dev|cairo|pango|libvips|rust|cargo|musl-dev)(?:$|[=@])/.test(
+              pkg,
+            ),
+          )
+        ) {
+          labels.add("native build toolchain install");
+        }
       }
-      if (
-        /\b(apt(?:-get)?\s+install|apk\s+add|dnf\s+install|yum\s+install)\b.*\b(build-essential|gcc|g\+\+|make|python3?-dev|libxml2-dev|libxslt-dev|cairo|pango|libvips|rust|cargo|musl-dev)\b/i.test(
-          text,
-        )
-      ) {
-        labels.add("native build toolchain install");
-      }
+      Object.assign(persisted, githubEnvironmentValues(run));
     }
   }
 
@@ -66,7 +82,6 @@ export const nativeDependencyMayFallBackToSourceBuildRule = {
     const pythonPackages = context.repository.nativePackages.python;
     if (
       (nodePackages.length === 0 && pythonPackages.length === 0) ||
-      !workflowHasSourceBuildSmell(workflow) ||
       (context.repository.primaryWorkflowPath !== undefined &&
         workflow.relativePath !== context.repository.primaryWorkflowPath)
     ) {
@@ -74,6 +89,9 @@ export const nativeDependencyMayFallBackToSourceBuildRule = {
     }
 
     const smellSummary = sourceBuildSmellSummary(workflow);
+    if (smellSummary.length === 0) {
+      return [];
+    }
     const packageSummary = [
       nodePackages.length > 0 ? `Node: ${nodePackages.join(", ")}` : undefined,
       pythonPackages.length > 0 ? `Python: ${pythonPackages.join(", ")}` : undefined,

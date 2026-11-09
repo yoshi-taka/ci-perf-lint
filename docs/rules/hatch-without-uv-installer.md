@@ -1,5 +1,7 @@
 # hatch-without-uv-installer
 
+Workflow evidence uses executed Hatch invocations, including supported Python/tool wrappers and visible substitutions. Comments, labels and printed examples do not establish execution. Installing Hatch alone does not count; an actual Hatch command alongside installation still does. Repository configuration advice remains independent.
+
 ## What it flags
 
 Flags repositories and CI jobs that use Hatch without `installer = "uv"` configured.

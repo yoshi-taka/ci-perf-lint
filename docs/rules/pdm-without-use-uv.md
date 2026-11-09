@@ -1,5 +1,7 @@
 # pdm-without-use-uv
 
+PDM workflow and backend-configuration signals use executed invocations rather than labels, comments or printed examples. A displayed `pdm config --local use_uv true` cannot exempt actual PDM work. Structured configuration and independent repository advice are retained.
+
 ## What it flags
 
 Flags repositories and CI jobs that use PDM without `use_uv = true` configured.

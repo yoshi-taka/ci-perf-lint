@@ -3,6 +3,15 @@ import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { isManualCacheStep, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
+import { toolInvocations } from "./shared/tool-command-evidence.ts";
+import {
+  repositoryCommandHead,
+  shellFileRedirectionTargets,
+} from "./shared/repository-command-evidence.ts";
+import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
+import { declaredShellEnvironmentNames } from "./shared/shell-environment-evidence.ts";
+import { shellExecutionTexts } from "./shared/shell-execution-text.ts";
+import { shellCommandSegments } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "missing-turbo-cache",
@@ -11,14 +20,19 @@ const meta = {
   docsPath: "docs/rules/missing-turbo-cache.md",
 } satisfies RuleMeta;
 
-function stepText(step: WorkflowStep): string {
-  return `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`;
+function stepRunsTurboTasks(step: WorkflowStep): boolean {
+  return toolInvocations(step.run ?? "").some((words) => {
+    const [tool, action, task] = repositoryCommandHead(words);
+    return (
+      tool === "turbo" &&
+      action === "run" &&
+      ["build", "test", "lint", "typecheck", "check"].includes(task ?? "")
+    );
+  });
 }
 
 function jobRunsTurboTasks(job: WorkflowJob): boolean {
-  return job.steps.some((step) =>
-    /\bturbo\s+run\s+(?:build|test|lint|typecheck|check)\b/i.test(stepText(step)),
-  );
+  return job.steps.some(stepRunsTurboTasks);
 }
 
 function turboCachePathText(step: WorkflowStep): string {
@@ -58,10 +72,32 @@ function workflowHasTurboLocalCache(workflow: WorkflowDocument): boolean {
   );
 }
 
-function workflowHasTurboRemoteCacheWiring(workflow: WorkflowDocument): boolean {
-  return /\bTURBO_TOKEN\b|\bTURBO_TEAM\b|\bTURBO_API\b|\bTURBO_REMOTE_ONLY\b/i.test(
-    workflow.source ?? "",
-  );
+function jobHasTurboRemoteCacheWiring(workflow: WorkflowDocument, job: WorkflowJob): boolean {
+  const names = ["TURBO_TOKEN", "TURBO_TEAM", "TURBO_API", "TURBO_REMOTE_ONLY"];
+  const persisted = new Set<string>();
+  for (const step of job.steps) {
+    const run = step.run ?? "";
+    const environment = effectiveStepEnvironment(workflow, job, step);
+    const declared = declaredShellEnvironmentNames(run);
+    if (
+      stepRunsTurboTasks(step) &&
+      names.some((name) => name in environment || declared.has(name) || persisted.has(name))
+    ) {
+      return true;
+    }
+    for (const segment of shellExecutionTexts(run).flatMap(shellCommandSegments)) {
+      if (
+        shellFileRedirectionTargets(segment).some((target) =>
+          ["$GITHUB_ENV", "${GITHUB_ENV}", '"$GITHUB_ENV"', '"${GITHUB_ENV}"'].includes(target),
+        )
+      ) {
+        for (const name of declaredShellEnvironmentNames(segment)) {
+          persisted.add(name);
+        }
+      }
+    }
+  }
+  return false;
 }
 
 export const missingTurboCacheRule = {
@@ -71,14 +107,18 @@ export const missingTurboCacheRule = {
       !context.repository.frameworks.usesTurbo ||
       context.repository.frameworks.usesNx ||
       context.repository.frameworks.usesLerna ||
-      workflowHasTurboLocalCache(workflow) ||
-      workflowHasTurboRemoteCacheWiring(workflow)
+      workflowHasTurboLocalCache(workflow)
     ) {
       return [];
     }
 
     return workflow.jobs
-      .filter((job) => jobAllowsActionsCacheRestore(workflow, job) && jobRunsTurboTasks(job))
+      .filter(
+        (job) =>
+          jobAllowsActionsCacheRestore(workflow, job) &&
+          jobRunsTurboTasks(job) &&
+          !jobHasTurboRemoteCacheWiring(workflow, job),
+      )
       .map((job) =>
         buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs Turbo tasks without visible local or remote cache wiring.`,

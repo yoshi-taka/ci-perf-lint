@@ -3,6 +3,11 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { CircleCiDocument, CircleCiJob } from "../circleci-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import {
+  textHasHistoryDependentExecution,
+  textHasOpaqueRepositoryExecution,
+} from "./shared/repository-command-evidence.ts";
+import { staticShellWords } from "./shared/command-patterns.ts";
 
 const meta = {
   id: "circleci-checkout-uses-full-clone",
@@ -12,13 +17,71 @@ const meta = {
   scope: "circleci",
 } satisfies RuleMeta;
 
-const historyDependentCommandPattern =
-  /(git fetch|git pull|git rebase|git merge|git push|git describe|git diff|git log|git rev-list|git tag|commitlint|semantic-release|lerna changed|nx affected|turbo run|get-release-version|release notes|changelog|previous tag|release-it|changeset)/i;
+const modeledSteps = new Set([
+  "checkout",
+  "run",
+  "save_cache",
+  "restore_cache",
+  "store_artifacts",
+  "store_test_results",
+  "persist_to_workspace",
+  "attach_workspace",
+  "add_ssh_keys",
+  "setup_remote_docker",
+]);
 
-function jobNeedsFullHistory(job: CircleCiJob): boolean {
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function isModeledShell(shell: unknown): boolean {
+  if (shell === undefined) {
+    return true;
+  }
+  if (typeof shell !== "string") {
+    return false;
+  }
+  const words = staticShellWords(shell);
+  return Boolean(
+    words?.length &&
+    ["bash", "sh", "/bin/bash", "/bin/sh", "/usr/bin/bash", "/usr/bin/sh"].includes(words[0]!) &&
+    words
+      .slice(1)
+      .every(
+        (word) => /^-[euxo]+$/.test(word) || ["pipefail", "errexit", "nounset"].includes(word),
+      ),
+  );
+}
+
+function jobHasUnresolvedCheckoutNeeds(doc: CircleCiDocument, job: CircleCiJob): boolean {
+  const raw = asRecord(asRecord(doc.parsed?.jobs)[job.name]);
+  // Executor/orb commands and conditional command bodies are not expanded by this rule.
+  if (raw.executor !== undefined || !isModeledShell(raw.shell)) {
+    return true;
+  }
+  if (
+    Array.isArray(raw.steps) &&
+    raw.steps.some((step) => {
+      const type = typeof step === "string" ? step : Object.keys(asRecord(step))[0];
+      return !type || !modeledSteps.has(type);
+    })
+  ) {
+    return true;
+  }
   for (const step of job.steps) {
-    if (step.type === "run" && step.command) {
-      if (historyDependentCommandPattern.test(step.command)) {
+    if (!modeledSteps.has(step.type)) {
+      return true;
+    }
+    if (step.type === "run") {
+      if (
+        !step.command ||
+        !isModeledShell(step.shell) ||
+        (step.shell === undefined && /^win(?:dows)?[/.]/i.test(job.resourceClass ?? "")) ||
+        textHasHistoryDependentExecution(step.command) ||
+        textHasOpaqueRepositoryExecution(step.command)
+      ) {
         return true;
       }
     }
@@ -45,18 +108,19 @@ export const circleciCheckoutUsesFullCloneRule = {
       if (!usesFullClone) {
         continue;
       }
-      if (jobNeedsFullHistory(job)) {
+      if (jobHasUnresolvedCheckoutNeeds(doc, job)) {
         continue;
       }
 
       findings.push(
         buildDiagnostic(doc, meta, checkoutNode, {
-          message: `Job "${job.name}" uses full checkout clone but does not need git history.`,
-          why: "CircleCI defaults to blobless clone, which is faster and uses less data. Explicitly requesting a full clone is only necessary when the job accesses git history (e.g. git log, git describe, commitlint, semantic-release).",
-          suggestion: `Remove checkout or set checkout method to blobless (or omit method, as blobless is the default).`,
+          message: `Job "${job.name}" explicitly requests a full checkout without a visible need for eager historical file blobs.`,
+          why: "A blobless clone retains commit and tree metadata but fetches file contents lazily. A full clone downloads historical file blobs eagerly, which can add transfer time and storage. No visible command establishes that this job needs those blobs downloaded up front.",
+          suggestion:
+            "Keep the checkout step. If the job supports lazy blob fetching, test method: blobless (or omit method) and verify the same tools and repository-file operations still work.",
           measurementHint:
-            "Full clones fetch all git history, which increases checkout time and storage.",
-          aiHandoff: `Review ${doc.relativePath} job "${job.name}" - the checkout uses method: full but no step commands require git history.`,
+            "Compare checkout transfer size, lazy blob fetches, and total job time with the same commit history and checkout contents.",
+          aiHandoff: `Review ${doc.relativePath} job "${job.name}" and test whether method: blobless avoids eager historical blob transfer. Preserve the checkout step and verify all repository-file and history operations.`,
           score: 60,
         }),
       );

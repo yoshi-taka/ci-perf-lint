@@ -1,5 +1,7 @@
 # cuda-torch-install-on-cpu-runner
 
+Torch packages and CPU-index/backend options are extracted from the same executed installer invocation. Printed installs, requirement/log filenames and another command's CPU flags do not count. Structured environment, literal shell declarations and recognized `$GITHUB_ENV` writes retain configuration intent; unresolved backend/index values withhold default-PyPI advice. Actual CUDA tools/setup/configuration remain guarded, without treating logs or labels as GPU work.
+
 Flags standard Ubuntu x64 GitHub-hosted jobs that install PyTorch directly without a CPU-only index, pulling the CUDA build and its NVIDIA dependencies onto a runner that has no GPU.
 
 ## Why it matters

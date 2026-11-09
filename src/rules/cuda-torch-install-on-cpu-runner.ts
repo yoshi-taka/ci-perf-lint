@@ -4,6 +4,12 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobRunsOnStandardX64Ubuntu } from "./shared/runs-on-facts.ts";
 import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
+import { dependencyInstallCommands } from "./shared/dependency-install-evidence.ts";
+import { toolInvocations } from "./shared/tool-command-evidence.ts";
+import {
+  declaredShellEnvironmentNames,
+  githubEnvironmentValues,
+} from "./shared/shell-environment-evidence.ts";
 
 const meta = {
   id: "cuda-torch-install-on-cpu-runner",
@@ -18,36 +24,18 @@ const matrixRunsOnPattern = /^\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}$/;
 const cudaBuildSignalPattern =
   /\bTORCH_CUDA_ARCH_LIST\b|\bCUDA_HOME\b|\bCUDA_PATH\b|\bCUDA_COMPUTE_CAP\b|\bLIBTORCH_USE_PYTORCH\b|\bnvcc\b|cuda-toolkit|\/whl\/cu|and-cuda/i;
 
-const installCommandPattern =
-  /\b(?:(?:python3?|py)\s+-m\s+pip|pip3?)\s+install\b|\buv\s+pip\s+install\b|\buv\s+add\b|\bpoetry\s+add\b/i;
-
-const torchPackagePattern = /\btorch(?:vision|audio)?\b/i;
-
-const cpuInstallPattern =
-  /--index-url[=\s]+\S*\/whl\/cpu|--find-links[=\s]+\S*\/cpu\b|\+cpu\b|--torch-backend[=\s]+(?:cpu|auto)\b/i;
-
-const cpuEnvPattern = /\bUV_TORCH_BACKEND\b\s*[:=]\s*["']?(?:cpu|auto)\b/i;
-const cpuIndexEnvPattern = /\bPIP_(?:EXTRA_)?INDEX_URL\b\s*[:=]\s*["']?\S*\/whl\/cpu/i;
-
-function textify(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    return value.map(textify).join("\n");
-  }
-  if (typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>)
-      .map(([key, entry]) => `${key}: ${textify(entry)}`)
-      .join("\n");
-  }
-  return "";
+function environmentHasCudaIntent(env: Record<string, unknown>): boolean {
+  return (
+    Object.keys(env).some((name) =>
+      /^(?:TORCH_CUDA_ARCH_LIST|CUDA_HOME|CUDA_PATH|CUDA_COMPUTE_CAP|LIBTORCH_USE_PYTORCH)$/.test(
+        name,
+      ),
+    ) ||
+    [env.PIP_INDEX_URL, env.PIP_EXTRA_INDEX_URL].some(
+      (value) => typeof value === "string" && /\/whl\/cu\d/i.test(value),
+    ) ||
+    (typeof env.UV_TORCH_BACKEND === "string" && /^cu\d+/.test(env.UV_TORCH_BACKEND))
+  );
 }
 
 function isStandardUbuntuX64Label(label: string): boolean {
@@ -124,25 +112,60 @@ function stepIfExcludesLinux(step: WorkflowStep): boolean {
   return mentionsNonLinux && !mentionsLinux;
 }
 
-function hasCpuInstallIntent(stepRun: string, env: string): boolean {
-  if (cpuInstallPattern.test(stepRun)) {
-    return true;
-  }
-  return cpuEnvPattern.test(env) || cpuIndexEnvPattern.test(env);
-}
-
-function collectTorchPackages(step: WorkflowStep): string[] {
+function collectTorchPackages(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  step: WorkflowStep,
+  persisted: Record<string, string>,
+): string[] {
   if (!step.run || stepIfExcludesLinux(step)) {
     return [];
   }
 
   const packages = new Set<string>();
-  for (const line of step.run.split("\n")) {
-    if (!installCommandPattern.test(line) || !torchPackagePattern.test(line)) {
+  for (const command of dependencyInstallCommands(step.run, {
+    ...persisted,
+    ...effectiveStepEnvironment(workflow, job, step),
+  })) {
+    if (!command.python) {
       continue;
     }
-    for (const token of line.match(/\btorch(?:vision|audio)?\b/gi) ?? []) {
-      packages.add(token.toLowerCase());
+    const { options, environment } = command;
+    if (
+      options.some(
+        ({ name, value }) =>
+          ["--index-url", "--extra-index-url", "--find-links", "-f", "--torch-backend"].includes(
+            name,
+          ) && /[$`]|__shell_substitution__/.test(value ?? ""),
+      ) ||
+      [
+        environment.UV_TORCH_BACKEND,
+        environment.PIP_INDEX_URL,
+        environment.PIP_EXTRA_INDEX_URL,
+      ].some((value) => typeof value === "string" && /[$`]|__shell_substitution__/.test(value))
+    ) {
+      continue;
+    }
+    if (
+      options.some(
+        ({ name, value }) =>
+          (["--index-url", "--extra-index-url", "--find-links", "-f"].includes(name) &&
+            /\/whl\/cpu|\/cpu\b/i.test(value ?? "")) ||
+          (name === "--torch-backend" && ["cpu", "auto"].includes(value ?? "")),
+      ) ||
+      (typeof environment.UV_TORCH_BACKEND === "string" &&
+        ["cpu", "auto"].includes(environment.UV_TORCH_BACKEND)) ||
+      [environment.PIP_INDEX_URL, environment.PIP_EXTRA_INDEX_URL].some(
+        (value) => typeof value === "string" && /\/whl\/cpu/i.test(value),
+      )
+    ) {
+      continue;
+    }
+    for (const token of command.packages) {
+      const name = /^(torch(?:vision|audio)?)(?=$|[<>=!~[])/i.exec(token)?.[1];
+      if (name && !/\+cpu\b/i.test(token)) {
+        packages.add(name.toLowerCase());
+      }
     }
   }
   return [...packages];
@@ -152,7 +175,6 @@ export const cudaTorchInstallOnCpuRunnerRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const findings: Diagnostic[] = [];
-    const workflowEnvText = textify(workflow.parsed?.env);
 
     for (const job of workflow.jobs) {
       if (job.raw.container) {
@@ -162,28 +184,42 @@ export const cudaTorchInstallOnCpuRunnerRule = {
         continue;
       }
 
-      const jobEnvText = textify(job.raw.env);
-      const jobStepText = job.steps
-        .map(
-          (step) => `${step.name ?? ""} ${step.uses ?? ""} ${step.run ?? ""} ${textify(step.with)}`,
-        )
-        .join("\n");
-      if (cudaBuildSignalPattern.test(`${workflowEnvText}\n${jobEnvText}\n${jobStepText}`)) {
+      const cudaEnvironment: Record<string, string> = {};
+      const hasCudaWork = job.steps.some((step) => {
+        const environment = {
+          ...cudaEnvironment,
+          ...effectiveStepEnvironment(workflow, job, step),
+        };
+        const hasIntent =
+          cudaBuildSignalPattern.test(step.uses ?? "") ||
+          environmentHasCudaIntent(environment) ||
+          [...declaredShellEnvironmentNames(step.run ?? "")].some((name) =>
+            cudaBuildSignalPattern.test(name),
+          ) ||
+          toolInvocations(step.run ?? "").some(([tool]) => tool === "nvcc") ||
+          dependencyInstallCommands(step.run ?? "", environment).some(
+            (command) =>
+              environmentHasCudaIntent(command.environment) ||
+              command.packages.some((pkg) => pkg.includes("and-cuda")) ||
+              command.options.some(
+                ({ name, value }) =>
+                  ["--index-url", "--extra-index-url", "--find-links", "-f"].includes(name) &&
+                  /\/whl\/cu\d/i.test(value ?? ""),
+              ),
+          );
+        Object.assign(cudaEnvironment, githubEnvironmentValues(step.run ?? ""));
+        return hasIntent;
+      });
+      if (hasCudaWork) {
         continue;
       }
 
       const packages = new Set<string>();
+      const persisted: Record<string, string> = {};
       let anchor: WorkflowStep | undefined;
       for (const step of job.steps) {
-        if (
-          hasCpuInstallIntent(
-            step.run ?? "",
-            textify(effectiveStepEnvironment(workflow, job, step)),
-          )
-        ) {
-          continue;
-        }
-        const stepPackages = collectTorchPackages(step);
+        const stepPackages = collectTorchPackages(workflow, job, step, persisted);
+        Object.assign(persisted, githubEnvironmentValues(step.run ?? ""));
         if (stepPackages.length === 0) {
           continue;
         }

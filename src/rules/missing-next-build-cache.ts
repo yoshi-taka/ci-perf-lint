@@ -3,7 +3,7 @@ import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { workflowHasCachePath, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
-import { getWorkflowStepText } from "./shared/workflow-step-text.ts";
+import { textRunsTool } from "./shared/tool-command-evidence.ts";
 import { selectSignal } from "./shared/signal-selector.ts";
 
 const usesNextjs = selectSignal((s) => s.frameworks.usesNextjs);
@@ -16,7 +16,7 @@ const meta = {
 } satisfies RuleMeta;
 
 function jobRunsNextBuild(job: WorkflowJob): boolean {
-  return job.steps.some((step) => /\bnext\s+build\b/i.test(getWorkflowStepText(step)));
+  return job.steps.some((step) => textRunsTool(step.run ?? "", "next", ["build"]));
 }
 
 const nextCachePathRe = /\.next\/cache\b/i;

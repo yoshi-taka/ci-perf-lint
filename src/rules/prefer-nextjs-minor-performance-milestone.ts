@@ -1,15 +1,13 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
-import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { versionSpecIsBelow } from "../repository-dependency-versions.ts";
 
-function stepText(step: WorkflowStep): string {
-  return `${step.name ?? ""} ${step.run ?? ""} ${step.uses ?? ""}`;
-}
+import { textRunsTool } from "./shared/tool-command-evidence.ts";
 
 function jobRunsNextBuild(job: WorkflowJob): boolean {
-  return job.steps.some((step) => /\bnext\s+build\b/i.test(stepText(step)));
+  return job.steps.some((step) => textRunsTool(step.run ?? "", "next", ["build"]));
 }
 
 interface NextjsMilestoneConfig {

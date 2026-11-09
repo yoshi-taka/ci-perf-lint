@@ -1,5 +1,7 @@
 # missing-turbo-cache
 
+Workload evidence comes from executed Turbo commands. Remote-cache intent comes from the consuming job's structured environment, actual shell declarations or recognized prior `$GITHUB_ENV` writes, not printed variable names or another job's environment. Existing local/artifact-cache gates are retained.
+
 Flags workflows that visibly run `turbo run ...` tasks while no local Turbo cache path or remote-cache wiring is visible.
 
 ## Why it matters
