@@ -8,9 +8,10 @@ import { getLoweredWorkflowStepText } from "./shared/workflow-step-text.ts";
 import { hasHistoryDependentCommand } from "./shared/workflow-jobs.ts";
 import { collectScopePrefixes } from "./shared/workflow-path-prefixes.ts";
 import { getCheckoutStep } from "./shared/workflow-analysis.ts";
+import { shellNonDisplayInvocations } from "./shared/shell-invocations.ts";
 
 const wideRepoAccessPattern =
-  /(find\s+\.\b|rg\s+(?:--files\b|\.)|fd\s+\.\b|git\s+grep\b|ls\s+-r\b|du\s+-|turbo\s+run\b|nx\s+affected\b|lerna\b)/;
+  /(find\s+\.(?=\s|\/|$)|rg\s+(?:--files\b|\.)|fd\s+\.(?=\s|\/|$)|git\s+grep\b|ls\s+-r\b|du\s+-|turbo\s+run\b|nx\s+affected\b|lerna\b)/;
 const heavyBuildOrInstallPattern =
   /(\bnpm\b\s+(?:\S+\s+)*?(?:ci\b|install\b|run\s+build\b)|\b(?:pnpm|yarn)\b\s+(?:\S+\s+)*?(?:install\b|build\b)|\bbun\b\s+(?:\S+\s+)*?(?:install\b|run\s+build\b)|\bpytest\b|\bjest\b|\bvitest\b|\bcargo\s+(?:build|check|clippy|test|bench|doc|package|publish|install|b|c|t|ck|br|cl|rr)\b|\bgradle\b|\bmvn\b|tauri|electron-builder|docker build)/;
 const blobHungryReleasePattern =
@@ -21,7 +22,6 @@ const agenticToolPattern =
   /(sst\/opencode\/github@|claude|codex|openai|anthropic|gemini|ai agent|agentic|autofix|code review)/;
 const docsPattern =
   /(content\/docs|docs\/|documentation|update docs|write docs|edit docs|changed files|modified files)/;
-const gitFetchDepthPattern = /\bgit\s+fetch\b(?=[\s\S]*--depth[=\s](\d+))/;
 const releaseNotesChangelogTagPattern =
   /\b(release notes|changelog|tag|version|release|commitlint)\b/;
 const releaseNotesChangelogTagJobPattern =
@@ -32,6 +32,63 @@ const strongReleaseMetadataPattern =
   /(\bgh\s+release\s+(?:create|view|edit|upload)\b|\bgh\s+api\b.*\/releases\b|\bgit\s+(?:describe|tag|rev-list|log)\b|previous tag|release notes|changelog|git-cliff|conventional-changelog|changelogithub|release-please|googleapis\/release-please-action@|release-please-automation-action@|softprops\/action-gh-release@|ncipollo\/release-action@|release-drafter\/release-drafter@|actions\/create-release@|e18e\/action-dependency-diff@)/;
 const commitlintPattern = /\bcommitlint\b/;
 const commitlintActionPattern = /(commitlint|commitlint-github-action)/;
+
+/** Positive evidence only; raw safety exclusions below intentionally stay conservative. */
+function metadataEvidence(step: WorkflowStep): string[] {
+  const commands = shellNonDisplayInvocations(step.run ?? "", true).map((words) => {
+    if (words.some((word) => ["--help", "-h", "--version"].includes(word))) {
+      return "";
+    }
+    let [tool, action, task] = words;
+    if (tool === "npm" && ["run", "run-script"].includes(action ?? "")) {
+      tool = task;
+    }
+    if (tool === "git") {
+      return words.slice(0, 2).join(" ");
+    }
+    if (tool === "gh" && action === "release") {
+      return words.slice(0, 3).join(" ");
+    }
+    // API body/header values cannot supply release endpoint evidence.
+    if (tool === "gh" && action === "api") {
+      const args = words.slice(2);
+      for (let index = 0; index < args.length; index++) {
+        const arg = args[index]!;
+        if (
+          [
+            "-f",
+            "-F",
+            "--field",
+            "--raw-field",
+            "-H",
+            "--header",
+            "-X",
+            "--method",
+            "--input",
+            "--hostname",
+            "-q",
+            "--jq",
+            "-t",
+            "--template",
+          ].includes(arg)
+        ) {
+          index++;
+          continue;
+        }
+        if (!arg.startsWith("-")) {
+          return `gh api ${arg}`;
+        }
+      }
+      return "";
+    }
+    return /^(?:commitlint|semantic-release|release-it|changeset|git-cliff|conventional-changelog|changelogithub|release-please)(?:$|[.:-])/.test(
+      tool ?? "",
+    )
+      ? tool!
+      : "";
+  });
+  return [step.uses?.toLowerCase() ?? "", ...commands];
+}
 
 const meta = {
   id: "consider-filter-blob-none-for-release-metadata",
@@ -106,11 +163,47 @@ function jobLooksLikeRepoEditingAgenticDocsJob(job: WorkflowJob): boolean {
 }
 
 function jobHasExplicitFilteredFetchCandidate(job: WorkflowJob): boolean {
-  return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    const depth = gitFetchDepthPattern.exec(text)?.[1];
-    return depth !== undefined && Number(depth) > 1 && !text.includes("--filter=");
-  });
+  return job.steps.some((step) =>
+    shellNonDisplayInvocations(step.run ?? "", false).some(([tool, action, ...args]) => {
+      if (tool !== "git" || action !== "fetch") {
+        return false;
+      }
+      let depth: string | undefined;
+      let filtered = false;
+      for (let index = 0; index < args.length; index++) {
+        const arg = args[index]!;
+        if (arg === "--") {
+          break;
+        }
+        if (["--help", "-h", "--dry-run", "-n"].includes(arg)) {
+          return false;
+        }
+        if (arg === "--depth") {
+          depth = args[++index];
+        } else if (arg.startsWith("--depth=")) {
+          depth = arg.slice(8);
+        } else if (arg === "--filter" || arg.startsWith("--filter=")) {
+          filtered = true;
+        } else if (
+          [
+            "--upload-pack",
+            "--server-option",
+            "-o",
+            "--refmap",
+            "--shallow-since",
+            "--shallow-exclude",
+            "--negotiation-tip",
+            "--recurse-submodules",
+            "--jobs",
+            "-j",
+          ].includes(arg)
+        ) {
+          index++;
+        }
+      }
+      return !filtered && depth !== undefined && /^\d+$/.test(depth) && Number(depth) > 1;
+    }),
+  );
 }
 
 function jobLooksHistoryMetadataLike(workflow: WorkflowDocument, job: WorkflowJob): boolean {
@@ -126,15 +219,13 @@ function jobLooksHistoryMetadataLike(workflow: WorkflowDocument, job: WorkflowJo
   }
 
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return historyMetadataPattern.test(text);
+    return metadataEvidence(step).some((text) => historyMetadataPattern.test(text));
   });
 }
 
 function jobHasStrongReleaseMetadataSignal(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return strongReleaseMetadataPattern.test(text);
+    return metadataEvidence(step).some((text) => strongReleaseMetadataPattern.test(text));
   });
 }
 
@@ -145,8 +236,7 @@ function jobLooksCommitMetadataLike(job: WorkflowJob): boolean {
   }
 
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return commitlintActionPattern.test(text);
+    return metadataEvidence(step).some((text) => commitlintActionPattern.test(text));
   });
 }
 
@@ -156,6 +246,15 @@ function evaluateJobForBlobNone(
   context: RuleContext,
 ): Diagnostic | undefined {
   if (!jobLooksHistoryMetadataLike(workflow, job)) {
+    return undefined;
+  }
+  // Names are context hints, not proof that metadata commands actually execute.
+  if (
+    !job.steps.some((step) =>
+      metadataEvidence(step).some((text) => historyMetadataPattern.test(text)),
+    ) &&
+    !jobHasExplicitFilteredFetchCandidate(job)
+  ) {
     return undefined;
   }
 

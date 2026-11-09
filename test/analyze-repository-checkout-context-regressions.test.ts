@@ -62,11 +62,7 @@ test.each([undefined, 1, 0, 2000])(
         { uses: "actions/checkout@v4", with: depth === undefined ? {} : { "fetch-depth": depth } },
         {
           name: "Generate changelog",
-          uses: "actions/github-script@v9",
-          with: {
-            script:
-              "const generate = require('./.github/scripts/generate_changelog'); await generate();",
-          },
+          run: "git log --oneline",
         },
       ],
       "Generate changelog",
@@ -76,6 +72,26 @@ test.each([undefined, 1, 0, 2000])(
     ).toBe(depth === 0 || depth === 2000);
   },
 );
+
+test("a changelog label does not prove what an opaque github-script helper executes", async () => {
+  const report = await scan(
+    [
+      { uses: "actions/checkout@v4", with: { "fetch-depth": 0 } },
+      {
+        name: "Generate changelog",
+        uses: "actions/github-script@v9",
+        with: {
+          script:
+            "const generate = require('./.github/scripts/generate_changelog'); await generate();",
+        },
+      },
+    ],
+    "Generate changelog",
+  );
+  expect(
+    report.findings.some((f) => f.ruleId === "consider-filter-blob-none-for-release-metadata"),
+  ).toBe(false);
+});
 
 test.each([1, 2000])("explicit fetch must also transfer history: depth=%s", async (depth) => {
   const report = await scan(
