@@ -3,6 +3,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobRunsOnHostedMacos, jobUsesContainer } from "./shared/workflow-jobs.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 const meta = {
   id: "avoid-xcode-install-on-hosted-macos",
@@ -11,15 +12,63 @@ const meta = {
   docsPath: "docs/rules/avoid-xcode-install-on-hosted-macos.md",
 } satisfies RuleMeta;
 
-const xcodeInstallPattern =
-  /\b(?:xcodes|xcversion)\s+install\b|\bmise\s+install\s+xcode@|\b(?:curl|wget|aria2c)\b[\s\S]*\bXcode[^ \n]*\.xip\b|\bxip\s+--expand\b[\s\S]*\bXcode[^ \n]*\.xip\b/i;
-
-function getXcodeInstallStep(steps: WorkflowStep[]): WorkflowStep | undefined {
-  return steps.find((step) => xcodeInstallPattern.test(step.run ?? ""));
+function getXcodeInstallStep(
+  steps: WorkflowStep[],
+): { step: WorkflowStep; command: string } | undefined {
+  for (const step of steps) {
+    for (const [tool, action, ...args] of shellInvocations(step.run ?? "", false)) {
+      if ([action, ...args].some((arg) => ["--help", "-h", "--version"].includes(arg ?? ""))) {
+        continue;
+      }
+      if ((tool === "xcodes" || tool === "xcversion") && action === "install") {
+        return { step, command: [tool, action, ...args].join(" ") };
+      }
+      if (tool === "mise" && action === "install" && args[0]?.startsWith("xcode@")) {
+        return { step, command: [tool, action, ...args].join(" ") };
+      }
+      if (
+        tool === "xip" &&
+        action === "--expand" &&
+        /(?:^|\/)Xcode[^\s]*\.xip$/i.test(args[0] ?? "")
+      ) {
+        return { step, command: args[0]! };
+      }
+      if (["curl", "wget", "aria2c"].includes(tool ?? "")) {
+        const words = [action, ...args];
+        for (let index = 0; index < words.length; index++) {
+          const word = words[index] ?? "";
+          if (
+            [
+              "-H",
+              "--header",
+              "-d",
+              "--data",
+              "--data-raw",
+              "--data-binary",
+              "--post-data",
+              "-o",
+              "--output",
+              "-O",
+              "--output-document",
+              "-A",
+              "--user-agent",
+              "-e",
+              "--referer",
+            ].includes(word) &&
+            !(tool === "curl" && word === "-O")
+          ) {
+            index++;
+          } else if (/^(?:https?|ftp):\/\/[^\s]*\/Xcode[^\s/?#]*\.xip(?:[?#].*)?$/i.test(word)) {
+            return { step, command: word };
+          }
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
-function getRequestedXcodeVersion(step: WorkflowStep): string | undefined {
-  const run = step.run ?? "";
+function getRequestedXcodeVersion(run: string): string | undefined {
   const versionPatterns = [
     /\b(?:xcodes|xcversion)\s+install\s+(?:--select\s+)?(?:--latest\s+)?(?:--experimental-unxip\s+)?(?:--no-superuser\s+)?(?:--path\s+\S+\s+)?(?:Xcode\s+)?v?(\d+(?:\.\d+){0,2}(?:\s*(?:beta|rc)\s*\d*)?)/i,
     /\bmise\s+install\s+xcode@v?(\d+(?:\.\d+){0,2}(?:[-_ ]?(?:beta|rc)\d*)?)/i,
@@ -45,12 +94,13 @@ export const avoidXcodeInstallOnHostedMacosRule = {
         continue;
       }
 
-      const installStep = getXcodeInstallStep(job.steps);
-      if (!installStep) {
+      const install = getXcodeInstallStep(job.steps);
+      if (!install) {
         continue;
       }
 
-      const requestedVersion = getRequestedXcodeVersion(installStep);
+      const { step: installStep, command } = install;
+      const requestedVersion = getRequestedXcodeVersion(command);
       const versionPhrase = requestedVersion ? ` requested Xcode ${requestedVersion}` : " Xcode";
 
       findings.push(

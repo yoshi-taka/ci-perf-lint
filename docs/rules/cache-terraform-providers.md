@@ -1,5 +1,7 @@
 # `cache-terraform-providers`
 
+Terraform init must appear as a visible shell invocation, not a step label, comment or printed command. The literal global `-chdir=...` form is supported. Existing structured cache-action checks are unchanged.
+
 Detects jobs that run `terraform init` without caching the downloaded provider plugins.
 
 ## Why it matters

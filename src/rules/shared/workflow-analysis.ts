@@ -12,9 +12,8 @@ import { detectLintTool, detectPythonTool } from "./tools.ts";
 import { detectToolPresence } from "./tool-presence-automaton.ts";
 import { collectCommandEntries } from "./any-step.ts";
 import { shellInvocations } from "./shell-invocations.ts";
+import { textRunsDockerBake } from "./docker-build-commands.ts";
 
-const dockerBuildxBakePattern = /\bdocker\s+buildx\s+bake\b|\bdocker-buildx\s+bake\b/i;
-const dockerBuildPattern = /\bdocker\s+build\b/i;
 const heavyStepSignalPattern =
   /\b(?:(?:npm(?!\s+(?:view|info|search|ping)\b))|pnpm|yarn|bun|(?:pip(?!\s+(?:index|show|list|freeze|search)\b))|pipenv|poetry|bundle|bundler|uv|go test|cargo test|pytest|vitest|jest|eslint|biome|oxlint|claude|codex|gemini|build)\b/;
 const directHeavySignalPattern =
@@ -276,8 +275,11 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
     jobInstallManager ??= facts.installCommand;
     jobHasInstall ||= Boolean(facts.installCommand);
 
-    hasBuildxBake ||= dockerBuildxBakePattern.test(run);
-    hasDockerBuild ||= dockerBuildPattern.test(run);
+    const invocations = shellInvocations(run);
+    hasBuildxBake ||= textRunsDockerBake(run);
+    hasDockerBuild ||= invocations.some(
+      ([tool, action]) => tool === "docker" && action === "build",
+    );
     hasHeavyStepSignal ||= heavyStepSignalPattern.test(heavyStepText);
     hasDirectHeavySignals ||= directHeavySignalPattern.test(loweredRunNameText);
     hasHistoryDependentCommand ||= historyDependentCommandPattern.test(stepText);

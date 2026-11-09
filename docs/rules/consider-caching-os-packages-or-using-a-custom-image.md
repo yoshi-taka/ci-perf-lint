@@ -1,5 +1,7 @@
 # consider-caching-os-packages-or-using-a-custom-image
 
+APT installs use shared shell command extraction. Heavy-package evidence comes only from visible package arguments, not comments, output, option values or following commands. The existing severity-count estimate is retained on each parsed invocation and capped at its extracted package count; this migration does not recalibrate scoring for real installs. Recognized global/install options and sudo environment assignments are supported; unknown options and simulated installs are conservatively skipped.
+
 Flags jobs that repeatedly install OS packages at runtime without visible package caching or a prebuilt image strategy.
 
 ## Why it matters

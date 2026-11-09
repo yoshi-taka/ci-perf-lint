@@ -45,6 +45,18 @@ describe("extractSemanticSteps", () => {
     const buildStep = steps.find((s) => s.text.includes("npm run build"));
     expect(buildStep?.commandType).toBe("build");
   });
+
+  test.each([
+    ["npm run build", "build"],
+    ["npx oxlint .", "lint"],
+    ["echo 'npm run build'", "other"],
+    ["printf '%s' 'cargo build'", "other"],
+    ["# cargo build\necho done", "other"],
+  ] as const)("step names are not executable prefixes: %s", (run, expected) => {
+    const step = { ...makeStep(run), name: "cargo build oxlint" };
+    const doc = { ...mockGitHubActionsDoc, jobs: [makeJob("check", [step])] };
+    expect(extractSemanticSteps(doc)[0]?.commandType).toBe(expected);
+  });
 });
 
 describe("groupStepsByJob", () => {

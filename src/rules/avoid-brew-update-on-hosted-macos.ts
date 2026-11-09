@@ -2,7 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { shellCommandSegments, staticShellWords } from "./shared/command-patterns.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 import { jobRunsOnHostedMacos, jobUsesContainer } from "./shared/workflow-jobs.ts";
 
 const meta = {
@@ -13,20 +13,12 @@ const meta = {
 } satisfies RuleMeta;
 
 function stepRunsBrewUpdate(step: WorkflowStep): boolean {
-  return shellCommandSegments(step.run ?? "").some((command) => {
-    const words = staticShellWords(command);
-    if (!words) {
-      return false;
-    }
-    let index = 0;
-    while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
-      index++;
-    }
-    if (words[index] === "sudo") {
-      index++;
-    }
-    return words[index] === "brew" && ["update", "upgrade"].includes(words[index + 1] ?? "");
-  });
+  return shellInvocations(step.run ?? "", false).some(
+    ([tool, action, ...args]) =>
+      tool === "brew" &&
+      ["update", "upgrade"].includes(action ?? "") &&
+      !args.some((arg) => ["--help", "-h", "--dry-run", "-n"].includes(arg)),
+  );
 }
 
 function getBrewUpdateStep(steps: WorkflowStep[]): WorkflowStep | undefined {

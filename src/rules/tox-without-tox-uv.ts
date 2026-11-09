@@ -2,6 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 const meta = {
   id: "tox-without-tox-uv",
@@ -10,16 +11,50 @@ const meta = {
   docsPath: "docs/rules/tox-without-tox-uv.md",
 } satisfies RuleMeta;
 
-const toxRunPattern = /(?:^|\s)(?:(?:python|python3)\s+-m\s+)?tox(?:\s|$)/i;
-const pipInstallPattern = /\b(?:pip|uv\s+pip)\s+install\b/i;
-const toxUvInstallPattern = /\b(?:pip|uv\s+pip)\s+install\b[\s\S]*?\btox-uv\b/i;
-
 function stepIsToxRun(run: string): boolean {
-  return toxRunPattern.test(run) && !pipInstallPattern.test(run);
+  return shellInvocations(run).some(
+    ([tool, ...args]) =>
+      tool === "tox" && !args.some((arg) => ["--help", "-h", "--version"].includes(arg)),
+  );
 }
 
 function stepInstallsToxUv(run: string): boolean {
-  return toxUvInstallPattern.test(run);
+  return shellInvocations(run).some(([tool, ...args]) => {
+    if (tool === "uv" && args[0] === "pip") {
+      args = args.slice(1);
+    } else if (!/^pip(?:3(?:\.\d+)?)?$/.test(tool ?? "")) {
+      return false;
+    }
+    if (args[0] !== "install") {
+      return false;
+    }
+    if (args.some((arg) => ["--help", "-h", "--version", "--dry-run"].includes(arg))) {
+      return false;
+    }
+    for (let index = 1; index < args.length; index++) {
+      const arg = args[index]!;
+      if (
+        [
+          "-r",
+          "--requirement",
+          "-c",
+          "--constraint",
+          "--index-url",
+          "--extra-index-url",
+          "--target",
+          "--prefix",
+          "--cache-dir",
+          "--config-settings",
+          "--python",
+        ].includes(arg)
+      ) {
+        index++;
+      } else if (/^tox-uv(?:$|[<>=!~;[])/i.test(arg)) {
+        return true;
+      }
+    }
+    return false;
+  });
 }
 
 function jobHasToxUvSetup(job: { steps: { run?: string }[] }): boolean {

@@ -1,5 +1,7 @@
 # unnecessary-npm-global-upgrade-before-npm-install
 
+Upgrade, install and publish evidence uses shared shell command extraction across all four CI formats. Printed commands and comments neither trigger findings nor supply publish/alternative-package-manager exemptions.
+
 ## Why it matters
 
 Some workflows run `npm install -g npm` to upgrade the npm CLI before running

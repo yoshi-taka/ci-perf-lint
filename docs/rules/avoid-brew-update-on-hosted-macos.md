@@ -1,5 +1,7 @@
 # avoid-brew-update-on-hosted-macos
 
+Homebrew execution uses the shared shell command extractor, including visible command substitutions and supported wrappers. Printed commands and comments are not updates. Explicit help and dry-run invocations are skipped.
+
 ## What it flags
 
 Flags GitHub-hosted macOS jobs that run `brew update` or `brew upgrade` during CI.

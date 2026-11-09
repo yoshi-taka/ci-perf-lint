@@ -2,6 +2,7 @@ import type { WorkflowJob, WorkflowStep } from "../../workflow.ts";
 import type { AnyStep } from "./any-step.ts";
 import { getJobFacts } from "./workflow-analysis.ts";
 import { getStepCommandText } from "./any-step.ts";
+import { dockerBuildArguments, dockerBuildFlag } from "./docker-build-commands.ts";
 
 export function stepDisablesDockerBuildCache(step: WorkflowStep | AnyStep): boolean {
   const uses = "uses" in step ? (step.uses?.toLowerCase() ?? "") : "";
@@ -13,9 +14,7 @@ export function stepDisablesDockerBuildCache(step: WorkflowStep | AnyStep): bool
     );
   }
 
-  return /\b(?:docker\s+(?:buildx\s+build|build)|depot\s+build)\b[\s\S]*\s--no-cache(?:\s|$)/i.test(
-    getStepCommandText(step),
-  );
+  return textDisablesDockerBuildCache(getStepCommandText(step));
 }
 
 export function jobRunsBuildxBake(job: WorkflowJob): boolean {
@@ -23,11 +22,9 @@ export function jobRunsBuildxBake(job: WorkflowJob): boolean {
 }
 
 export function textDisablesDockerBuildCache(text: string): boolean {
-  return /\b(?:docker\s+(?:buildx\s+build|build)|depot\s+build)\b[\s\S]*\s--no-cache(?:\s|$)/i.test(
-    text,
-  );
+  return dockerBuildArguments(text).some((args) => dockerBuildFlag(args, "--no-cache"));
 }
 
 export function textRunsDockerBuild(text: string): boolean {
-  return /\bdocker\s+(?:buildx\s+build|build)\b/i.test(text);
+  return dockerBuildArguments(text).length > 0;
 }

@@ -1,5 +1,6 @@
 import path from "node:path";
-import { parseBootstrapInvocation, shellCommands } from "./command-patterns.ts";
+import { parseBootstrapInvocation } from "./command-patterns.ts";
+import { shellInvocations } from "./shell-invocations.ts";
 
 const lintToolMatchers = [
   ["eslint", /(?:^|\s)(?:npx\s+)?eslint(?:\s|$)|--eslint(?:\s|$)/i],
@@ -25,8 +26,8 @@ const buildToolMatchers = [
   ["webpack", /\bwebpack\b/i],
   ["rollup", /\brollup\b/i],
   ["esbuild", /\besbuild\b/i],
-  ["maven-package", /\b(?:mvn|\.\/mvnw)\b.*\b(?:package|install)\b/i],
-  ["gradle-build", /\b(?:gradle|\.\/gradlew)\b.*\b(?:build|assemble)\b/i],
+  ["maven-package", /^(?:mvn|\.\/mvnw)\b.*\b(?:package|install)\b/i],
+  ["gradle-build", /^(?:gradle|\.\/gradlew)\b.*\b(?:build|assemble)\b/i],
   ["dotnet-build", /\bdotnet\s+build\b/i],
   ["go-build", /\bgo\s+build\b/i],
   ["cargo-build", /\bcargo\s+build\b/i],
@@ -126,21 +127,15 @@ export const KNOWN_INSTALLER_ACTIONS: [DependencyFamily, readonly string[]][] = 
 ];
 
 export function usesLanguageInstall(stepText: string): boolean {
-  return /(npm ci|npm install|pnpm install|yarn install|bun install|pip install|poetry install|uv sync|go mod download)/i.test(
-    stepText,
+  const family = detectInstallCommandFromText(stepText);
+  return (
+    family !== undefined &&
+    ["npm", "pnpm", "yarn", "bun", "pip", "poetry", "uv", "go"].includes(family)
   );
 }
 
 export function detectInstallCommandFromText(run: string): string | undefined {
-  const commands = shellCommands(run);
-  // Heredoc bodies are data or scripts with separate execution semantics.
-  if (
-    commands.some((tokens) =>
-      tokens.some((token, index) => token === "<" && tokens[index + 1] === "<"),
-    )
-  ) {
-    return undefined;
-  }
+  const commands = shellInvocations(run, false);
   const families = new Set<DependencyFamily>();
   for (const tokens of commands) {
     const family = installFamilyForCommand(tokens);
@@ -231,11 +226,11 @@ function installFamilyForCommand(tokens: string[]): DependencyFamily | undefined
   return family;
 }
 
-export function detectLintToolFromText(stepName: string, run: string): string | undefined {
-  const text = `${stepName} ${run}`.trim();
+export function detectLintToolFromText(_stepName: string, run: string): string | undefined {
+  const commands = shellInvocations(run);
 
   for (const [tool, matcher] of lintToolMatchers) {
-    if (matcher.test(text)) {
+    if (commands.some(([command]) => matcher.exec(command ?? "")?.index === 0)) {
       return tool;
     }
   }
@@ -243,11 +238,11 @@ export function detectLintToolFromText(stepName: string, run: string): string | 
   return undefined;
 }
 
-export function detectBuildToolFromText(stepName: string, run: string): string | undefined {
-  const text = `${stepName} ${run}`.trim();
+export function detectBuildToolFromText(_stepName: string, run: string): string | undefined {
+  const commands = [...shellInvocations(run, false), ...shellInvocations(run)];
 
   for (const [tool, matcher] of buildToolMatchers) {
-    if (matcher.test(text)) {
+    if (commands.some((words) => matcher.exec(words.join(" "))?.index === 0)) {
       return tool;
     }
   }
@@ -255,11 +250,11 @@ export function detectBuildToolFromText(stepName: string, run: string): string |
   return undefined;
 }
 
-export function detectPythonToolFromText(stepName: string, run: string): string | undefined {
-  const text = `${stepName} ${run}`.trim();
+export function detectPythonToolFromText(_stepName: string, run: string): string | undefined {
+  const commands = shellInvocations(run);
 
   for (const [tool, matcher] of pythonToolMatchers) {
-    if (matcher.test(text)) {
+    if (commands.some(([command]) => matcher.exec(command ?? "")?.index === 0)) {
       return tool;
     }
   }

@@ -1,5 +1,7 @@
 # prefer-nextest-for-heavy-rust-tests
 
+Cargo test/nextest evidence comes from executable command positions, not step labels, comments or output. Workspace/package/doctest flags belong to their own invocation; `--doc` or `--no-run` on one command does not suppress a separate real test command.
+
 ## What it flags
 
 Flags heavy-looking Rust test jobs that still run `cargo test` without visible `cargo-nextest` adoption.

@@ -1,5 +1,7 @@
 # `npm-audit-in-ci`
 
+Detection uses visible npm command invocations, not step names, comments, or `echo`/`printf` output. A visible command substitution still counts as execution.
+
 Flags `npm audit` steps in workflows triggered by `push` or `pull_request`.
 
 Why this rule exists:

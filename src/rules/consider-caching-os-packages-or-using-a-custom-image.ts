@@ -4,6 +4,7 @@ import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { isHeavyJob, jobRunsOnHostedUbuntu, jobUsesContainer } from "./shared/workflow-jobs.ts";
 import { jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
+import { collectAptInstallCommands } from "./shared/os-package-commands.ts";
 
 const meta = {
   id: "consider-caching-os-packages-or-using-a-custom-image",
@@ -15,44 +16,21 @@ const meta = {
 const heavyPackagePattern =
   /\b(build-essential|clang(?:-\d+)?|llvm(?:-\d+)?|webkit2gtk|libgtk-[^ \n]+|libayatana-[^ \n]+|protobuf-compiler|ninja-build|musl-tools|gcc|g\+\+|libssl-dev|libxml2-dev|libxslt-dev|rustc|cargo)\b/i;
 
-function getInstallCommands(job: WorkflowJob): string[] {
-  return job.steps
-    .map((step) => step.run ?? "")
-    .filter((run) => /\b(?:apt|apt-get)\s+install\b/i.test(run));
+function getInstallCommands(job: WorkflowJob) {
+  return job.steps.flatMap((step) => collectAptInstallCommands(step.run ?? ""));
 }
 
-function countInstalledPackages(commands: string[]): number {
-  let count = 0;
-
-  for (const command of commands) {
-    const normalized = command
-      .replace(/\\\r?\n/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const match = normalized.match(
-      /\b(?:apt|apt-get)\s+install\b(?:\s+-[\w-]+(?:[= ][^\s]+)?)*\s+(.+)/i,
-    );
-    if (!match?.[1]) {
-      continue;
-    }
-
-    const packages = match[1]
-      .split(/\s+/)
-      .filter(
-        (token) =>
-          token.length > 0 &&
-          !token.startsWith("-") &&
-          !["&&", "||", ";", "|"].includes(token) &&
-          !token.includes("="),
-      );
-    count += packages.length;
-  }
-
-  return count;
-}
-
-function hasHeavyPackageSet(commands: string[]): boolean {
-  return commands.some((command) => heavyPackagePattern.test(command));
+function legacyPackageEstimate(command: string): number {
+  // Keep the existing severity heuristic during evidence migration. Only parsed
+  // install invocations reach this estimate, never display text or later commands.
+  const match = command.match(
+    /\b(?:apt|apt-get)\s+install\b(?:\s+-[\w-]+(?:[= ][^\s]+)?)*\s+(.+)/i,
+  );
+  return (
+    match?.[1]
+      ?.split(/\s+/)
+      .filter((token) => token && !token.startsWith("-") && !token.includes("=")).length ?? 0
+  );
 }
 
 function hasVisibleOsPackageCache(job: WorkflowJob): boolean {
@@ -101,8 +79,13 @@ export const considerCachingOsPackagesOrUsingACustomImageRule = {
         continue;
       }
 
-      const packageCount = countInstalledPackages(installCommands);
-      const heavyPackageSet = hasHeavyPackageSet(installCommands);
+      const packages = installCommands.flatMap((command) => command.packages);
+      const packageCount = installCommands.reduce(
+        (count, command) =>
+          count + Math.min(command.packages.length, legacyPackageEstimate(command.command)),
+        0,
+      );
+      const heavyPackageSet = packages.some((name) => heavyPackagePattern.test(name));
       const heavyJob = isHeavyJob(job);
       const severity = heavyPackageSet && heavyJob && packageCount >= 2 ? "warning" : "suggestion";
 

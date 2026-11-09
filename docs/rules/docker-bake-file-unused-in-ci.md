@@ -1,5 +1,7 @@
 # docker-bake-file-unused-in-ci
 
+Build and bake evidence uses shared shell command extraction across all four CI formats. Comments, step labels and printed bake commands do not establish bake adoption or suppress findings for actual builds. Explicit `docker/bake-action` usage remains supported.
+
 Detects repositories that have a Docker bake file while CI bypasses it with direct Docker image builds.
 
 This rule looks for:

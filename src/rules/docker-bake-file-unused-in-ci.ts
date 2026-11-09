@@ -5,6 +5,7 @@ import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { textRunsDockerBuild } from "./shared/docker.ts";
 import { extractSemanticSteps } from "./shared/semantic-adapter.ts";
 import { selectSignal } from "./shared/signal-selector.ts";
+import { textRunsDockerBake } from "./shared/docker-build-commands.ts";
 
 const hasBakeFile = selectSignal((s) => s.docker.hasBakeFile);
 
@@ -15,8 +16,6 @@ const meta = {
   docsPath: "docs/rules/docker-bake-file-unused-in-ci.md",
   scope: "all",
 } satisfies RuleMeta;
-
-const bakeInvocationPattern = /\bdocker\s+buildx\s+bake\b/i;
 
 function docUsesBakeAction(doc: CIDocument): boolean {
   return (
@@ -39,7 +38,7 @@ export const dockerBakeFileUnusedInCiRule = {
     }
 
     const steps = extractSemanticSteps(doc);
-    if (steps.some((s) => bakeInvocationPattern.test(s.text))) {
+    if (steps.some((s) => textRunsDockerBake(s.text))) {
       return [];
     }
 

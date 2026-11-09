@@ -1,5 +1,7 @@
 # wasteful-npm-global-install
 
+Shared shell command extraction distinguishes actual npm upgrades, alternative installs and compatibility clients from printed commands/comments across all four CI formats. A printed `npm publish` does not create an exemption; a real wrapped invocation still does.
+
 ## What It Detects
 
 Jobs that use yarn, pnpm, or bun for package management but still run

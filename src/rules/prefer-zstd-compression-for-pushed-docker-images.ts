@@ -2,6 +2,11 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import {
+  buildkitBuildArguments,
+  dockerBuildFlag,
+  dockerBuildOptionValues,
+} from "./shared/docker-build-commands.ts";
 
 const meta = {
   id: "prefer-zstd-compression-for-pushed-docker-images",
@@ -36,17 +41,35 @@ function actionStepUsesZstd(step: WorkflowStep): boolean {
   return /\bcompression=zstd\b/i.test(outputs) && /\boci-mediatypes=true\b/i.test(outputs);
 }
 
-function shellStepBuildsAndPushesWithBuildKit(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
-  return (
-    /\b(?:docker\s+buildx|depot)\s+build\b/i.test(run) &&
-    /\s--push(?:\s|$)|type=registry/i.test(run)
-  );
-}
-
-function shellStepUsesZstd(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
-  return /\bcompression=zstd\b/i.test(run) && /\boci-mediatypes=true\b/i.test(run);
+function shellStepNeedsZstd(step: WorkflowStep): boolean {
+  return buildkitBuildArguments(step.run ?? "").some((args) => {
+    const outputs = dockerBuildOptionValues(args, "--output").map(
+      (output) =>
+        new Map(
+          output.split(",").map((entry) => {
+            const equals = entry.indexOf("=");
+            return [entry.slice(0, equals).trim(), entry.slice(equals + 1).trim()] as const;
+          }),
+        ),
+    );
+    const pushedOutputs = outputs.filter(
+      (output) =>
+        output.get("type") === "registry" ||
+        (output.get("type") === "image" && output.get("push") === "true"),
+    );
+    if (!dockerBuildFlag(args, "--push") && pushedOutputs.length === 0) {
+      return false;
+    }
+    const selected = pushedOutputs.length
+      ? pushedOutputs
+      : outputs.filter((output) => !output.has("type") || output.get("type") === "image");
+    return (
+      selected.length === 0 ||
+      selected.some(
+        (output) => output.get("compression") !== "zstd" || output.get("oci-mediatypes") !== "true",
+      )
+    );
+  });
 }
 
 function findMissingZstdStep(jobSteps: WorkflowStep[]): WorkflowStep | undefined {
@@ -58,7 +81,7 @@ function findMissingZstdStep(jobSteps: WorkflowStep[]): WorkflowStep | undefined
       continue;
     }
 
-    if (shellStepBuildsAndPushesWithBuildKit(step) && !shellStepUsesZstd(step)) {
+    if (shellStepNeedsZstd(step)) {
       return step;
     }
   }

@@ -1,5 +1,7 @@
 # avoid-xcode-install-on-hosted-macos
 
+Shared shell extraction distinguishes actual installer/download/extract commands from comments and display text. The requested version comes from the detected invocation, not another command in the step. Xcode archive URLs passed as recognized downloader data/header options do not establish a download.
+
 ## What it flags
 
 Flags GitHub-hosted macOS jobs that visibly install or download Xcode during CI.

@@ -1,31 +1,29 @@
 import type { WorkflowJob } from "../../workflow.ts";
 import { collectGoBuildCommands } from "./go-build-commands.ts";
+import { collectGoTestCommands } from "./go-test-commands.ts";
+import { shellInvocations } from "./shell-invocations.ts";
 
 function stepRunsGoVet(run: string): boolean {
-  return /\bgo\s+vet(?:\s|$)/i.test(run);
+  return shellInvocations(run, false).some(([tool, action]) => tool === "go" && action === "vet");
 }
 
 function stepRunsBroadGoBuild(run: string): boolean {
-  return /\bgo\s+build\b[\s\S]*(?:^|\s)\.\/\.\.\.(?:\s|$)/i.test(run);
+  return collectGoBuildCommands(run).some((command) => command.targets.includes("./..."));
 }
 
 function stepRunsGoTestWithoutVetOff(run: string): boolean {
-  return /\bgo\s+test(?:\s|$)/i.test(run) && !/(?:^|\s)-vet=off(?:\s|$)/i.test(run);
+  return collectGoTestCommands(run).some((command) => command.flags.get("-vet") !== "off");
 }
 
 function stepRunsBroadRaceGoTest(run: string): boolean {
-  return (
-    /\bgo\s+test(?:\s|$)/i.test(run) &&
-    /(?:^|\s)-race(?:\s|$)/i.test(run) &&
-    /(?:^|\s)\.\/\.\.\.(?:\s|$)/i.test(run)
+  return collectGoTestCommands(run).some(
+    (command) => command.flags.get("-race") === "true" && command.targets.includes("./..."),
   );
 }
 
 function stepRunsBroadSerialGoTest(run: string): boolean {
-  return (
-    /\bgo\s+test(?:\s|$)/i.test(run) &&
-    /(?:^|\s)-p(?:=|\s*)1(?:\s|$)/i.test(run) &&
-    /(?:^|\s)\.\/\.\.\.(?:\s|$)/i.test(run)
+  return collectGoTestCommands(run).some(
+    (command) => command.flags.get("-p") === "1" && command.targets.includes("./..."),
   );
 }
 
@@ -85,10 +83,10 @@ function buildJobStepAnalysis(job: WorkflowJob): JobStepAnalysis {
       goVetStepIndex = i;
     }
 
-    const test = /\bgo\s+test(?:\s|$)/i.test(run);
+    const test = collectGoTestCommands(run).length > 0;
     isGoTestStep[i] = test;
 
-    const build = /\bgo\s+build(?:\s|$)/i.test(run);
+    const build = collectGoBuildCommands(run).length > 0;
     isGoBuildStep[i] = build;
 
     goBuildOccurrenceTotal += goBuildOccurrenceCountInRun(run);

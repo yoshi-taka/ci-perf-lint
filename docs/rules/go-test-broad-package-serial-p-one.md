@@ -1,5 +1,7 @@
 # go-test-broad-package-serial-p-one
 
+`-p 1` and `./...` must belong to the same visible Go test invocation. Comments, output, option values and test-binary arguments after `-args` cannot supply them. Unknown test flags are conservatively unresolved.
+
 Detects broad Go test runs that serialize package execution with `-p 1`.
 
 This rule looks for:

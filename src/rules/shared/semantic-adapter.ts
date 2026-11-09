@@ -31,13 +31,12 @@ function classifyCommandType(stepName: string, text: string): CommandType {
     return "install";
   }
 
-  const combined = `${stepName} ${text}`.toLowerCase();
-  const lint = detectLintToolFromText(stepName, combined);
+  const lint = detectLintToolFromText(stepName, text);
   if (lint) {
     return "lint";
   }
 
-  const build = detectBuildToolFromText(stepName, combined);
+  const build = detectBuildToolFromText(stepName, text);
   if (build) {
     return "build";
   }

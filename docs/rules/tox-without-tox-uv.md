@@ -1,5 +1,7 @@
 # tox-without-tox-uv
 
+Shared shell extraction distinguishes actual tox runs and tox-uv package installs from comments/output. A package name used as an install option value (for example `--cache-dir tox-uv`) does not establish plugin setup. Separate install and tox commands in one step are considered independently.
+
 ## What it flags
 
 Flags jobs that run `tox` without `tox-uv` installed.

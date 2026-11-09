@@ -2,7 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { getLoweredWorkflowStepText } from "./shared/workflow-step-text.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 import { isManualCacheStep, jobAllowsActionsCacheRestore } from "./shared/workflow-caches.ts";
 
 const meta = {
@@ -31,8 +31,15 @@ function getCachePathText(step: WorkflowStep): string {
 
 function jobHasTerraformInit(job: WorkflowJob): boolean {
   return job.steps.some((step) => {
-    const text = getLoweredWorkflowStepText(step);
-    return /\bterraform\s+init\b/.test(text);
+    return shellInvocations(step.run ?? "", false).some(([tool, ...args]) => {
+      if (tool !== "terraform") {
+        return false;
+      }
+      if (args[0]?.startsWith("-chdir=")) {
+        args = args.slice(1);
+      }
+      return args[0] === "init" && !args.some((arg) => ["-help", "--help", "-h"].includes(arg));
+    });
   });
 }
 

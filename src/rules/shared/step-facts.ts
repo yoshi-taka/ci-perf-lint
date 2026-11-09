@@ -1,5 +1,6 @@
 import type { WorkflowStep } from "../../workflow.ts";
 import type { SetupActionKind } from "./tools-text.ts";
+import { dockerBuildArguments, dockerBuildFlag } from "./docker-build-commands.ts";
 import {
   detectInstallCommandFromText,
   detectLintToolFromText,
@@ -141,10 +142,13 @@ function computeStepFacts(step: WorkflowStep): StepFacts {
       typeof step.with?.["cache-from"] === "string" ? step.with["cache-from"] : undefined;
     dockerCacheTo = typeof step.with?.["cache-to"] === "string" ? step.with["cache-to"] : undefined;
     dockerPlatforms = typeof step.with?.platforms === "string" ? step.with.platforms : undefined;
-  } else if (/\bdocker\s+(?:buildx\s+build|build)\b/i.test(run)) {
-    isDockerBuild = true;
-    dockerNoCache = /\b--no-cache\b/i.test(run);
-    dockerLoad = /\b--load\b/i.test(run);
+  } else {
+    const builds = dockerBuildArguments(run);
+    isDockerBuild = builds.length > 0;
+    if (isDockerBuild) {
+      dockerNoCache = builds.some((args) => dockerBuildFlag(args, "--no-cache"));
+      dockerLoad = builds.some((args) => dockerBuildFlag(args, "--load"));
+    }
   }
 
   return {

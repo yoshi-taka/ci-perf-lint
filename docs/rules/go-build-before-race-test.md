@@ -1,5 +1,7 @@
 # go-build-before-race-test
 
+Build/test evidence is command-scoped: output text, comments, option values and another command's `-race` do not establish a race test. Existing build-equivalence safeguards remain: dynamic/subshell build contexts are not assumed equivalent.
+
 Detects broad `go build ./...` steps that run before broad race-enabled Go tests.
 
 This rule looks for:

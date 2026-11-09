@@ -6,8 +6,7 @@ import {
   workflowHasPullRequestTrigger,
 } from "./shared/workflow-triggers.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-
-const npmAuditPattern = /\bnpm\s+audit\b(?!\s+signatures\b)/i;
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 const securityWorkflowName =
   /\b(security|audit|vulnerability|dependabot|snyk|trivy|secret|scan)\b/i;
@@ -36,7 +35,15 @@ export const npmAuditInCiRule = {
     for (const job of workflow.jobs) {
       for (const step of job.steps) {
         const run = step.run ?? "";
-        if (!npmAuditPattern.test(run)) {
+        if (
+          !shellInvocations(run, false).some(
+            ([tool, action, ...args]) =>
+              tool === "npm" &&
+              action === "audit" &&
+              args[0] !== "signatures" &&
+              !args.some((arg) => ["--help", "-h", "--version"].includes(arg)),
+          )
+        ) {
           continue;
         }
 

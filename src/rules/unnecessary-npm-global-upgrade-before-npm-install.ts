@@ -3,43 +3,12 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { CIDocument } from "./shared/any-step.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { extractSemanticSteps } from "./shared/semantic-adapter.ts";
-import { shellCommandSegments, staticShellWords } from "./shared/command-patterns.ts";
-
-const npmGlobalUpdate = /\bnpm\s+(?:install|i|update|upgrade)\s+(?:-g|--global)\s+npm\b/i;
-const npmPublish = /\bnpm\s+publish\b/i;
-const yarnPnpmBunInstall = /\b(?:yarn\s+install|pnpm\s+install|bun\s+install)\b/i;
-
-function hasProjectNpmInstall(text: string): boolean {
-  for (const segment of shellCommandSegments(text)) {
-    const words = staticShellWords(segment);
-    if (!words) {
-      continue;
-    }
-    let index = 0;
-    while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
-      index++;
-    }
-    if (words[index] !== "npm") {
-      continue;
-    }
-    const subcommand = words[index + 1];
-    if (subcommand === "ci") {
-      return true;
-    }
-    if (subcommand !== "install") {
-      continue;
-    }
-    if (
-      words
-        .slice(index + 2)
-        .some((word) => word === "-g" || word === "--global" || word.startsWith("--global="))
-    ) {
-      continue;
-    }
-    return true;
-  }
-  return false;
-}
+import { shellInvocations } from "./shared/shell-invocations.ts";
+import {
+  isNpmGlobalUpgrade,
+  isAlternativePackageInstall,
+  isProjectNpmInstall,
+} from "./shared/npm-global-commands.ts";
 
 const meta = {
   id: "unnecessary-npm-global-upgrade-before-npm-install",
@@ -55,23 +24,23 @@ export const unnecessaryNpmGlobalUpgradeBeforeNpmInstallRule = {
     const findings: Diagnostic[] = [];
     const steps = extractSemanticSteps(doc);
 
-    if (steps.some((s) => npmPublish.test(s.text))) {
+    const commands = steps.flatMap((step) => shellInvocations(step.text, false));
+    if (commands.some(([tool, action]) => tool === "npm" && action === "publish")) {
       return findings;
     }
 
-    if (steps.some((s) => yarnPnpmBunInstall.test(s.text))) {
+    if (commands.some(isAlternativePackageInstall)) {
       return findings;
     }
 
-    const hasGlobalUpdate = steps.some((s) => npmGlobalUpdate.test(s.text));
-    const hasProjectInstall = steps.some((s) => hasProjectNpmInstall(s.text));
+    const hasGlobalUpdate = commands.some(isNpmGlobalUpgrade);
+    const hasProjectInstall = commands.some(isProjectNpmInstall);
     if (!hasGlobalUpdate || !hasProjectInstall) {
       return findings;
     }
 
     for (const step of steps) {
-      const match = step.text.match(npmGlobalUpdate);
-      if (!match) {
+      if (!shellInvocations(step.text, false).some(isNpmGlobalUpgrade)) {
         continue;
       }
 

@@ -3,25 +3,8 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { CIDocument } from "./shared/any-step.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { extractSemanticSteps, groupStepsByJob } from "./shared/semantic-adapter.ts";
-import { shellCommandSegments, staticShellWords } from "./shared/command-patterns.ts";
-
-const npmGlobalUpdate = /\bnpm\s+(?:install|i|update|upgrade)\s+(?:-g|--global)\s+npm\b/i;
-const yarnPnpmBunInstall = /\b(?:yarn\s+install|pnpm\s+install|bun\s+install)\b/i;
-
-function runsNpmCommand(command: string): boolean {
-  const words = staticShellWords(command);
-  if (!words) {
-    return false;
-  }
-  let index = 0;
-  while (/^[A-Za-z_]\w*=/.test(words[index] ?? "")) {
-    index++;
-  }
-  if (["command", "env", "exec", "nohup", "sudo", "time"].includes(words[index] ?? "")) {
-    index++;
-  }
-  return words[index] === "npm";
-}
+import { shellInvocations } from "./shared/shell-invocations.ts";
+import { isNpmGlobalUpgrade, isAlternativePackageInstall } from "./shared/npm-global-commands.ts";
 
 const meta = {
   id: "wasteful-npm-global-install",
@@ -36,17 +19,16 @@ export const wastefulNpmGlobalInstallRule = {
   check(doc: CIDocument, _context: RuleContext): Diagnostic[] {
     const findings: Diagnostic[] = [];
     for (const steps of groupStepsByJob(extractSemanticSteps(doc)).values()) {
-      if (!steps.some((s) => yarnPnpmBunInstall.test(s.text))) {
+      const commands = steps.flatMap((step) => shellInvocations(step.text, false));
+      if (!commands.some(isAlternativePackageInstall)) {
         continue;
       }
-      const commands = steps.flatMap((step) => shellCommandSegments(step.text));
       // npm can be a compatibility-test client or tool installer even when root deps use Yarn.
-      if (commands.some((command) => runsNpmCommand(command) && !npmGlobalUpdate.test(command))) {
+      if (commands.some((words) => words[0] === "npm" && !isNpmGlobalUpgrade(words))) {
         continue;
       }
       for (const step of steps) {
-        const match = step.text.match(npmGlobalUpdate);
-        if (!match) {
+        if (!shellInvocations(step.text, false).some(isNpmGlobalUpgrade)) {
           continue;
         }
 

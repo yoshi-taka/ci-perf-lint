@@ -1,5 +1,7 @@
 # go-test-repeats-vet-after-go-vet
 
+Go execution evidence uses shared shell extraction. Printed commands/comments are not evidence, and `-vet=off` applies only to its own test invocation. Unknown test flags are conservatively unresolved.
+
 Detects Go CI jobs that run `go vet` and then run `go test` without `-vet=off`.
 
 This rule looks for:

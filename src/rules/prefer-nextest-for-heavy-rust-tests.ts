@@ -3,6 +3,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { jobHasMatrix } from "./shared/workflow-jobs.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 
 const meta = {
   id: "prefer-nextest-for-heavy-rust-tests",
@@ -11,27 +12,80 @@ const meta = {
   docsPath: "docs/rules/prefer-nextest-for-heavy-rust-tests.md",
 } satisfies RuleMeta;
 
-function stepRunsCargoTest(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
-  return /\bcargo\s+test\b/i.test(run) && !/\bcargo\s+test\b[^\n]*\s--doc\b/i.test(run);
+function cargoTestArguments(step: WorkflowStep): string[][] {
+  return shellInvocations(step.run ?? "", false).flatMap(([tool, ...words]) => {
+    if (tool !== "cargo") {
+      return [];
+    }
+    if (words[0]?.startsWith("+")) {
+      words = words.slice(1);
+    }
+    if (words[0] !== "test") {
+      return [];
+    }
+    const end = words.indexOf("--");
+    const args = words.slice(1, end < 0 ? undefined : end);
+    return args.some((arg) => ["--doc", "--help", "-h", "--no-run"].includes(arg)) ? [] : [args];
+  });
 }
 
 function stepUsesNextest(step: WorkflowStep): boolean {
-  const text = `${step.name ?? ""} ${step.uses ?? ""} ${step.run ?? ""}`;
-  return /\b(?:cargo\s+nextest|nextest\s+run|cargo-nextest)\b/i.test(text);
+  return (
+    shellInvocations(step.run ?? "", false).some(([tool, ...words]) => {
+      if (tool === "cargo" && words[0]?.startsWith("+")) {
+        words = words.slice(1);
+      }
+      if (tool === "cargo" && words[0] === "install") {
+        for (let index = 1; index < words.length; index++) {
+          const word = words[index]!;
+          if (
+            [
+              "--version",
+              "--root",
+              "--path",
+              "--git",
+              "--branch",
+              "--tag",
+              "--rev",
+              "--index",
+              "--registry",
+              "--target",
+              "--target-dir",
+              "--features",
+              "--jobs",
+              "-j",
+            ].includes(word)
+          ) {
+            index++;
+          } else if (/^cargo-nextest(?:@.+)?$/.test(word)) {
+            return true;
+          }
+        }
+      }
+      return (
+        (tool === "cargo" && words[0] === "nextest") ||
+        (tool === "nextest" && words[0] === "run") ||
+        tool === "cargo-nextest"
+      );
+    }) || /^taiki-e\/install-action@(?:cargo-)?nextest$/.test(step.uses ?? "")
+  );
 }
 
 function cargoTestCommandLooksHeavy(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
-  return /\bcargo\s+test\b[^\n]*(?:--workspace|--all(?:\s|$)|--all-features|--tests|--benches)/i.test(
-    run,
+  return cargoTestArguments(step).some((args) =>
+    args.some((arg) =>
+      ["--workspace", "--all", "--all-features", "--tests", "--benches"].includes(arg),
+    ),
   );
 }
 
 function cargoTestCommandLooksPackageScoped(step: WorkflowStep): boolean {
-  const run = step.run ?? "";
-  return /\bcargo\s+test\b[^\n]*(?:-p\s+\S+|--package(?:=|\s)\S+|--manifest-path(?:=|\s)\S+)/i.test(
-    run,
+  return cargoTestArguments(step).some((args) =>
+    args.some(
+      (arg, index) =>
+        /^(?:--package|--manifest-path)=.+/.test(arg) ||
+        (["-p", "--package", "--manifest-path"].includes(arg) && Boolean(args[index + 1])),
+    ),
   );
 }
 
@@ -45,7 +99,7 @@ function jobNameLooksIntegrationHeavy(job: WorkflowJob): boolean {
 }
 
 function getCargoTestStep(job: WorkflowJob): WorkflowStep | undefined {
-  return job.steps.find((step) => stepRunsCargoTest(step));
+  return job.steps.find((step) => cargoTestArguments(step).length > 0);
 }
 
 function jobLooksHeavyRustTest(
