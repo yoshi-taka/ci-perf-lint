@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { collectBundlerExternalSubpathLeakDiagnostics } from "./bundler-external-subpath-leak.ts";
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import { collectJvmCdsOpportunityDiagnostics } from "./jvm-cds-opportunity.ts";
@@ -138,6 +139,41 @@ function extractSignals(
   };
 }
 
+const COLLECTOR_CONCURRENCY_CAP = 8;
+
+/**
+ * Collectors read files and spawn scans, so a small multiple of the CPU count
+ * keeps the machine busy without starting every collector (and its buffers) at
+ * once on large repositories.
+ */
+function collectorConcurrency(count: number): number {
+  return Math.max(1, Math.min(count, COLLECTOR_CONCURRENCY_CAP, availableParallelism()));
+}
+
+async function settleWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  run: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    for (;;) {
+      const index = next++;
+      if (index >= items.length) {
+        return;
+      }
+      try {
+        results[index] = { status: "fulfilled", value: await run(items[index]!) };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 export async function collectRepositoryDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
@@ -233,8 +269,10 @@ export async function collectRepositoryDiagnostics(
 
   const resourceTimingStartedAt = performance.now();
 
-  const collectorResults = await Promise.allSettled(
-    scheduledCollectors.map(async (collector) => {
+  const collectorResults = await settleWithConcurrency(
+    scheduledCollectors,
+    collectorConcurrency(scheduledCollectors.length),
+    async (collector) => {
       const startedAt = performance.now();
       const result = await runRepositoryDiagnosticCollector(
         collector as CollectorLike,
@@ -247,7 +285,7 @@ export async function collectRepositoryDiagnostics(
         );
       }
       return result;
-    }),
+    },
   );
 
   if (timingsEnabled() && resourceObservability.cacheMisses > 0) {
