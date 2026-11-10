@@ -263,6 +263,9 @@ class Parser {
   private version: string | null = "1.2";
   private explicitVersion = false;
   private tags: Record<string, string> = { ...DEFAULT_TAGS };
+  // Duplicate-key detection runs once per added pair. Remembering signatures
+  // keeps lockfile-sized maps linear instead of rescanning every earlier key.
+  private readonly seenMapKeys = new WeakMap<ParseMapNode, Set<string>>();
 
   constructor(src: string) {
     this.src = src;
@@ -2362,6 +2365,7 @@ class Parser {
         pair.key?.kind === "map"
       ) {
         map.items.push(...pair.key.items);
+        this.rememberMapKeys(map, pair.key.items);
         const tail = pair.key.items[pair.key.items.length - 1] ?? null;
         previous = tail ? (tail.value ?? tail.key) : null;
         lastEnd = pair.key.range[1];
@@ -3336,14 +3340,42 @@ class Parser {
     if (signature === null) {
       return;
     }
+    const seen = this.seenMapKeys.get(map) ?? this.seedMapKeys(map);
+    if (seen.has(signature)) {
+      const start = key ? key.range[0] : map.range[0];
+      this.recordError("DUPLICATE_KEY", "Map keys must be unique", start, start + 1);
+      return;
+    }
+    seen.add(signature);
+  }
+
+  private seedMapKeys(map: ParseMapNode): Set<string> {
+    const seen = new Set<string>();
     for (const pair of map.items) {
       if (this.isMergeKeyNode(pair.key)) {
         continue;
       }
-      if (this.keySignature(pair.key) === signature) {
-        const start = key ? key.range[0] : map.range[0];
-        this.recordError("DUPLICATE_KEY", "Map keys must be unique", start, start + 1);
-        return;
+      const signature = this.keySignature(pair.key);
+      if (signature !== null) {
+        seen.add(signature);
+      }
+    }
+    this.seenMapKeys.set(map, seen);
+    return seen;
+  }
+
+  private rememberMapKeys(map: ParseMapNode, items: readonly ParsePairNode[]): void {
+    const seen = this.seenMapKeys.get(map);
+    if (seen === undefined) {
+      return;
+    }
+    for (const item of items) {
+      if (this.isMergeKeyNode(item.key)) {
+        continue;
+      }
+      const signature = this.keySignature(item.key);
+      if (signature !== null) {
+        seen.add(signature);
       }
     }
   }
