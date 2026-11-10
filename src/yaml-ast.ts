@@ -34,7 +34,6 @@ export class Alias extends AstNode<"alias"> {
     super("alias");
   }
   // Runtime JSON dispatch: jsonValue(Alias) below preserves node-only alias semantics.
-  // fallow-ignore-next-line unused-class-member
   toJSON(): { source: string } {
     return { source: this.source };
   }
@@ -68,7 +67,6 @@ export class YAMLMap<K = unknown, V = unknown> extends AstNode<"map"> {
     return !keepScalar && value instanceof Scalar ? value.value : value;
   }
   // Used through Node unions in lazyNodeRecord and by jsonValue(YAMLMap) below.
-  // fallow-ignore-next-line unused-class-member
   toJSON(): unknown {
     return nodeMapValue(this);
   }
@@ -96,7 +94,6 @@ export class YAMLSeq<T = unknown> extends AstNode<"seq"> {
     return !keepScalar && value instanceof Scalar ? value.value : value;
   }
   // Workflow helpers and jsonValue(YAMLSeq) invoke this through the Node union.
-  // fallow-ignore-next-line unused-class-member
   toJSON(): unknown[] {
     return this.items.map((item, index) => jsonValue(item, String(index)));
   }
