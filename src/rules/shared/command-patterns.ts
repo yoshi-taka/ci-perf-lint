@@ -2,11 +2,33 @@ const npmRunMatcher = /^\s*npm\s+(?:run|run-script)\s+([A-Za-z0-9:_./-]+)(\s+--(
 const commandTokenPattern = /(?:'[^']*'|"[^"]*"|\\[^\r\n]|[^\s'"\\;&|()<>])+|[;&|()<>]|\r?\n/g;
 const commandSeparatorPattern = /^[;&|()\r\n]+$/;
 
+const TOKEN_CACHE_LIMIT = 1024;
+const SEGMENT_CACHE_LIMIT = 512;
+const shellTokenCache = new Map<string, readonly RegExpExecArray[]>();
+const shellSegmentCache = new Map<string, readonly string[]>();
+
+/** The same step text is tokenized by many rules; tokenize it once per process. */
+function shellTokens(text: string): readonly RegExpExecArray[] {
+  const cached = shellTokenCache.get(text);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const tokens = [...text.replace(/\\\r?\n/g, " ").matchAll(commandTokenPattern)];
+  if (shellTokenCache.size >= TOKEN_CACHE_LIMIT) {
+    const oldest = shellTokenCache.keys().next().value;
+    if (oldest !== undefined) {
+      shellTokenCache.delete(oldest);
+    }
+  }
+  shellTokenCache.set(text, tokens);
+  return tokens;
+}
+
 /** Recognize input-document operators without confusing quoted text or comments. */
 export function hasShellInputDocument(text: string): boolean {
   let comment = false;
   let previousLessThanEnd: number | undefined;
-  for (const match of text.replace(/\\\r?\n/g, " ").matchAll(commandTokenPattern)) {
+  for (const match of shellTokens(text)) {
     const token = match[0];
     if (/^\r?\n$/.test(token)) {
       comment = false;
@@ -29,7 +51,7 @@ export function shellCommands(text: string): string[][] {
   const commands: string[][] = [];
   let tokens: string[] = [];
   let comment = false;
-  for (const match of text.replace(/\\\r?\n/g, " ").matchAll(commandTokenPattern)) {
+  for (const match of shellTokens(text)) {
     const token = match[0];
     if (/^\r?\n$/.test(token)) {
       comment = false;
@@ -378,6 +400,22 @@ export function lineColumnForIndex(text: string, index: number): { line: number;
 
 /** Separate simple shell commands without splitting quoted arguments or continuations. */
 export function shellCommandSegments(text: string): string[] {
+  const cached = shellSegmentCache.get(text);
+  if (cached !== undefined) {
+    return [...cached];
+  }
+  const commands = splitShellCommandSegments(text);
+  if (shellSegmentCache.size >= SEGMENT_CACHE_LIMIT) {
+    const oldest = shellSegmentCache.keys().next().value;
+    if (oldest !== undefined) {
+      shellSegmentCache.delete(oldest);
+    }
+  }
+  shellSegmentCache.set(text, commands.slice());
+  return commands;
+}
+
+function splitShellCommandSegments(text: string): string[] {
   const commands: string[] = [];
   let command = "";
   let quote = "";

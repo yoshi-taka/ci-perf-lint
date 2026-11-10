@@ -1,7 +1,29 @@
 import { hasShellInputDocument } from "./command-patterns.ts";
 
+const EXECUTION_TEXT_CACHE_LIMIT = 512;
+const executionTextCache = new Map<string, readonly string[]>();
+
 /** Extract substitutions as execution, not argument text. Never execute or expand shell code. */
 export function shellExecutionTexts(text: string, depth = 0): string[] {
+  if (depth > 0) {
+    return computeShellExecutionTexts(text, depth);
+  }
+  const cached = executionTextCache.get(text);
+  if (cached !== undefined) {
+    return [...cached];
+  }
+  const result = computeShellExecutionTexts(text, depth);
+  if (executionTextCache.size >= EXECUTION_TEXT_CACHE_LIMIT) {
+    const oldest = executionTextCache.keys().next().value;
+    if (oldest !== undefined) {
+      executionTextCache.delete(oldest);
+    }
+  }
+  executionTextCache.set(text, result.slice());
+  return result;
+}
+
+function computeShellExecutionTexts(text: string, depth: number): string[] {
   if (depth >= 16 || hasShellInputDocument(text)) {
     return [];
   }
