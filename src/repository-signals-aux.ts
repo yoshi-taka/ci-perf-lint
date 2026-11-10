@@ -1,5 +1,6 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
+import { detectPackageManager } from "./repository-package-helpers.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import type { RepositoryScanContext } from "./repository-scan-context.ts";
 import type { WorkflowDocument } from "./workflow.ts";
@@ -162,6 +163,7 @@ async function collectNpmSignals(
     .sort((left, right) => left.localeCompare(right));
 
   return {
+    packageManager: await detectPackageManager(context),
     npmrcFiles,
     npmrcRelevantSettings: uniqueSettings,
     lifecycleHookScripts: collectScriptLifecycleHooks(packageJson.value),

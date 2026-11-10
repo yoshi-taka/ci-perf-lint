@@ -71,6 +71,7 @@ export const RULE_REGISTRY = {
   "prefer-cdk-asset-build-concurrency": { kind: "repository" },
   "prefer-buildx-bake-for-multiple-images": { kind: "workflow" },
   "prefer-buildx-build-over-docker-build": { kind: "workflow" },
+  "prefer-bun-fmt-over-prettier": { kind: "workflow" },
   "prefer-cache-apt-pkgs-action-1-3-1": { kind: "workflow" },
   "prefer-ccache-action-1-2-20-on-windows": { kind: "workflow" },
   "prefer-cdk-express-mode-in-development": { kind: "workflow" },

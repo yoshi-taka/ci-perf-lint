@@ -135,6 +135,7 @@ Current rule registry:
 - `prefer-azurite-3-36`
 - `prefer-buildx-bake-for-multiple-images`
 - `prefer-buildx-build-over-docker-build`
+- `prefer-bun-fmt-over-prettier`
 - `prefer-cache-apt-pkgs-action-1-3-1`
 - `prefer-cargo-shear-in-ci`
 - `prefer-ccache-action-1-2-20-on-windows`

@@ -78,6 +78,46 @@ describe("migrations: typescript and developer tooling", () => {
     expect(oxfmtFinding?.suggestion).toContain("drop-in-style migration path");
   });
 
+  test("warns when a Bun repository uses Prettier instead of bun fmt", async () => {
+    const report = await getFixtureReport(fixtures.formattingBunLike, {
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    const bunFmtFinding = report.findings.find(
+      (finding) => finding.ruleId === "prefer-bun-fmt-over-prettier",
+    );
+
+    expect(bunFmtFinding?.severity).toBe("warning");
+    expect(bunFmtFinding?.message).toContain("Bun");
+    expect(bunFmtFinding?.suggestion).toContain("bun fmt");
+    expect(report.findings.some((finding) => finding.ruleId === "prefer-oxfmt-over-prettier")).toBe(
+      false,
+    );
+  });
+
+  test("does not recommend bun fmt when the Bun repository uses oxfmt", async () => {
+    const report = await getFixtureReport(fixtures.formattingBunOxfmtOk, {
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(
+      report.findings.some((finding) => finding.ruleId === "prefer-bun-fmt-over-prettier"),
+    ).toBe(false);
+  });
+
+  test("does not recommend bun fmt when it is already used", async () => {
+    const report = await getFixtureReport(fixtures.formattingBunFmtOk, {
+      targetPath: ".",
+      topCount: 20,
+    });
+
+    expect(
+      report.findings.some((finding) => finding.ruleId === "prefer-bun-fmt-over-prettier"),
+    ).toBe(false);
+  });
+
   test("treats oxfmt migration as suggestion when prettier plugins are visible", async () => {
     const strictReport = await getFixtureReport(fixtures.formattingPluginLike, {
       targetPath: ".",

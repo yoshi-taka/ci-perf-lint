@@ -84,6 +84,7 @@ function createSignals(): RepositorySignals {
     prettier: {
       usesPrettier: false,
       usesOxfmt: false,
+      usesBunFmt: false,
       hasConfig: false,
       pluginNames: [],
       usesPrettierEslint: false,

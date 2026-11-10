@@ -42,6 +42,7 @@ import {
   collectPreferNextjs14MinorPerformanceMilestoneDiagnostics,
 } from "./prefer-nextjs-minor-performance-milestone.ts";
 import { collectPreferOxlintOverEslintDiagnostics } from "./prefer-oxlint-over-eslint.ts";
+import { collectPreferBunFmtOverPrettierDiagnostics } from "./prefer-bun-fmt-over-prettier.ts";
 import { collectPreferOxfmtOverPrettierDiagnostics } from "./prefer-oxfmt-over-prettier.ts";
 import {
   collectPreferStorybook6MinorPerformanceMilestoneDiagnostics,
@@ -93,6 +94,12 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptLinting,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPreferEslintPluginImportXDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-bun-fmt-over-prettier",
+    gate: gateKeys.javascriptHeavy,
+    collect: ({ repoRoot, repository, warnings, scanContext }) =>
+      collectPreferBunFmtOverPrettierDiagnostics(repoRoot, repository, warnings, scanContext),
   },
   {
     id: "prefer-oxfmt-over-prettier",

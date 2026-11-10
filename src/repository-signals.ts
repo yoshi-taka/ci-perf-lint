@@ -454,6 +454,7 @@ export async function collectRepositorySignals(
       hasDockerBakeFile: false,
       stackedDiffs: { likelyUsed: false, evidence: [] },
       npm: {
+        packageManager: undefined,
         npmrcFiles: [],
         npmrcRelevantSettings: [],
         lifecycleHookScripts: [],
@@ -538,6 +539,7 @@ export async function collectRepositorySignals(
     collectSignalIf(hasPrettierEvidence, "prettier", context, collectPrettierSignals, {
       usesPrettier: false,
       usesOxfmt: false,
+      usesBunFmt: false,
       hasConfig: false,
       pluginNames: [],
       usesPrettierEslint: false,

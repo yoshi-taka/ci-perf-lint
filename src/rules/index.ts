@@ -92,6 +92,7 @@ import { preferRuffFormatOverBlackRule } from "./prefer-ruff-format-over-black.t
 import { preferEslintConcurrencyRule } from "./prefer-eslint-concurrency.ts";
 import { preferOxlintOverEslintRule } from "./prefer-oxlint-over-eslint.ts";
 import { preferOxlintTypeCheckOverTscRule } from "./prefer-oxlint-type-check-over-tsc.ts";
+import { preferBunFmtOverPrettierRule } from "./prefer-bun-fmt-over-prettier.ts";
 import { preferOxfmtOverPrettierRule } from "./prefer-oxfmt-over-prettier.ts";
 import { preferPnpm1210Rule } from "./prefer-pnpm-12-10.ts";
 import { preferPnpmSetupForStoreOnlyCacheRule } from "./prefer-pnpm-setup-for-store-only-cache.ts";
@@ -227,6 +228,7 @@ export const allRules = [
   preferOxlintOverEslintRule,
   preferOxlintTypeCheckOverTscRule,
   preferOxfmtOverPrettierRule,
+  preferBunFmtOverPrettierRule,
   preferPnpm1210Rule,
   preferPnpmSetupForStoreOnlyCacheRule,
   preferPulumiActions42Rule,

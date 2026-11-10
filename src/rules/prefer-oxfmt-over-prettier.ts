@@ -18,6 +18,9 @@ const meta = {
 export const preferOxfmtOverPrettierRule = {
   meta,
   check(workflow: WorkflowDocument, context: RuleContext) {
+    if (context.repository.npm.packageManager === "bun") {
+      return [];
+    }
     const { usesPrettier, usesOxfmt } = context.repository.prettier;
     const workflowUsesPrettier = workflowUsesLintTool(workflow, "prettier");
     const workflowUsesOxfmt = workflowStepTextMatches(

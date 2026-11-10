@@ -1,3 +1,40 @@
+import type { RepositoryScanContext } from "./repository-scan-context.ts";
+
+export type NodePackageManager = "npm" | "pnpm" | "yarn" | "bun";
+
+const packageManagerLockfiles: readonly [NodePackageManager, string][] = [
+  ["pnpm", "pnpm-lock.yaml"],
+  ["yarn", "yarn.lock"],
+  ["bun", "bun.lock"],
+  ["bun", "bun.lockb"],
+];
+
+/** Detect the root package manager without running any package manager command. */
+export async function detectPackageManager(
+  context: RepositoryScanContext,
+): Promise<NodePackageManager | undefined> {
+  const packageJson = await context.loadPackageJson();
+  const declared = packageJson.value?.packageManager;
+  if (typeof declared === "string") {
+    const name = declared.split("@")[0]?.toLowerCase();
+    if (name === "npm" || name === "pnpm" || name === "yarn" || name === "bun") {
+      return name;
+    }
+  }
+
+  if (await context.pathExists(context.resolve("package-lock.json"))) {
+    return "npm";
+  }
+
+  for (const [manager, file] of packageManagerLockfiles) {
+    if (await context.pathExists(context.resolve(file))) {
+      return manager;
+    }
+  }
+
+  return undefined;
+}
+
 export function dependencySectionsOf(packageJson: Record<string, unknown>): unknown[] {
   return [
     packageJson.dependencies,

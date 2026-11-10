@@ -1,8 +1,8 @@
-import path from "node:path";
-import type { AnalysisWarning, Diagnostic, RuleMeta, SourceLocation } from "../types.ts";
+import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { findPrettierEvidenceLocation } from "./prettier-evidence.ts";
 
 const meta = {
   id: "prefer-oxfmt-over-prettier",
@@ -11,25 +11,15 @@ const meta = {
   docsPath: "docs/rules/prefer-oxfmt-over-prettier.md",
 } satisfies RuleMeta;
 
-function lineColumnForIndex(text: string, index: number): { line: number; column: number } {
-  const before = text.slice(0, Math.max(0, index));
-  const lines = before.split("\n");
-  return {
-    line: lines.length,
-    column: lines.at(-1)?.length ? lines.at(-1)!.length + 1 : 1,
-  };
-}
-
-function normalizeRelativePath(repoRoot: string, filePath: string): string {
-  return path.relative(repoRoot, filePath).replace(/\\/g, "/") || path.basename(filePath);
-}
-
 export async function collectPreferOxfmtOverPrettierDiagnostics(
   repoRoot: string,
   repository: RepositorySignals,
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
+  if (repository.npm.packageManager === "bun") {
+    return [];
+  }
   const { usesPrettier, usesOxfmt, pluginNames } = repository.prettier;
   if (!usesPrettier || usesOxfmt) {
     return [];
@@ -42,44 +32,7 @@ export async function collectPreferOxfmtOverPrettierDiagnostics(
       : "No visible Prettier plugins were detected at the repository root.";
 
   const context = scanContext ?? new RepositoryScanContext(repoRoot, warnings ?? []);
-  let location: SourceLocation | undefined;
-
-  const prettierDepPattern = /"prettier"\s*:/g;
-  const packageJsonEntry = await context.loadPackageJson();
-  if (packageJsonEntry.text) {
-    const match = prettierDepPattern.exec(packageJsonEntry.text);
-    if (match) {
-      const pos = lineColumnForIndex(packageJsonEntry.text, match.index);
-      location = {
-        path: normalizeRelativePath(repoRoot, packageJsonEntry.path),
-        line: pos.line,
-        column: pos.column,
-      };
-    }
-  }
-
-  if (!location) {
-    const prettierConfigFileNames = [
-      ".prettierrc",
-      ".prettierrc.json",
-      ".prettierrc.json5",
-      ".prettierrc.yaml",
-      ".prettierrc.yml",
-      ".prettierrc.js",
-      ".prettierrc.cjs",
-      ".prettierrc.mjs",
-      ".prettierrc.toml",
-    ];
-    for (const fileName of prettierConfigFileNames) {
-      const configPath = context.resolve(fileName);
-      if (await context.pathExists(configPath)) {
-        location = { path: fileName, line: 1, column: 1 };
-        break;
-      }
-    }
-  }
-
-  location ??= { path: "package.json", line: 1, column: 1 };
+  const location = await findPrettierEvidenceLocation(repoRoot, context);
 
   return [
     buildRepositoryDiagnostic(repository, meta, {

@@ -140,6 +140,7 @@ export interface RepositorySignals {
   prettier: {
     usesPrettier: boolean;
     usesOxfmt: boolean;
+    usesBunFmt: boolean;
     hasConfig: boolean;
     pluginNames: string[];
     usesPrettierEslint: boolean;
@@ -163,6 +164,7 @@ export interface RepositorySignals {
     python: string[];
   };
   npm: {
+    packageManager?: "npm" | "pnpm" | "yarn" | "bun";
     npmrcFiles: string[];
     npmrcRelevantSettings: string[];
     lifecycleHookScripts: string[];

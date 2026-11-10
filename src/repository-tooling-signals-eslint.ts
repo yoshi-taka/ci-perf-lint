@@ -410,6 +410,7 @@ export async function collectPrettierSignals(
   const pluginNames = new Set<string>();
   let usesPrettier = false;
   let usesOxfmt = false;
+  let usesBunFmt = false;
   let hasConfig = false;
   let usesPrettierEslint = false;
 
@@ -446,6 +447,13 @@ export async function collectPrettierSignals(
     usesPrettierEslint ||= packageJsonText.includes("prettier-eslint");
     usesPrettier ||= /["'`][^"'`]*["'`]\s*:\s*["'`][^"'`]*\bprettier\b/i.test(packageJsonText);
     usesOxfmt ||= /["'`][^"'`]*["'`]\s*:\s*["'`][^"'`]*\boxfmt\b/i.test(packageJsonText);
+
+    const scripts = packageJson.scripts;
+    if (scripts && typeof scripts === "object" && !Array.isArray(scripts)) {
+      usesBunFmt = Object.values(scripts).some(
+        (command) => typeof command === "string" && /\bbun\s+fmt\b/.test(command),
+      );
+    }
   }
 
   const configFiles = await loadExistingTextFiles(context, prettierConfigFileNames);
@@ -459,6 +467,7 @@ export async function collectPrettierSignals(
   return {
     usesPrettier,
     usesOxfmt,
+    usesBunFmt,
     hasConfig,
     pluginNames: [...pluginNames].sort(),
     usesPrettierEslint,
