@@ -1,6 +1,7 @@
 import type { ParsedDocument } from "./yaml-ast.ts";
 import { buildOwnedDocument } from "./yaml-owned-parse.ts";
 import { parseYaml, type ParseDiagnostic, type ParseDocumentResult } from "./yaml-parse.ts";
+import { enableMergeKeys } from "./yaml-merge-option.ts";
 
 export { YAMLMap, isMap, isNode, isScalar, isSeq } from "./yaml-ast.ts";
 export { LineCounter } from "./yaml-line-counter.ts";
@@ -12,6 +13,7 @@ interface ParseOptions {
     addNewLine(offset: number): number;
   };
   uniqueKeys?: boolean;
+  merge?: boolean;
   keepSourceTokens?: boolean;
   prettyErrors?: boolean;
 }
@@ -108,7 +110,8 @@ export function parseDocument(source: string, options: ParseOptions = {}): Parse
     }
   }
   try {
-    const result = adjustDiagnostics(parseYaml(source), options);
+    const parsed = parseYaml(source);
+    const result = adjustDiagnostics(options.merge ? enableMergeKeys(parsed) : parsed, options);
     return buildOwnedDocument(result);
   } catch (error) {
     return fatalDocument(source, error);

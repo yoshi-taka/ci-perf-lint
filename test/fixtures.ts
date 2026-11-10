@@ -46,6 +46,7 @@ const fixtureNames = {
   gitlabCiTimeoutLike: "gitlab-ci-timeout-like",
   gitlabCiTimeoutOk: "gitlab-ci-timeout-ok",
   circleciFullCloneLike: "circleci-full-clone-like",
+  circleciMergeKeysLike: "circleci-merge-keys-like",
   circleciFullCloneOk: "circleci-full-clone-ok",
   circleciFullCloneOkUsesHistory: "circleci-full-clone-ok-uses-history",
   depotCiLike: "depot-ci-like",

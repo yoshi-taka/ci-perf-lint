@@ -1,0 +1,25 @@
+version: 2.1
+
+defaults: &defaults
+  context: release
+
+tag-filter: &tag-filter
+  filters:
+    branches:
+      ignore: /.*/
+    tags:
+      only: /^v.*/
+
+jobs:
+  build:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - run: docker build --no-cache .
+
+workflows:
+  release:
+    jobs:
+      - build:
+          <<: *defaults
+          <<: *tag-filter

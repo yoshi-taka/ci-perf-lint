@@ -444,7 +444,7 @@ describe("composeRefiners (legacy)", () => {
 // ============================================================
 
 describe("refiner commutativity", () => {
-  test("deduplicate commutes with mode-filter (both are filter-like)", () => {
+  test("deduplicate commutes with the identity exploratory mode-filter", () => {
     const diagnostics = [
       makeDiagnostic({
         ruleId: "rule-a",
@@ -478,7 +478,7 @@ describe("refiner commutativity", () => {
       makeDiagnostic({ ruleId: "rule-a", location: { path: "a.yml", line: 1, column: 1 } }),
       makeDiagnostic({ ruleId: "rule-a", location: { path: "a.yml", line: 2, column: 1 } }),
     ];
-    const caps = new Map([["rule-a", 1]]);
+    const caps = new Map([["rule-a", 2]]);
 
     const dedupeFirst = composeRefiners([
       deduplicateRefiner(),
@@ -490,12 +490,11 @@ describe("refiner commutativity", () => {
       deduplicateRefiner(),
     ]).refine(diagnostics, {});
 
-    // dedupe first: 2 duplicates → 1 → cap to 1
-    // cap first: 3 → cap to 1 (first one) → dedupe (still 1)
-    expect(dedupeFirst).toHaveLength(1);
+    // Dedupe first retains two distinct locations; cap first spends both slots
+    // on the first location and deduplication then leaves only one finding.
+    expect(dedupeFirst).toHaveLength(2);
     expect(capFirst).toHaveLength(1);
-    // Both result in 1, but the specific diagnostic may differ
-    // This demonstrates order-dependent behavior
+    expect(dedupeFirst).not.toEqual(capFirst);
   });
 
   test("sorting is stable regardless of prior operations", () => {

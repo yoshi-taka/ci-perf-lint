@@ -1,9 +1,10 @@
-# Lean pilot: evidence strength, pruning, and gate expressions
+# Lean pilot: evidence, gates, and finding retention
 
 Run `bun run verify:formal` with Lean **4.35.0** installed (elan reads
 `formal/lean-toolchain`), or set `LEAN_BIN=/absolute/path/to/lean`.
 No Mathlib, Lake dependencies, or generated fixtures.
 Individual checks: `bun run verify:formal:gates` or `bun run verify:formal:gate-expr`.
+Retention checks: `bun run verify:formal:retention`.
 CI runs all verifiers in the `formal` job; ordinary regression tests need no Lean.
 
 ## Scope and evidence
@@ -149,3 +150,65 @@ cases additionally compare Boolean and traced evaluation results.
 counterexamples, distinct reasons, transform invariance, legacy precedence, and
 actual right-operand reads. Lean's model is pure and total, so its proofs do not
 claim evaluation-count, getter/proxy, trace-shape, or resource-exhaustion guarantees.
+
+## Finding retention: selection, suppression, aggregation
+
+`FindingRetention.lean` models the scope/mode predicates, scope repair, strict
+fallback severity promotion, path:line deduplication, and per-rule caps in
+`repo-finding-utils.ts`, `severity-promotion.ts`, and `refiner-pipeline.ts` at
+`67fd8ce`. The bridge preserves the actual `repo.ts` ordering rather than silently
+substituting a desired one: scope selection, promotion, scope repair, mode
+selection, action prioritization, sorting, then reporter aggregation.
+
+### What is proved universally
+
+- `selection_exact`: an input occurrence survives the joint predicate iff its
+  scope and mode permit it. Exploratory retains every severity; if both low-level
+  scope flags are true, workflowOnly has precedence (not a claim about CLI inputs).
+- `scope_fix_idempotent`: scope repair can safely be applied twice.
+- `promotion_preserves_tokens`: promotion cannot add/drop/reorder occurrences.
+- `dedup_no_fabrication`, `dedup_key_coverage`, `dedup_keys_unique`: dedup retains
+  input representatives, preserves every previously unseen path:line class, and
+  emits no duplicate class. **This is not per-rule completeness.** A trivial
+  always-empty implementation would fail the coverage theorem.
+- `implied_head_survives`: a cap step always keeps an implied-rule occurrence,
+  regardless of its accumulated count. This is not a complete proof of cap quotas.
+
+### Counterexamples, not silently repaired policies
+
+The existing dedup key intentionally ignores rule ID and column. For two findings
+on the same path:line, `[suggestion(rule-a), warning(rule-b)]`, dedup then strict
+mode filtering yields `[]`, while filtering then dedup yields the warning. Lean
+proves this counterexample; the ordinary exploratory-mode commutativity test was
+renamed to describe its identity-filter assumption. The cap/dedup test now uses
+a genuine counterexample: `[line1, line1, line2]` with cap=2 yields one or two
+survivors depending on ordering.
+
+Scope selection also differs before/after repairing an undefined scope with a
+repository source. These witnesses use valid synthetic diagnostics; **no active
+registered-rule/end-to-end omission is claimed**. Neither the cross-rule dedup
+policy nor production pipeline order has been changed by this verification work.
+A policy change and a corresponding no-loss regression guard need separate approval.
+
+### Executable checks and limits
+
+**14,040** cases cover all 585 diagnostic sequences of lengths 0–3 over eight
+prototypes, both modes, four scope-flag combinations, and three cap/implied-ID
+configurations. They include co-location, distinct rules/columns, missing/explicit
+scopes, repository provenance, Unicode paths, duplicate classes, zero caps, implied
+exemptions, and fallback promotion. Exact survivor tokens and suppression warning
+counts/messages are compared with Lean. Map/promotion metadata and input immutability
+are checked too. Score prioritization/sorting must preserve the selected multiset;
+their score/order algorithms are not formally modeled here.
+
+Reporter grouping has an **independent executable conservation oracle, not a Lean
+model/proof of the full grouping implementation**. Every selected occurrence must
+appear in exactly one aligned member group, with the earliest member index and
+its message, handoff, and location retained. Mixed scopes/workflows/job names are
+exercised. `test/boundary-finding-retention.test.ts` additionally checks repeated
+references to the same diagnostic object, preserving multiplicity.
+
+This does not cover detector completeness, implication suppression, shared-diagnostic
+aggregation, rendered text, intentional top-N display truncation, arbitrary cap
+numbers outside nonnegative integers, or all possible reporter keys. Counterexample
+assertions document present behavior; green does not mean global losslessness.

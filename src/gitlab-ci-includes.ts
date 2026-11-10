@@ -1,7 +1,8 @@
 import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { readTextFile } from "./read-text-file.ts";
-import { isMap, isScalar, isSeq, parseDocument, type Node } from "./yaml.ts";
+import { isMap, isScalar, isSeq, type Node } from "./yaml.ts";
+import { parseCiYaml } from "./ci-yaml.ts";
 import type { AnalysisWarning } from "./types.ts";
 
 /** Discover literal, unconditional, repository-local includes; never fetch or execute. */
@@ -38,7 +39,7 @@ export async function collectGitlabLocalIncludes(
       if ((await stat(filePath)).size > 5_000_000) {
         return;
       }
-      const doc = parseDocument(await readTextFile(filePath));
+      const doc = parseCiYaml(await readTextFile(filePath), "gitlab-ci");
       if (doc.errors.length > 0 || !isMap(doc.contents)) {
         return;
       }

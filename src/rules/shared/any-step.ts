@@ -91,7 +91,7 @@ const commandEntryCollectors: Record<string, CIDocumentNormalizer<CIDocument>> =
       for (let i = 0; i < scriptLines.length; i++) {
         entries.push({
           text: scriptLines[i]!,
-          node: undefined,
+          node: job.scriptNodes?.[i] ?? job.scriptNode,
           jobName: job.name,
           stepName: job.name,
           workingDirectory: undefined,

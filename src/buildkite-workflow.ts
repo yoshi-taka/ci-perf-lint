@@ -1,7 +1,7 @@
 import path from "node:path";
+import { parseCiYaml } from "./ci-yaml.ts";
 import {
   LineCounter,
-  parseDocument,
   type ParsedDocument,
   type Node,
   type Pair,
@@ -279,7 +279,7 @@ export function parsePipeline(
   const lineCounter = new LineCounter();
   let yamlDocument: ParsedDocument;
   try {
-    yamlDocument = parseDocument(source, { lineCounter });
+    yamlDocument = parseCiYaml(source, "buildkite", lineCounter);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to parse pipeline ${relativePath}: ${detail}`);

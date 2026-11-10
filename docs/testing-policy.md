@@ -74,6 +74,25 @@
 - If a fixture needs to model an exception case rather than a positive or clean baseline, prefer a descriptive suffix that still preserves the scenario stem, for example `deep-checkout-mutating-action` or `clean-no-findings`.
 - Before adding a new fixture, check whether an existing `*-like` or `*-ok` fixture already expresses the same repository shape closely enough.
 
+## CI YAML aliases and merges
+
+`src/ci-yaml.ts` separates CI dialect policy from the generic YAML parser.
+GitHub Actions/Depot resolve aliases without map merges; CircleCI, GitLab CI,
+and Buildkite resolve aliases and map merges. Discovery and document extraction
+must use the same resolved AST, retaining definition-site source ranges.
+This is not full CI schema validation or implementation of GitLab `extends`/`!reference`.
+
+Tests must assert an inherited command reaches an actual registered rule, not
+just that parsing succeeds. Check explicit overrides before/after merges,
+multiple-source precedence, declaration-order alias binding, normal duplicate
+rejection, cycles, logical expansion/depth/work limits, and source locations.
+See `test/boundary-ci-yaml-references.test.ts` and
+`test/analyze-repository-yaml-inheritance.test.ts`.
+The fixture validity guard checks both independent YAML syntax and CI policy.
+
+Merge semantics references: [GitLab anchors](https://docs.gitlab.com/ci/yaml/yaml_optimization/#anchors),
+[Buildkite anchors/overrides](https://buildkite.com/docs/pipelines/integrations/plugins/using#overriding-yaml-anchors).
+
 ## Guard rule-specific absence assertions
 
 Use `analyzeRepositoryForRule(options, { id, severity })` from `test/helpers.ts` when a fixture is intended to exercise one rule's command/configuration behavior. It rejects suggestion tests outside exploratory mode and target-rule `gate-skipped`, `rule-error` or `collector-error` telemetry, so an empty result cannot silently pass for those reasons. Existing report callers can use `assertRuleTestReport(report, rule, mode)`.

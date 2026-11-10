@@ -1,7 +1,7 @@
 import path from "node:path";
+import { parseCiYaml } from "./ci-yaml.ts";
 import {
   LineCounter,
-  parseDocument,
   YAMLMap,
   type ParsedDocument,
   type Node,
@@ -304,11 +304,7 @@ export function parseCircleCi(
   const lineCounter = new LineCounter();
   let yamlDocument: ParsedDocument;
   try {
-    yamlDocument = parseDocument(source, {
-      lineCounter,
-      keepSourceTokens: true,
-      prettyErrors: true,
-    });
+    yamlDocument = parseCiYaml(source, "circleci", lineCounter);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to parse CircleCI config ${relativePath}: ${detail}`);

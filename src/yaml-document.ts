@@ -19,7 +19,7 @@ function children(value: unknown): unknown[] | undefined {
 }
 
 /** Resolve by AST order, not source offsets: redefined anchors and mutations matter. */
-function indexAliases(root: unknown): Map<Alias, Node | undefined> {
+export function indexAliases(root: unknown): Map<Alias, Node | undefined> {
   const targets = new Map<Alias, Node | undefined>();
   const names = new Map<string, Node>();
   const pending = [root];

@@ -1,7 +1,8 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { readTextFile } from "./read-text-file.ts";
-import { isMap, isScalar, isSeq, parseDocument } from "./yaml.ts";
+import { isMap, isScalar, isSeq } from "./yaml.ts";
+import { parseCiYaml } from "./ci-yaml.ts";
 import { circleciConfigReferences } from "./circleci-config-references.ts";
 import type { CircleCiDocument } from "./circleci-workflow.ts";
 import type { AnalysisWarning } from "./types.ts";
@@ -132,7 +133,7 @@ export async function collectCircleciConfigs(
       if ((await stat(file)).size > 5_000_000) {
         return;
       }
-      const doc = parseDocument(await readTextFile(file));
+      const doc = parseCiYaml(await readTextFile(file), "circleci");
       if (doc.errors.length || !isMap(doc.contents)) {
         return;
       }

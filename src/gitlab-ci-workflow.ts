@@ -1,7 +1,7 @@
 import path from "node:path";
+import { parseCiYaml } from "./ci-yaml.ts";
 import {
   LineCounter,
-  parseDocument,
   type ParsedDocument,
   type Node,
   type Pair,
@@ -53,6 +53,7 @@ export interface GitlabCiJob {
   stageNode?: Node;
   script?: string[];
   scriptNode?: Node;
+  scriptNodes?: Node[];
   image?: string;
   imageNode?: Node;
   timeout?: string;
@@ -167,6 +168,29 @@ function getBool(node: Node | undefined): boolean | undefined {
   return undefined;
 }
 
+function collectScriptCommands(node: Node | undefined): { text: string; node: Node }[] {
+  const commands: { text: string; node: Node }[] = [];
+  const pending: unknown[] = [node];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (
+      isScalar(current) &&
+      typeof current.value === "string" &&
+      (current.tag === undefined || current.tag === "tag:yaml.org,2002:str")
+    ) {
+      commands.push({ text: current.value, node: current });
+    } else if (
+      isSeq(current) &&
+      (current.tag === undefined || current.tag === "tag:yaml.org,2002:seq")
+    ) {
+      for (let i = current.items.length - 1; i >= 0; i--) {
+        pending.push(current.items[i]);
+      }
+    }
+  }
+  return commands;
+}
+
 function parseJob(item: YAMLMap<unknown, unknown>, jobName: string): GitlabCiJob {
   const stageNode = getNode(item, "stage");
   const scriptNode = getNode(item, "script");
@@ -181,7 +205,7 @@ function parseJob(item: YAMLMap<unknown, unknown>, jobName: string): GitlabCiJob
 
   const parallelValue = getScalarString(parallelNode);
   const parallelNum = parallelValue ? parseInt(parallelValue, 10) : undefined;
-  const script = getScalarOrStringArray(scriptNode);
+  const commands = collectScriptCommands(scriptNode);
 
   return {
     node: item,
@@ -189,8 +213,9 @@ function parseJob(item: YAMLMap<unknown, unknown>, jobName: string): GitlabCiJob
     nameNode: isNode(item) ? undefined : undefined,
     stage: getScalarString(stageNode),
     stageNode,
-    script: typeof script === "string" ? [script] : script,
+    script: commands.length ? commands.map((command) => command.text) : undefined,
     scriptNode,
+    scriptNodes: commands.length ? commands.map((command) => command.node) : undefined,
     image: getScalarString(imageNode),
     imageNode,
     timeout: getScalarString(timeoutNode),
@@ -224,7 +249,7 @@ export function parseGitlabCi(
   const lineCounter = new LineCounter();
   let yamlDocument: ParsedDocument;
   try {
-    yamlDocument = parseDocument(source, { lineCounter });
+    yamlDocument = parseCiYaml(source, "gitlab-ci", lineCounter);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to parse GitLab CI config ${relativePath}: ${detail}`);

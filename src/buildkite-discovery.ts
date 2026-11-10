@@ -1,7 +1,8 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { readTextFile } from "./read-text-file.ts";
-import { isMap, isScalar, isSeq, parseDocument } from "./yaml.ts";
+import { isMap, isScalar, isSeq } from "./yaml.ts";
+import { parseCiYaml } from "./ci-yaml.ts";
 
 export function buildkiteDirectoryForPath(filePath: string): string | undefined {
   let directory = filePath;
@@ -27,7 +28,7 @@ async function looksLikePipeline(filePath: string): Promise<boolean> {
     return false;
   }
   const source = await readTextFile(filePath);
-  const doc = parseDocument(source);
+  const doc = parseCiYaml(source, "buildkite");
   if (isMap(doc.contents) && isSeq(doc.contents.get("steps", true))) {
     return true;
   }
