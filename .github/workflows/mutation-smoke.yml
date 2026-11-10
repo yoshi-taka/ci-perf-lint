@@ -31,3 +31,6 @@ jobs:
 
       - name: Mutation smoke (core)
         run: bun run test:slow:mutation:smoke
+
+      - name: Mutation smoke (shell evidence, sandboxed)
+        run: bun run test:slow:mutation:shell-evidence

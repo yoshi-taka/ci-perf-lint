@@ -43,6 +43,14 @@ Use this path when a finding can be detected from a single workflow plus already
 8. Add focused fixtures under `test/fixtures/`.
 9. Add or update repository analysis tests under `test/analyze-repository-*.test.ts`.
 
+For command-driven evidence, exemptions, or skip conditions, also add a scenario to
+`test/analyze-repository-shell-evidence-metamorphic.test.ts`. The shared helper checks
+real execution against echo/printf/comments and harmless-log insertion, through the
+final analyzer (including gates and collectors). Declare a positive baseline and
+explicit literal counts; configuration-based findings need not disappear. Run
+`bun run test:shell-evidence`. See [Testing Policy](./testing-policy.md#shell-evidence-commands-are-not-printed-examples)
+for the required controls and the separate Stryker command that tests their strength.
+
 Minimal shape:
 
 ```ts
@@ -100,6 +108,11 @@ Use this path when the finding needs repository files, package metadata, source 
 8. Add or update the matching explainer under `docs/rules/`.
 9. Add focused fixtures under `test/fixtures/`.
 10. Add or update repository analysis tests under `test/analyze-repository-*.test.ts`.
+
+The same shell-evidence contract applies to collectors, repository signals, and
+cross-workflow precedents when they use command text. Testing only a workflow rule
+does not cover its package-script or repository counterpart. Keep structured config
+and meaningful environment writes as explicit controls.
 
 Minimal shape:
 

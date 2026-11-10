@@ -174,14 +174,14 @@ paramsDef → ParamSpec[] → generatePairwise() → combinations[]
 ## Mutation Testing (Stryker)
 
 - Mutation testing via Stryker for targeted source files where correctness is critical.
-- Configs: `stryker/stryker.{core,helper,repo,renderer}.config.mjs`.
+- Configs: `stryker/stryker.*.config.mjs`; each config's `mutate` list is the coverage boundary, not every rule in the repository.
 - Run: `bun run test:slow:mutation` (not in default `bun test` path; intentionally slow).
-- Covered modules:
-  - `src/finding-grouping.ts`, `src/repository-package-helpers.ts`, `src/cli-option-resolver.ts`
-  - `src/reporters.ts`, `src/reporters-render.ts`, `src/rule-engine/`
-  - `src/repo.ts`, `src/repository-signals.ts`, `src/rules/*.ts`
+- Targets include core helpers, workflow/rule-engine paths, repository finding utilities, reporter paths, and a separate shell-evidence target. Inspect the config rather than assuming a whole directory is mutated.
 - Add a new Stryker config when adding a new module whose mutation coverage should be tracked.
 - Use `command` test runner with a focused test command to keep per-config runs fast.
+- Shell evidence: `bun run test:slow:mutation:shell-evidence` mutates `shell-invocations.ts` and runs the shell-evidence contract tests. It uses a sandbox (`inPlace: false`), so source files in the working tree are not temporarily rewritten. The sandbox excludes `tsconfig.json`: Bun runs the tests without it, avoiding Stryker's TypeScript 7 TSConfig API incompatibility. Type checking still belongs to `bun run lint`.
+- `.github/workflows/mutation-smoke.yml` runs core then shell-evidence smoke steps in one job weekly and on manual dispatch, sharing checkout and dependency setup. The ordinary PR test job runs the input-transformation tests, not the slow mutation run.
+- Mutation testing changes **implementation** to check test strength; it does not automatically supply **input** transformations such as adding an echo. Both are needed.
 
 ## Metamorphic / Differential Testing
 
@@ -211,10 +211,49 @@ paramsDef → ParamSpec[] → generatePairwise() → combinations[]
 
 - Prefer comparisons of normalized structures over raw string equality.
 - Use `toEqual` for structural equality after normalization.
-- Keep metamorphic tests in `test/boundary-metamorphic.test.ts`. Add new relations
-  as new `test()` blocks in the existing `describe("metamorphic relations")` block.
+- Keep general pipeline relations in `test/boundary-metamorphic.test.ts`. Shell-evidence relations have the dedicated suite below; do not grow the general file into a rule-regression catch-all.
 - Avoid re-testing individual rule logic. Metamorphic tests target cross-cutting
   pipeline invariants (partitioning, ordering, rendering), not rule correctness.
+
+### Shell evidence: commands are not printed examples
+
+These three inputs are not equivalent executions:
+
+```sh
+npm install          # executes
+echo 'npm install'   # only prints
+# npm install        # only comments
+```
+
+Use `test/shell-evidence-metamorphic.ts` and register a minimal scenario in
+`test/analyze-repository-shell-evidence-metamorphic.test.ts` when adding or changing
+command evidence, skip/exemption logic, or repository collectors driven by commands.
+
+The shared contract automatically checks:
+
+1. **A positive baseline really fires.** Declare explicit counts per rule/scope. An always-empty detector must fail the test.
+2. **Harmless logs do not change diagnostics.** Prepend and append generated echo, printf, and shell-comment variants of install/build/meta/history/builder-state text. Compare finding identity, severity, confidence, score, explanation, and suggestion. Line/column offsets are ignored. Only source-quoting messages may opt out of message equality with `messageIncludesSource`; other fields remain checked.
+3. **Printed commands do not become execution.** Replace the selected executable text with generated single-quoted echo/printf or comments. Declare `literalCount` for each affected rule/scope; it is not automatically zero. Real action/configuration evidence may still justify a finding.
+4. **Actual substitutions stay executable.** Set `executableSubstitution` when that rule models it. Double quotes do not make `$(...)` or backticks harmless. Keep separate conservative guard tests where substitutions make execution unknown, such as job-wide runner portability.
+5. **A failed/skipped analysis is not a passing negative control.** Parser/rule/collector failures, target gate skips, and truncation fail the contract. Suggestions always use exploratory mode.
+
+The command is `bun run test:shell-evidence`. The test files are also included in
+the normal `bun run test`, so PR CI enforces the contract without a separate opt-in.
+Initial scenarios cover runner safety/severity, meta/timeout gates, sparse scope,
+Elixir, CDK, container installs, persistent Docker targets, mise/tox collectors, and
+ESLint/tsc package scripts. This is a growing registry, not proof that every rule or
+CI dialect has exhaustive coverage. Keep existing focused and cross-platform tests.
+
+Do **not** label all echo/printf statements harmless: a recognized write to
+`$GITHUB_ENV` has an effect and needs its own positive control. Structured checkout,
+agent/build actions, configuration files, and meaningful intent names must not be
+deleted merely to force a zero-finding assertion. Do not weaken unknown-script or
+custom-shell guards to make the invariance test pass.
+
+After a mutation survives, inspect the concrete change: add a meaningful positive/
+negative control if behavior was untested, or document an equivalent mutant. Do not
+raise coverage claims from a raw mutation score or disable transformations simply
+to turn the run green.
 
 ## `analysisWarnings` map
 
