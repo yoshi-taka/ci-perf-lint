@@ -17,6 +17,20 @@
 
 ---
 
+## リリースノート
+
+PR は必須にしない。リリース前にエージェントが前回公開タグからリリース対象 commit までを整理し、利用者向けのドラフトを作る。
+
+1. 比較元・比較先を明記し、commit 履歴と実際の差分を確認する。未リリースの変更を混ぜない。
+2. 利用者への影響で「新機能 / 改善 / 修正 / 注意点」に分類する。該当しない見出しは省略する。
+3. 各項目は「何ができるようになったか / 何が直ったか」を短く説明する。内部リファクタ・テスト追加・依存更新は原則省略し、利用者に影響する場合だけ載せる。
+4. 破壊的変更・設定変更・移行手順があれば「注意点」に明記する。末尾にタグ間の比較リンクを添える。commit 一覧そのものを本文にしない。
+5. ユーザーがドラフトを確認する。公開の許可を得てから、CI が作成した GitHub Release の本文を確認済みノートで置き換え、反映を確認する。
+
+現行 workflow は本文を自動生成するため、この置き換えは別途必要。ノート作成だけでは commit / tag / push / publish の許可にはならない。
+
+---
+
 ## Method 1: tag push (安定版 / prerelease 共通)
 
 完全自動。version bump から tag push までをローカルで行い、CI が publish + release する。
@@ -76,7 +90,7 @@ git push origin v<version>
 |---|------|------|------|
 | 1 | Checkout | tag commit を checkout | |
 | 2 | Setup Node | Node 24 + npm registry | |
-| 3 | Setup Bun | Bun 1.4.2 | |
+| 3 | Setup Bun | Bun 1.4.4 | |
 | 4 | Install | `bun install --frozen-lockfile` | lockfile 未コミットだと失敗 |
 | 5 | Build | `bun run build` | `dist/cli.js` を生成 |
 | 6 | Sync wrapper | tag と root version の一致を確認し、wrapper の version + dep を同期 | `"*"` → `"<version>"` |
@@ -89,7 +103,7 @@ git push origin v<version>
 ### 注意
 
 - tag push 時は **Verify step が実行されない**（lint / test / audit / smoke test はスキップ）。必ず事前にローカルで確認すること。
-- CI が作成する GitHub Release の本文は自動生成（commit 履歴ベース）。
+- CI が作成する GitHub Release の初期本文は自動生成（commit 履歴ベース）。公開許可後、上記の確認済みリリースノートで置き換える。
 - 同梱物は `dist/`, `README.md`, `LICENSE`（`package.json` の `files` フィールドによる）。
 - 依存を変更したら必ず `bun install` で `bun.lock` を更新し、`package.json` と同じ commit に含めること。片方だけ push すると CI / publish の frozen install が失敗する（pre-push の `lockfile-sync` で検出）。
 
@@ -137,6 +151,6 @@ tag push との差分:
 
 - **`git push --tags` 禁止**: すべてのローカル tag が送信され、古い version の publish workflow が複数同時に発火する。必ず `git push origin v<特定のversion>` で 1 つずつ push する。
 - **workspace 非対応**: `packages/ci-perf-lint` は root の `workspaces` に含まれていない。依存解決は CI の Sync ステップに委ねている。
-- **CI 上の Bun version**: `1.4.2` 固定。ローカルと異なる場合は `publish.yml` の `bun-version` を更新すること。
+- **CI 上の Bun version**: `1.4.4` 固定。ローカルと異なる場合は `publish.yml` の `bun-version` を更新すること。
 - **publish → docs deploy**: publish workflow の完了後、別の CI workflow でドキュメントサイト（Astro）が自動デプロイされる。
 - **publish 失敗時**: tag workflow は同じ version のまま再実行できる。公開済み package をスキップし、未公開の package を公開する。registry の通信・認証エラーは「未公開」とみなさず停止する。dispatch で再実行する場合は意図せず再 bump しないよう入力を確認する。
