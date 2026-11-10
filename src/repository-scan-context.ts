@@ -39,6 +39,16 @@ const DEFAULT_IGNORED_DIRECTORIES = new Set([
   ".terraform",
 ]);
 
+function buildIgnoredDirectoryPattern(directories: ReadonlySet<string>): RegExp {
+  if (directories.size === 0) {
+    return /$^/;
+  }
+  const names = [...directories]
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  return new RegExp(`(?:^|/)(?:${names})(?:/|$)`);
+}
+
 export class LruMap<K, V> extends Map<K, V> {
   readonly #maxSize: number;
   readonly #ttl: number;
@@ -106,6 +116,7 @@ export class RepositoryScanContext {
   readonly #walkFileLoads = new LruMap<string, Promise<string[]>>(64);
   readonly #parsedMakefileLoads = new LruMap<string, Promise<ParsedMakefile | null>>(64);
   #rgFileListPromise: Promise<string[] | null> | null = null;
+  #rgFileDirectories: readonly string[] | null = null;
   #filePathSet: Set<string> | null | undefined;
   #hasGitDir: boolean | undefined;
   static #rgPath: string | null | undefined;
@@ -316,24 +327,24 @@ export class RepositoryScanContext {
     const rgFiles = await this.#getRgFileList();
     if (rgFiles !== null) {
       const prefix = relativeDir === "." ? "" : `${relativeDir}/`;
-      for (const relativePath of rgFiles) {
+      const directories = (await this.#getRgFileDirectories()) ?? [];
+      const ignoredDirectoryPattern = buildIgnoredDirectoryPattern(ignoredDirectories);
+      for (let index = 0; index < rgFiles.length; index++) {
+        const relativePath = rgFiles[index]!;
         if (!relativePath.startsWith(prefix)) {
           continue;
         }
 
-        if (
-          relativePath
-            .replace(/\\/g, "/")
-            .split("/")
-            .slice(0, -1)
-            .some((segment) => ignoredDirectories.has(segment))
-        ) {
+        if (!include(relativePath)) {
           continue;
         }
 
-        if (include(relativePath)) {
-          yield relativePath;
+        const directory = directories[index] ?? "";
+        if (directory !== "" && ignoredDirectoryPattern.test(directory)) {
+          continue;
         }
+
+        yield relativePath;
       }
 
       return;
@@ -427,6 +438,19 @@ export class RepositoryScanContext {
       cacheKey: "python-files",
       include: (relativePath) => /\.py$/i.test(relativePath),
     });
+  }
+
+  async #getRgFileDirectories(): Promise<readonly string[] | null> {
+    const files = await this.#getRgFileList();
+    if (files === null) {
+      return null;
+    }
+    this.#rgFileDirectories ??= files.map((file) => {
+      const normalized = file.replace(/\\/g, "/");
+      const lastSlash = normalized.lastIndexOf("/");
+      return lastSlash < 0 ? "" : normalized.slice(0, lastSlash);
+    });
+    return this.#rgFileDirectories;
   }
 
   async #getRgFileList(): Promise<string[] | null> {
@@ -630,6 +654,7 @@ export class RepositoryScanContext {
     this.#walkFileLoads.clear();
     this.#parsedMakefileLoads.clear();
     this.#rgFileListPromise = null;
+    this.#rgFileDirectories = null;
     this.#filePathSet = undefined;
     this.#hasGitDir = undefined;
   }
