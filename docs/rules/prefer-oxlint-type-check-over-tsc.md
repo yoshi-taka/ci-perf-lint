@@ -4,11 +4,11 @@ Workflow and package-script evidence requires an executed tsc invocation with it
 
 ## Why it matters
 
-Oxlint's type-aware mode runs the TypeScript type checker (tsgolint) inside the same TypeScript program it uses for linting. That means one pass can both lint and report type errors, replacing a separate `tsc --noEmit` step and avoiding the duplicate program setup and analysis.
+Oxlint's type-aware mode runs a TypeScript type checker inside the same TypeScript program it uses for linting. That means one pass can both lint and report type errors, replacing a separate `tsc --noEmit` step and avoiding the duplicate program setup and analysis.
 
 - `oxlint --type-aware` enables rules that need type information.
 - `oxlint --type-check` additionally reports TypeScript compiler diagnostics, so the Oxc docs describe it as able to replace a separate `tsc --noEmit` step in CI.
-- tsgolint v7 (stable, 2026-07) is built on the TypeScript 7 native compiler (`typescript-go`), covers 59 of 61 typescript-eslint type-aware rules, and benchmarks 12-18x faster than ESLint plus typescript-eslint on large TypeScript codebases. TypeScript 7.0+ is required.
+- The backend is tsgolint v7 (stable, 2026-07; built on the TypeScript 7 native compiler, `typescript-go`) or the newer `tsrs` Rust port. Oxlint 1.92+ prefers `tsrs-lint` when `tsrs` is installed and falls back to tsgolint. Both cover 59 of 61 typescript-eslint type-aware rules, and tsgolint benchmarks 12-18x faster than ESLint plus typescript-eslint on large TypeScript codebases. TypeScript 7.0+ is required.
 
 ## What it flags
 
@@ -24,14 +24,14 @@ It only fires when oxlint is a repository dependency. `tsc -b` / `tsc --build` c
 Folding type checking into oxlint requires:
 
 - A current oxlint. The `typeAware` / `typeCheck` config options were added in oxlint 1.51.0; use the latest release.
-- `oxlint-tsgolint@7` installed as a dev dependency (the type-aware engine).
-- TypeScript 7.0+. Type-aware linting is powered by `typescript-go`, and tsgolint is built on TypeScript 7. Some legacy `tsconfig` options are unsupported (for example `baseUrl`), and options deprecated in TypeScript 6.0 / removed in 7.0 must be migrated first (see `ts5to6`).
+- `oxlint-tsgolint@7` or `tsrs` installed as a dev dependency (the type-aware engine; oxlint 1.92+ prefers `tsrs-lint` when `tsrs` is present).
+- TypeScript 7.0+. Type-aware linting is powered by `typescript-go` (tsgolint) or the `tsrs` Rust port, both built on TypeScript 7. Some legacy `tsconfig` options are unsupported (for example `baseUrl`), and options deprecated in TypeScript 6.0 / removed in 7.0 must be migrated first (see `ts5to6`).
 
 The finding message states which prerequisite is still missing for the repository.
 
 ## Suggested action
 
-Confirm oxlint and `oxlint-tsgolint` are current, then replace the separate tsc type-check with `oxlint --type-aware --type-check` on the lint step and remove the redundant tsc invocation. Keep any separate declaration/build emit.
+Confirm oxlint and the type-aware backend (`oxlint-tsgolint` or `tsrs`) are current, then replace the separate tsc type-check with `oxlint --type-aware --type-check` on the lint step and remove the redundant tsc invocation. Keep any separate declaration/build emit.
 
 ## Verification
 

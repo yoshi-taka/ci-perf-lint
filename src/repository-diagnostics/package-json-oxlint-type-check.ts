@@ -76,7 +76,7 @@ export async function collectPackageJsonOxlintTypeCheckDiagnostics(
         why: oxlintTypeCheckWhy,
         suggestion,
         measurementHint: oxlintTypeCheckMeasurementHint,
-        aiHandoff: `Review package.json script "${scriptName}". Confirm oxlint and oxlint-tsgolint are current, then replace the standalone tsc type-check with \`oxlint --type-aware --type-check\` and remove the redundant tsc invocation. Keep any separate declaration/build emit.`,
+        aiHandoff: `Review package.json script "${scriptName}". Confirm oxlint and the type-aware backend (\`oxlint-tsgolint\` or \`tsrs\`) are current, then replace the standalone tsc type-check with \`oxlint --type-aware --type-check\` and remove the redundant tsc invocation. Keep any separate declaration/build emit.`,
         score: 45,
       }),
     );

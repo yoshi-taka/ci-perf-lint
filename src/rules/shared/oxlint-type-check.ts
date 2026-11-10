@@ -52,7 +52,7 @@ function meetsTypeScript7(typescript: RepositorySignals["typescript"]): boolean 
 }
 
 export const oxlintTypeCheckWhy =
-  "Oxlint's type-aware mode runs the TypeScript type checker (tsgolint) inside the same program as linting, so it can replace a separate `tsc --noEmit` step and avoid the duplicate setup and analysis. tsgolint v7 is built on the TypeScript 7 native compiler (typescript-go), covers 59 of 61 typescript-eslint type-aware rules, and is 12-18x faster than ESLint plus typescript-eslint on large TypeScript codebases. TypeScript 7.0+ is required, and some legacy tsconfig options (for example `baseUrl`) are unsupported.";
+  "Oxlint's type-aware mode runs a TypeScript type checker inside the same program as linting, so it can replace a separate `tsc --noEmit` step and avoid the duplicate setup and analysis. The backend is `tsgolint` v7 (the TypeScript 7 native compiler, typescript-go) or the newer `tsrs` Rust port, which oxlint 1.92+ prefers when installed; both cover 59 of 61 typescript-eslint type-aware rules, and tsgolint benchmarks 12-18x faster than ESLint plus typescript-eslint on large TypeScript codebases. TypeScript 7.0+ is required, and some legacy tsconfig options (for example `baseUrl`) are unsupported.";
 
 export const oxlintTypeCheckMeasurementHint =
   "Compare CI type-check wall-clock time and reported type errors before and after folding tsc --noEmit into oxlint --type-aware --type-check.";
@@ -62,8 +62,8 @@ function oxlintTypeCheckPrerequisite(repository: RepositorySignals): string {
   if (!meetsMinimumOxlint(repository.eslint)) {
     needs.push("upgrade oxlint to a current release (>=1.51.0; latest recommended)");
   }
-  if (!repository.eslint.hasOxlintTsgolint) {
-    needs.push("add `oxlint-tsgolint@7` as a dev dependency");
+  if (!repository.eslint.hasOxlintTypeAwareBackend) {
+    needs.push("add `oxlint-tsgolint@7` or `tsrs` as a dev dependency");
   }
   if (!meetsTypeScript7(repository.typescript)) {
     needs.push(

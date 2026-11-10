@@ -582,6 +582,20 @@ describe("analyzeRepository repo-aware and tooling rules: javascript repository 
       );
     });
 
+    test("accepts tsrs as the type-aware backend", async () => {
+      const report = await getFixtureReport(
+        fixtures.preferOxlintTypeCheckOverTscTsrsLike,
+        baseOptions,
+      );
+
+      const repositoryFinding = report.findings.find(
+        (c) => c.ruleId === "prefer-oxlint-type-check-over-tsc" && c.scope === "repository",
+      );
+      expect(repositoryFinding).toBeDefined();
+      expect(repositoryFinding?.suggestion).not.toContain("oxlint-tsgolint");
+      expect(repositoryFinding?.suggestion).toContain("already meet the type-check prerequisites");
+    });
+
     test("skips when oxlint is not a dependency", async () => {
       const report = await getFixtureReport(
         fixtures.preferOxlintTypeCheckOverTscNoOxlint,

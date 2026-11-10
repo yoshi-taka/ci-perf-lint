@@ -532,7 +532,7 @@ export async function collectRepositorySignals(
         usesImportXPlugin: false,
         usesNoBarrelFilesPlugin: false,
         usesBarrelFilesPlugin: false,
-        hasOxlintTsgolint: false,
+        hasOxlintTypeAwareBackend: false,
       },
     ),
     collectSignalIf(hasPrettierEvidence, "prettier", context, collectPrettierSignals, {

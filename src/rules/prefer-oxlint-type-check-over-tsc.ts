@@ -53,7 +53,7 @@ export const preferOxlintTypeCheckOverTscRule = {
             why: oxlintTypeCheckWhy,
             suggestion,
             measurementHint: oxlintTypeCheckMeasurementHint,
-            aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Confirm oxlint and oxlint-tsgolint are current, then replace the separate tsc type-check step with \`oxlint --type-aware --type-check\` on the lint step and remove the redundant tsc invocation. Keep any declaration/build emit that is separate from type checking.`,
+            aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Confirm oxlint and the type-aware backend (\`oxlint-tsgolint\` or \`tsrs\`) are current, then replace the separate tsc type-check step with \`oxlint --type-aware --type-check\` on the lint step and remove the redundant tsc invocation. Keep any declaration/build emit that is separate from type checking.`,
             score: 47,
           }),
         ];

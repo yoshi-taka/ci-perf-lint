@@ -23,6 +23,7 @@ const fixtureNames = {
   pnpmVersionOk: "pnpm-version-ok",
   preferOxlintTypeCheckOverTscOk: "prefer-oxlint-type-check-over-tsc-ok",
   preferOxlintTypeCheckOverTscNoOxlint: "prefer-oxlint-type-check-over-tsc-no-oxlint",
+  preferOxlintTypeCheckOverTscTsrsLike: "prefer-oxlint-type-check-over-tsc-tsrs-like",
   blobNoneAgenticDocsEditLike: "blob-none-agentic-docs-edit-like",
   blobNoneBuildWithFlagsLike: "blob-none-build-with-flags-like",
   blobNoneChangelogActionLike: "blob-none-changelog-action-like",

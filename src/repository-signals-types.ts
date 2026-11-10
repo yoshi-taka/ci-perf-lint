@@ -135,7 +135,7 @@ export interface RepositorySignals {
     oxlintVersionSpec?: string;
     oxlintMajor?: number;
     oxlintMinor?: number;
-    hasOxlintTsgolint: boolean;
+    hasOxlintTypeAwareBackend: boolean;
   };
   prettier: {
     usesPrettier: boolean;

@@ -311,7 +311,7 @@ export async function collectEslintSignals(
   let usesImportXPlugin = false;
   let usesNoBarrelFilesPlugin = false;
   let usesBarrelFilesPlugin = false;
-  let hasOxlintTsgolint = false;
+  let hasOxlintTypeAwareBackend = false;
   let oxlintVersionSpec: string | undefined;
   let eslintVersionSpec: string | undefined;
 
@@ -326,7 +326,9 @@ export async function collectEslintSignals(
     eslintVersionSpec ??= packageJsonDependencyVersionSpec(packageJson, "eslint");
     usesOxlint ||= packageJsonHasDependency(packageJson, "oxlint");
     oxlintVersionSpec ??= packageJsonDependencyVersionSpec(packageJson, "oxlint");
-    hasOxlintTsgolint ||= packageJsonHasDependency(packageJson, "oxlint-tsgolint");
+    hasOxlintTypeAwareBackend ||=
+      packageJsonHasDependency(packageJson, "oxlint-tsgolint") ||
+      packageJsonHasDependency(packageJson, "tsrs");
     collectPluginNamesFromPackageJson(packageJson, pluginNames);
     usesPrettierPlugin ||= packageJsonHasDependency(packageJson, "eslint-plugin-prettier");
     usesPrettierRecommendedConfig ||= textMentionsPrettierRecommendedConfig(packageJsonText);
@@ -398,7 +400,7 @@ export async function collectEslintSignals(
     oxlintVersionSpec,
     oxlintMajor: oxlintParsed.major,
     oxlintMinor: oxlintParsed.minor,
-    hasOxlintTsgolint,
+    hasOxlintTypeAwareBackend,
   };
 }
 
