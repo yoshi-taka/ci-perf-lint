@@ -64,8 +64,9 @@
     "perf:mem": "bun --heap-prof --heap-prof-dir .profile src/cli.ts",
     "setup-hooks": "lefthook install",
     "test:related": "bun run scripts/test-related.ts",
-    "verify:formal": "bun run scripts/verify-formal.ts && bun run verify:formal:gates",
-    "verify:formal:gates": "AGENT=1 bun run scripts/verify-formal-gates.ts"
+    "verify:formal": "bun run scripts/verify-formal.ts && bun run verify:formal:gates && bun run verify:formal:gate-expr",
+    "verify:formal:gates": "AGENT=1 bun run scripts/verify-formal-gates.ts",
+    "verify:formal:gate-expr": "bun run scripts/verify-formal-gate-expr.ts"
   },
   "dependencies": {
     "oxc-parser": "^0.155.0",

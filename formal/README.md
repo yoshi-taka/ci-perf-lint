@@ -1,10 +1,10 @@
-# Lean pilot: evidence strength and gate pruning
+# Lean pilot: evidence strength, pruning, and gate expressions
 
 Run `bun run verify:formal` with Lean **4.35.0** installed (elan reads
 `formal/lean-toolchain`), or set `LEAN_BIN=/absolute/path/to/lean`.
 No Mathlib, Lake dependencies, or generated fixtures.
-Gate checks alone: `bun run verify:formal:gates`.
-CI runs both verifiers in the `formal` job; ordinary regression tests need no Lean.
+Individual checks: `bun run verify:formal:gates` or `bun run verify:formal:gate-expr`.
+CI runs all verifiers in the `formal` job; ordinary regression tests need no Lean.
 
 ## Scope and evidence
 
@@ -92,3 +92,60 @@ assumption is necessary; it does not assert a remaining production defect.
 
 Green now requires corrected no-loss behavior, not reproduction of known failures.
 Independent review remains outstanding for this pilot.
+
+## Ordered gate-expression semantics
+
+`GateExpr.lean` models `collector-types.ts` result evaluation and `gate-expr.ts`
+simplify/flatten operations at `c31cf22`. Production behavior is unchanged.
+The specified policy is **ordered fail-fast**, not commutative Boolean logic:
+
+| Left operand | AND | OR |
+|---|---|---|
+| resolved false | resolved false | right operand |
+| resolved true | right operand | resolved true |
+| skipped/error | left operand, same reason | left operand, same reason |
+
+NOT flips only resolved values; skipped/error and their reasons remain unchanged.
+The first unresolved operand wins, even if a later error or decisive Boolean
+exists. Legacy selection precedence is expression, nonempty gates array, single
+gate, then unrestricted true. Empty arrays fall through to the single gate.
+
+### Universal model proofs
+
+- `simplify_preserves_result`: deduplication and double-negation elimination
+  preserve the **exact** result, including arbitrary reason strings, for all
+  finite ASTs and assignments. The model also preserves TS's intentional failure
+  to recognize NOT nodes in `gatesEqual`.
+- `flattenAnd_preserves_result` / `flattenOr_preserves_result`: reassociation,
+  without operand reordering, preserves the exact result for all finite ASTs.
+- `resolved_agrees_with_boolean`: the result evaluator matches ordinary Boolean
+  evaluation when all gates are resolved. The Boolean API's missing=false default
+  is not a semantics for skipped/error; in particular, NOT skipped must not enable
+  a collector as NOT false would.
+- `not_skipped` / `not_error`: negation cannot turn an unresolved atom into true.
+
+### Counterexamples and policy boundary
+
+Lean proves ordering counterexamples: skipped OR true differs from true OR skipped;
+error AND false differs from false AND error. Distribution can change a resolved
+false into an error by evaluating an operand previously bypassed by short-circuiting.
+These prohibit otherwise familiar Boolean rewrites under the existing policy.
+They do **not** establish an active diagnostic omission: the currently registered
+OR expression uses Husky/tooling gates, both resolved by the current collector.
+Changing to an order-independent unknown/error policy needs a separate decision.
+
+### Executable comparison
+
+The bridge checks **26,752** expression/assignment pairs: all 411 ASTs of sizes
+1–5 over three gates plus seven targeted deeper ASTs, across all 64 assignments
+of false/true/skipped/error. Reasons differ by gate, so incorrect provenance is
+observable. For each pair it compares the real public collector evaluator, all
+three transformed AST shapes, and all transformed results against Lean.
+Another **7,744** legacy list cases cover lengths 0–4, including repeats and empty
+lists, and agreement with `gateExprFromLegacy`. **3,344** fully resolved expression
+cases additionally compare Boolean and traced evaluation results.
+
+`test/boundary-gate-result-semantics.test.ts` independently checks the result table,
+counterexamples, distinct reasons, transform invariance, legacy precedence, and
+actual right-operand reads. Lean's model is pure and total, so its proofs do not
+claim evaluation-count, getter/proxy, trace-shape, or resource-exhaustion guarantees.
