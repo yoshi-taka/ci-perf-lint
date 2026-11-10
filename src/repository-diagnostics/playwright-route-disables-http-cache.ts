@@ -13,19 +13,53 @@ const meta = {
 
 const sourceSuffixes = ["", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"];
 
+// Minified bundles and checked-in tool releases can be megabytes of one line.
+// Parsing them costs seconds and hundreds of MB while never containing tests.
+const MAX_SOURCE_LENGTH = 256 * 1024;
+
+const sourceFilePattern = /\.(?:[cm]?[jt]sx?)$/i;
+const declarationFilePattern = /\.d\.[cm]?ts$/i;
+const ignoredPathPattern =
+  /(?:^|\/)(?:node_modules|vendor|dist|build|coverage|\.next|\.turbo|\.yarn|assets|[^/]*-output)(?:\/|$)|\.min\.[cm]?js$/i;
+// `page.route(`, `context.route(` and `page["route"](`.
+const routeCallPattern = /\.route\s*\(|\[\s*["']route["']\s*\]/;
+const playwrightHintPattern = /playwright/i;
+const testPathPattern =
+  /(?:^|\/)(?:e2e|tests?|__tests__|playwright|support|fixtures|test-utils)(?:\/|$)|\.(?:spec|test)\.[cm]?[jt]sx?$/i;
+const localImportPattern = /(?:from\s*|import\s*\()\s*["']\.\.?\//;
+
+function shouldScanPath(path: string): boolean {
+  return (
+    sourceFilePattern.test(path) &&
+    !declarationFilePattern.test(path) &&
+    !ignoredPathPattern.test(path)
+  );
+}
+
+function isCandidateSource(path: string, source: string): boolean {
+  if (!routeCallPattern.test(source)) {
+    return false;
+  }
+  // The rule only concerns Playwright test and fixture modules. Skip unrelated
+  // sources that merely happen to call `.route()` (for example Express routers)
+  // instead of parsing every match.
+  return (
+    testPathPattern.test(path) ||
+    playwrightHintPattern.test(source) ||
+    localImportPattern.test(source)
+  );
+}
+
 export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
   const diagnostics: Diagnostic[] = [];
   const files = (await context.scanContext.walkFiles(".")).sort();
   const fileSet = new Set(files);
-  const sourceCache = new Map<string, string | undefined>();
 
   async function read(path: string): Promise<string | undefined> {
-    if (!sourceCache.has(path)) {
-      sourceCache.set(path, await context.fileIndex.readTextFile(path));
-    }
-    return sourceCache.get(path);
+    const source = await context.fileIndex.readTextFile(path);
+    return source !== undefined && source.length <= MAX_SOURCE_LENGTH ? source : undefined;
   }
 
   function resolveLocalImport(fromPath: string, specifier: string): string | undefined {
@@ -108,15 +142,11 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
   }
 
   for (const path of files) {
-    if (
-      !/\.(?:[cm]?[jt]sx?)$/.test(path) ||
-      /\.d\.[cm]?ts$/.test(path) ||
-      /(?:^|\/)(?:node_modules|vendor|dist|build|coverage|\.next)\//.test(path)
-    ) {
+    if (!shouldScanPath(path)) {
       continue;
     }
     const source = await read(path);
-    if (!source || !source.includes("route")) {
+    if (!source || !isCandidateSource(path, source)) {
       continue;
     }
     const facts = playwrightModuleFacts(path, source);

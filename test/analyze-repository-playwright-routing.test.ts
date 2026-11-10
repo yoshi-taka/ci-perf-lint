@@ -105,6 +105,19 @@ it('api', async ({ page }) => { await page.route('**/api', r => r.fulfill({ body
     expect(findings).toHaveLength(1);
   });
 
+  test("skips generated bundles and oversized sources", async () => {
+    const routeSource = `import { test } from '@playwright/test';
+test('api', async ({ page }) => { await page.route('/api', r => r.fulfill({ body: '{}' })); });`;
+    const findings = await scan({
+      ".yarn/releases/yarn-4.10.3.cjs": routeSource,
+      "assets/vendor.min.js": routeSource,
+      "e2e/oversized.spec.ts": `${routeSource}\n// ${"x".repeat(260 * 1024)}`,
+      "e2e/kept.spec.ts": routeSource,
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.location.path).toBe("e2e/kept.spec.ts");
+  });
+
   test("does not warn for fetch patches, unrelated routes, comments, or custom cross-file imports", async () => {
     const findings = await scan({
       "e2e/api.spec.ts": `import { test } from '@playwright/test';
