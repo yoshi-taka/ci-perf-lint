@@ -111,6 +111,7 @@ export async function collectJestSignals(
 
 export async function collectHuskySignals(
   context: RepositoryScanContext,
+  options: { resolveDependencyVersions?: boolean } = {},
 ): Promise<RepositorySignals["husky"]> {
   const hookFiles: RepositorySignals["husky"]["hookFiles"] = [];
   let usesHusky = false;
@@ -199,7 +200,10 @@ export async function collectHuskySignals(
       ? findPackageJsonDependencyLocation(packageJsonEntry.text, "husky")
       : { line: 1, column: 1 };
 
-    const versionSpec = await effectiveDependencyVersionSpec(context, "husky");
+    const versionSpec =
+      options.resolveDependencyVersions === false
+        ? undefined
+        : await effectiveDependencyVersionSpec(context, "husky");
     return {
       usesHusky,
       usesLintStaged,
@@ -209,13 +213,17 @@ export async function collectHuskySignals(
       multiCommandHookCount,
       lintStagedPatternCount,
       lintStagedCommandCount,
-      versionSpec,
-      ...(versionSpec ? parseSemverLikeVersionSpec(versionSpec) : {}),
-      versionLocation: {
-        path: packageJsonRelativePath,
-        line: versionLocation.line,
-        column: versionLocation.column,
-      },
+      ...(versionSpec
+        ? {
+            versionSpec,
+            ...parseSemverLikeVersionSpec(versionSpec),
+            versionLocation: {
+              path: packageJsonRelativePath,
+              line: versionLocation.line,
+              column: versionLocation.column,
+            },
+          }
+        : {}),
       hookFiles,
     };
   }

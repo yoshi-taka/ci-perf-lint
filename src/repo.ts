@@ -295,7 +295,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     githubWorkflows,
     jobSummaries,
     scanContext,
-    preparedWorkflows,
+    { additionalDocuments: preparedWorkflows, workflowOnly },
   );
   timer.mark("collect-repository-signals");
   analysisWarnings.push(...repositoryAnalysis.warnings);

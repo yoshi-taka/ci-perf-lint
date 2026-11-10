@@ -391,8 +391,13 @@ export async function collectRepositorySignals(
   workflows: WorkflowDocument[],
   sharedJobSummaries: JobSummary[],
   scanContext?: RepositoryScanContext,
-  additionalDocuments: AnyWorkflowDocument[] = [],
+  options: { additionalDocuments?: AnyWorkflowDocument[]; workflowOnly?: boolean } = {},
 ): Promise<{ signals: RepositorySignals; warnings: AnalysisWarning[] }> {
+  // Lockfile-backed versions are only consumed by repository diagnostics for
+  // some signals. Workflow-only runs skip those lookups to avoid parsing a
+  // multi-megabyte lockfile for values no workflow rule reads.
+  const resolveDependencyVersions = !options.workflowOnly;
+  const additionalDocuments = options.additionalDocuments ?? [];
   const warnings = scanContext?.warnings ?? [];
   const evidenceWorkflows = [
     ...workflows,
@@ -508,22 +513,28 @@ export async function collectRepositorySignals(
     elixirSignals,
     jvmSignals,
   ] = await Promise.all([
-    collectSignalIf(hasEslintEvidence, "eslint", context, collectEslintSignals, {
-      usesEslint: false,
-      usesOxlint: false,
-      hasConfig: false,
-      pluginNames: [],
-      unsupportedPluginNames: [],
-      usesCustomExtensions: false,
-      usesPrettierPlugin: false,
-      usesPrettierRecommendedConfig: false,
-      usesPrettierRule: false,
-      usesImportPlugin: false,
-      usesImportXPlugin: false,
-      usesNoBarrelFilesPlugin: false,
-      usesBarrelFilesPlugin: false,
-      hasOxlintTsgolint: false,
-    }),
+    collectSignalIf(
+      hasEslintEvidence,
+      "eslint",
+      context,
+      (ctx) => collectEslintSignals(ctx, { resolveDependencyVersions }),
+      {
+        usesEslint: false,
+        usesOxlint: false,
+        hasConfig: false,
+        pluginNames: [],
+        unsupportedPluginNames: [],
+        usesCustomExtensions: false,
+        usesPrettierPlugin: false,
+        usesPrettierRecommendedConfig: false,
+        usesPrettierRule: false,
+        usesImportPlugin: false,
+        usesImportXPlugin: false,
+        usesNoBarrelFilesPlugin: false,
+        usesBarrelFilesPlugin: false,
+        hasOxlintTsgolint: false,
+      },
+    ),
     collectSignalIf(hasPrettierEvidence, "prettier", context, collectPrettierSignals, {
       usesPrettier: false,
       usesOxfmt: false,
@@ -589,17 +600,23 @@ export async function collectRepositorySignals(
       minor: undefined,
       isPublishingTypeDefinitions: false,
     }),
-    collectSignalIf(hasHuskyEvidence, "husky", context, collectHuskySignals, {
-      usesHusky: false,
-      usesLintStaged: false,
-      hookFileCount: 0,
-      nonPreCommitHookCount: 0,
-      totalHookCommandCount: 0,
-      multiCommandHookCount: 0,
-      lintStagedPatternCount: 0,
-      lintStagedCommandCount: 0,
-      hookFiles: [],
-    }),
+    collectSignalIf(
+      hasHuskyEvidence,
+      "husky",
+      context,
+      (ctx) => collectHuskySignals(ctx, { resolveDependencyVersions }),
+      {
+        usesHusky: false,
+        usesLintStaged: false,
+        hookFileCount: 0,
+        nonPreCommitHookCount: 0,
+        totalHookCommandCount: 0,
+        multiCommandHookCount: 0,
+        lintStagedPatternCount: 0,
+        lintStagedCommandCount: 0,
+        hookFiles: [],
+      },
+    ),
     collectSignalIf(hasPythonEvidence, "hatch", context, collectHatchSignals, {
       usesHatch: false,
       usesUvInstaller: false,

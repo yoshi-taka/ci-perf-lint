@@ -297,6 +297,7 @@ async function loadExistingTextFiles(
 
 export async function collectEslintSignals(
   context: RepositoryScanContext,
+  options: { resolveDependencyVersions?: boolean } = {},
 ): Promise<RepositorySignals["eslint"]> {
   const pluginNames = new Set<string>();
   let usesEslint = false;
@@ -370,8 +371,10 @@ export async function collectEslintSignals(
   const unsupportedPluginNames = normalizedPluginNames.filter(
     (pluginName) => !supportedOxlintPluginNames.has(pluginName),
   );
-  eslintVersionSpec = await effectiveDependencyVersionSpec(context, "eslint");
-  oxlintVersionSpec = await effectiveDependencyVersionSpec(context, "oxlint");
+  if (options.resolveDependencyVersions !== false) {
+    eslintVersionSpec = await effectiveDependencyVersionSpec(context, "eslint");
+    oxlintVersionSpec = await effectiveDependencyVersionSpec(context, "oxlint");
+  }
   const oxlintParsed = oxlintVersionSpec ? parseSemverLikeVersionSpec(oxlintVersionSpec) : {};
   const eslintParsed = eslintVersionSpec ? parseSemverLikeVersionSpec(eslintVersionSpec) : {};
 
