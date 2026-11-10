@@ -21,6 +21,41 @@ permissions:
   contents: read
 
 jobs:
+  formal:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install pinned elan
+        run: |
+          dir=$(mktemp -d "$RUNNER_TEMP/formal-elan.XXXXXX")
+          curl --fail --location --silent --show-error \
+            https://github.com/leanprover/elan/releases/download/v4.2.4/elan-aarch64-unknown-linux-gnu.tar.gz \
+            --output "$dir/elan.tar.gz"
+          echo "05febd124d84ebf994b2e7479922a5650b1e950c17ae3bd1ddd776b65bb72bf9  $dir/elan.tar.gz" | sha256sum --check
+          tar -xzf "$dir/elan.tar.gz" -C "$dir"
+          "$dir/elan-init" -y --no-modify-path --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Lean toolchain
+        uses: actions/cache@v5
+        with:
+          path: ~/.elan/toolchains
+          key: lean-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('formal/lean-toolchain') }}
+
+      - name: Prove models and compare real implementations
+        run: bun run verify:formal
+
   checks:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 20

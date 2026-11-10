@@ -18,6 +18,7 @@ import {
 import { meetsMinimum } from "../rules/shared/evidence.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
+import { pruneGateDescendants } from "./gate-pruning.ts";
 
 interface AdjacencyList {
   successors: Map<GateKey, readonly GateKey[]>;
@@ -68,9 +69,7 @@ export function buildDag(prerequisites: Partial<Record<GateKey, GateKey[]>>): Ad
 
 const gatePrerequisites: Partial<Record<GateKey, GateKey[]>> = {
   hasJavaScriptLinting: ["hasJavaScriptTooling"],
-  hasJavaScriptBuildConfig: ["hasJavaScriptTooling"],
   hasJavaScriptPackageScripts: ["hasJavaScriptTooling"],
-  hasJavaScriptFrameworks: ["hasJavaScriptTooling"],
 };
 
 const dag = buildDag(gatePrerequisites);
@@ -470,77 +469,39 @@ export async function collectRepositoryDiagnosticGateState(
 
   const jsToolingQuick = quickTestJavaScriptTooling(jsObservations);
 
-  if (jsToolingQuick === true) {
-    state.hasJavaScriptTooling = true;
-    markResolved(results, "hasJavaScriptTooling", true);
-    observability.observed.push("hasJavaScriptTooling");
+  state.hasJavaScriptTooling =
+    jsToolingQuick ??
+    (
+      await timedGate("javascript-tooling", () =>
+        looksLikeJavaScriptRepository(context.scanContext),
+      )
+    ).value;
+  markResolved(results, "hasJavaScriptTooling", state.hasJavaScriptTooling);
+  observability.observed.push("hasJavaScriptTooling");
 
-    const [jsBuildConfigEvidence, jsPackageScriptEvidence] = await Promise.all([
-      repositoryHasJavaScriptBuildConfigEvidence(context.scanContext),
-      repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
-    ]);
+  if (state.hasJavaScriptTooling) {
+    const jsPackageScriptEvidence = await repositoryHasJavaScriptPackageScriptEvidence(
+      context.scanContext,
+    );
     state.hasJavaScriptLinting = repositoryLikelyUsesJavaScriptLinting(context, jsObservations);
     markResolved(results, "hasJavaScriptLinting", state.hasJavaScriptLinting);
-    state.hasJavaScriptBuildConfig =
-      repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) || jsBuildConfigEvidence;
-    markResolved(results, "hasJavaScriptBuildConfig", state.hasJavaScriptBuildConfig);
     state.hasJavaScriptPackageScripts =
       repositoryLikelyUsesJavaScriptPackageScripts(jsObservations) || jsPackageScriptEvidence;
     markResolved(results, "hasJavaScriptPackageScripts", state.hasJavaScriptPackageScripts);
-  } else if (jsToolingQuick === false) {
-    state.hasJavaScriptTooling = false;
-    markResolved(results, "hasJavaScriptTooling", false);
-    state.hasJavaScriptLinting = false;
-    state.hasJavaScriptBuildConfig = false;
-    state.hasJavaScriptPackageScripts = false;
-    state.hasJavaScriptFrameworks = false;
-    pruneDescendants(
-      gateKeys.javascriptTooling,
-
+  } else {
+    pruneGateDescendants(dag.successors, gateKeys.javascriptTooling, gateKeys.javascriptTooling, {
       state,
       results,
-      gateKeys.javascriptTooling,
       observability,
-    );
-    await evaluateDescendantsPruned(context, state, results, observability);
-    return { state, observability, results };
-  } else {
-    const jsToolingResult = await timedGate("javascript-tooling", () =>
-      looksLikeJavaScriptRepository(context.scanContext),
-    );
-    state.hasJavaScriptTooling = jsToolingResult.value;
-    markResolved(results, "hasJavaScriptTooling", jsToolingResult.value);
-    observability.observed.push("hasJavaScriptTooling");
-
-    if (!state.hasJavaScriptTooling) {
-      state.hasJavaScriptLinting = false;
-      state.hasJavaScriptBuildConfig = false;
-      state.hasJavaScriptPackageScripts = false;
-      state.hasJavaScriptFrameworks = false;
-      pruneDescendants(
-        gateKeys.javascriptTooling,
-        state,
-        results,
-        gateKeys.javascriptTooling,
-        observability,
-      );
-      await evaluateDescendantsPruned(context, state, results, observability);
-      return { state, observability, results };
-    }
-
-    const [jsBuildConfigEvidence, jsPackageScriptEvidence] = await Promise.all([
-      repositoryHasJavaScriptBuildConfigEvidence(context.scanContext),
-      repositoryHasJavaScriptPackageScriptEvidence(context.scanContext),
-    ]);
-    state.hasJavaScriptLinting = repositoryLikelyUsesJavaScriptLinting(context, jsObservations);
-    markResolved(results, "hasJavaScriptLinting", state.hasJavaScriptLinting);
-    state.hasJavaScriptBuildConfig =
-      repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) || jsBuildConfigEvidence;
-    markResolved(results, "hasJavaScriptBuildConfig", state.hasJavaScriptBuildConfig);
-    state.hasJavaScriptPackageScripts =
-      repositoryLikelyUsesJavaScriptPackageScripts(jsObservations) || jsPackageScriptEvidence;
-    markResolved(results, "hasJavaScriptPackageScripts", state.hasJavaScriptPackageScripts);
+    });
   }
+
+  // Config/framework evidence is independent of the broad tooling heuristic.
+  // In particular, a standalone webpack config need not have a package.json.
+  state.hasJavaScriptBuildConfig =
+    repositoryLikelyUsesJavaScriptBuildConfig(jsObservations) ||
+    (await repositoryHasJavaScriptBuildConfigEvidence(context.scanContext));
+  markResolved(results, "hasJavaScriptBuildConfig", state.hasJavaScriptBuildConfig);
 
   const jsFrameworksQuick = quickTestJavaScriptFrameworks(context, jsObservations);
   if (jsFrameworksQuick !== undefined) {
@@ -548,13 +509,11 @@ export async function collectRepositoryDiagnosticGateState(
     markResolved(results, "hasJavaScriptFrameworks", jsFrameworksQuick);
     observability.observed.push("hasJavaScriptFrameworks");
     if (!jsFrameworksQuick) {
-      pruneDescendants(
+      pruneGateDescendants(
+        dag.successors,
         gateKeys.javascriptFrameworks,
-
-        state,
-        results,
         gateKeys.javascriptFrameworks,
-        observability,
+        { state, results, observability },
       );
     }
   } else {
@@ -565,13 +524,11 @@ export async function collectRepositoryDiagnosticGateState(
     markResolved(results, "hasJavaScriptFrameworks", jsFrameworksResult.value);
     observability.observed.push("hasJavaScriptFrameworks");
     if (!jsFrameworksResult.value) {
-      pruneDescendants(
+      pruneGateDescendants(
+        dag.successors,
         gateKeys.javascriptFrameworks,
-
-        state,
-        results,
         gateKeys.javascriptFrameworks,
-        observability,
+        { state, results, observability },
       );
     }
   }
@@ -589,72 +546,4 @@ export async function collectRepositoryDiagnosticGateState(
   }
 
   return { state, observability, results };
-}
-
-async function evaluateDescendantsPruned(
-  context: RepositoryDiagnosticContext,
-  state: RepositoryDiagnosticGateState,
-  results: GateResultRecord,
-  observability: { observed: string[]; derivedFalse: { gate: string; dueTo: string[] }[] },
-): Promise<void> {
-  if (state[gateKeys.rust]) {
-    return;
-  }
-
-  const rustQuick = quickTestRust(context);
-  if (rustQuick !== undefined) {
-    state.hasRust = rustQuick;
-    markResolved(results, "hasRust", rustQuick);
-    observability.observed.push("hasRust");
-  } else {
-    const rustResult = await timedGate("rust", () => looksLikeRustRepository(context.scanContext));
-    state.hasRust = rustResult.value;
-    markResolved(results, "hasRust", rustResult.value);
-    observability.observed.push("hasRust");
-  }
-}
-
-function pruneDescendants(
-  key: GateKey,
-  state: RepositoryDiagnosticGateState,
-  results: GateResultRecord,
-  reason: GateKey,
-  observability: {
-    derivedFalse: { gate: string; dueTo: string[] }[];
-  },
-): void {
-  const visited = new Set<GateKey>();
-  const stack = [...(dag.successors.get(key) ?? [])];
-
-  while (stack.length > 0) {
-    const curr = stack.pop()!;
-    if (visited.has(curr)) {
-      continue;
-    }
-    visited.add(curr);
-
-    results[curr] = { status: "skipped", reason: `parent gate ${reason} is not resolved true` };
-
-    if (!state[curr]) {
-      const existing = observability.derivedFalse.find((d) => d.gate === curr);
-      if (existing) {
-        if (!existing.dueTo.includes(key)) {
-          existing.dueTo.push(key);
-        }
-      } else {
-        observability.derivedFalse.push({ gate: curr, dueTo: [key] });
-      }
-    } else {
-      state[curr] = false as never;
-      const existing = observability.derivedFalse.find((d) => d.gate === curr);
-      if (existing) {
-        if (!existing.dueTo.includes(reason)) {
-          existing.dueTo.push(reason);
-        }
-      } else {
-        observability.derivedFalse.push({ gate: curr, dueTo: [reason] });
-      }
-      stack.push(...(dag.successors.get(curr) ?? []));
-    }
-  }
 }

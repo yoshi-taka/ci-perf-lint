@@ -63,7 +63,9 @@
     "perf:profile": "bun --cpu-prof --cpu-prof-dir .profile src/cli.ts",
     "perf:mem": "bun --heap-prof --heap-prof-dir .profile src/cli.ts",
     "setup-hooks": "lefthook install",
-    "test:related": "bun run scripts/test-related.ts"
+    "test:related": "bun run scripts/test-related.ts",
+    "verify:formal": "bun run scripts/verify-formal.ts && bun run verify:formal:gates",
+    "verify:formal:gates": "AGENT=1 bun run scripts/verify-formal-gates.ts"
   },
   "dependencies": {
     "oxc-parser": "^0.155.0",

@@ -53,6 +53,7 @@ Compare CI feedback time with and without `fork-ts-checker-webpack-plugin`. Type
 
 ## Compatibility Notes
 
+- Standalone root webpack configs are checked even without a root `package.json` or JavaScript-heavy workflow.
 - `fork-ts-checker-webpack-plugin` works with webpack 4 and 5
 - Compatible with `ts-loader` versions that support `transpileOnly` and `happyPackMode`
 - Can be configured to watch specific files or directories for type checking
