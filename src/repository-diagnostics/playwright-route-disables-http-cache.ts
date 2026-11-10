@@ -119,7 +119,7 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
       fixtureCache.set(cacheKey, false);
       return false;
     }
-    const facts = playwrightModuleFacts(modulePath, source);
+    const facts = await playwrightModuleFacts(modulePath, source);
     if (!facts || (requireTestExport && !facts.exportsTest)) {
       fixtureCache.set(cacheKey, false);
       return false;
@@ -149,7 +149,7 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
     if (!source || !isCandidateSource(path, source)) {
       continue;
     }
-    const facts = playwrightModuleFacts(path, source);
+    const facts = await playwrightModuleFacts(path, source);
     if (!facts) {
       continue;
     }
@@ -163,7 +163,7 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
     if (!source.includes("playwright/test") && localFixtureSpecs.size === 0) {
       continue;
     }
-    for (const offset of findPlaywrightRoutes(path, source, localFixtureSpecs)) {
+    for (const offset of await findPlaywrightRoutes(path, source, localFixtureSpecs)) {
       const before = source.slice(0, offset);
       diagnostics.push(
         buildRepositoryDiagnostic(context.repository, meta, {

@@ -152,11 +152,11 @@ export async function collectConsiderEslintWarningRulesOffInCiDiagnostics({
   }
   let warnings: string[];
   if (!legacy) {
-    warnings = staticEslintWarningRules(file, text);
+    warnings = await staticEslintWarningRules(file, text);
   } else if (file === "package.json") {
     warnings = legacyEslintWarningRules(packageConfig);
   } else if (file.endsWith(".js") || file.endsWith(".cjs")) {
-    warnings = staticEslintWarningRules(file, text, true);
+    warnings = await staticEslintWarningRules(file, text, true);
   } else {
     try {
       warnings = legacyEslintWarningRules(JSON.parse(text));

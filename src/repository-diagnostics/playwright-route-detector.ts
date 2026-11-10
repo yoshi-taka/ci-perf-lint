@@ -1,4 +1,5 @@
-import { parseSync, visitorKeys, type Node, type Expression } from "oxc-parser";
+import type { Node, Expression } from "oxc-parser";
+import { loadOxcParser } from "./oxc-parser.ts";
 
 type Kind = "test" | "page" | "context";
 interface Binding {
@@ -13,7 +14,7 @@ interface Scope {
   functionScope: boolean;
 }
 
-function children(node: Node): Node[] {
+function children(node: Node, visitorKeys: Record<string, string[]>): Node[] {
   const record = node as unknown as Record<string, unknown>;
   return (visitorKeys[node.type] ?? []).flatMap((key) => {
     const value = record[key];
@@ -127,10 +128,11 @@ export interface PlaywrightModuleFacts {
  * named `test` and either imports Playwright directly or imports another trusted
  * local fixture module (handled by the collector's transitive walk).
  */
-export function playwrightModuleFacts(
+export async function playwrightModuleFacts(
   filename: string,
   source: string,
-): PlaywrightModuleFacts | undefined {
+): Promise<PlaywrightModuleFacts | undefined> {
+  const { parseSync } = await loadOxcParser();
   const parsed = parseSync(filename, source, { preserveParens: false });
   if (parsed.errors.length > 0) {
     return undefined;
@@ -203,11 +205,12 @@ export function playwrightModuleFacts(
 }
 
 /** Same-file lexical provenance plus explicitly trusted local fixture modules. */
-export function findPlaywrightRoutes(
+export async function findPlaywrightRoutes(
   filename: string,
   source: string,
   localFixtureSpecs: ReadonlySet<string> = new Set(),
-): number[] {
+): Promise<number[]> {
+  const { parseSync, visitorKeys } = await loadOxcParser();
   const parsed = parseSync(filename, source, { preserveParens: false });
   if (parsed.errors.length > 0) {
     return [];
@@ -298,7 +301,7 @@ export function findPlaywrightRoutes(
         scope.bindings.set(specifier.local.name, { scope, kind: isTest ? "test" : undefined });
       }
     }
-    for (const child of children(node)) {
+    for (const child of children(node, visitorKeys)) {
       walk(child, scope, node);
     }
   }

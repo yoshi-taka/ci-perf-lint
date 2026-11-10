@@ -1,5 +1,4 @@
 import path from "node:path";
-import { parseSync } from "oxc-parser";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import {
@@ -8,6 +7,7 @@ import {
 } from "../repository-dependency-versions.ts";
 import { lineColumnForIndex } from "../rules/shared/command-patterns.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { loadOxcParser } from "./oxc-parser.ts";
 
 const meta = {
   id: "prefer-msw-2-memory-fixes",
@@ -42,6 +42,7 @@ async function nodeImportEvidence(
     if (!source || source.length > 500_000 || !source.includes("msw/node")) {
       continue;
     }
+    const { parseSync } = await loadOxcParser();
     const parsed = parseSync(file, source);
     if (parsed.errors.length) {
       continue;

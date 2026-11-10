@@ -20,8 +20,8 @@ describe("Playwright route provenance", () => {
     `const custom = test.extend({ mock: async ({ page }, use) => { await ${route}; await use(null); } });`,
     `const custom = test.extend({}); custom('api', async ({ page }) => { await ${route}; });`,
     `test('api', async ({ page }) => { const install = () => ${route}; install(); });`,
-  ])("recognizes %s", (body) => {
-    expect(findPlaywrightRoutes("tests/api.spec.ts", header + body)).toHaveLength(1);
+  ])("recognizes %s", async (body) => {
+    expect(await findPlaywrightRoutes("tests/api.spec.ts", header + body)).toHaveLength(1);
   });
 
   test.each([
@@ -45,21 +45,21 @@ describe("Playwright route provenance", () => {
     `test.describe('api', async ({ page }) => { ${route}; });`,
     `function helper(page: Page) { ${route}; }`,
     `test('api', async ({ page }) => {`,
-  ])("ignores %s", (body) => {
-    expect(findPlaywrightRoutes("tests/api.spec.ts", header + body)).toEqual([]);
+  ])("ignores %s", async (body) => {
+    expect(await findPlaywrightRoutes("tests/api.spec.ts", header + body)).toEqual([]);
   });
 
-  test("resolves renamed test imports and alternate entrypoint", () => {
+  test("resolves renamed test imports and alternate entrypoint", async () => {
     const source = `import { test as e2e } from 'playwright/test'; e2e('api', async ({ page }) => { ${route}; });`;
-    expect(findPlaywrightRoutes("api.spec.js", source)).toEqual([source.indexOf(route)]);
+    expect(await findPlaywrightRoutes("api.spec.js", source)).toEqual([source.indexOf(route)]);
   });
 
-  test("trusts an explicitly supplied local fixture module", () => {
+  test("trusts an explicitly supplied local fixture module", async () => {
     const source = `import { test as e2e } from './fixtures'; e2e('api', async ({ page }) => { ${route}; });`;
-    expect(findPlaywrightRoutes("api.spec.js", source, new Set(["./fixtures"]))).toEqual([
+    expect(await findPlaywrightRoutes("api.spec.js", source, new Set(["./fixtures"]))).toEqual([
       source.indexOf(route),
     ]);
-    expect(findPlaywrightRoutes("api.spec.js", source)).toEqual([]);
+    expect(await findPlaywrightRoutes("api.spec.js", source)).toEqual([]);
   });
 
   test.each([
@@ -67,17 +67,17 @@ describe("Playwright route provenance", () => {
     `import { test } from './fixtures';`,
     `import type { test } from '@playwright/test';`,
     `import { type test } from '@playwright/test';`,
-  ])("does not infer Playwright from %s", (importText) => {
+  ])("does not infer Playwright from %s", async (importText) => {
     expect(
-      findPlaywrightRoutes(
+      await findPlaywrightRoutes(
         "api.spec.ts",
         `${importText} test('api', async ({ page }) => { ${route}; });`,
       ),
     ).toEqual([]);
   });
 
-  test("retains outer binding after a shadowing scope", () => {
+  test("retains outer binding after a shadowing scope", async () => {
     const source = `${header}test('api', async ({ page }) => { { const page = other; ${route}; } await ${route}; });`;
-    expect(findPlaywrightRoutes("api.spec.ts", source)).toEqual([source.lastIndexOf(route)]);
+    expect(await findPlaywrightRoutes("api.spec.ts", source)).toEqual([source.lastIndexOf(route)]);
   });
 });

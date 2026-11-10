@@ -32,7 +32,7 @@ export async function collectTestcontainersNodeFixedSleepDiagnostics(
     ) {
       continue;
     }
-    for (const { offset, millis } of findTestcontainersNodeSleeps(file, source)) {
+    for (const { offset, millis } of await findTestcontainersNodeSleeps(file, source)) {
       findings.push(
         buildRepositoryDiagnostic(context.repository, meta, {
           location: { path: file, ...lineColumnForIndex(source, offset) },

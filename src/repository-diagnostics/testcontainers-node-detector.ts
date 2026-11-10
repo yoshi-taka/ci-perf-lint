@@ -1,6 +1,7 @@
-import { parseSync, visitorKeys, type Node } from "oxc-parser";
+import type { Node } from "oxc-parser";
+import { loadOxcParser } from "./oxc-parser.ts";
 
-function children(node: Node): Node[] {
+function children(node: Node, visitorKeys: Record<string, string[]>): Node[] {
   const record = node as unknown as Record<string, unknown>;
   return (visitorKeys[node.type] ?? []).flatMap((key) => {
     const value = record[key];
@@ -51,10 +52,11 @@ function awaitedStatement(node: Node): Node | undefined {
 }
 
 /** Direct constructor chains only. Ambiguous file-wide bindings conservatively abstain. */
-export function findTestcontainersNodeSleeps(
+export async function findTestcontainersNodeSleeps(
   filename: string,
   source: string,
-): { offset: number; millis: number }[] {
+): Promise<{ offset: number; millis: number }[]> {
+  const { parseSync, visitorKeys } = await loadOxcParser();
   const parsed = parseSync(filename, source, { preserveParens: false });
   if (parsed.errors.length) {
     return [];
@@ -134,7 +136,7 @@ export function findTestcontainersNodeSleeps(
         }
       }
     }
-    for (const child of children(node)) {
+    for (const child of children(node, visitorKeys)) {
       walk(child);
     }
   }

@@ -1,4 +1,5 @@
-import { parseSync, type Node } from "oxc-parser";
+import type { Node } from "oxc-parser";
+import { loadOxcParser } from "./oxc-parser.ts";
 
 function propertyName(node: Node): string | undefined {
   if (node.type === "Identifier") {
@@ -30,11 +31,12 @@ export function legacyEslintWarningRules(value: unknown): string[] {
 }
 
 /** Literal configs only: never execute config. Spreads/extends clear earlier rules. */
-export function staticEslintWarningRules(
+export async function staticEslintWarningRules(
   filename: string,
   source: string,
   legacy = false,
-): string[] {
+): Promise<string[]> {
+  const { parseSync } = await loadOxcParser();
   const parsed = parseSync(filename, source, { preserveParens: false });
   if (parsed.errors.length > 0) {
     return [];
