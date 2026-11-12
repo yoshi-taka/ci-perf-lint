@@ -22,16 +22,20 @@ export async function getPublishPlan(
   version: string,
   lookup: RegistryLookup = queryRegistry,
 ): Promise<{ publishScoped: boolean; publishWrapper: boolean }> {
-  if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(version))
+  if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(version)) {
     throw new Error(`Expected exact publish version: ${version}`);
+  }
   const exists = async (name: string): Promise<boolean> => {
     const result = await lookup(`${name}@${version}`);
     const data: unknown = JSON.parse(result.stdout);
-    if (result.exitCode === 0 && data === version) return true;
+    if (result.exitCode === 0 && data === version) {
+      return true;
+    }
     if (result.exitCode !== 0 && data && typeof data === "object" && "error" in data) {
       const error = data.error;
-      if (error && typeof error === "object" && "code" in error && error.code === "E404")
+      if (error && typeof error === "object" && "code" in error && error.code === "E404") {
         return false;
+      }
     }
     throw new Error(`Cannot determine registry status for ${name}@${version}`);
   };
@@ -45,7 +49,9 @@ export async function getPublishPlan(
 if (import.meta.main) {
   const plan = await getPublishPlan(process.argv[2] ?? "");
   const output = process.env.GITHUB_OUTPUT;
-  if (!output) throw new Error("GITHUB_OUTPUT is required");
+  if (!output) {
+    throw new Error("GITHUB_OUTPUT is required");
+  }
   await appendFile(
     output,
     `publish_scoped=${plan.publishScoped}\npublish_wrapper=${plan.publishWrapper}\n`,

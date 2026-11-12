@@ -18,8 +18,9 @@ const allIds = [
   ]),
 ].sort();
 for (const rule of allRules) {
-  if (!existsSync(path.join(repoRoot, rule.meta.docsPath)))
+  if (!existsSync(path.join(repoRoot, rule.meta.docsPath))) {
     throw new Error(`Missing explainer for ${rule.meta.id}`);
+  }
 }
 
 const registryLines = allIds.map((id) => `- \`${id}\``).join("\n");
