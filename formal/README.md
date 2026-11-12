@@ -2,10 +2,50 @@
 
 Run `bun run verify:formal` with Lean **4.35.0** installed (elan reads
 `formal/lean-toolchain`), or set `LEAN_BIN=/absolute/path/to/lean`.
-No Mathlib, Lake dependencies, or generated fixtures.
-Individual checks: `bun run verify:formal:gates` or `bun run verify:formal:gate-expr`.
+Lake builds native generators; a working native C compiler/linker is required
+(included in the official Lean distribution used here). No Mathlib, external
+Lake dependencies, or generated fixtures.
+`LEAN_BIN` selects the sibling `lake`; `LAKE_BIN` overrides that selection.
+The runner checks the compiler actually selected by `lake env lean --version`
+against `formal/lean-toolchain`.
+Individual checks: `bun run verify:formal:evidence`, `bun run verify:formal:gates`,
+or `bun run verify:formal:gate-expr`.
 Retention checks: `bun run verify:formal:retention`.
 CI runs all verifiers in the `formal` job; ordinary regression tests need no Lean.
+
+## Incremental verification
+
+`lake build` checks proofs with warnings as errors and builds the four executables.
+Lake reuses unchanged checked artifacts in ignored `formal/.lake/`; CI caches
+`formal/.lake/build`, keyed by OS, architecture, toolchain, configuration and sources,
+with a compatible-prefix fallback. Lake revalidates restored build dependencies.
+Treat build caches as trusted executable artifacts, not independent proof certificates.
+Delete/move the build directory for a clean recheck when investigating cache integrity.
+
+Every invocation requires all source-declared `#print axioms` reports in fresh or
+replayed Lake diagnostics and rejects `sorryAx`. No prebuilt-check bypass exists.
+The aggregate runner builds first, then uses at most two isolated TS verifier
+processes; workers also revalidate their Lake targets. Case generation and comparisons
+with current TS run **every time**: neither JSONL nor differential results are cached.
+Native generation replaces repeated elaboration via `lean --run`, not proof checks.
+
+Set `CI_PERF_LINT_FORMAL_TIMINGS=1` for toolchain/build/generation/total timings.
+Run `FORMAL_INTEGRATION=1 bun run test test/boundary-formal-runtime.test.ts` with
+Lean installed to check real cache hits, source invalidation, false proofs, and
+untracked `sorry` rejection. CI runs this explicitly; ordinary tests skip that case.
+
+Local macOS ARM64 measurements (Lean 4.35.0; three sequential runs per warm
+configuration): original total 10,754/10,943/10,913 ms (median 10,913), optimized
+2,135/2,105/2,091 ms (median 2,105; ~81% reduction). One optimized clean-build
+end-to-end run took 5,300 ms. All four native JSONL outputs were byte-identical
+to `lean --run` after removing compile-time audit lines. These are verification
+command timings, **not whole-CI speedups**: installation, cache transfer and the
+additional safety integration test are excluded.
+
+To add a model, register its executable/root in `lakefile.toml`, its mapping in
+`scripts/formal-runtime.ts`, and its TS bridge in `scripts/verify-formal-all.ts`.
+Include source-declared axiom audits and exact case-count assertions in the bridge;
+keep TS comparisons uncached. Add a focused package script if useful.
 
 ## Scope and evidence
 

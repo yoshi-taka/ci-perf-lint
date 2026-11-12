@@ -1,5 +1,5 @@
-import { deepStrictEqual, equal, ok } from "node:assert/strict";
-import { fileURLToPath } from "node:url";
+import { deepStrictEqual, equal } from "node:assert/strict";
+import { formalRunner } from "./formal-runtime.ts";
 import {
   collectorRequiresAllGatesFromResults,
   type GateKey,
@@ -33,29 +33,17 @@ type LegacyCase = {
   result: GateResult;
 };
 
-const cwd = fileURLToPath(new URL("../formal/", import.meta.url));
-const lean = process.env.LEAN_BIN ?? "lean";
-const version = Bun.spawnSync([lean, "--version"], { cwd });
-ok(
-  version.exitCode === 0 && /version 4\.35\.0\b/.test(version.stdout.toString()),
-  "Lean 4.35.0 required",
-);
-const checked = Bun.spawnSync([lean, "-DwarningAsError=true", "GateExpr.lean"], { cwd });
-equal(checked.exitCode, 0, checked.stdout.toString() + checked.stderr.toString());
-ok(!checked.stdout.toString().includes("sorryAx"));
-const run = Bun.spawnSync([lean, "-DwarningAsError=true", "--run", "GateExpr.lean"], {
-  cwd,
-  maxBuffer: 64 * 1024 * 1024,
-});
-equal(run.exitCode, 0, run.stdout.toString() + run.stderr.toString());
+const output = await formalRunner.run("GateExpr");
 
 const nodes = [gateKeys.rust, gateKeys.gradle, gateKeys.javascriptTooling] as const;
 let expressions = 0;
 let legacy = 0;
 let booleanCases = 0;
 const seen = new Set<string>();
-for (const line of run.stdout.toString().split("\n")) {
-  if (!line.startsWith("{")) continue;
+for (const line of output.split("\n")) {
+  if (!line.startsWith("{")) {
+    continue;
+  }
   const item = JSON.parse(line) as ExpressionCase | LegacyCase;
   equal(item.results.length, 3);
   const key = JSON.stringify([
@@ -68,7 +56,9 @@ for (const line of run.stdout.toString().split("\n")) {
   const results = Object.fromEntries(
     Object.values(gateKeys).map((gate) => [gate, { status: "skipped", reason: "unused" }]),
   ) as GateResultRecord;
-  for (const [i, node] of nodes.entries()) results[node] = item.results[i]!;
+  for (const [i, node] of nodes.entries()) {
+    results[node] = item.results[i]!;
+  }
   if (item.kind === "legacy") {
     deepStrictEqual(
       collectorRequiresAllGatesFromResults({ gates: item.gates }, results),
@@ -116,7 +106,6 @@ for (const line of run.stdout.toString().split("\n")) {
 equal(expressions, 418 * 64);
 equal(legacy, 121 * 64);
 equal(booleanCases, 418 * 8);
-console.log(checked.stdout.toString().trim());
 console.log(
   `Gate expressions: ${expressions} model/TS/transform cases; ${legacy} legacy cases; ${booleanCases} resolved Boolean/trace cases passed.`,
 );

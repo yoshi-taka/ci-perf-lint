@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { formalRunner } from "./formal-runtime.ts";
 import type {
   GateKey,
   GateResultRecord,
@@ -46,21 +47,7 @@ interface Observations {
   frameworks: boolean;
 }
 
-const cwd = fileURLToPath(new URL("../formal/", import.meta.url));
-const lean = process.env.LEAN_BIN ?? "lean";
-const version = Bun.spawnSync([lean, "--version"], { cwd });
-ok(
-  version.exitCode === 0 && /version 4\.35\.0\b/.test(version.stdout.toString()),
-  "Lean 4.35.0 required",
-);
-const checked = Bun.spawnSync([lean, "-DwarningAsError=true", "Gates.lean"], { cwd });
-equal(checked.exitCode, 0, checked.stdout.toString() + checked.stderr.toString());
-ok(!checked.stdout.toString().includes("sorryAx"));
-const run = Bun.spawnSync([lean, "-DwarningAsError=true", "--run", "Gates.lean"], {
-  cwd,
-  maxBuffer: 16 * 1024 * 1024,
-});
-equal(run.exitCode, 0, run.stdout.toString() + run.stderr.toString());
+const output = await formalRunner.run("Gates");
 
 // Export private functions from a TEMPORARY copy. Production visibility is unchanged.
 // Only import paths and the export list change; algorithm and dependencies stay real TS.
@@ -75,18 +62,19 @@ const exports = [
   "repositoryLikelyUsesJavaScriptLinting",
   "quickTestJavaScriptFrameworks",
 ];
-for (const name of exports) ok(source.includes(name), `Missing instrumentation target ${name}`);
+for (const name of exports) {
+  ok(source.includes(name), `Missing instrumentation target ${name}`);
+}
 const tempBase = path.join(tmpdir(), "opencode");
 await mkdir(tempBase, { recursive: true });
 const temp = await mkdtemp(path.join(tempBase, "formal-gates-"));
 
 try {
-  const instrumented =
-    source.replace(
-      /from "(\.[^"]+)"/g,
-      (_, relative: string) =>
-        `from ${JSON.stringify(pathToFileURL(path.resolve(path.dirname(sourcePath), relative)).href)}`,
-    ) + `\nexport { ${exports.join(", ")} };\n`;
+  const instrumented = `${source.replace(
+    /from "(\.[^"]+)"/g,
+    (_, relative: string) =>
+      `from ${JSON.stringify(pathToFileURL(path.resolve(path.dirname(sourcePath), relative)).href)}`,
+  )}\nexport { ${exports.join(", ")} };\n`;
   const modulePath = path.join(temp, "gates.ts");
   await writeFile(modulePath, instrumented);
   const gates = (await import(pathToFileURL(modulePath).href)) as GateHarness;
@@ -100,8 +88,10 @@ try {
   let cases = 0;
   let sawChain = false;
   const seen = new Set<string>();
-  for (const line of run.stdout.toString().split("\n")) {
-    if (!line.startsWith("{")) continue;
+  for (const line of output.split("\n")) {
+    if (!line.startsWith("{")) {
+      continue;
+    }
     const item = JSON.parse(line) as {
       graph: number[][];
       root: number;
@@ -118,19 +108,21 @@ try {
     const successors = new Map<GateKey, readonly GateKey[]>();
     for (const [i, neighbors] of item.graph.entries()) {
       successors.set(
-        keys[i]!,
-        neighbors.map((n) => keys[n]!),
+        keys[i],
+        neighbors.map((n) => keys[n]),
       );
     }
     const state = Object.fromEntries(
       allKeys.map((key) => [key, false]),
     ) as RepositoryDiagnosticGateState;
-    for (const [i, key] of keys.entries()) state[key] = item.before[i]!;
+    for (const [i, key] of keys.entries()) {
+      state[key] = item.before[i]!;
+    }
     const results = Object.fromEntries(
       allKeys.map((key) => [key, { status: "resolved", value: state[key] }]),
     ) as GateResultRecord;
     const observability = { derivedFalse: [] as { gate: string; dueTo: string[] }[] };
-    const root = keys[item.root]!;
+    const root = keys[item.root];
     pruneGateDescendants(successors, root, root, { state, results, observability });
     deepStrictEqual(
       keys.map((key) => state[key]),
@@ -160,17 +152,21 @@ try {
         reason: `parent gate ${root} is not resolved true`,
       });
     }
-    for (const entry of observability.derivedFalse) deepStrictEqual(entry.dueTo, [root]);
+    for (const entry of observability.derivedFalse) {
+      deepStrictEqual(entry.dueTo, [root]);
+    }
     // Independent BFS oracle, not a copy of the conditional traversal.
     const reached = new Set<number>();
-    const queue = [...item.graph[item.root]!];
+    const queue = [...item.graph[item.root]];
     for (let i = 0; i < queue.length; i++) {
-      const node = queue[i]!;
-      if (reached.has(node)) continue;
+      const node = queue[i];
+      if (reached.has(node)) {
+        continue;
+      }
       reached.add(node);
-      queue.push(...item.graph[node]!);
+      queue.push(...item.graph[node]);
     }
-    const allFalse = [...reached].every((node) => !state[keys[node]!]);
+    const allFalse = [...reached].every((node) => !state[keys[node]]);
     equal(allFalse, item.allDescendantsFalse);
     equal(allFalse, true, `Descendant left true: ${caseKey}`);
     deepStrictEqual(new Set(skippedKeys), new Set([...reached].map((node) => keys[node])));
@@ -293,18 +289,23 @@ try {
       path.join(root, ".github/workflows/ci.yml"),
       "name: CI\non: push\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
     );
-    for (const [file, text] of Object.entries(files)) await writeFile(path.join(root, file), text);
+    for (const [file, text] of Object.entries(files)) {
+      await writeFile(path.join(root, file), text);
+    }
     const result = await inspectRepository(root);
     deepStrictEqual(result.reported, result.direct);
-    if (index < 24) equal(result.resolution.state.hasJavaScriptBuildConfig, true);
+    if (index < 24) {
+      equal(result.resolution.state.hasJavaScriptBuildConfig, true);
+    }
     if ("tailwind.config.js" in files) {
       equal(result.resolution.state.hasJavaScriptTooling, false);
       equal(result.resolution.state.hasJavaScriptFrameworks, true);
     }
-    if ("Cargo.toml" in files) equal(result.resolution.state.hasRust, true);
+    if ("Cargo.toml" in files) {
+      equal(result.resolution.state.hasRust, true);
+    }
   }
 
-  console.log(checked.stdout.toString().trim());
   console.log(`Gate model/TS: ${cases} matched; all reachable descendants cleared and skipped.`);
   console.log(
     `Eager/pruned gates and direct/reported diagnostics agree across ${scenarios.length + 2} repository scenarios.`,

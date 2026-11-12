@@ -1,5 +1,5 @@
 import { deepStrictEqual, equal, ok } from "node:assert/strict";
-import { fileURLToPath } from "node:url";
+import { formalRunner } from "./formal-runtime.ts";
 import { findingIncludedInMode, findingIncludedInScope } from "../src/repo-finding-utils.ts";
 import {
   actionsPriorityListOp,
@@ -41,21 +41,7 @@ interface Case {
   visible: number[];
 }
 
-const cwd = fileURLToPath(new URL("../formal/", import.meta.url));
-const lean = process.env.LEAN_BIN ?? "lean";
-const version = Bun.spawnSync([lean, "--version"], { cwd });
-ok(
-  version.exitCode === 0 && /version 4\.35\.0\b/.test(version.stdout.toString()),
-  "Lean 4.35.0 required",
-);
-const checked = Bun.spawnSync([lean, "-DwarningAsError=true", "FindingRetention.lean"], { cwd });
-equal(checked.exitCode, 0, checked.stdout.toString() + checked.stderr.toString());
-ok(!checked.stdout.toString().includes("sorryAx"));
-const run = Bun.spawnSync([lean, "-DwarningAsError=true", "--run", "FindingRetention.lean"], {
-  cwd,
-  maxBuffer: 64 * 1024 * 1024,
-});
-equal(run.exitCode, 0, run.stdout.toString() + run.stderr.toString());
+const output = await formalRunner.run("FindingRetention");
 
 function diagnostic(d: ModelFinding): Diagnostic {
   const location = { path: d.path, line: d.line, column: d.column };
@@ -85,8 +71,10 @@ let cases = 0;
 let modeOrderCounterexamples = 0;
 let scopeOrderCounterexamples = 0;
 const seen = new Set<string>();
-for (const line of run.stdout.toString().split("\n")) {
-  if (!line.startsWith("{")) continue;
+for (const line of output.split("\n")) {
+  if (!line.startsWith("{")) {
+    continue;
+  }
   const item = JSON.parse(line) as Case;
   const key = JSON.stringify([
     item.findings,
@@ -112,17 +100,21 @@ for (const line of run.stdout.toString().split("\n")) {
     deepStrictEqual(repositoryScopeFixMap().map(d, {}), d);
   }
   deepStrictEqual(tokens(fixed.filter((d) => scope(d) && modeKeep(d))), item.fixedSelected, key);
-  if (JSON.stringify(item.selected) !== JSON.stringify(item.fixedSelected))
+  if (JSON.stringify(item.selected) !== JSON.stringify(item.fixedSelected)) {
     scopeOrderCounterexamples++;
+  }
 
   const deduplicated = deduplicateRefiner().refine(input, {});
   deepStrictEqual(tokens(deduplicated), item.deduplicated, key);
-  for (const d of deduplicated) ok(input.includes(d), "Dedup must retain original objects");
+  for (const d of deduplicated) {
+    ok(input.includes(d), "Dedup must retain original objects");
+  }
   deepStrictEqual(deduplicateRefiner().refine(deduplicated, {}), deduplicated);
   const dedupThenMode = deduplicated.filter(modeKeep);
   const modeThenDedup = deduplicateRefiner().refine(input.filter(modeKeep), {});
-  if (JSON.stringify(tokens(dedupThenMode)) !== JSON.stringify(tokens(modeThenDedup)))
+  if (JSON.stringify(tokens(dedupThenMode)) !== JSON.stringify(tokens(modeThenDedup))) {
     modeOrderCounterexamples++;
+  }
 
   const caps = new Map(item.caps);
   const warnings: AnalysisWarning[] = [];
@@ -131,7 +123,9 @@ for (const line of run.stdout.toString().split("\n")) {
     workflowPath: "fixture.yml",
   });
   deepStrictEqual(tokens(capped), item.capped, key);
-  for (const d of capped) ok(input.includes(d), "Cap must retain original objects");
+  for (const d of capped) {
+    ok(input.includes(d), "Cap must retain original objects");
+  }
   deepStrictEqual(
     warnings,
     item.suppressed.map(([ruleId, count]) => ({
@@ -152,8 +146,9 @@ for (const line of run.stdout.toString().split("\n")) {
     key,
   );
   deepStrictEqual(tokens(promoted), tokens(scopeFiltered));
-  for (const [i, d] of promoted.entries())
+  for (const [i, d] of promoted.entries()) {
     deepStrictEqual(d, { ...scopeFiltered[i], severity: item.promotedSeverities[i] });
+  }
   const pipeline = composePipeline({
     maps: [repositoryScopeFixMap()],
     filters: [modeFilter(mode)],
@@ -170,7 +165,7 @@ for (const line of run.stdout.toString().split("\n")) {
   deepStrictEqual(sorted(tokens(aggregated.memberFindings.flat())), sorted(tokens(pipeline)), key);
   for (const [i, members] of aggregated.memberFindings.entries()) {
     ok(members.length > 0);
-    const group = aggregated.aggregatedFindings[i]!;
+    const group = aggregated.aggregatedFindings[i];
     equal(group.firstIndex, Math.min(...members.map((d) => pipeline.indexOf(d))));
     for (const member of members) {
       ok(pipeline.includes(member));
@@ -190,7 +185,6 @@ for (const line of run.stdout.toString().split("\n")) {
 equal(cases, 585 * 8 * 3);
 ok(modeOrderCounterexamples > 0, "Expected documented dedup/filter policy conflict");
 ok(scopeOrderCounterexamples > 0, "Expected missing-scope ordering witness");
-console.log(checked.stdout.toString().trim());
 console.log(
   `Retention: ${cases} model/TS cases; reporter membership and suppression telemetry conserved.`,
 );

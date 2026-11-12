@@ -11,6 +11,7 @@ CPU.*.md
 .bun-test-timings.json
 artifacts
 node_modules
+formal/.lake/
 !test/fixtures/*/node_modules/
 !test/fixtures/*/node_modules/**
 docs/internal

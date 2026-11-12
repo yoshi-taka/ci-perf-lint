@@ -1,0 +1,20 @@
+name = "ciPerfFormal"
+version = "0.1.0"
+defaultTargets = ["evidence", "gates", "gateExpr", "findingRetention"]
+moreLeanArgs = ["-DwarningAsError=true"]
+
+[[lean_exe]]
+name = "evidence"
+root = "Evidence"
+
+[[lean_exe]]
+name = "gates"
+root = "Gates"
+
+[[lean_exe]]
+name = "gateExpr"
+root = "GateExpr"
+
+[[lean_exe]]
+name = "findingRetention"
+root = "FindingRetention"

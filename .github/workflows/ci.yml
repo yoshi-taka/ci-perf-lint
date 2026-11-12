@@ -53,6 +53,17 @@ jobs:
           path: ~/.elan/toolchains
           key: lean-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('formal/lean-toolchain') }}
 
+      - name: Cache checked Lean build
+        uses: actions/cache@v5
+        with:
+          path: formal/.lake/build
+          key: formal-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('formal/lean-toolchain', 'formal/lakefile.toml', 'formal/lake-manifest.json') }}-${{ hashFiles('formal/**/*.lean', '!formal/.lake/**') }}
+          restore-keys: |
+            formal-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('formal/lean-toolchain', 'formal/lakefile.toml', 'formal/lake-manifest.json') }}-
+
+      - name: Verify Lean build-cache safety
+        run: FORMAL_INTEGRATION=1 bun run test test/boundary-formal-runtime.test.ts
+
       - name: Prove models and compare real implementations
         run: bun run verify:formal
 
