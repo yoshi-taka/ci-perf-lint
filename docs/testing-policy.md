@@ -12,9 +12,44 @@
 | **Property-based** | `test/fuzz-*.test.ts` | Random input invariant testing (fast-check) |
 | **Pairwise / combinatorial** | `test/pairwise-cluster-*.test.ts` | All-pairs interaction coverage across rule clusters |
 | **Reporter rendering** | `test/reporters-render-report.test.ts` | Text / JSON / markdown / handoff output format |
-| **Reporter aggregation** | `test/reporters-aggregation.test.ts` | Grouped findings, deduplication |
+| **Reporter aggregation** | `test/reporters-aggregation*.test.ts` | Grouped findings, deduplication, preservation of distinct fixes |
 | **Metamorphic / differential** | `test/boundary-metamorphic.test.ts` | Oracle-less invariant verification |
 | **Mutation** | `stryker/stryker.*.config.mjs` | Stryker mutation testing (opt-in, slow) |
+
+## Lean and Z3: what they add
+
+Tests check examples. Lean and Z3 also help check the logic behind selected parts
+of the tool. Neither replaces tests or proves that the whole application is correct.
+
+### Lean: prove properties of a model
+
+Lean checks mathematical models of evidence thresholds, gate evaluation/pruning,
+and finding retention. Separate scripts compare model results with the real
+TypeScript functions on generated inputs.
+
+This proves properties of the **model**, not complete equivalence with TypeScript.
+The comparisons help catch differences between the model and implementation, but
+cover only the tested inputs. Model assumptions and exclusions must stay explicit.
+
+Run `bun run verify:formal` with the required Lean toolchain installed. Ordinary
+tests do not require Lean. Setup, scope, and limitations: [formal/README.md](../formal/README.md).
+If the toolchain is unavailable, report the verification as not run, not passed.
+
+### Z3: look for counterexamples
+
+Z3 has been used in an exploratory PoC to ask: "Can these conditions make a fix
+disappear from the grouped report?" It found a counterexample in a manually written
+model. A real workflow then reproduced the problem: pnpm and Bun fixes were combined,
+leaving only one instruction in `fixFirst`. Both instructions now remain, guarded by
+[`reporters-aggregation-remediation.test.ts`](../test/reporters-aggregation-remediation.test.ts).
+
+Z3 is **not** a runtime dependency or a permanent CI check. A model counterexample
+is a candidate bug: reproduce it in the real code and check the intended behavior
+before calling it a defect. "No counterexample" means only none within the modeled
+conditions, not that the entire codebase is bug-free.
+
+For either tool: state the property and assumptions, replay counterexamples against
+the implementation, and turn confirmed defects into ordinary regression tests.
 
 ## Goals
 

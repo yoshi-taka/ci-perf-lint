@@ -15,6 +15,17 @@ type MutableAggregatedFinding = AggregatedFinding & {
   repair?: RepairOp;
 };
 
+function remediationKey(
+  finding: Pick<AggregatedFinding, "ruleId" | "docsPath" | "suggestion" | "measurementHint">,
+): string {
+  return JSON.stringify([
+    finding.ruleId,
+    finding.docsPath,
+    finding.suggestion,
+    finding.measurementHint,
+  ]);
+}
+
 function mergeCrossWorkflowAggregatedFindings<
   T extends AggregatedFinding & {
     memberFindings: Diagnostic[];
@@ -23,7 +34,7 @@ function mergeCrossWorkflowAggregatedFindings<
 >(findings: T[]): T[] {
   return mergeSingleJobCrossWorkflowEntries(
     findings,
-    (finding) => [finding.ruleId, finding.suggestion, finding.measurementHint].join("::"),
+    remediationKey,
     (target, source) => {
       mergeUniqueValues(target.workflows, source.workflows);
       mergeUniqueValues(target.locations, source.locations);
@@ -134,12 +145,8 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
   const repositoryGrouped = new Map<string, MutableAggregatedFinding>();
   const workflowGrouped = new Map<string, MutableAggregatedFinding>();
 
-  function workflowFindingKey(workflow: string, ruleId: string): string {
-    return `${workflow}\n${ruleId}`;
-  }
-
-  function repositoryFindingKey(ruleId: string, docsPath: string): string {
-    return [ruleId, docsPath].join("\n");
+  function workflowFindingKey(finding: Diagnostic | AggregatedFinding): string {
+    return JSON.stringify([finding.workflow, remediationKey(finding)]);
   }
 
   findings.forEach((finding, index) => {
@@ -147,7 +154,7 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
     const location = `${finding.location.path}:${finding.location.line}:${finding.location.column}`;
     if (finding.scope === "repository") {
       const existing =
-        repositoryGrouped.get(repositoryFindingKey(finding.ruleId, finding.docsPath)) ??
+        repositoryGrouped.get(remediationKey(finding)) ??
         createMutableAggregatedFinding(finding, index, location, jobName);
       pushUniqueValue(existing.messages, existing.messageSet, finding.message);
       existing.aiHandoffs ??= [];
@@ -158,12 +165,12 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
       if (existing.firstIndex !== index) {
         existing.memberFindings.push(finding);
       }
-      repositoryGrouped.set(repositoryFindingKey(finding.ruleId, finding.docsPath), existing);
+      repositoryGrouped.set(remediationKey(finding), existing);
       return;
     }
 
     const existing =
-      workflowGrouped.get(workflowFindingKey(finding.workflow, finding.ruleId)) ??
+      workflowGrouped.get(workflowFindingKey(finding)) ??
       createMutableAggregatedFinding(finding, index, location, jobName);
 
     pushUniqueValue(existing.messages, existing.messageSet, finding.message);
@@ -177,19 +184,19 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
       existing.memberFindings.push(finding);
     }
 
-    workflowGrouped.set(workflowFindingKey(finding.workflow, finding.ruleId), existing);
+    workflowGrouped.set(workflowFindingKey(finding), existing);
   });
 
-  const workflowByRuleDocs = new Map<string, MutableAggregatedFinding[]>();
+  const workflowByRemediation = new Map<string, MutableAggregatedFinding[]>();
   for (const wfEntry of workflowGrouped.values()) {
-    const key = `${wfEntry.ruleId}\n${wfEntry.docsPath}`;
-    const entries = workflowByRuleDocs.get(key) ?? [];
+    const key = remediationKey(wfEntry);
+    const entries = workflowByRemediation.get(key) ?? [];
     entries.push(wfEntry);
-    workflowByRuleDocs.set(key, entries);
+    workflowByRemediation.set(key, entries);
   }
 
   for (const [repoKey, repoEntry] of repositoryGrouped) {
-    const wfEntries = workflowByRuleDocs.get(`${repoEntry.ruleId}\n${repoEntry.docsPath}`);
+    const wfEntries = workflowByRemediation.get(repoKey);
     if (!wfEntries || wfEntries.length === 0) {
       continue;
     }
@@ -226,7 +233,7 @@ export function aggregateFindingsWithMembers(findings: Diagnostic[]): {
       mergeUniqueValues((primaryEntry.sourceKinds ??= []), otherEntry.sourceKinds ?? []);
       primaryEntry.memberFindings.push(...otherEntry.memberFindings);
       primaryEntry.firstIndex = Math.min(primaryEntry.firstIndex, otherEntry.firstIndex);
-      workflowGrouped.delete(workflowFindingKey(otherEntry.workflow, otherEntry.ruleId));
+      workflowGrouped.delete(workflowFindingKey(otherEntry));
     }
 
     repositoryGrouped.delete(repoKey);
