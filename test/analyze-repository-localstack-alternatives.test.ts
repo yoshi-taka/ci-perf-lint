@@ -110,13 +110,27 @@ describe("LocalStack emulator alternatives", () => {
       expect(matches[0]?.severity).toBe("warning");
       expect(matches[0]?.message).toContain(image);
       expect(matches[0]?.location.line).toBe(9);
-      for (const name of ["Floci", "MiniStack", "fakecloud"]) {
+      for (const name of ["AWS Emulator", "Floci", "MiniStack", "fakecloud"]) {
         expect(matches[0]?.suggestion).toContain(name);
       }
       expect(matches[0]?.suggestion).not.toContain("Moto");
       expect(matches[0]?.suggestion).toContain("AGPL-3.0");
     });
   }
+  test("separates AWS Emulator fidelity and API speed from memory and CI startup", () => {
+    for (const name of ["positive-0", "docker-run-positive"]) {
+      const finding = findings(name)[0]!;
+      expect(finding.message).toContain("AWS Emulator");
+      expect(finding.why).toContain("AWS behavior fidelity and API speed");
+      expect(finding.why).toContain("lower memory use and faster CI startup");
+      expect(finding.suggestion).toContain("Other alternatives can use less memory");
+      expect(finding.suggestion).toContain("released package or image");
+      expect(finding.measurementHint).toContain("API latency and throughput");
+      expect(finding.measurementHint).toContain("install time");
+      expect(finding.aiHandoff).toContain("AWS Emulator");
+      expect(finding.aiHandoff).toContain("where other alternatives can be better");
+    }
+  });
   for (const [index, image] of negative.entries()) {
     test(`does not warn for ${image}`, () => {
       expect(findings(`negative-${index}`)).toHaveLength(0);

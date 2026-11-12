@@ -2,7 +2,9 @@
 
 ## Why it matters
 
-Local AWS emulation can contribute image-pull, startup, memory, and integration-test costs. Floci, MiniStack, and fakecloud offer alternative implementations, and external OSS projects have migrated real tests to them. This warning prompts evaluation; it does not establish that LocalStack is slow or promise a speedup.
+Local AWS emulation can contribute download, installation, startup, memory, and integration-test costs. AWS Emulator, Floci, MiniStack, and fakecloud offer alternative implementations; external OSS projects have migrated real tests to Floci, MiniStack, and fakecloud. This warning prompts evaluation; it does not establish that LocalStack is slow or promise a speedup.
+
+AWS Emulator is worth evaluating for AWS behavior fidelity and API speed. Project-specific validation found strengths in those areas, while other alternatives performed better on memory use and CI startup. These are separate tradeoffs, not a claim that AWS Emulator is the lightest or fastest to provision. Recheck required operations with the project's unchanged tests; fidelity-suite scores alone do not establish compatibility.
 
 Performance evidence checked on 2026-11-04 (upstream authors' measurements, not independently reproduced here):
 
@@ -18,19 +20,20 @@ An enabled GitHub Actions job with an official `localstack/localstack` or `local
 
 ## Suggested action
 
-Evaluate all three candidates against the project's actual requirements rather than choosing by advertised service count or vendor benchmarks:
+Evaluate all four candidates against the project's actual requirements rather than choosing by advertised service count or vendor benchmarks:
 
+- [AWS Emulator](https://github.com/aws/aws-emulator): AWS's local emulator, licensed CC0-1.0 with Apache-2.0 vendored components. Consider it for behavior fidelity and API speed, not as the default memory or CI-startup winner. Prefer a pinned prebuilt package for Linux CI; container and embedded modes have different provisioning/build costs. Check required APIs, endpoint/TLS configuration, and telemetry settings before migration.
 - [Floci](https://github.com/floci-io/floci): MIT-licensed local AWS emulator. [Apache Camel Quarkus](https://github.com/apache/camel-quarkus/pull/9293) continues updating it after migration; [omniload](https://github.com/panodata/omniload/pull/63) migrated DynamoDB-related tests.
 - [MiniStack](https://github.com/ministackorg/ministack): MIT-licensed local AWS emulator. [Global Bible Tools](https://github.com/globalbibletools/platform/pull/314) migrated local S3 usage.
 - [fakecloud](https://github.com/faiscadev/fakecloud): AGPL-3.0 local AWS emulator; review the license before adoption. [Grafana k6-jslib-aws](https://github.com/grafana/k6-jslib-aws/pull/195) migrated AWS integration tests, documenting compatibility adjustments rather than claiming a drop-in replacement.
 
-Pin a released image only after checking required operations, Lambda runtimes, event routing, IAM, persistence, state isolation, Docker socket requirements, and health checks. Retain LocalStack when alternatives cannot meet the test contract. Do not remove assertions to make a migration pass.
+Pin a released package or image only after checking required operations, Lambda runtimes, event routing, IAM, persistence, state isolation, Docker socket requirements, and health checks. Retain LocalStack when alternatives cannot meet the test contract. Do not remove assertions to make a migration pass.
 
 Moto is intentionally not recommended here: this rule evaluates broader emulator replacements, not switching test architecture to API mocking. Moto does have an HTTP server mode usable from languages other than Python; its omission is not a claim that it is Python-only.
 
 ## Verification
 
-Compare cold image-pull time, service readiness, peak memory including child containers, and complete integration-test time using equivalent runners and fixtures. Run the existing tests without weakening assertions. Verify actual function execution and cross-service delivery, not only successful resource creation. No fixed speedup multiplier is assumed.
+Compare AWS behavior fidelity, API latency and throughput, cold package-download or image-pull and installation time, service readiness, peak memory including child containers, and complete integration-test time using equivalent runners and fixtures. Keep API speed separate from total CI provisioning time. Run the existing tests without weakening assertions. Verify actual function execution and cross-service delivery, not only successful resource creation. No fixed speedup multiplier is assumed.
 
 ## What the scanner does
 
