@@ -83,7 +83,6 @@ export function fixtureCacheKey(options: CacheOptions): string {
     options.repositoryOnly ?? false,
     options.topCount ?? 20,
     process.env.AGENT ?? "",
-    process.env.CI_PERF_LINT_DISABLE_OXLINT ?? "",
     process.env.CI_PERF_LINT_SHARED_DIAGNOSTICS ?? "",
   ]);
 }

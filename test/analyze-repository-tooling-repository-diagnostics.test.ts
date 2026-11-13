@@ -6,7 +6,7 @@ import { fixtures } from "./fixtures.ts";
 import { getFixtureReport, tempDirs } from "./repository-diagnostics-test-helpers.ts";
 
 describe("analyzeRepository repo-aware and tooling rules: repository diagnostics", () => {
-  test("keeps embedded oxlint barrel findings after its pre-signal prewarm", async () => {
+  test("detects large barrels with the native source audit", async () => {
     const report = await getFixtureReport(fixtures.barrelFileLike, {
       targetPath: ".",
       topCount: 20,
@@ -84,7 +84,7 @@ describe("analyzeRepository repo-aware and tooling rules: repository diagnostics
     expect(declarationFinding?.suggestion).toContain("public type surface");
   });
 
-  test("skips the embedded barrel scan when oxlint is already present in the repository", async () => {
+  test("skips the barrel audit when a repository already uses an Oxlint guardrail", async () => {
     const report = await getFixtureReport(fixtures.barrelFileSkipOxlintLike, {
       targetPath: ".",
       topCount: 20,
@@ -96,7 +96,7 @@ describe("analyzeRepository repo-aware and tooling rules: repository diagnostics
     );
   });
 
-  test("ignores vendored node_modules files in the embedded barrel scan", async () => {
+  test("ignores vendored node_modules files in the barrel audit", async () => {
     const fixtureRoot = await tempDirs.create("apl-barrel-ignore-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
     const vendoredDir = path.join(fixtureRoot, "node_modules", "pkg");
@@ -138,7 +138,7 @@ describe("analyzeRepository repo-aware and tooling rules: repository diagnostics
     );
   });
 
-  test("detects MUI barrel imports with embedded oxlint no-restricted-imports", async () => {
+  test("detects MUI barrel imports with the native source audit", async () => {
     const strictReport = await getFixtureReport(fixtures.muiBarrelImportLike, {
       targetPath: ".",
       topCount: 20,
@@ -178,9 +178,6 @@ describe("analyzeRepository repo-aware and tooling rules: repository diagnostics
     const findings = report.findings.filter(
       (candidate) => candidate.ruleId === "prefer-explicit-import-extensions",
     );
-    if (findings.length === 0) {
-      return; // oxlint unavailable on this machine
-    }
     expect(findings).toHaveLength(1);
     const [finding] = findings;
     expect(finding?.scope).toBe("repository");
@@ -260,8 +257,7 @@ describe("analyzeRepository repo-aware and tooling rules: repository diagnostics
     ).toBe(false);
   });
 
-  // Skipped: same SIGILL reason as above.
-  test("warns on large Jest inline snapshots with embedded oxlint", async () => {
+  test("warns on large Jest inline snapshots with the native source audit", async () => {
     const fixtureRoot = await tempDirs.create("apl-large-jest-snapshot-");
     const workflowDir = path.join(fixtureRoot, ".github", "workflows");
     const srcDir = path.join(fixtureRoot, "src");
@@ -310,15 +306,13 @@ describe("analyzeRepository repo-aware and tooling rules: repository diagnostics
     });
 
     const finding = report.findings.find((candidate) => candidate.ruleId === "large-jest-snapshot");
-    if (!finding) {
-      return; // oxlint unavailable on this machine
-    }
-    expect(finding.scope).toBe("repository");
-    expect(finding.severity).toBe("warning");
-    expect(finding.confidence).toBe("high");
-    expect(finding.docsPath).toBe("docs/rules/large-jest-snapshot.md");
-    expect(finding.location.path).toBe("src/component.test.js");
-    expect(finding.message).toContain("large Jest snapshot");
+    expect(finding).toBeDefined();
+    expect(finding?.scope).toBe("repository");
+    expect(finding?.severity).toBe("warning");
+    expect(finding?.confidence).toBe("high");
+    expect(finding?.docsPath).toBe("docs/rules/large-jest-snapshot.md");
+    expect(finding?.location.path).toBe("src/component.test.js");
+    expect(finding?.message).toContain("large Jest snapshot");
   });
 
   test("warns on large external Jest snapshot files", async () => {

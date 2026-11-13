@@ -48,6 +48,11 @@ is a candidate bug: reproduce it in the real code and check the intended behavio
 before calling it a defect. "No counterexample" means only none within the modeled
 conditions, not that the entire codebase is bug-free.
 
+Native source-audit verification uses Bun + the official `z3-solver` WASM bindings,
+with an isolated optional manifest/lock under `formal/`; no Python is needed.
+Run `bun install --cwd formal --frozen-lockfile`, then
+`bun run --cwd formal verify:source`. See the scope in `formal/README.md`.
+
 For either tool: state the property and assumptions, replay counterexamples against
 the implementation, and turn confirmed defects into ordinary regression tests.
 
@@ -309,7 +314,76 @@ negative control if behavior was untested, or document an equivalent mutant. Do 
 raise coverage claims from a raw mutation score or disable transformations simply
 to turn the run green.
 
-## `analysisWarnings` map
+## Native source-audit validation targets
+
+### Resource limits
+
+`bun run test` uses two **file workers** (`--parallel=2`), a 2,048 MiB sampled
+process-tree RSS budget and a 180 s deadline. `--max-concurrency` controls tests
+within a worker; it does not cap file-worker processes. The supervisor directly
+kills observed descendants (including separate process groups) before their
+wrapper. `--no-orphans` supplements this; it was insufficient alone for a
+microtask-starved worker. Cleanup regressions inspect liveness at the runner's exit,
+not only after output EOF, which can hide a surviving child.
+
+The three `test:slow:mutation:source-*` commands run one Stryker worker and one
+Bun file worker, with a 1,536 MiB tree budget and a 30-minute overall deadline.
+`test:mutation:source` is the internal command used inside that bounded runner;
+do not use it for unbounded manual mutant replay. Do not overlap full tests,
+mutation trials and manual replay jobs.
+
+`scripts/run-bounded.ts` samples RSS every 100 ms, including descendants in
+different process groups. This is a fail-fast guard, **not an OS hard memory
+limit**: short spikes between samples can exceed the threshold. Sampling failure
+fails closed. Exit 137 means the memory guard fired, 124 means deadline, and 125
+means guard/setup failure; none is a passing test or proof of a killed mutant.
+The runner currently requires POSIX `ps`/process groups and Bun's `--no-orphans`
+support (verified with Bun 1.4.4). This affects development test commands, not the
+published Node CLI. `boundary-bounded-runner.test.ts` verifies limits and cleanup
+using allocation fixtures capped at 128 MiB, not unrestricted OOM experiments.
+
+- Boundary/regression: `test/boundary-source-*.test.ts`, including shadowing,
+  resolver ambiguity, every JS line terminator, thresholds and cyclic graphs.
+  `boundary-source-reference-resolver.test.ts` adds JSONC properties, static map
+  ownership/ambiguity and real analyzer canonicalization. `boundary-source-sfc.test.ts`
+  checks framework offsets, script isolation, malformed/unsupported regions and
+  no target execution, template imports and framework-generated-JS scope comparisons;
+  `boundary-source-jest-aliases.test.ts` covers unwritten aliases and transparent wrappers.
+  `boundary-source-resolution-safety.test.ts` pins exact/over traversal budgets,
+  inheritance depth, unsupported modifiers and SFC parser/scaffold selection.
+- Entry points: `test/analyze-repository-source-imports.test.ts` and
+  `test/source-audit-e2e.test.ts`; separate package smoke tests install production
+  dependencies only and check the Node CLI with no Oxlint package present.
+- Property/metamorphic/differential: `test/fuzz-source-audit.test.ts`.
+  `SOURCE_AUDIT_FUZZ_RUNS=2000 FAST_CHECK_SEED=20261113 bun run test test/fuzz-source-audit.test.ts`.
+  The graph oracle uses an independently implemented fixed-point closure;
+  duplicate/reordered facts must not inflate results. Interrupts fail, not pass.
+- Combinatorial: `test/pairwise-cluster-source-audit.test.ts` checks all declared
+  parameter pairs and real findings; it is not exhaustive over all combinations.
+- Mutation: `bun --bun stryker run stryker/stryker.source-audit.config.mjs`.
+  The sandbox mutates eight named modules, including scan orchestration and
+  external snapshot parsing, not all repository
+  collectors. No in-place rewrite. JSON evidence is saved under `docs/internal/`.
+  Surviving mutants need review; timeouts are reported separately from kills.
+  `bun run test:slow:mutation:source-collectors` checks source gates/report builders;
+  `bun run test:slow:mutation:source-resolution` checks config/package maps and SFC
+  extraction. Separate trial reports must not be presented as whole-program proof.
+- Coverage-guided: build with
+  `bun build src/repository-diagnostics/source-audit-parser.ts --target node --format esm --outfile dist/fuzz-source-audit.mjs --external oxc-parser`.
+  Copy `fuzz/corpus/source-audit/` to a temporary/ignored corpus directory, then run
+  `bunx --no-install jazzer fuzz/source-audit.fuzz.mjs <corpus> -- -max_total_time=20 -max_len=4096`.
+  This instruments the JS extraction boundary, not the native Rust parser.
+- Line/function coverage can be collected with `bun run test --coverage` on those
+  tests. High line coverage is not branch completeness or mutation strength.
+- Existing golden/reporter, CLI, workflow partitioning and cross-platform suites
+  remain in `bun run test`; those methods do not imply source rules support every
+  CI dialect. Source finding entrypoints are explicitly checked for all four CI
+  dialects in `test/boundary-source-audit-followups.test.ts`.
+- Optional source models for Lean/Alloy/TLA+ run with
+  `bun run --cwd formal verify:models` after providing local tool paths;
+  see `formal/README.md` for assumptions, finite scopes and intentional mutants.
+
+## `analysisWarnings` map (reference)
 
 `ReportData.analysisWarnings` is internal scan telemetry, not primary user-facing output.
 
@@ -321,7 +395,7 @@ to turn the run green.
 | Repository file read / JSON parse | `src/repository-scan-context.ts` | `Failed to read file while collecting repository signals: ...` / `Failed to parse JSON while collecting repository signals: ...` | Common source for malformed `package.json` cases. |
 | Repository diagnostics collector wrapper | `src/repository-diagnostics/index.ts` | `Collector <id> failed: ...` | Per-collector failure guardrail. |
 | Docker build target fallback | `src/repository-diagnostics/docker-build-targets.ts` | collector-specific `context.warn(...)` | Narrow helper warning path. |
-| Embedded Oxlint runtime | `src/repository-diagnostics/embedded-oxlint-runner.ts` | `Embedded Oxlint ...` | Binary missing, stderr, bad JSON, exit-without-json, runtime failure. |
+| Native source audits | `src/repository-diagnostics/source-audit.ts` | `source-audit` | Unsupported component files, JS/TS parse failures; boundary and Node CLI tests cover syntax/provenance/exclusions without a linter runtime. |
 
 ### Test guidance for `analysisWarnings`
 

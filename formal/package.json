@@ -1,0 +1,12 @@
+{
+  "name": "ci-perf-source-audit-verification",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify:source": "bun import-audit.ts",
+    "verify:models": "bun source-models.ts"
+  },
+  "devDependencies": {
+    "z3-solver": "5.4.1"
+  }
+}

@@ -24,8 +24,6 @@ import type {
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
 import type { AnyWorkflowDocument, CiKind } from "./ci-types.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
-import type { EmbeddedOxlintScanPlan } from "./repository-diagnostics/embedded-oxlint-config.ts";
-import { prewarmEmbeddedOxlint } from "./repository-diagnostics/embedded-oxlint.ts";
 import { collectJobSummaries } from "./repository-similar-workflows-job-summaries.ts";
 import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts";
 import type { RepositorySignals } from "./repository-signals-types.ts";
@@ -127,23 +125,6 @@ function uniqueWarnings(warnings: AnalysisWarning[]): AnalysisWarning[] {
   }
 
   return deduped;
-}
-
-async function conservativeEmbeddedOxlintScanPlan(
-  scanContext: RepositoryScanContext,
-): Promise<EmbeddedOxlintScanPlan> {
-  const likelyJavaScript = await scanContext.findRootFile([
-    "package.json",
-    "tsconfig.json",
-    "jsconfig.json",
-  ]);
-  const enabled = likelyJavaScript !== null;
-  return {
-    importExtensions: enabled,
-    restrictedImports: enabled,
-    barrels: enabled,
-    snapshots: enabled,
-  };
 }
 
 async function parseWorkflowFile(
@@ -278,18 +259,6 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   );
 
   const jobSummaries = collectJobSummaries(githubWorkflows);
-  let prewarmedEmbeddedOxlint = false;
-  if (!workflowOnly && process.env.AGENT !== "1") {
-    const embeddedOxlintPlan = await conservativeEmbeddedOxlintScanPlan(scanContext);
-    if (Object.values(embeddedOxlintPlan).some(Boolean)) {
-      // Do not attach background warnings to the user-facing report.
-      void prewarmEmbeddedOxlint(target.repoRoot, embeddedOxlintPlan, scanContext).catch(() => {});
-      prewarmedEmbeddedOxlint = true;
-    }
-  }
-  timer.mark(
-    prewarmedEmbeddedOxlint ? "embedded-oxlint-prewarm" : "embedded-oxlint-prewarm-skipped",
-  );
   const repositoryAnalysis = await collectRepositorySignals(
     target.repoRoot,
     githubWorkflows,
@@ -532,7 +501,13 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
     return transformMetadata ? { ...finding, transformMetadata } : finding;
   });
 
-  const uniqueAnalysisWarnings = uniqueWarnings(analysisWarnings);
+  // Native source collectors share a context whose warning sink differs from
+  // collector warnings. Copy only their completed audit telemetry, not unrelated
+  // background/prewarm warnings whose arrival order is nondeterministic.
+  const uniqueAnalysisWarnings = uniqueWarnings([
+    ...analysisWarnings,
+    ...scanContext.warnings.filter((warning) => warning.source === "source-audit"),
+  ]);
   const measureCompletenessReport: MeasureCompleteness = {
     totalWorkflows: measureCompleteness.totalWorkflows,
     evaluatedWorkflows: measureCompleteness.evaluatedWorkflowPaths.size,

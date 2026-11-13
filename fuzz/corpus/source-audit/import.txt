@@ -1,0 +1,4 @@
+import {type Options, format as renamed} from "date-fns";
+import {ReactComponent as Logo} from "./logo.svg";
+export {format as other} from "date-fns";
+export * from "./other";

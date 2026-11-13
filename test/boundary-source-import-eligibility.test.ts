@@ -1,24 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFile } from "node:fs/promises";
 import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 import { collectRepositorySignals } from "../src/repository-signals.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
-import { writeEmbeddedOxlintConfig } from "../src/repository-diagnostics/embedded-oxlint-config.ts";
-import { buildEmbeddedOxlintScanPlan } from "../src/repository-diagnostics/embedded-oxlint-plan.ts";
 import { collectExplicitImportExtensionDiagnostics } from "../src/repository-diagnostics/imports.ts";
 import { createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 afterEach(async () => tempDirs.cleanup());
 
-const collectorIds = [
-  "prefer-explicit-import-extensions",
-  "restricted-import-diagnostics",
-  "detected-large-barrel-file",
-  "large-jest-snapshot",
-];
-
-async function createScenario(files: Record<string, string> = { "package.json": "{}" }) {
+async function createScenario(
+  files: Record<string, string> = { "package.json": "{}", "src/a.ts": 'import {x} from "./x";' },
+) {
   const repoRoot = await tempDirs.create("apl-oxlint-plan-");
   await writeRepositoryFiles(repoRoot, files);
   const context = new RepositoryScanContext(repoRoot, []);
@@ -33,39 +25,25 @@ async function createScenario(files: Record<string, string> = { "package.json": 
   return { repoRoot, context, repository };
 }
 
-describe("embedded Oxlint scan eligibility", () => {
-  test("omits extension checks for a non-Vite repository without dropping other groups", async () => {
+describe("native import scan eligibility", () => {
+  test("omits extension checks for non-Vite repositories", async () => {
     const { repoRoot, repository, context } = await createScenario();
     repository.frameworks.usesVite = false;
 
-    const plan = await buildEmbeddedOxlintScanPlan(collectorIds, repository, context);
-    expect(plan).toEqual({
-      importExtensions: false,
-      restrictedImports: true,
-      barrels: true,
-      snapshots: true,
-    });
-    const config = JSON.parse(await readFile(await writeEmbeddedOxlintConfig(plan), "utf8")) as {
-      rules: Record<string, unknown>;
-    };
-    expect(config.rules).not.toHaveProperty("import/extensions");
-    expect(config.rules).toHaveProperty("no-restricted-imports");
-    expect(config.rules).toHaveProperty("oxc/no-barrel-file");
-    expect(config.rules).toHaveProperty("jest/no-large-snapshots");
     expect(
       await collectExplicitImportExtensionDiagnostics(repoRoot, repository, [], context),
     ).toEqual([]);
   });
 
   test.each(["usesVite", "usesAstro", "usesSvelteKit", "usesSolidStart"] as const)(
-    "preserves extension checks for eligible %s repositories",
+    "runs native extension checks for eligible %s repositories",
     async (framework) => {
-      const { repository, context } = await createScenario();
+      const { repoRoot, repository, context } = await createScenario();
       repository.frameworks.usesVite = false;
       repository.frameworks[framework] = true;
       expect(
-        (await buildEmbeddedOxlintScanPlan(collectorIds, repository, context)).importExtensions,
-      ).toBe(true);
+        await collectExplicitImportExtensionDiagnostics(repoRoot, repository, [], context),
+      ).toHaveLength(1);
     },
   );
 
@@ -80,34 +58,34 @@ describe("embedded Oxlint scan eligibility", () => {
       }
       if (scenario === "no-workflows") {
         repository.workflowCount = 0;
+        repository.primaryWorkflowPath = undefined;
       }
       if (scenario === "no-primary-workflow") {
         repository.primaryWorkflowPath = undefined;
       }
 
       expect(
-        (await buildEmbeddedOxlintScanPlan(collectorIds, repository, context)).importExtensions,
-      ).toBe(false);
-      expect(
         await collectExplicitImportExtensionDiagnostics(repoRoot, repository, [], context),
       ).toEqual([]);
     },
   );
 
-  test("preserves JavaScript detection in subdirectories", async () => {
-    const { repository, context } = await createScenario({ "app/package.json": "{}" });
+  test("non-GitHub primary CI remains eligible with zero GitHub workflow count", async () => {
+    const { repoRoot, repository, context } = await createScenario();
+    repository.workflowCount = 0;
+    repository.primaryWorkflowPath = ".gitlab-ci.yml";
     expect(
-      (await buildEmbeddedOxlintScanPlan(collectorIds, repository, context)).importExtensions,
-    ).toBe(true);
+      await collectExplicitImportExtensionDiagnostics(repoRoot, repository, [], context),
+    ).toHaveLength(1);
   });
 
-  test("does not enable unselected groups even for an eligible repository", async () => {
-    const { repository, context } = await createScenario();
-    expect(await buildEmbeddedOxlintScanPlan([], repository, context)).toEqual({
-      importExtensions: false,
-      restrictedImports: false,
-      barrels: false,
-      snapshots: false,
+  test("preserves JavaScript detection in subdirectories", async () => {
+    const { repoRoot, repository, context } = await createScenario({
+      "app/package.json": "{}",
+      "app/a.ts": 'export * from "./x";',
     });
+    expect(
+      await collectExplicitImportExtensionDiagnostics(repoRoot, repository, [], context),
+    ).toHaveLength(1);
   });
 });

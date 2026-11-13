@@ -8,15 +8,6 @@ if (fastCheckSeed !== undefined && /^\d+$/.test(fastCheckSeed)) {
   fc.configureGlobal({ seed: Number(fastCheckSeed) % 2 ** 31 });
 }
 
-const originalDisableEmbeddedOxlintPrewarm = process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM;
-
-process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM = "1";
-
 afterAll(() => {
-  if (originalDisableEmbeddedOxlintPrewarm === undefined) {
-    delete process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM;
-  } else {
-    process.env.CI_PERF_LINT_DISABLE_OXLINT_PREWARM = originalDisableEmbeddedOxlintPrewarm;
-  }
   clearTestCaches();
 });

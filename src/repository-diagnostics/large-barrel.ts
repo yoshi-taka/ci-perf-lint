@@ -2,7 +2,7 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import { collectEmbeddedOxlintDiagnosticsByCode } from "./embedded-oxlint.ts";
+import { collectSourceAudit } from "./source-audit.ts";
 import type { DiagnosticOp } from "../rules/shared/diagnostic-ops.ts";
 import { applyOps } from "../rules/shared/diagnostic-ops.ts";
 
@@ -48,7 +48,7 @@ function buildBarrelAiHandoff(relativePath: string, generated: boolean): string 
     return `Review ${relativePath} as a generated large barrel. Prefer fixing the generator or upstream source layout instead of hand-editing generated output, and only narrow broad \`export *\` re-exports when regeneration stays safe.`;
   }
 
-  return `Review ${relativePath} and remove broad \`export *\` barrel patterns that Oxlint flagged as oversized. Keep API boundaries narrow, prefer direct imports where possible, and evaluate adding \`no-barrel-file\` as a guardrail.`;
+  return `Review ${relativePath} and remove broad \`export *\` barrel patterns flagged by the source audit. Keep API boundaries narrow, prefer direct imports where possible, and evaluate adding \`no-barrel-file\` as a guardrail.`;
 }
 
 export async function collectLargeBarrelFileDiagnostics(
@@ -70,38 +70,29 @@ export async function collectLargeBarrelFileDiagnostics(
     return [];
   }
 
-  if (repository.workflowCount === 0 || !repository.primaryWorkflowPath) {
+  if (!repository.primaryWorkflowPath) {
     return [];
   }
 
-  const barrelDiagnostics = await collectEmbeddedOxlintDiagnosticsByCode(
-    repoRoot,
-    "oxc(no-barrel-file)",
-    warnings,
-    context,
-  );
-  if (!barrelDiagnostics) {
-    return [];
-  }
+  const barrelDiagnostics = (await collectSourceAudit(context)).barrels;
 
   const results = await Promise.allSettled(
-    barrelDiagnostics.map(async ({ diagnostic, relativePath }) => {
-      const contextText = diagnostic.message;
+    barrelDiagnostics.map(async ({ line, column, sourceCount, relativePath }) => {
       const fileContent = (await context.readTextFileOrWarn(context.resolve(relativePath))) ?? "";
       const generated = barrelFileLooksGenerated(fileContent);
       const advisoryOnly = generated || relativePath.endsWith(".d.ts");
       const why =
-        "Embedded Oxlint `oxc/no-barrel-file` detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.";
+        "The source audit detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.";
       const suggestion = buildBarrelSuggestion(relativePath, generated);
 
       const builtDiagnostic = buildRepositoryDiagnostic(repository, barrelFileMeta, {
         location: {
           path: relativePath,
-          line: diagnostic.line,
-          column: diagnostic.column,
+          line,
+          column,
         },
         severity: undefined,
-        message: `Embedded Oxlint scan flagged ${relativePath} as a large barrel file. ${contextText}`,
+        message: `Source audit flagged ${relativePath} as a large barrel file: wildcard re-exports reach at least ${sourceCount} distinct module references.`,
         why,
         suggestion,
         measurementHint:

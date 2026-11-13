@@ -1,0 +1,19 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "ci-perf-source-audit-verification",
+      "devDependencies": {
+        "z3-solver": "5.4.1",
+      },
+    },
+  },
+  "packages": {
+    "async-mutex": ["async-mutex@0.3.2", "", { "dependencies": { "tslib": "^2.3.1" } }, "sha512-HuTK7E7MT7jZEh1P9GtRW9+aTWiDWWi9InbZ5hjxrnRa39KS4BW04+xLBhYNS2aXhHUIKZSw3gj4Pn1pj+qGAA=="],
+
+    "tslib": ["tslib@2.9.1", "", {}, "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA=="],
+
+    "z3-solver": ["z3-solver@5.4.1", "", { "dependencies": { "async-mutex": "^0.3.2" } }, "sha512-HyRpufMZ1NuaYfnxzc34qw9tLzwoUipv8ySfRewnCwXaKVuT5LHs313+edFfaWs0MLmk1v9yg4V44QqtdFLtDg=="],
+  }
+}

@@ -15,6 +15,67 @@ CI runs all verifiers in the `formal` job; ordinary regression tests need no Lea
 
 ## Incremental verification
 
+The separate exploratory source-audit check runs entirely on Bun + Z3/WASM:
+
+```sh
+bun install --cwd formal --frozen-lockfile
+bun run --cwd formal verify:source
+```
+
+After that isolated install, `bun run verify:source-audit` is an equivalent root
+shortcut. Optional type-aware checking:
+`bunx --no-install oxlint --type-aware --type-check --deny-warnings formal/import-audit.ts`.
+
+`formal/package.json` and its lock isolate the optional `z3-solver` dependency
+from root installs, the product, and ordinary CI. Python is not required.
+The script terminates Z3 workers in `finally`, treats unknown/timeouts as failure,
+and checks the native
+import eligibility model with Z3 and compares current TypeScript on all 128
+Boolean inputs, plus size-threshold properties and 906 concrete size inputs.
+It also compares real AST extraction and barrel traversal on all 512 directed
+three-node graphs with a fixed 99-reference baseline (bounded graph evidence).
+Parser correctness and discovery are outside that model;
+ordinary source-import tests cover concrete syntax and repository behavior.
+This check is not part of the Lean `verify:formal` command or CI.
+
+### Source-audit models: Lean, Alloy, TLA+
+
+Optional local experiment (no automatic download/global installation or new CI job):
+
+```sh
+LEAN_BIN=/path/to/lean-4.35.0/bin/lean \
+JAVA_BIN=/path/to/java \
+ALLOY_JAR=/path/to/org.alloytools.alloy.dist.jar \
+TLA_JAR=/path/to/tla2tools.jar \
+bun run --cwd formal verify:models
+```
+
+- `SourceAudit.lean`: seven axiom-audited theorems for exact eligibility,
+  arbitrary-natural strict thresholds/capping, root exclusion and duplicate
+  membership. No `sorry`. The runner compares 128 eligibility and 906 count
+  cases with current TS and requires a deliberately wrong cap to fail proof.
+- `SourceResolution.als`: exact-path precedence, uniqueness and ambiguous-leaf
+  behavior up to five files/requests. Positive unique/ambiguous witnesses and a
+  deliberately broken resolver distinguish meaningful checks from empty scopes.
+  The runner also compares all 32 subsets of five concrete path candidates with
+  the actual `resolveSourceReference` helper. This is not full TS config resolution.
+- `SourceCache.tla`: atomic promise publication for three concurrent one-shot
+  callers, one context and eventual completion. TLC checks 15 reachable states,
+  at-most-one start, no premature result, and progress under weak fairness of
+  completion. A delayed-publication mutant must violate at-most-once. The normal
+  Bun regression checks actual promise identity, read count, concurrent completion
+  and fresh facts across contexts. Rejection is abstracted as settlement; hanging
+  I/O, cancellation, multiple worker threads and reentrant callbacks are excluded.
+
+Run Z3 separately with `bun run verify:source-audit`. The four tools answer
+different questions; their results do not combine into a whole-program proof.
+Finite Alloy/TLC exploration is bounded evidence. Lean proves the stated model
+properties generally, **not implementation equivalence**. Ordinary tests link the
+model to real AST extraction, resolver/cache behavior and all four CI entrypoints.
+New models remain local/optional, separate from the existing four-model Lean CI.
+Logs and Alloy receipts are retained in the temporary evidence directory printed
+by `verify:models`; a timeout/tool failure is not a successful verification.
+
 `lake build` checks proofs with warnings as errors and builds the four executables.
 Lake reuses unchanged checked artifacts in ignored `formal/.lake/`; CI caches
 `formal/.lake/build`, keyed by OS, architecture, toolchain, configuration and sources,

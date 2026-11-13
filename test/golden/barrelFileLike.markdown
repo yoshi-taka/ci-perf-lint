@@ -31,8 +31,8 @@
 - Confidence: `high`
 - Scope: `repository-wide source/tooling`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/detected-large-barrel-file`
-- Message: Embedded Oxlint scan flagged src/index.js as a large barrel file. Barrel file detected, 101 modules are loaded which exceeds the threshold of 100.
-- Why it matters: Embedded Oxlint `oxc/no-barrel-file` detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.
+- Message: Source audit flagged src/index.js as a large barrel file: wildcard re-exports reach at least 101 distinct module references.
+- Why it matters: The source audit detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.
 - Suggested action: Replace broad `export *` barrel usage in the flagged file with direct imports or narrower explicit re-exports, then consider adding `no-barrel-file` to keep large barrels from returning.
 - Measurement hint: Compare lint, test, typecheck, or build wall-clock time before and after replacing the flagged barrel with direct imports or narrower re-exports.
 

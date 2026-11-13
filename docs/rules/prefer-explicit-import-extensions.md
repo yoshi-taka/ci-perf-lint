@@ -4,15 +4,15 @@ Large Vite-family repositories should prefer explicit file extensions for relati
 
 ## What it detects
 
-This repository-wide finding uses embedded Oxlint with `import/extensions` configured as `always` and `ignorePackages: true`.
+This finding uses the [native source import audit](../source-import-audit.md) to inspect relative static ESM imports, explicit re-exports and literal dynamic imports. Type-only references, package paths and loader query/fragment paths are ignored. Dotted omitted extensions require one matching source file; exact assets and ambiguous paths are not guessed.
 
 It only runs for large or complex repositories that appear to use Vite, Astro, SvelteKit, or SolidStart. Package imports are intentionally ignored.
 
-The embedded scan plan uses the same eligibility check as this finding. Other JavaScript repositories do not enable `import/extensions` just because another embedded rule needs a scan.
+Other JavaScript repositories do not enable this finding just because another source audit runs. Supported Vue/Svelte/Astro script regions are audited; unsupported languages, external scripts and template coverage gaps emit analysis warnings.
 
 The following are excluded to avoid context-dependent false positives:
 
-- **CommonJS `require()` calls.** Node.js CJS resolver resolves extensionless paths natively without probing candidate extensions. The Vite-family resolver probe cost does not apply.
+- **CommonJS `require()` calls and computed dynamic import paths.** Only literal dynamic imports (including static templates) are inspected; target expressions are never evaluated.
 - **Build output directories.** Files under `dist/`, `build/`, or `out/` are transpiled artifacts; modifying them would not persist across rebuilds.
 
 ## Why it matters

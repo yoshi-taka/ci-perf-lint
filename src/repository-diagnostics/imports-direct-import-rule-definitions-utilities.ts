@@ -27,7 +27,6 @@ const utilityDefs: UtilityEntryData[] = [
     depNames: ["date-fns"],
     meta: dateFnsDirectImportMeta,
     exactSources: ["date-fns"],
-    defaultContextText: "Top-level date-fns import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level date-fns import",
     why: "Next.js optimizes `date-fns` by default because its top-level entry exports many functions. Production bundlers can usually tree-shake it, but CI tooling such as TypeScript, Jest, lint, and build steps may still pay module graph and type-processing cost when importing from the package root.",
     suggestion:
@@ -42,7 +41,6 @@ const utilityDefs: UtilityEntryData[] = [
     depNames: ["lodash-es"],
     meta: lodashEsDirectImportMeta,
     exactSources: ["lodash-es"],
-    defaultContextText: "Top-level lodash-es import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level lodash-es import",
     why: "Next.js optimizes `lodash-es` by default because its top-level entry exports many functions. CI tooling such as Jest, TypeScript, lint, and build steps may pay heavy startup or module graph cost when importing from the package root; upstream Jest/Angular reports show large startup differences from replacing root `lodash-es` imports with direct function imports.",
     suggestion:
@@ -57,7 +55,6 @@ const utilityDefs: UtilityEntryData[] = [
     depNames: ["ramda"],
     meta: ramdaDirectImportMeta,
     exactSources: ["ramda"],
-    defaultContextText: "Top-level ramda import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level ramda import",
     why: "Next.js optimizes `ramda` by default because its top-level entry exports many utility functions. CI tooling such as Jest, TypeScript, lint, and build steps may pay startup or module graph cost when importing from the package root.",
     suggestion:
@@ -72,7 +69,6 @@ const utilityDefs: UtilityEntryData[] = [
     depNames: ["rxjs"],
     meta: rxjsDirectImportMeta,
     exactSources: ["rxjs"],
-    defaultContextText: "Top-level rxjs import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level rxjs import",
     why: "Next.js optimizes `rxjs` by default because the top-level entry exposes many observables, creation functions, subjects, schedulers, and operators. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -87,7 +83,6 @@ const utilityDefs: UtilityEntryData[] = [
     depNames: ["recharts"],
     meta: rechartsDirectImportMeta,
     exactSources: ["recharts"],
-    defaultContextText: "Top-level recharts import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level recharts import",
     why: "Next.js optimizes `recharts` by default because its top-level entry exposes many chart components and utilities. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -102,7 +97,6 @@ const utilityDefs: UtilityEntryData[] = [
     depNames: ["react-use"],
     meta: reactUseDirectImportMeta,
     exactSources: ["react-use"],
-    defaultContextText: "Top-level react-use import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level react-use import",
     why: "Next.js optimizes `react-use` by default because its top-level entry exposes many hooks and utilities. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -138,7 +132,6 @@ export function createUtilityImportRuleDefinitions(
       exactSources: ["effect"],
       matches: (source) => regexMatcher("^@effect/[^/]+$")(source),
       content: makeContent({
-        defaultContextText: "Top-level Effect import detected by embedded Oxlint scan.",
         flaggedDescription: "a top-level Effect import",
         why: "Next.js optimizes `effect` and `@effect/*` by default because these entries can expose many modules. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from top-level package entries.",
         suggestion:

@@ -1,0 +1,6 @@
+async function load() {
+  const dates = await import("date-fns");
+  return import(`./child.controller`);
+}
+import * as jest from "@jest/globals";
+jest.expect(value).toMatchInlineSnapshot(`small`);

@@ -1,6 +1,6 @@
 # prefer-direct-mui-core-imports
 
-This repository-wide finding comes from an embedded `oxlint` scan using `eslint/no-restricted-imports` to detect imports from the `mui-core` package root.
+This finding uses the [native source import audit](../source-import-audit.md) to detect runtime imports and re-exports from the `mui-core` package root.
 
 ## What it flags
 
@@ -20,7 +20,7 @@ Next.js optimizes `mui-core` by default through `optimizePackageImports`, which 
 
 ## What the scanner does
 
-When this tool sees a JavaScript or TypeScript repository that depends on `mui-core` and has JS or TS CI activity, it runs an embedded `oxlint` check with a temporary config equivalent to:
+For repositories depending on `mui-core` with JS or TS CI activity, the native audit applies the restriction illustrated below (not an executed linter configuration):
 
 ```json
 {

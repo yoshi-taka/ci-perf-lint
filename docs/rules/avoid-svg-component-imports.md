@@ -1,6 +1,6 @@
 # avoid-svg-component-imports
 
-This repository-wide finding comes from an embedded `oxlint` scan using `eslint/no-restricted-imports` to detect SVG imports that turn asset files into React, Vue, or similar framework components.
+This finding uses the [native source import audit](../source-import-audit.md) to detect runtime SVG component imports and re-exports in JS/TS files. Component-file extraction is currently unsupported.
 
 The policy is intentionally not "SVG components are always bad." The default should be URL or string asset imports, with component imports reserved for explicit UI primitive locations or cases where component behavior is useful.
 
@@ -37,7 +37,7 @@ URL or string imports let the bundler keep SVGs in the asset pipeline instead.
 
 ## What the scanner does
 
-When this tool sees a JavaScript or TypeScript repository with JS or TS CI activity, it runs an embedded `oxlint` check with a temporary config equivalent to:
+For JavaScript or TypeScript repositories with JS or TS CI activity, the native audit applies the name/path restrictions illustrated below. Namespace imports are also candidates. This is a policy illustration, not an executed linter configuration:
 
 ```json
 {

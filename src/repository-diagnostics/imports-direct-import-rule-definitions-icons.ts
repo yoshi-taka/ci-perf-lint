@@ -29,6 +29,7 @@ interface IconEntryData extends MakeContentOptions {
     | typeof lucideDynamicIconMeta
     | typeof tablerIconsDirectImportMeta;
   exactSources: readonly string[];
+  requiredName?: string;
 }
 
 const standardIconDefs: IconEntryData[] = [
@@ -36,7 +37,6 @@ const standardIconDefs: IconEntryData[] = [
     depNames: ["lucide-react"],
     meta: lucideDynamicIconMeta,
     exactSources: ["lucide-react/dynamic"],
-    defaultContextText: "Lucide DynamicIcon import detected by embedded Oxlint scan.",
     flaggedDescription: "a Lucide dynamic icon import",
     why: "Lucide recommends direct icon imports for static icons. `lucide-react/dynamic` is useful for data-driven icon names, but it imports all icons during build time and can increase build work, generated modules, network requests, and loading flashes.",
     suggestion:
@@ -51,7 +51,7 @@ const standardIconDefs: IconEntryData[] = [
     depNames: ["lucide-angular"],
     meta: lucideAngularIconsMeta,
     exactSources: ["lucide-angular"],
-    defaultContextText: "Lucide Angular icons registry import detected by embedded Oxlint scan.",
+    requiredName: "icons",
     flaggedDescription: "a Lucide Angular icons registry import",
     why: "The `icons` export from `lucide-angular` represents the icon registry pattern and can pull a large icon set into CI-time parsing and transforms. Static Angular icon usage should register or import only the icons the app needs.",
     suggestion:
@@ -66,7 +66,6 @@ const standardIconDefs: IconEntryData[] = [
     depNames: ["@ant-design/icons"],
     meta: antDesignIconsDirectImportMeta,
     exactSources: ["@ant-design/icons"],
-    defaultContextText: "Top-level @ant-design/icons import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level @ant-design/icons import",
     why: "Next.js optimizes `@ant-design/icons` by default because icon packages expose many components. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the icon package root.",
     suggestion:
@@ -81,7 +80,6 @@ const standardIconDefs: IconEntryData[] = [
     depNames: ["@tabler/icons-react"],
     meta: tablerIconsDirectImportMeta,
     exactSources: ["@tabler/icons-react"],
-    defaultContextText: "Top-level @tabler/icons-react import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level @tabler/icons-react import",
     why: "Next.js optimizes `@tabler/icons-react` by default because icon packages expose many components from their package root. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the icon package root.",
     suggestion:
@@ -115,7 +113,6 @@ const standardIconDefs: IconEntryData[] = [
       "@heroicons/svelte/24/solid",
       "@heroicons/svelte/24/outline",
     ],
-    defaultContextText: "Heroicons grouped icon import detected by embedded Oxlint scan.",
     flaggedDescription: "a grouped Heroicons import",
     why: "Next.js optimizes `@heroicons/react/20/solid`, `@heroicons/react/24/solid`, and `@heroicons/react/24/outline` by default because each entry can expose many icons. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from these grouped icon entries.",
     suggestion:
@@ -130,7 +127,6 @@ const standardIconDefs: IconEntryData[] = [
     depNames: fontAwesomeIconPackRoots,
     meta: fontAwesomeDirectImportMeta,
     exactSources: fontAwesomeIconPackRoots,
-    defaultContextText: "Top-level Font Awesome icon pack import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level Font Awesome icon pack import",
     why: "Next.js optimizes Font Awesome icon packs by default because the package root can expose a large icon catalog. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from icon pack roots.",
     suggestion:
@@ -151,6 +147,9 @@ function toIconDef(
     enabled: dependencyIndexHasAnyDependency(dependencyIndex, data.depNames),
     meta: data.meta,
     exactSources: data.exactSources,
+    accepts: data.requiredName
+      ? (entry) => entry.namespace || entry.names.includes(data.requiredName!)
+      : undefined,
     content: makeContent(data),
   };
 }
@@ -165,7 +164,6 @@ export function createIconAndAssetImportRuleDefinitions(
       meta: reactIconsDirectImportMeta,
       matches: (source) => regexMatcher("^react-icons/[^/]+$")(source),
       content: makeContent({
-        defaultContextText: "Grouped react-icons import detected by embedded Oxlint scan.",
         flaggedDescription: "a grouped react-icons import",
         why: "Next.js optimizes `react-icons/*` by default because each icon set entry can expose many icons. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from grouped icon-set entries.",
         suggestion:
@@ -183,8 +181,9 @@ export function createIconAndAssetImportRuleDefinitions(
       matches: (source, relativePath) =>
         !isAllowedSvgComponentImporterPath(relativePath) &&
         suffixMatcher(".svg", ".svg?react", ".svg?vue", ".svg?component")(source),
+      accepts: (entry) =>
+        !entry.source.endsWith(".svg") || entry.namespace || entry.names.includes("ReactComponent"),
       content: makeContent({
-        defaultContextText: "SVG component import detected by embedded Oxlint scan.",
         flaggedDescription: "an SVG component import",
         why: "Converting SVG assets into React, Vue, or similar framework components moves asset bytes through the JavaScript transform and component runtime path. URL or string asset imports let the bundler keep SVG handling in the asset pipeline and avoid framework-specific component work.",
         suggestion:

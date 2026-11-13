@@ -1,6 +1,6 @@
 # avoid-mui-barrel-imports
 
-This repository-wide finding comes from an embedded `oxlint` scan using `eslint/no-restricted-imports` with Material UI's recommended top-level package restriction.
+This finding uses the [native source import audit](../source-import-audit.md) with Material UI's recommended top-level package restriction.
 
 ## What it flags
 
@@ -18,7 +18,7 @@ Icon imports are especially sensitive because `@mui/icons-material` has many exp
 
 ## What the scanner does
 
-When this tool sees a JavaScript or TypeScript repository that depends on MUI and has JS or TS CI activity, it runs an embedded `oxlint` check with a temporary config equivalent to:
+For repositories depending on MUI with JS or TS CI activity, the native audit applies the restriction illustrated below (not an executed linter configuration):
 
 ```json
 {

@@ -39,7 +39,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["@material-ui/core", "@material-ui/icons"],
     meta: materialUiV4DirectImportMeta,
     exactSources: ["@material-ui/core", "@material-ui/icons"],
-    defaultContextText: "Top-level Material UI v4 import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level Material UI v4 import",
     why: "Next.js optimizes `@material-ui/core` and `@material-ui/icons` by default because these top-level entries expose many components and icons. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -54,7 +53,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["mui-core"],
     meta: muiCoreDirectImportMeta,
     exactSources: ["mui-core"],
-    defaultContextText: "Top-level mui-core import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level mui-core import",
     why: "Next.js optimizes `mui-core` by default because its top-level entry can expose many Material UI components. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -69,7 +67,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["antd"],
     meta: antdDirectImportMeta,
     exactSources: ["antd"],
-    defaultContextText: "Top-level antd import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level antd import",
     why: "Next.js optimizes `antd` by default because its top-level entry exposes many components. Ant Design supports ES module tree shaking, but CI tooling such as Jest, TypeScript, lint, and build steps may still pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -84,7 +81,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["@visx/visx"],
     meta: visxDirectImportMeta,
     exactSources: ["@visx/visx"],
-    defaultContextText: "Top-level @visx/visx import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level @visx/visx import",
     why: "Next.js optimizes `@visx/visx` by default because it is an umbrella entry for many visx packages. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -99,7 +95,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["@tremor/react"],
     meta: tremorDirectImportMeta,
     exactSources: ["@tremor/react"],
-    defaultContextText: "Top-level @tremor/react import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level @tremor/react import",
     why: "Next.js optimizes `@tremor/react` by default because its top-level entry exposes many dashboard components. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -114,7 +109,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["react-bootstrap"],
     meta: reactBootstrapDirectImportMeta,
     exactSources: ["react-bootstrap"],
-    defaultContextText: "Top-level react-bootstrap import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level react-bootstrap import",
     why: "Next.js optimizes `react-bootstrap` by default because its top-level entry exposes many components. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -129,7 +123,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["@headlessui/react"],
     meta: headlessUiReactDirectImportMeta,
     exactSources: ["@headlessui/react"],
-    defaultContextText: "Top-level @headlessui/react import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level @headlessui/react import",
     why: "Next.js optimizes `@headlessui/react` by default because its top-level entry exposes many components. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -144,8 +137,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["@headlessui-float/react"],
     meta: headlessUiFloatReactDirectImportMeta,
     exactSources: ["@headlessui-float/react"],
-    defaultContextText:
-      "Top-level @headlessui-float/react import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level @headlessui-float/react import",
     why: "Next.js optimizes `@headlessui-float/react` by default because its top-level entry can expose multiple components and helpers. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:
@@ -160,7 +151,6 @@ const standardUiDefs: UiEntryData[] = [
     depNames: ["@angular/material"],
     meta: angularMaterialDirectImportMeta,
     exactSources: ["@angular/material"],
-    defaultContextText: "Top-level @angular/material import detected by embedded Oxlint scan.",
     flaggedDescription: "a top-level @angular/material import",
     why: "Next.js optimizes `@angular/material` by default because the root package can expose many component modules. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from the package root.",
     suggestion:

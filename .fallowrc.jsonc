@@ -7,7 +7,7 @@
   "ignorePatterns": ["dist/**", "site/**", "packages/ci-perf-lint/**", "test/fixtures/**", "fuzz/**", "profile-*.ts", "scripts/**", "src/rules/shared/evidence-propagation.ts", "src/rules/shared/finding-sheet.ts", "src/rules/shared/singularity.ts", "src/rules/shared/workflow-interaction.ts", "src/transform-stability.ts"],
   "ignoreDependencies": ["bun", "@codspeed/tinybench-plugin", "tsrs"],
   "ignoreBinaries": ["rg"],
-  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts", "src/rules/shared/predicate.ts"],
+  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts", "src/rules/shared/predicate.ts", "stryker/stryker.source-audit.config.mjs", "stryker/stryker.source-collectors.config.mjs", "stryker/stryker.source-resolution.config.mjs"],
   "rules": {
     "circular-dependencies": "error",
     "duplicate-exports": "error"

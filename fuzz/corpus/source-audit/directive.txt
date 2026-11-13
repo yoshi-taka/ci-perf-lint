@@ -1,0 +1,4 @@
+// eslint-disable-next-line no-restricted-imports -- intentional
+import {format} from "date-fns";
+/* oxlint-disable jest/no-large-snapshots */
+expect(value).toMatchInlineSnapshot("small");

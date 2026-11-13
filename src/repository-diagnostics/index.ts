@@ -38,8 +38,6 @@ import { ResourceCache } from "./resource-cache.ts";
 import { ResourceEvaluator } from "./resource-evaluator.ts";
 import type { ResourceEvaluationObservability } from "./semantic-resource.ts";
 import { registerDefaultResources } from "./resources/index.ts";
-import { setEmbeddedOxlintScanPlan } from "./embedded-oxlint.ts";
-import { buildEmbeddedOxlintScanPlan } from "./embedded-oxlint-plan.ts";
 
 const resourceRegistry: ResourceRegistry = new ResourceRegistry();
 registerDefaultResources(resourceRegistry);
@@ -215,15 +213,6 @@ export async function collectRepositoryDiagnostics(
         return left.id.localeCompare(right.id);
       })
     : applicableCollectors;
-
-  setEmbeddedOxlintScanPlan(
-    context.scanContext,
-    await buildEmbeddedOxlintScanPlan(
-      applicableCollectors.map((collector) => collector.id),
-      context.repository,
-      context.scanContext,
-    ),
-  );
 
   for (const collector of repositoryDiagnosticCollectors) {
     if (applicableCollectors.includes(collector)) {

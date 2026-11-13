@@ -1,11 +1,10 @@
 import type { RuleMeta, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
-import type { EmbeddedOxlintDiagnostic } from "./embedded-oxlint.ts";
+import type { SourceImport } from "./source-audit-parser.ts";
 import { nextjsHasAutomaticMuiImportOptimization } from "./imports-shared.ts";
 
 interface RestrictedImportRuleContent {
-  defaultContextText: string;
   message: (relativePath: string, contextText: string) => string;
   why: string;
   suggestion: string;
@@ -19,28 +18,34 @@ export interface RestrictedImportRuleDefinition {
   meta: RuleMeta;
   exactSources?: readonly string[];
   matches?: (source: string | undefined, relativePath: string) => boolean;
+  accepts?: (entry: SourceImport) => boolean;
   content: RestrictedImportRuleContent;
 }
 
 export function buildRestrictedImportDiagnostic(
   repository: RepositorySignals,
   meta: RuleMeta,
-  entry: EmbeddedOxlintDiagnostic,
+  entry: SourceImport,
   content: RestrictedImportRuleContent,
 ): Diagnostic {
-  const contextText = entry.diagnostic.message;
+  const contextText = entry.dynamic
+    ? `Literal dynamic import from '${entry.source}'.`
+    : `Runtime import or re-export from '${entry.source}'.`;
+  const lazyCaution = entry.dynamic
+    ? " Preserve lazy loading and promise/namespace behavior; narrow dynamic subpaths only after checking consumers and the exported API."
+    : "";
 
   return buildRepositoryDiagnostic(repository, meta, {
     location: {
       path: entry.relativePath,
-      line: entry.diagnostic.line,
-      column: entry.diagnostic.column,
+      line: entry.line,
+      column: entry.column,
     },
     message: content.message(entry.relativePath, contextText),
     why: content.why,
-    suggestion: content.suggestion,
+    suggestion: content.suggestion + lazyCaution,
     measurementHint: content.measurementHint,
-    aiHandoff: content.aiHandoff,
+    aiHandoff: content.aiHandoff + lazyCaution,
     score: content.score,
   });
 }
@@ -85,9 +90,8 @@ export function createMuiBarrelImportContent(
     : "";
 
   return {
-    defaultContextText: "Top-level MUI package import detected by embedded Oxlint scan.",
     message: (relativePath, contextText) =>
-      `Embedded Oxlint scan flagged ${relativePath} for a top-level MUI import. ${contextText}`,
+      `Source import audit flagged ${relativePath} for a top-level MUI import. ${contextText}`,
     why: `Material UI recommends avoiding top-level barrel imports such as \`@mui/material\` and \`@mui/icons-material\` because they can slow development startup and rebuilds, especially for icon imports.${nextjsContext}`,
     suggestion:
       "Run `npx @mui/codemod@latest v5.0.0/path-imports <path>` (or `bunx @mui/codemod@latest v5.0.0/path-imports <path>`) to replace existing MUI barrel imports, then prevent regressions with `no-restricted-imports`.",
@@ -100,7 +104,6 @@ export function createMuiBarrelImportContent(
 }
 
 export interface MakeContentOptions {
-  defaultContextText: string;
   flaggedDescription: string;
   why: string;
   suggestion: string;
@@ -111,9 +114,8 @@ export interface MakeContentOptions {
 
 export function makeContent(options: MakeContentOptions): RestrictedImportRuleContent {
   return {
-    defaultContextText: options.defaultContextText,
     message: (relativePath, contextText) =>
-      `Embedded Oxlint scan flagged ${relativePath} for ${options.flaggedDescription}. ${contextText}`,
+      `Source import audit flagged ${relativePath} for ${options.flaggedDescription}. ${contextText}`,
     why: options.why,
     suggestion: options.suggestion,
     measurementHint: options.measurementHint,

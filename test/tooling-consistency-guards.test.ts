@@ -6,22 +6,7 @@ import { Bench } from "tinybench";
 import { getPublishPlan } from "../scripts/publish-package-status.ts";
 import { failedBenchmarkTasks } from "../bench/benchmark-results.ts";
 import { allRules } from "../src/rules/index.ts";
-import { spawnOxlintProcess } from "../src/repository-diagnostics/embedded-oxlint-spawn.ts";
 import { analyzeRepository } from "../src/repo.ts";
-
-describe("external process failures", () => {
-  test("settles every stream and status when an executable is missing", async () => {
-    const process = spawnOxlintProcess(
-      [path.join(import.meta.dir, "missing-oxlint-executable")],
-      import.meta.dir,
-    );
-    const [out, err, code] = await Promise.all([process.stdout, process.stderr, process.exited]);
-    expect(out).toBe("");
-    expect(err).toContain("ENOENT");
-    expect(code).toBe(1);
-    expect(process.timedOut).toBe(false);
-  });
-});
 
 describe("publish idempotency", () => {
   const version = "1.2.0";

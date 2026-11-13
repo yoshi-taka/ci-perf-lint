@@ -1,14 +1,14 @@
 import type { AnalysisWarning, Diagnostic } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
-import { collectIndexedRestrictedImportDiagnostics } from "./embedded-oxlint.ts";
+import { collectSourceAudit } from "./source-audit.ts";
+import type { SourceImport } from "./source-audit-parser.ts";
 import {
   buildRestrictedImportDiagnostic,
   type RestrictedImportRuleDefinition,
 } from "./imports-direct-import-shared.ts";
 import { createRestrictedImportRuleDefinitions } from "./imports-direct-import-rule-definitions.ts";
 import { looksLikeJavaScriptRepository, repositoryUsesMui } from "./imports-shared.ts";
-import type { EmbeddedOxlintDiagnostic } from "./embedded-oxlint.ts";
 import path from "node:path";
 
 function classifyDefinitions(definitions: RestrictedImportRuleDefinition[]): {
@@ -39,7 +39,7 @@ function classifyDefinitions(definitions: RestrictedImportRuleDefinition[]): {
 }
 
 function matchRestrictedImportFindings(
-  entry: EmbeddedOxlintDiagnostic & { source?: string },
+  entry: SourceImport,
   exactSourceDefinitions: Map<string, RestrictedImportRuleDefinition[]>,
   patternDefinitions: RestrictedImportRuleDefinition[],
   repository: RepositorySignals,
@@ -49,6 +49,9 @@ function matchRestrictedImportFindings(
 
   if (source) {
     for (const definition of exactSourceDefinitions.get(source) ?? []) {
+      if (definition.accepts && !definition.accepts(entry)) {
+        continue;
+      }
       findings.push(
         buildRestrictedImportDiagnostic(repository, definition.meta, entry, definition.content),
       );
@@ -56,7 +59,10 @@ function matchRestrictedImportFindings(
   }
 
   for (const definition of patternDefinitions) {
-    if (!definition.matches?.(source, entry.relativePath)) {
+    if (
+      !definition.matches?.(source, entry.relativePath) ||
+      (definition.accepts && !definition.accepts(entry))
+    ) {
       continue;
     }
 
@@ -79,16 +85,12 @@ export async function collectRestrictedImportRepositoryDiagnostics(
     return [];
   }
 
-  if (repository.workflowCount === 0 || !repository.primaryWorkflowPath) {
+  if (!repository.primaryWorkflowPath) {
     return [];
   }
 
   const [dependencyIndexResult, usesMuiResult, indexedDiagnosticsResult] = await Promise.allSettled(
-    [
-      context.loadDependencyIndex(),
-      repositoryUsesMui(context),
-      collectIndexedRestrictedImportDiagnostics(repoRoot, warnings, scanContext),
-    ],
+    [context.loadDependencyIndex(), repositoryUsesMui(context), collectSourceAudit(context)],
   );
 
   if (
@@ -131,7 +133,7 @@ export async function collectRestrictedImportRepositoryDiagnostics(
     }
   }
   const usesMui = usesMuiResult.value;
-  const indexedDiagnostics = indexedDiagnosticsResult.value;
+  const indexedDiagnostics = indexedDiagnosticsResult.value.imports;
   const definitions = createRestrictedImportRuleDefinitions(
     repository,
     dependencyIndex,
@@ -140,7 +142,10 @@ export async function collectRestrictedImportRepositoryDiagnostics(
   const { exactSourceDefinitions, patternDefinitions } = classifyDefinitions(definitions);
   const findings: Diagnostic[] = [];
 
-  for (const entry of indexedDiagnostics.diagnostics) {
+  for (const entry of indexedDiagnostics) {
+    if (!entry.restricted) {
+      continue;
+    }
     findings.push(
       ...matchRestrictedImportFindings(
         entry,

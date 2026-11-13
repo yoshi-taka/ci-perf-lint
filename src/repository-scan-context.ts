@@ -396,15 +396,6 @@ export class RepositoryScanContext {
     }
   }
 
-  async hasFileMatching(predicate: (relativePath: string) => boolean): Promise<boolean> {
-    for await (const relativePath of this.walkFilesIter(".")) {
-      if (predicate(relativePath)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   async walkFiles(relativeDir = ".", options: WalkFilesOptions = {}): Promise<string[]> {
     const callerIgnored = options.ignoredDirectories ?? new Set<string>();
     const include = options.include ?? (() => true);

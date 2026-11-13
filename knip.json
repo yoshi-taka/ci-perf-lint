@@ -18,9 +18,11 @@
         "site/src/layouts/RuleLayout.astro",
         "bench/**/*.bench.ts",
         "bench/run.ts",
+        "stryker/stryker.source-*.config.mjs",
         "fuzz/**/*.mjs",
         "test/**/*.test.ts"
       ]
-    }
+    },
+    "formal": {}
   }
 }

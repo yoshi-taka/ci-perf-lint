@@ -129,7 +129,6 @@ export async function shouldScanExplicitImportExtensions(
   return (
     repository.looksLargeOrComplex &&
     repositoryUsesViteFamily(repository) &&
-    repository.workflowCount > 0 &&
     Boolean(repository.primaryWorkflowPath) &&
     (await looksLikeJavaScriptRepository(scanContext)).value
   );

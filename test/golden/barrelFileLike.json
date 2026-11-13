@@ -47,11 +47,11 @@
       "line": 1,
       "column": 1
     },
-    "message": "Embedded Oxlint scan flagged src/index.js as a large barrel file. Barrel file detected, 101 modules are loaded which exceeds the threshold of 100.",
-    "why": "Embedded Oxlint `oxc/no-barrel-file` detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.",
+    "message": "Source audit flagged src/index.js as a large barrel file: wildcard re-exports reach at least 101 distinct module references.",
+    "why": "The source audit detected a large `export *` barrel. Large barrel files can inflate module graph construction cost for CI lint, test, typecheck, and build steps.",
     "suggestion": "Replace broad `export *` barrel usage in the flagged file with direct imports or narrower explicit re-exports, then consider adding `no-barrel-file` to keep large barrels from returning.",
     "measurementHint": "Compare lint, test, typecheck, or build wall-clock time before and after replacing the flagged barrel with direct imports or narrower re-exports.",
-    "aiHandoff": "Review src/index.js and remove broad `export *` barrel patterns that Oxlint flagged as oversized. Keep API boundaries narrow, prefer direct imports where possible, and evaluate adding `no-barrel-file` as a guardrail.",
+    "aiHandoff": "Review src/index.js and remove broad `export *` barrel patterns flagged by the source audit. Keep API boundaries narrow, prefer direct imports where possible, and evaluate adding `no-barrel-file` as a guardrail.",
     "score": 92
   },
   {

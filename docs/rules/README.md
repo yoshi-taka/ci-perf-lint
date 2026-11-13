@@ -5,6 +5,9 @@ Each rule has:
 - a dedicated implementation module under `src/rules/` (workflow rules) or `src/repository-diagnostics/` (repository-wide diagnostics)
 - a dedicated explainer under `docs/rules/`
 
+Source-code performance rules share the [native source audit](../source-import-audit.md).
+See its supported syntax, suppression comments and incomplete-scan limitations.
+
 Current rule registry:
 
 - `async-test-uses-sync-testclient`

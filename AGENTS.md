@@ -47,7 +47,7 @@ Repository-wide diagnostics:
 - Large current hotspots:
   - `src/repository-diagnostics/dockerfile-instructions.ts` (529 lines)
   - `src/repository-diagnostics/docker-build-targets.ts` (461 lines)
-  - `src/repository-diagnostics/embedded-oxlint-runner.ts` (416 lines)
+  - Native source audit: `source-audit.ts` (context cache/discovery), `source-audit-parser.ts` (shared AST facts), `source-barrel-graph.ts` (bounded relative-reference graph), `jest-inline-snapshots.ts` (Jest provenance/scopes)
   - `src/repository-tooling-signals.ts` is now a thin re-export barrel (14 lines); signal collectors split across:
     - `src/repository-tooling-signals-tailwind-ts.ts` (167 lines)
     - `src/repository-tooling-signals-python.ts` (155 lines)
