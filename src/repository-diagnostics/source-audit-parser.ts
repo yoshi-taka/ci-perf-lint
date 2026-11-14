@@ -81,14 +81,44 @@ export async function parseSourceAudit(
   capture?: (parsed: SourceProgramCapture) => void,
 ): Promise<SourceFileAudit | undefined> {
   const { parseSync, visitorKeys, rawTransferSupported } = await loadOxcParser();
+  const parserFilename =
+    typeof syntaxFilename === "string" ? syntaxFilename : syntaxFilename.filename;
+  if (
+    source.length >= 128 * 1024 &&
+    /\.[cm]?jsx?$/i.test(parserFilename) &&
+    !capture &&
+    !source.includes("InlineSnapshot") &&
+    rawTransferSupported()
+  ) {
+    // Large classic bundles often have no facts. Validate syntax and module metadata
+    // without expanding their AST. Never pass lazy nodes to the ESTree visitors below.
+    const metadataOptions: NonNullable<Parameters<typeof parseSync>[2]> & {
+      experimentalLazy: boolean;
+    } = { experimentalLazy: true };
+    const metadata = parseSync(parserFilename, source, metadataOptions) as unknown as Pick<
+      ReturnType<typeof parseSync>,
+      "errors" | "module"
+    > & { dispose(): void };
+    try {
+      if (metadata.errors.length) {
+        return undefined;
+      }
+      if (!metadata.module.hasModuleSyntax && metadata.module.dynamicImports.length === 0) {
+        return { imports: [], wildcardExports: [], snapshots: [] };
+      }
+    } finally {
+      // Also release before reparsing a module through the eager fallback.
+      metadata.dispose();
+    }
+  }
   // Eager raw transfer preserves ESTree while avoiding JSON serialization and
-  // parsing of every AST. Lazy transfer uses a different node schema; do not use
-  // it here. Oxc's experimental option is not yet in its public ParserOptions.
+  // parsing of every AST. Lazy transfer uses a different node schema; AST consumers
+  // must use eager transfer. These experimental options are not in ParserOptions.
   const transferOptions: NonNullable<Parameters<typeof parseSync>[2]> & {
     experimentalRawTransfer: boolean;
   } = { experimentalRawTransfer: true };
   const parsed = parseSync(
-    typeof syntaxFilename === "string" ? syntaxFilename : syntaxFilename.filename,
+    parserFilename,
     source,
     rawTransferSupported() ? transferOptions : undefined,
   );
