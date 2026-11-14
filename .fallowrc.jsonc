@@ -7,7 +7,7 @@
   "ignorePatterns": ["dist/**", "site/**", "packages/ci-perf-lint/**", "test/fixtures/**", "fuzz/**", "profile-*.ts", "scripts/**", "src/rules/shared/evidence-propagation.ts", "src/rules/shared/finding-sheet.ts", "src/rules/shared/singularity.ts", "src/rules/shared/workflow-interaction.ts", "src/transform-stability.ts"],
   "ignoreDependencies": ["bun", "@codspeed/tinybench-plugin", "tsrs"],
   "ignoreBinaries": ["rg"],
-  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts", "src/rules/shared/predicate.ts", "stryker/stryker.source-audit.config.mjs", "stryker/stryker.source-collectors.config.mjs", "stryker/stryker.source-resolution.config.mjs"],
+  "dynamicallyLoaded": ["src/repository-diagnostics/imports-direct-import-diagnostics.ts", "bench/run.ts", "bench/source-memory/run.ts", "src/rules/shared/predicate.ts", "stryker/stryker.source-audit.config.mjs", "stryker/stryker.source-collectors.config.mjs", "stryker/stryker.source-resolution.config.mjs"],
   "rules": {
     "circular-dependencies": "error",
     "duplicate-exports": "error"
@@ -24,6 +24,9 @@
   },
   "usedClassMembers": ["clear", "has", "ids", "pythonFiles", "prerequisites", "findRootFile"],
   "ignoreExports": [
+    // Unit-test seams; production callers are inside the same benchmark module.
+    { "file": "bench/source-memory/measure.ts", "exports": ["memoryRows", "memoryTree", "treeSamplingLimited", "validateMemoryOutput"] },
+    { "file": "bench/source-memory/scenarios.ts", "exports": ["sourceMemoryFiles"] },
     { "file": "src/rules/shared/diagnostic-transform.ts", "exports": ["hasAppliedTransform", "markTransformApplied", "getAppliedTransformLabels", "resetTransformTracking"] },
     { "file": "src/cli-option-resolver.ts", "exports": ["similarFlagDistanceLimit", "levenshteinDistance"] },
     { "file": "src/repo-finding-utils.ts", "exports": ["isActionsFinding", "promoteStrictFallbackSuggestions"] },

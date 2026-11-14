@@ -80,8 +80,18 @@ export async function parseSourceAudit(
   syntaxFilename = filename,
   capture?: (parsed: SourceProgramCapture) => void,
 ): Promise<SourceFileAudit | undefined> {
-  const { parseSync, visitorKeys } = await loadOxcParser();
-  const parsed = parseSync(syntaxFilename, source);
+  const { parseSync, visitorKeys, rawTransferSupported } = await loadOxcParser();
+  // Eager raw transfer preserves ESTree while avoiding JSON serialization and
+  // parsing of every AST. Lazy transfer uses a different node schema; do not use
+  // it here. Oxc's experimental option is not yet in its public ParserOptions.
+  const transferOptions: NonNullable<Parameters<typeof parseSync>[2]> & {
+    experimentalRawTransfer: boolean;
+  } = { experimentalRawTransfer: true };
+  const parsed = parseSync(
+    syntaxFilename,
+    source,
+    rawTransferSupported() ? transferOptions : undefined,
+  );
   if (parsed.errors.length) {
     return undefined;
   }

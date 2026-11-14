@@ -316,6 +316,11 @@ to turn the run green.
 
 ## Native source-audit validation targets
 
+Reusable memory comparisons live in [`bench/source-memory/`](../bench/source-memory/README.md).
+Run `bun run bench:source-memory -- --help` for synthetic SFC/config controls or an
+existing target repository. This is opt-in, not a new CI benchmark. Raw local
+measurements remain under ignored output directories.
+
 ### Resource limits
 
 `bun run test` uses two **file workers** (`--parallel=2`), a 2,048 MiB sampled

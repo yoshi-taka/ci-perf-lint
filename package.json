@@ -66,6 +66,7 @@
     "perf:flame": "bun --profile src/cli.ts",
     "perf:profile": "bun --cpu-prof --cpu-prof-dir .profile src/cli.ts",
     "perf:mem": "bun --heap-prof --heap-prof-dir .profile src/cli.ts",
+    "bench:source-memory": "bun --no-orphans scripts/run-bounded.ts --memory-mib 2048 --timeout-ms 600000 -- bun --no-orphans bench/source-memory/run.ts",
     "setup-hooks": "lefthook install",
     "test:related": "bun run scripts/test-related.ts",
     "verify:formal": "AGENT=1 bun run scripts/verify-formal-all.ts",

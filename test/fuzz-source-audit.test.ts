@@ -1,11 +1,58 @@
 import { expect, test } from "bun:test";
 import fc from "fast-check";
+import { parseSync, rawTransferSupported } from "oxc-parser";
 import { parseSourceAudit } from "../src/repository-diagnostics/source-audit-parser.ts";
 import { findLargeBarrels } from "../src/repository-diagnostics/source-barrel-graph.ts";
 
 const runs = Number(process.env.SOURCE_AUDIT_FUZZ_RUNS ?? 150);
 const options = { numRuns: runs, interruptAfterTimeLimit: 15000, markInterruptAsFailure: true };
 const lineEnding = fc.constantFrom("\n", "\r\n", "\r", "\u2028", "\u2029");
+
+test("fuzz/differential: eager raw transfer preserves normal AST, metadata, comments and errors", () => {
+  if (!rawTransferSupported()) {
+    // Production uses normal transfer on unsupported platforms.
+    expect(parseSync("fallback.ts", 'export * from "./entry";').errors).toEqual([]);
+    return;
+  }
+  const rawOptions: NonNullable<Parameters<typeof parseSync>[2]> & {
+    experimentalRawTransfer: boolean;
+  } = { experimentalRawTransfer: true };
+  const fragments = [
+    'import type {} from "types";',
+    'import {} from "empty";',
+    'import {format as renamed, type Locale} from "date-fns";',
+    'export {} from "./empty";',
+    'export type * from "./types";',
+    'export * as namespace from "./entry";',
+    'export {renamed as format, type Locale} from "./entry";',
+    'const emoji = "😀日本語"; import(`date-fns`);',
+    'const dynamic = import /* gap */ ("./late");',
+    "// oxlint-disable-next-line import/extensions",
+    'import "./extensionless";',
+    'import {expect as check} from "@jest/globals"; check(1).toMatchInlineSnapshot(`one\\ntwo`);',
+    'const element = <div title="日本語">{import("./view")}</div>;',
+    "class Example { #value = 1; accessor item = 2; }",
+    "const broken = ;",
+    "/* unterminated",
+    'const invalid = "\\uD800";',
+  ];
+  fc.assert(
+    fc.property(
+      fc.array(fc.constantFrom(...fragments), { minLength: 1, maxLength: 12 }),
+      lineEnding,
+      (parts, eol) => {
+        const source = parts.join(eol);
+        const normal = parseSync("transfer.tsx", source);
+        const raw = parseSync("transfer.tsx", source, rawOptions);
+        expect(raw.errors).toEqual(normal.errors);
+        expect(raw.comments).toEqual(normal.comments);
+        expect(raw.module).toEqual(normal.module);
+        expect(raw.program).toEqual(normal.program);
+      },
+    ),
+    options,
+  );
+});
 
 test("fuzz: arbitrary UTF-16 source either parses safely or is explicitly rejected", async () => {
   await fc.assert(
