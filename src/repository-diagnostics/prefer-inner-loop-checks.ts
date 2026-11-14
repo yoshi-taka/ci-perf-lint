@@ -128,6 +128,7 @@ export async function collectPreferInnerLoopChecksDiagnostics(
   }
   const activity = await collectInnerLoopActivity(context.repoRoot, candidates, {
     declaredVisibility: context.repositoryVisibility,
+    ...context.innerLoopActivity,
   });
   for (const workflow of context.workflows) {
     if (workflow.parsed?.defaults) {

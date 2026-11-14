@@ -100,6 +100,12 @@ export interface RepositoryDiagnosticGateResolution {
 
 export interface RepositoryDiagnosticContext {
   repositoryVisibility?: "private" | "public";
+  /** Test seam: replace GitHub telemetry sources instead of the process globals. */
+  innerLoopActivity?: {
+    env?: NodeJS.ProcessEnv;
+    request?: typeof fetch;
+    now?: number;
+  };
   repoRoot: string;
   repository: RepositorySignals;
   workflows: WorkflowDocument[];

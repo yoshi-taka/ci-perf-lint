@@ -4,7 +4,7 @@ import path from "node:path";
 import { stringify } from "yaml";
 import { parseArgs } from "../src/main.ts";
 import type { Diagnostic } from "../src/types.ts";
-import { createTempDirTracker } from "./helpers.ts";
+import { analyzeRepositoryForRule, createTempDirTracker } from "./helpers.ts";
 import {
   activityApiJob,
   activityEnvironment,
@@ -66,51 +66,67 @@ async function scan(
   }
   const visibility = options.visibility ?? "private";
   await prepareActivityRepository(root);
-  const code = `
-    Date.now = () => ${activityNow};
-    globalThis.fetch = async (url) => {
-      const value = new URL(String(url)).pathname.endsWith('/actions/runs')
-        ? { total_count: ${options.runs ?? 100}, workflow_runs: ${JSON.stringify(activityRuns(options.runs ?? 100))} }
-        : String(url).includes('/jobs?')
-          ? { total_count: 1, jobs: [${JSON.stringify(activityApiJob(options.setupSeconds))}] }
-          : { private: ${options.apiPrivate ?? true}, full_name: 'example/private' };
-      return Response.json(value);
-    };
-    const { analyzeRepositoryForRule } = await import(${JSON.stringify(`${import.meta.dir}/helpers.ts`)});
-    ${
-      options.cli
-        ? `
+  const env = {
+    ...process.env,
+    ...activityEnvironment(root),
+    GH_TOKEN: options.api === false ? "" : "fixture-token",
+    GITHUB_TOKEN: "",
+    AGENT: "1",
+  };
+  const request = ((input: string | URL | Request) => {
+    const href = input instanceof Request ? input.url : String(input);
+    const runs = options.runs ?? 100;
+    const value = new URL(href).pathname.endsWith("/actions/runs")
+      ? { total_count: runs, workflow_runs: activityRuns(runs) }
+      : href.includes("/jobs?")
+        ? { total_count: 1, jobs: [activityApiJob(options.setupSeconds)] }
+        : { private: options.apiPrivate ?? true, full_name: "example/private" };
+    return Promise.resolve(Response.json(value));
+  }) as unknown as typeof fetch;
+
+  if (options.cli) {
+    // The CLI path has no telemetry seam yet, so keep its process isolation.
+    const code = `
+      Date.now = () => ${activityNow};
+      globalThis.fetch = async (url) => {
+        const value = new URL(String(url)).pathname.endsWith('/actions/runs')
+          ? { total_count: 100, workflow_runs: ${JSON.stringify(activityRuns(100))} }
+          : String(url).includes('/jobs?')
+            ? { total_count: 1, jobs: [${JSON.stringify(activityApiJob(undefined))}] }
+            : { private: true, full_name: 'example/private' };
+        return Response.json(value);
+      };
       const { runCli } = await import(${JSON.stringify(`${import.meta.dir}/../src/main.ts`)});
       await runCli(['--format', 'json', '--findings-only'], ${JSON.stringify(root)}, { log: console.log, error: console.error });
-    `
-        : `
-      const report = await analyzeRepositoryForRule(${JSON.stringify({ cwd: root, targetPath: ".", topCount: 100, repositoryVisibility: visibility === "unknown" ? undefined : visibility })}, { id: '${id}', severity: 'warning' });
-      console.log(JSON.stringify(report.findings));
-    `
+    `;
+    const child = Bun.spawn([process.execPath, "--eval", code], {
+      env,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, status] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    if (status !== 0) {
+      throw new Error(stderr);
     }
-  `;
-  // Isolate mocks and Actions variables from concurrently running test files.
-  const child = Bun.spawn([process.execPath, "--eval", code], {
-    env: {
-      ...process.env,
-      ...activityEnvironment(root),
-      GH_TOKEN: options.api === false ? "" : "fixture-token",
-      GITHUB_TOKEN: "",
-      AGENT: "1",
-    },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [stdout, stderr, status] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (status !== 0) {
-    throw new Error(stderr);
+    const findings = JSON.parse(stdout) as Diagnostic[];
+    return { root, findings: findings.filter((finding) => finding.ruleId === id) };
   }
-  const findings = JSON.parse(stdout) as Diagnostic[];
-  return { root, findings: findings.filter((finding) => finding.ruleId === id) };
+
+  const report = await analyzeRepositoryForRule(
+    {
+      cwd: root,
+      targetPath: ".",
+      topCount: 100,
+      repositoryVisibility: visibility === "unknown" ? undefined : visibility,
+      innerLoopActivity: { env, request, now: activityNow },
+    },
+    { id, severity: "warning" },
+  );
+  return { root, findings: report.findings.filter((finding) => finding.ruleId === id) };
 }
 
 test("private agent validation policy plus skill flags lint as warning in strict mode", async () => {
