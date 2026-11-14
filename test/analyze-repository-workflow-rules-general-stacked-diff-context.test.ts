@@ -122,11 +122,13 @@ describe("analyzeRepository workflow and execution rules: stacked diff context",
     const packageFinding = findings.find((finding) => finding.location.path === "package.json");
     expect(packageFinding?.scope).toBe("repository");
     expect(packageFinding?.message).toContain('script "check"');
-    expect(packageFinding?.suggestion).toContain("node --run lint -- --max-warnings=0");
-    expect(packageFinding?.suggestion).toContain("prelint/postlint");
-    expect(packageFinding?.suggestion).toContain("`node-options`");
-    expect(packageFinding?.suggestion).toContain("`registry`");
-    expect(packageFinding?.suggestion).toContain('"envcheck"');
+    expect(packageFinding?.suggestion).toBe(workflowFinding?.suggestion);
+    expect(packageFinding?.measurementHint).toBe(workflowFinding?.measurementHint);
+    expect(packageFinding?.aiHandoff).toContain("node --run lint -- --max-warnings=0");
+    expect(packageFinding?.aiHandoff).toContain("prelint/postlint");
+    expect(packageFinding?.aiHandoff).toContain("`node-options`");
+    expect(packageFinding?.aiHandoff).toContain("`registry`");
+    expect(packageFinding?.aiHandoff).toContain('"envcheck"');
   });
 
   test("adds stacked diff context when GitHub gh-stack evidence is present", async () => {

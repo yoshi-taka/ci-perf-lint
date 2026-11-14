@@ -37,3 +37,8 @@ Typical remediation:
 - replace `npm run lint` with `node --run lint` only when the repository targets a Node.js version that supports it
 - before changing, account for any compatibility evidence included in the finding
 - measure the step duration before and after the change
+
+Summary reports group these findings under a shared remediation, including package.json,
+workflow, and deployment configuration locations. Individual findings retain their script
+names, exact replacements, and available compatibility evidence in the AI handoff details.
+JSON and findings-only output retain the individual diagnostics.

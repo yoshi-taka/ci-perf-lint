@@ -2,6 +2,7 @@ import { isMap, isScalar, parseDocument } from "../yaml.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { nodeRunRemediation } from "../rules/shared/node-run-diagnostics.ts";
 import {
   detectRedundantBootstrapToolFromText,
   usesLanguageInstall,
@@ -138,10 +139,7 @@ export async function collectVercelJsonDiagnostics(
           location: { path: relativePath, line: location.line, column: location.column },
           message: `vercel.json ${field} runs package script "${npmRun.script}" through npm run.`,
           why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
-          suggestion:
-            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
-          measurementHint:
-            "Compare the build step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          ...nodeRunRemediation,
           aiHandoff: `Review vercel.json ${field} "${command}". Only replace it with \`${npmRun.replacement}\` after checking npm compatibility.`,
           score: 30,
         }),

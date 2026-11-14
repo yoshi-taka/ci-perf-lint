@@ -13,6 +13,7 @@ import { detectSimpleNpmRunFromText } from "./shared/command-patterns.ts";
 import { setIntersection } from "../set-algebra.ts";
 import { sourceContains } from "./shared/predicate.ts";
 import { predicateToPrecheck } from "./shared/predicate-score.ts";
+import { nodeRunRemediation } from "./shared/node-run-diagnostics.ts";
 
 const precheckPredicates = [{ pred: sourceContains("npm run"), weight: 1, label: "has-npm-run" }];
 
@@ -170,10 +171,7 @@ function checkGithubActions(workflow: WorkflowDocument, context: RuleContext): D
         buildDiagnostic(workflow, meta, step.runNode ?? step.node, {
           message: `Job "${job.id}" runs package script "${npmRun.script}" through npm run.`,
           why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
-          suggestion:
-            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
-          measurementHint:
-            "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          ...nodeRunRemediation,
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" step running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
           score: 30,
         }),
@@ -217,10 +215,7 @@ async function checkBuildkite(
         buildDiagnostic(pipeline, meta, step.commandNode ?? step.node, {
           message: `Step "${step.label ?? step.key ?? "(unnamed)"}" runs package script "${npmRun.script}" through npm run.`,
           why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
-          suggestion:
-            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
-          measurementHint:
-            "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          ...nodeRunRemediation,
           aiHandoff: `Review ${pipeline.relativePath} step "${step.label ?? step.key ?? "(unnamed)"}" running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
           score: 30,
         }),
@@ -251,10 +246,7 @@ async function checkCircleCi(doc: CircleCiDocument, context: RuleContext): Promi
         buildDiagnostic(doc, meta, step.commandNode ?? step.node, {
           message: `Job "${job.name}" step "${step.name ?? step.command ?? "(unnamed)"}" runs package script "${npmRun.script}" through npm run.`,
           why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
-          suggestion:
-            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
-          measurementHint:
-            "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          ...nodeRunRemediation,
           aiHandoff: `Review ${doc.relativePath} job "${job.name}" step running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
           score: 30,
         }),
@@ -286,10 +278,7 @@ async function checkGitlabCi(doc: GitlabCiDocument, context: RuleContext): Promi
         buildDiagnostic(doc, meta, job.scriptNode ?? job.node, {
           message: `Job "${job.name}" runs package script "${npmRun.script}" through npm run.`,
           why: "For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
-          suggestion:
-            "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
-          measurementHint:
-            "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
+          ...nodeRunRemediation,
           aiHandoff: `Review ${doc.relativePath} job "${job.name}" running \`npm run ${npmRun.script}\`. Only replace it with \`${npmRun.replacement}\` after checking the collected compatibility evidence: ${npmCompatibilityEvidence(context.repository, npmRun.script)}`,
           score: 30,
         }),

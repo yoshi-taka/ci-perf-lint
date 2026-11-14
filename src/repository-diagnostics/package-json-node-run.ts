@@ -3,6 +3,7 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
+import { nodeRunRemediation } from "../rules/shared/node-run-diagnostics.ts";
 import {
   detectSimpleNpmRunFromText,
   shellCommandSegments,
@@ -148,9 +149,7 @@ export async function collectPackageJsonNodeRunDiagnostics(
             ? `package.json script "${scriptName}" invokes package script ${quotedScripts[0]} through npm run.`
             : `package.json script "${scriptName}" invokes package scripts through npm run: ${quotedScripts.join(", ")}.`,
         why: "For simple package-script delegation on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.",
-        suggestion: `Consider replacing the nested npm invocation in script "${scriptName}" with ${replacementText} only after accounting for npm compatibility evidence. ${evidence}`,
-        measurementHint:
-          "Compare the package script duration before and after the change, and verify that the delegated scripts still receive the same arguments and environment they need.",
+        ...nodeRunRemediation,
         aiHandoff: `Review package.json script "${scriptName}". Only replace its npm run delegation(s) with ${replacementText} after checking the collected compatibility evidence. ${evidence}`,
         score: 30,
       }),
