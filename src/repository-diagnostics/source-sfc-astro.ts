@@ -1,196 +1,299 @@
-import type { Node } from "@astrojs/compiler/types";
 import type { ScriptRegion } from "./source-sfc.ts";
+import { sfcExpressionEnd, sfcHeaderTokens } from "./source-sfc-expression.ts";
+import { sfcRawEnd, sfcTag, type SfcTag } from "./source-sfc-markup.ts";
 
-/** Astro AST spans are UTF-8 bytes; Oxc and diagnostics need UTF-16 code units. */
-export async function astroScriptRegions(source: string): Promise<{
-  regions: ScriptRegion[];
-  incomplete: string[];
-  references?: { source: string; offset: number }[];
-}> {
-  const { parse } = await import("@astrojs/compiler");
-  const parsed = await parse(source, { position: true });
-  const incomplete: string[] = [];
-  if (parsed.diagnostics.some((issue) => issue.severity === 1)) {
-    return { regions: [], incomplete: ["Astro syntax errors"] };
-  }
-  const scripts: {
-    start: number;
-    end: number;
-    language: string;
-    content?: string;
-    template?: boolean;
-    tail?: string;
-  }[] = [];
-  const wanted = new Set<number>();
-  const external: { source: string; byte: number }[] = [];
-  const attributes: { byte: number; value: string }[] = [];
-  function warnOnce(note: string) {
-    if (!incomplete.includes(note)) {
-      incomplete.push(note);
-    }
-  }
-  function walk(node: Node, insideExpression = false) {
-    if (scripts.length >= 145) {
-      warnOnce("script/expression metadata budget exhausted");
-      return;
-    }
-    if ("attributes" in node) {
-      for (const attribute of node.attributes) {
-        if (attribute.kind === "expression" && attribute.position) {
-          if (attributes.length < 128) {
-            wanted.add(attribute.position.start.offset);
-            attributes.push({ byte: attribute.position.start.offset, value: attribute.value });
-          } else {
-            warnOnce("attribute expression budget exhausted");
-          }
-        }
-      }
-    }
-    if (node.type === "frontmatter" && node.position?.end) {
-      wanted.add(node.position.start.offset);
-      scripts.push({
-        start: node.position.start.offset,
-        end: node.position.end.offset,
-        language: "ts",
-        content: node.value,
-      });
-    } else if (node.type === "element" && node.name === "script") {
-      const attrs = new Map(node.attributes.map((attribute) => [attribute.name, attribute]));
-      const src = attrs.get("src");
-      if (src?.value && ["quoted", "empty"].includes(src.kind) && src.position) {
-        if (external.length < 128) {
-          wanted.add(src.position.start.offset);
-          external.push({ source: src.value, byte: src.position.start.offset });
-        } else if (!incomplete.includes("external reference budget exhausted")) {
-          incomplete.push("external reference budget exhausted");
-        }
-      }
-      if (
-        attrs.has("src") ||
-        node.attributes.some((attribute) =>
-          ["expression", "spread", "shorthand", "template-literal"].includes(attribute.kind),
-        )
-      ) {
-        incomplete.push("external or dynamic script attributes");
-        return;
-      }
-      const type = attrs.get("type")?.value;
-      if (type && !["module", "text/javascript", "application/javascript"].includes(type)) {
-        if (!type.includes("json")) {
-          incomplete.push("unsupported script type");
-        }
-        return;
-      }
-      const language = attrs.get("lang")?.value;
-      if (attrs.size && language && !["js", "javascript"].includes(language)) {
-        incomplete.push("inline script language preprocessing unavailable");
-        return;
-      }
-      for (const child of node.children) {
-        if (child.type !== "text" || !child.position?.end) {
-          incomplete.push("unsupported script child");
-          continue;
-        }
-        wanted.add(child.position.start.offset);
-        wanted.add(child.position.end.offset);
-        scripts.push({
-          start: child.position.start.offset,
-          end: child.position.end.offset,
-          language: language ?? (attrs.size ? "js" : "ts"),
-        });
-      }
-      return;
-    } else if (node.type === "expression" && !insideExpression) {
-      const first = node.children[0]?.position?.start;
-      const lastNode = node.children.at(-1);
-      const last = lastNode?.type === "text" ? lastNode.position?.start : lastNode?.position?.end;
-      if (first && last) {
-        wanted.add(first.offset);
-        wanted.add(last.offset);
-        scripts.push({
-          start: first.offset,
-          end: last.offset,
-          language: "tsx",
-          template: true,
-          tail: lastNode?.type === "text" ? lastNode.value : undefined,
-        });
-      } else {
-        incomplete.push("unknown Astro expression child spans");
-      }
-      incomplete.push("template imports audited; template snapshot provenance is not inferred");
-    }
-    if ("children" in node) {
-      for (const child of node.children) {
-        walk(child, insideExpression || node.type === "expression");
-      }
-    }
-  }
-  walk(parsed.ast);
-  const offsets = new Map<number, number>();
-  let bytes = 0;
-  let utf16 = 0;
-  for (const character of source) {
-    if (wanted.has(bytes)) {
-      offsets.set(bytes, utf16);
-    }
-    bytes += Buffer.byteLength(character);
-    utf16 += character.length;
-  }
-  offsets.set(bytes, utf16);
+const voidTags = new Set(
+  "area base br col embed hr img input link meta param source track wbr".split(" "),
+);
+
+/** Native UTF-16 spans; no Astro compiler or project code is loaded. */
+export function astroScriptRegions(source: string) {
   const regions: ScriptRegion[] = [];
-  for (const attribute of attributes) {
-    const offset = offsets.get(attribute.byte);
-    const open = offset === undefined ? -1 : source.indexOf("{", offset);
-    const start = open + 1;
-    const end = start + attribute.value.length;
-    if (open < 0 || source.slice(start, end) !== attribute.value || source[end] !== "}") {
-      incomplete.push("unknown Astro attribute expression span");
-      continue;
+  const references: { source: string; offset: number }[] = [];
+  const incomplete: string[] = [];
+  let metadata = 0,
+    attributes = 0;
+  const jsxSpans: { start: number; end: number }[] = [];
+  const jsxCache = new Map<number, number>();
+  function note(message: string) {
+    if (!incomplete.includes(message)) {
+      incomplete.push(message);
     }
-    regions.push({ start, end, language: "tsx", role: "template" });
   }
-  for (const script of scripts) {
-    let start = offsets.get(script.start);
-    let end = offsets.get(script.end);
-    if (script.content !== undefined && start !== undefined) {
-      if (source.slice(start, start + 3) !== "---") {
-        incomplete.push("unknown frontmatter delimiter span");
-        continue;
+  function syntax() {
+    return {
+      regions: [],
+      references: [],
+      incomplete: [...incomplete, "Astro syntax errors or unsupported boundaries"],
+    };
+  }
+  function add(region: ScriptRegion, attribute = false) {
+    if (attribute) {
+      if (++attributes > 128) {
+        note("attribute expression budget exhausted");
+        return;
       }
-      start += 3;
-      end = start + script.content.length;
-      if (source.slice(start, end) !== script.content) {
-        incomplete.push("unknown frontmatter content span");
-        continue;
-      }
+    } else if (++metadata > 145) {
+      note("script/expression metadata budget exhausted");
+      return;
     }
-    if (start === undefined || end === undefined) {
-      incomplete.push("unknown UTF-8 script span");
-      continue;
+    regions.push(region);
+  }
+  function tagAt(start: number, depth = 0): SfcTag | undefined {
+    if (source.startsWith("<>", start)) {
+      return { name: "", closing: false, selfClosing: false, end: start + 2, attributes: [] };
     }
-    if (script.template) {
-      if (script.tail !== undefined) {
-        if (source.slice(end, end + script.tail.length) !== script.tail) {
-          incomplete.push("unknown Astro expression tail span");
-          continue;
-        }
-        end += script.tail.length;
-      }
-      if (source[start - 1] !== "{" || source[end] !== "}") {
-        incomplete.push("unknown Astro expression delimiters");
-        continue;
-      }
+    if (source.startsWith("</>", start)) {
+      return { name: "", closing: true, selfClosing: false, end: start + 3, attributes: [] };
     }
-    regions.push({
+    return sfcTag(
+      source,
       start,
-      end,
-      language: script.language,
-      role: script.template ? "template" : undefined,
-    });
+      true,
+      (offset, childDepth) => jsxEnd(offset, depth + childDepth),
+      false,
+    );
   }
-  const references = external.flatMap((reference) => {
-    const offset = offsets.get(reference.byte);
-    return offset === undefined ? [] : [{ source: reference.source, offset }];
-  });
+  function jsxEnd(start: number, depth: number): number | undefined {
+    if (depth >= 64) {
+      return undefined;
+    }
+    const cached = jsxCache.get(start);
+    if (cached !== undefined) {
+      return cached;
+    }
+    if (jsxSpans.length >= 512) {
+      note("JSX metadata budget exhausted");
+      return undefined;
+    }
+    function finish(end: number) {
+      jsxSpans.push({ start, end });
+      jsxCache.set(start, end);
+      return end;
+    }
+    const stack: string[] = [];
+    for (let index = start; index < source.length;) {
+      if (source.startsWith("<!--", index)) {
+        const end = source.indexOf("-->", index + 4);
+        if (end < 0) {
+          return undefined;
+        }
+        index = end + 3;
+      } else if (source[index] === "{") {
+        const end = sfcExpressionEnd(source, index, depth + 1, index + 1, jsxEnd);
+        if (end === undefined) {
+          return undefined;
+        }
+        expression(index + 1, end - 1);
+        index = end;
+      } else if (
+        source[index] === "<" &&
+        /^<(?:\/?[A-Za-z]|\/?>)/.test(source.slice(index, index + 3))
+      ) {
+        const tag = tagAt(index, depth);
+        if (!tag) {
+          return undefined;
+        }
+        if (tag.closing) {
+          if (stack.pop() !== tag.name) {
+            return undefined;
+          }
+        } else if (!tag.selfClosing && !voidTags.has(tag.name)) {
+          if (stack.length >= 256) {
+            return undefined;
+          }
+          stack.push(tag.name);
+        }
+        if (!tag.closing && !attributeExpressions(tag)) {
+          return undefined;
+        }
+        index = tag.end;
+        if (!stack.length) {
+          return finish(index);
+        }
+      } else {
+        index++;
+      }
+    }
+    return undefined;
+  }
+  function expression(start: number, end: number, attribute = false) {
+    if (
+      /^(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\r\n\u2028\u2029]*(?:[\r\n\u2028\u2029]|$))*$/.test(
+        source.slice(start, end),
+      )
+    ) {
+      return;
+    }
+    add({ start, end, language: "tsx", role: "template" }, attribute);
+    note("template imports audited; template snapshot provenance is not inferred");
+  }
+  function attributeExpressions(tag: SfcTag) {
+    for (const attr of tag.attributes) {
+      if (!attr.dynamic) {
+        continue;
+      }
+      if (!attr.name) {
+        const start = attr.start + (attr.value.match(/^\s*/)?.[0].length ?? 0);
+        expression(source.startsWith("...", start) ? start + 3 : start, attr.end, true);
+      } else {
+        for (let index = attr.start; index < attr.end; index++) {
+          if (source[index] !== "{") {
+            continue;
+          }
+          const end = sfcExpressionEnd(source, index, 0, index + 1, jsxEnd);
+          if (end === undefined || end > attr.end) {
+            return false;
+          }
+          expression(index + 1, end - 1, true);
+          index = end - 1;
+        }
+      }
+    }
+    return true;
+  }
+  function script(tag: SfcTag, end: number) {
+    const attrs = new Map(tag.attributes.map((attr) => [attr.name, attr]));
+    const src = attrs.get("src");
+    if (src?.value && !src.dynamic && !src.boolean) {
+      if (references.length < 128) {
+        references.push({ source: src.value, offset: src.nameStart ?? src.start });
+      } else {
+        note("external reference budget exhausted");
+      }
+    }
+    if (attrs.has("src") || tag.attributes.some((attr) => attr.dynamic)) {
+      note("external or dynamic script attributes");
+      return;
+    }
+    const type = attrs.get("type")?.value;
+    if (type && !["module", "text/javascript", "application/javascript"].includes(type)) {
+      if (!type.includes("json")) {
+        note("unsupported script type");
+      }
+      return;
+    }
+    const language = attrs.get("lang")?.value;
+    if (language && !["js", "javascript", "ts", "typescript", "jsx", "tsx"].includes(language)) {
+      note("unsupported script language");
+      return;
+    }
+    add({ start: tag.end, end, language: language ?? (attrs.size ? "js" : "ts") });
+  }
+  function fenceEnd(start: number): number | undefined {
+    if (!source.startsWith("---", start)) {
+      return undefined;
+    }
+    let before = start - 1;
+    while (before >= 0 && /[ \t]/.test(source[before]!)) {
+      before--;
+    }
+    if (before >= 0 && !/[\r\n]/.test(source[before]!)) {
+      return undefined;
+    }
+    let end = start + 3;
+    while (/[ \t]/.test(source[end] ?? "")) {
+      end++;
+    }
+    return end === source.length || /[\r\n]/.test(source[end]!) ? end : undefined;
+  }
+  let index = 0;
+  const opening = /^\uFEFF?\s*---(?=\r?\n|$)/.exec(source);
+  if (opening) {
+    const start = opening[0].lastIndexOf("---") + 3;
+    let close: { start: number; end: number } | undefined;
+    for (const token of sfcHeaderTokens(source, start, source.length)) {
+      if (token.invalid) {
+        return syntax();
+      }
+      const end = fenceEnd(token.start);
+      if (end !== undefined) {
+        close = { start: token.start, end };
+        break;
+      }
+    }
+    if (!close) {
+      return syntax();
+    }
+    add({ start, end: close.start, language: "ts" });
+    index = close.end;
+  }
+  const stack: string[] = [];
+  while (index < source.length) {
+    if (source.startsWith("<!--", index)) {
+      const end = source.indexOf("-->", index + 4);
+      if (end < 0) {
+        return syntax();
+      }
+      index = end + 3;
+      continue;
+    }
+    if (source[index] === "{") {
+      const end = sfcExpressionEnd(source, index, 0, index + 1, jsxEnd);
+      if (end === undefined) {
+        return syntax();
+      }
+      expression(index + 1, end - 1);
+      index = end;
+      continue;
+    }
+    if (source[index] !== "<" || !/^<(?:\/?[A-Za-z]|\/?>)/.test(source.slice(index, index + 3))) {
+      index++;
+      continue;
+    }
+    const tag = tagAt(index);
+    if (!tag) {
+      return syntax();
+    }
+    index = tag.end;
+    if (tag.closing) {
+      if (stack.pop() !== tag.name) {
+        return syntax();
+      }
+      continue;
+    }
+    if (!attributeExpressions(tag)) {
+      return syntax();
+    }
+    if (tag.name === "script" || tag.name === "style") {
+      const end = tag.selfClosing
+        ? { start: tag.end, end: tag.end }
+        : sfcRawEnd(source, tag.name, tag.end);
+      if (!end) {
+        return syntax();
+      }
+      if (tag.name === "script") {
+        script(tag, end.start);
+      }
+      index = end.end;
+    } else if (!tag.selfClosing && !voidTags.has(tag.name)) {
+      if (stack.length >= 256) {
+        return syntax();
+      }
+      stack.push(tag.name);
+    }
+  }
+  if (stack.length) {
+    return syntax();
+  }
+  jsxSpans.sort((a, b) => a.start - b.start || b.end - a.end);
+  for (const region of regions) {
+    if (region.role !== "template") {
+      continue;
+    }
+    const omit: { start: number; end: number }[] = [];
+    for (const span of jsxSpans) {
+      if (
+        span.start >= region.start &&
+        span.end <= region.end &&
+        span.start >= (omit.at(-1)?.end ?? 0)
+      ) {
+        omit.push(span);
+      }
+    }
+    if (omit.length) {
+      region.omit = omit;
+    }
+  }
   return { regions, incomplete, references };
 }

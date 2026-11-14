@@ -155,15 +155,13 @@ test("Astro JSON scripts and external sources are not reinterpreted as JavaScrip
   );
 });
 
-test("Astro attributed inline scripts do not assume TypeScript preprocessing", async () => {
+test("Astro explicit TypeScript scripts are audited directly without preprocessing", async () => {
   const { result, warnings } = await audit(
     "Inline.astro",
     '<script lang="ts">import {format} from "date-fns";</script>',
   );
-  expect(result.imports).toEqual([]);
-  expect(
-    warnings.some((w) => w.message.includes("inline script language preprocessing unavailable")),
-  ).toBe(true);
+  expect(result.imports.map((entry) => entry.source)).toEqual(["date-fns"]);
+  expect(warnings.some((w) => w.message.includes("preprocessing"))).toBe(false);
 });
 
 test.each([
@@ -219,7 +217,7 @@ test.each(["vue", "astro"])(
 );
 
 test.each(["vue", "svelte"])(
-  "%s multi-script snapshot scope agrees with the framework's generated JS",
+  "%s multi-script snapshot scope agrees with the static import-hoisting contract",
   async (extension) => {
     const module = `check(v).toMatchInlineSnapshot(${snapshot});`;
     const instance = `import {expect as check} from "@jest/globals"; const expect=custom; check(v).toMatchInlineSnapshot(${snapshot}); expect(v).toMatchInlineSnapshot(${snapshot});`;
@@ -228,15 +226,14 @@ test.each(["vue", "svelte"])(
         ? `<script>${module}</script><script setup>${instance}</script>`
         : `<script module>${module}</script><script>${instance}</script>`;
     const { result } = await audit(`Component.${extension}`, source);
-    let generated: string;
-    if (extension === "vue") {
-      const { parse, compileScript } = await import("@vue/compiler-sfc");
-      generated = compileScript(parse(source).descriptor, { id: "audit" }).content;
-    } else {
-      const { compile } = await import("svelte/compiler");
-      generated = compile(source, { generate: "server" }).js.code;
-    }
-    const reference = await parseSourceAudit("generated.js", generated);
+    // Previously checked against framework-generated JS. Keep a dependency-free
+    // scope oracle: imports hoist, ordinary instance declarations do not.
+    const reference = await parseSourceAudit(
+      "scope-reference.js",
+      `import {expect as check} from "@jest/globals";
+${module}
+function instanceScope() { const expect=custom; check(v).toMatchInlineSnapshot(${snapshot}); expect(v).toMatchInlineSnapshot(${snapshot}); }`,
+    );
     expect(reference?.snapshots).toHaveLength(2);
     expect(result.snapshots).toHaveLength(reference!.snapshots.length);
   },

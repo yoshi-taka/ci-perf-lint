@@ -27,6 +27,9 @@ Both revisions must expose either `collectSourceAudit` or the former embedded
 Oxlint runner. Backend detection also supports native-vs-native comparisons.
 Both are bundled with the **same currently installed host dependencies**; this is
 a code comparison, not historical dependency-environment reproduction.
+Historical native snapshots requiring framework compilers cannot run their
+component cases with the current dependency set. Use TS/config controls or a
+separately prepared historical environment; this harness never installs those compilers.
 
 ## Inputs
 

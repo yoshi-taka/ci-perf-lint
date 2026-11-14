@@ -8,6 +8,7 @@ const exec = promisify(execFile);
 const external = [
   "oxlint",
   "oxc-parser",
+  // Historical archives may import these; they are not installed by the harness.
   "@vue/compiler-sfc",
   "svelte/compiler",
   "@astrojs/compiler",

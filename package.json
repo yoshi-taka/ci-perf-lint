@@ -45,7 +45,7 @@
     "lint": "oxlint --type-aware --type-check --deny-warnings --fix src test && bun fmt src test/*.ts scripts/*.ts",
     "format": "bun fmt src test/*.ts scripts/*.ts",
     "format:check": "bun fmt --check src test/*.ts scripts/*.ts",
-    "build": "bun build ./src/cli.ts --outdir ./dist --target node --external oxc-parser --external @vue/compiler-sfc --external svelte/compiler --external @astrojs/compiler",
+    "build": "bun build ./src/cli.ts --outdir ./dist --target node --external oxc-parser",
     "prepack": "bun run build",
     "cache:fixtures": "bun run scripts/cache-fixtures.ts",
     "new-rule": "bun run scripts/new-rule.ts",
@@ -77,10 +77,7 @@
     "verify:formal:retention": "bun run scripts/verify-formal-retention.ts"
   },
   "dependencies": {
-    "@astrojs/compiler": "^4.0.0",
-    "@vue/compiler-sfc": "^3.5.45",
-    "oxc-parser": "^0.155.0",
-    "svelte": "^5.57.3"
+    "oxc-parser": "^0.155.0"
   },
   "devDependencies": {
     "@astrojs/sitemap": "^3.7.4",

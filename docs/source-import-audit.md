@@ -26,8 +26,8 @@ This is a scoped escape hatch, not complete ESLint configuration compatibility.
 Discovery uses the repository scan context and excludes vendor, generated build
 directories, fixture and snapshot paths. `.eslintignore` is not loaded. Files
 containing generated source outside those directories are not automatically
-excluded. Vue/Svelte/Astro script regions are extracted with the host's dedicated
-framework parsers; no target preprocessors/config/hooks are loaded. Analysis
+excluded. Vue/Svelte/Astro regions use bounded static markup/JS-boundary scanners.
+No target preprocessors/config/hooks are loaded. Analysis
 warnings report unsupported regions, skipped files and JS/TS parsing failures.
 A partial audit is not evidence that those files are clean.
 
@@ -51,8 +51,8 @@ names/bodies and reports parse failures. It never executes templates.
 ## Component script scope
 
 Vue normal/setup scripts, Svelte module/instance scripts and Astro frontmatter/
-inline scripts retain original UTF-16 lines/columns. Astro's UTF-8 AST offsets
-are explicitly converted. HTML, styles and data-only JSON scripts are not treated
+inline scripts retain original UTF-16 lines/columns directly, without compiler AST
+offset conversions. HTML, styles and data-only JSON scripts are not treated
 as JavaScript. Imports in supported JS/JSX/TS/TSX scripts use the same rules and
 in-script suppression comments as ordinary source.
 
@@ -62,13 +62,22 @@ declarations remain in a child lexical frame for snapshot provenance. Unknown
 script bindings withhold snapshots with a warning rather than inventing identity.
 Literal imports in supported template expressions are audited, but template
 snapshot identity is not inferred. Static external script sources contribute graph
-edges; remote scripts are never fetched. Attributed Astro inline scripts do not
-assume TypeScript preprocessing. Preprocessors, unknown languages and unsupported
+edges; remote scripts are never fetched. Explicit JS/TS/JSX/TSX script languages,
+including attributed Astro scripts, are parsed directly without preprocessing.
+Preprocessors, unknown languages and unsupported
 expression spans remain visibly outside scope. No target source executes.
 Component inputs are capped at 4 MiB, 16 script regions and 128 template expressions.
-Astro additionally bounds metadata collection and external references. Framework parsers
-(`@vue/compiler-sfc`, `svelte/compiler`, `@astrojs/compiler`) are runtime
-dependencies but are dynamically loaded only when their component type is scanned.
+Component extraction does not depend on `@vue/compiler-sfc`, `svelte` or `@astrojs/compiler`.
+The scanner skips comments, styles, data/custom blocks and Vue `v-pre`; it handles
+quoted attributes, nested JS delimiters, strings, template literals and regexes.
+Oxc validates the extracted JS/TS; this is **not full framework grammar validation**.
+Malformed/ambiguous boundaries fail closed. Nesting is capped at 64 JS delimiters
+and 256 markup/block frames. Svelte each/key/await/snippet parameters, defaults,
+spread/shorthand attributes and Vue v-for/slot bindings are audited as JS/TS
+without executing bindings. Astro frontmatter, inline scripts, JSX expressions/
+fragments and attributes use the same static extraction principles.
+Preprocessor output is not evaluated. Astro additionally bounds metadata
+collection and external references. The only runtime parser dependency is Oxc.
 
 ## Static reference maps
 
@@ -114,10 +123,11 @@ These are detection improvements, not promises of ESLint/Oxlint compatibility.
 
 - [x] Run the Z3 verification on Bun/WASM without Python or a product dependency.
 - [x] Cover CR, LF, CRLF, U+2028 and U+2029 in locations and next-line suppression.
-- [x] Extract Vue/Svelte/Astro script regions with dedicated parsers and correct
+- [x] Extract Vue/Svelte/Astro script regions with bounded extractors and correct
   UTF-16 offsets, retaining explicit incomplete-audit warnings for skipped regions.
 - [x] Audit literal template imports and external script edges; model Vue/Svelte
-  module/instance snapshot scopes and compare with framework-generated JS.
+  module/instance snapshot scopes. Scope references were previously checked against
+  framework-generated JS; current regression tests use a dependency-free static oracle.
   Target preprocessors are deliberately not executed (see limits below).
 - [x] Detect literal dynamic imports; do not guess computed paths or execute code.
 - [x] Extend barrel graph resolution to basic static tsconfig/workspace/package maps,

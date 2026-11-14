@@ -77,7 +77,7 @@ export async function parseSourceAudit(
   filename: string,
   source: string,
   resolvesOmittedExtension: (request: string) => boolean = () => false,
-  syntaxFilename = filename,
+  syntaxFilename: string | { filename: string; positionSource: string } = filename,
   capture?: (parsed: SourceProgramCapture) => void,
 ): Promise<SourceFileAudit | undefined> {
   const { parseSync, visitorKeys, rawTransferSupported } = await loadOxcParser();
@@ -88,14 +88,17 @@ export async function parseSourceAudit(
     experimentalRawTransfer: boolean;
   } = { experimentalRawTransfer: true };
   const parsed = parseSync(
-    syntaxFilename,
+    typeof syntaxFilename === "string" ? syntaxFilename : syntaxFilename.filename,
     source,
     rawTransferSupported() ? transferOptions : undefined,
   );
   if (parsed.errors.length) {
     return undefined;
   }
-  const position = sourcePositions(source);
+  // Component scaffolds may overwrite markup/newlines, but never shift offsets.
+  const position = sourcePositions(
+    typeof syntaxFilename === "string" ? source : syntaxFilename.positionSource,
+  );
   const suppressed = sourceSuppressions(parsed.comments, (offset) => position(offset).line);
   capture?.({
     program: parsed.program,
