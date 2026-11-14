@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { analyzeRepositoryForRule, createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
 import { RepositoryScanContext } from "../src/repository-scan-context.ts";
+import { buildRepositoryFileIndex } from "../src/rules/shared/repository-file-index.ts";
+import { collectPlaywrightRouteDisablesHttpCacheDiagnostics } from "../src/repository-diagnostics/playwright-route-disables-http-cache.ts";
+import type { RepositoryDiagnosticContext } from "../src/repository-diagnostics/collector-types.ts";
 
 const tempDirs = createTempDirTracker();
 afterEach(() => tempDirs.cleanup());
@@ -160,6 +163,134 @@ test('api', async ({ page }) => { await page.route('/api', r => r.fulfill({ body
       expect(findings[0]!.location.path).toBe("e2e/exact.spec.ts");
     },
   );
+
+  test("prefetches only two reads and preserves findings when later reads finish first", async () => {
+    const names = ["a", "b", "c", "d"];
+    const gates = names.map(() => Promise.withResolvers<void>());
+    const secondStarted = Promise.withResolvers<void>();
+    const fourthStarted = Promise.withResolvers<void>();
+    const started: string[] = [];
+    let active = 0;
+    let peak = 0;
+    // oxlint-disable-next-line typescript/unbound-method -- Called with the original receiver below.
+    const original = RepositoryScanContext.prototype.readTextFileOrWarn;
+    const reader = spyOn(RepositoryScanContext.prototype, "readTextFileOrWarn").mockImplementation(
+      async function (this: RepositoryScanContext, path: string) {
+        const index = names.findIndex((name) => path.endsWith(`/e2e/${name}.spec.ts`));
+        if (index < 0) {
+          return original.call(this, path);
+        }
+        started.push(names[index]!);
+        active++;
+        peak = Math.max(peak, active);
+        if (started.length === 2) {
+          secondStarted.resolve();
+        }
+        if (started.length === 4) {
+          fourthStarted.resolve();
+        }
+        try {
+          await gates[index]!.promise;
+          return await original.call(this, path);
+        } finally {
+          active--;
+        }
+      },
+    );
+    const running = scan(
+      Object.fromEntries(
+        names.map((name) => [
+          `e2e/${name}.spec.ts`,
+          `import { test } from '@playwright/test';
+test('${name}', async ({ page }) => { await page.route('/${name}', r => r.fulfill({ body: '{}' })); });`,
+        ]),
+      ),
+    );
+    try {
+      await secondStarted.promise;
+      expect(started.toSorted()).toEqual(["a", "b"]);
+      gates[1]!.resolve();
+      // a is still pending: the producer must not run ahead through c/d.
+      expect(started.toSorted()).toEqual(["a", "b"]);
+      gates[0]!.resolve();
+      await fourthStarted.promise;
+      expect(started.toSorted()).toEqual(names);
+      expect(peak).toBe(2);
+      gates[3]!.resolve();
+      gates[2]!.resolve();
+      const findings = await running;
+      expect(findings.map((finding) => finding.location.path)).toEqual(
+        names.map((name) => `e2e/${name}.spec.ts`),
+      );
+      expect(active).toBe(0);
+    } finally {
+      for (const gate of gates) {
+        gate.resolve();
+      }
+      await running;
+      reader.mockRestore();
+    }
+  });
+
+  test("drains pending reads before returning a failure, without late warning mutations", async () => {
+    const cwd = await tempDirs.create("apl-playwright-prefetch-failure-");
+    await writeRepositoryFiles(cwd, { "a.ts": "", "b.ts": "", "c.ts": "" });
+    const context = new RepositoryScanContext(cwd, []);
+    const first = Promise.withResolvers<string | undefined>();
+    const second = Promise.withResolvers<string | undefined>();
+    const secondStarted = Promise.withResolvers<void>();
+    const started: string[] = [];
+    const events: string[] = [];
+    const fileIndex = buildRepositoryFileIndex(context);
+    fileIndex.readTextFile = async (path) => {
+      started.push(path);
+      if (started.length === 2) {
+        secondStarted.resolve();
+      }
+      if (path === "a.ts") {
+        return first.promise;
+      }
+      try {
+        return await second.promise;
+      } finally {
+        context.warn("prefetch-test", "Read finished");
+        events.push("read-finished");
+      }
+    };
+    const failure = new Error("Read failed");
+    let returned = false;
+    const running = collectPlaywrightRouteDisablesHttpCacheDiagnostics({
+      scanContext: context,
+      fileIndex,
+    } as RepositoryDiagnosticContext).then(
+      () => {
+        throw new Error("Expected read failure");
+      },
+      (error: unknown) => {
+        returned = true;
+        events.push("returned");
+        return error;
+      },
+    );
+    try {
+      await secondStarted.promise;
+      first.reject(failure);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(returned).toBe(false);
+      second.resolve(undefined);
+      expect(await running).toBe(failure);
+      expect(started.toSorted()).toEqual(["a.ts", "b.ts"]);
+      expect(events).toEqual(["read-finished", "returned"]);
+      const warnings = [...context.warnings];
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(context.warnings).toEqual(warnings);
+      expect(warnings).toHaveLength(1);
+    } finally {
+      first.reject(failure);
+      second.resolve(undefined);
+      await running;
+    }
+  });
 
   test("does not warn for fetch patches, unrelated routes, comments, or custom cross-file imports", async () => {
     const findings = await scan({

@@ -162,11 +162,45 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
     return false;
   }
 
-  for (const path of files) {
-    if (!shouldScanPath(path)) {
-      continue;
+  async function* sources() {
+    const candidates = files.filter(shouldScanPath);
+    // Each read returns at most MAX_SOURCE_LENGTH UTF-16 units. Two queued
+    // results retain at most 1 MiB of text; reuse read()'s size preflight.
+    const pending = new Map<
+      number,
+      Promise<{ ok: true; value: string | undefined } | { ok: false; error: unknown }>
+    >();
+    function load(index: number) {
+      const path = candidates[index];
+      if (path !== undefined) {
+        pending.set(
+          index,
+          read(path).then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+        );
+      }
     }
-    const source = await read(path);
+    load(0);
+    load(1);
+    try {
+      for (let index = 0; index < candidates.length; index++) {
+        const result = await pending.get(index)!;
+        pending.delete(index);
+        if (!result.ok) {
+          throw result.error;
+        }
+        load(index + 2);
+        yield { path: candidates[index]!, source: result.value };
+      }
+    } finally {
+      // No prefetched read may append warnings after this collector returns.
+      await Promise.all(pending.values());
+    }
+  }
+
+  for await (const { path, source } of sources()) {
     if (!source || !isCandidateSource(path, source)) {
       continue;
     }
