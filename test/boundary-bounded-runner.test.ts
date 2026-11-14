@@ -56,10 +56,10 @@ test.skipIf(!posix)(
   async () => {
     const root = await dirs.create("apl-bounded-starved-"),
       pidFile = `${root}/pid`;
-    // Finite 2 s control, not an unrestricted runaway if cleanup regresses.
-    const busy = "const until=Date.now()+2000;while(Date.now()<until){await Promise.resolve();}";
+    // Finite control, not an unrestricted runaway if cleanup regresses.
+    const busy = "const until=Date.now()+800;while(Date.now()<until){await Promise.resolve();}";
     const source = `import {spawn} from "node:child_process";const p=spawn(process.execPath,["--no-orphans","-e",${JSON.stringify(busy)}],{detached:true,stdio:"inherit"});await Bun.write(${JSON.stringify(pidFile)},String(p.pid));setInterval(()=>{},1000);`;
-    const result = await run(source, 256, 1000, async () => {
+    const result = await run(source, 256, 400, async () => {
       expect(notRunning(Number(await Bun.file(pidFile).text()))).toBe(true);
     });
     expect(result.code).toBe(124);
@@ -77,7 +77,7 @@ test.skipIf(!posix)(
     const root = await dirs.create("apl-bounded-deadline-"),
       pidFile = `${root}/pid`;
     const source = `import {spawn} from "node:child_process";const p=spawn(process.execPath,["--no-orphans","-e","setInterval(()=>{},1000)"],{detached:true,stdio:"inherit"});await Bun.write(${JSON.stringify(pidFile)},String(p.pid));setInterval(()=>{},1000);`;
-    const result = await run(source, 256, 1000);
+    const result = await run(source, 256, 400);
     expect(result.code).toBe(124);
     expect(result.err).toContain("deadline");
     expect(notRunning(Number(await Bun.file(pidFile).text()))).toBe(true);
@@ -96,7 +96,7 @@ test.skipIf(!posix)(
   async () => {
     // Deliberately bounded fixture: at most 128 MiB allocated even if the guard regresses.
     const result = await run(
-      "const blocks=[];const timer=setInterval(()=>{blocks.push(Buffer.alloc(1024*1024,1));if(blocks.length===128){clearInterval(timer);process.exit(0);}},5);",
+      "const blocks=[];const timer=setInterval(()=>{blocks.push(Buffer.alloc(4*1024*1024,1));if(blocks.length===32){clearInterval(timer);setInterval(()=>{},1000);}},5);",
       80,
       4000,
     );
@@ -109,7 +109,7 @@ test.skipIf(!posix)("RSS limit includes a worker in a different process group", 
   const root = await dirs.create("apl-bounded-worker-"),
     pidFile = `${root}/pid`;
   const allocation =
-    "const blocks=[];const t=setInterval(()=>{blocks.push(Buffer.alloc(1024*1024,1));if(blocks.length===128){clearInterval(t);process.exit(0);}},5);";
+    "const blocks=[];const t=setInterval(()=>{blocks.push(Buffer.alloc(4*1024*1024,1));if(blocks.length===32){clearInterval(t);setInterval(()=>{},1000);}},5);";
   const source = `import {spawn} from "node:child_process";const p=spawn(process.execPath,["--no-orphans","-e",${JSON.stringify(allocation)}],{detached:true,stdio:"inherit"});await Bun.write(${JSON.stringify(pidFile)},String(p.pid));setInterval(()=>{},1000);`;
   const result = await run(source, 110, 4000);
   expect(result.code).toBe(137);
