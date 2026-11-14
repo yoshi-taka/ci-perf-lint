@@ -26,7 +26,7 @@ function referencePositions(source: string): (offset: number) => { line: number;
   };
 }
 
-describe("source position bulk search", () => {
+describe("adaptive source positions", () => {
   test("preserves newline boundaries, CRLF midpoints and UTF-16 columns", () => {
     for (const source of [
       "",
@@ -95,5 +95,55 @@ describe("source position bulk search", () => {
       expect(third(1)).toEqual({ line: 1, column: 2 });
       expect(third(2)).toEqual({ line: 2, column: 1 });
     }
+  });
+
+  test("sparse forward queries and exceptional offsets preserve cursor state", () => {
+    const source = `\uFEFF🌟first\n${"ordinary line\n".repeat(2000)}`;
+    const position = sourcePositions(source);
+    const reference = referencePositions(source);
+    for (const offset of [0, 0.5, 1, 4, 7, 10, 10.5, NaN, -Infinity, -0.5, 100, 100, 100.5, 500]) {
+      expect(position(offset)).toEqual(reference(offset));
+    }
+    const first = position(500);
+    first.line = 999;
+    first.column = -999;
+    expect(position(500)).toEqual(reference(500));
+    for (const offset of [Infinity, source.length + 1, 100, 0, NaN]) {
+      expect(position(offset)).toEqual(reference(offset));
+    }
+  });
+
+  test("dense queries and backwards jumps agree before and after the index fallback", () => {
+    for (const source of ["x\n".repeat(2000), "x".repeat(10000), "🌟\r\n".repeat(1000)]) {
+      const position = sourcePositions(source);
+      const reference = referencePositions(source);
+      for (let offset = 0; offset < 2500; offset += 0.5) {
+        expect(position(offset)).toEqual(reference(offset));
+      }
+      for (const offset of [1, 2000, 0, -1, NaN, Infinity, source.length, 5]) {
+        expect(position(offset)).toEqual(reference(offset));
+      }
+    }
+  });
+
+  test("generated long LF sources preserve sparse, duplicate and reversed queries", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom("abc", "🌟", "\uFEFF", "\uD800", "\uDC00", "\n"), {
+          maxLength: 100,
+        }),
+        fc.array(fc.integer({ min: 0, max: 2000 }), { minLength: 1, maxLength: 50 }),
+        (parts, generated) => {
+          const source = `${parts.join("")}\n${"tail\n".repeat(1000)}`;
+          const position = sourcePositions(source);
+          const reference = referencePositions(source);
+          const offsets = generated.map((value) => value / 2).sort((a, b) => a - b);
+          for (const offset of [...offsets, ...offsets.slice().reverse(), NaN, Infinity, 0]) {
+            expect(position(offset)).toEqual(reference(offset));
+          }
+        },
+      ),
+      { numRuns: 1000 },
+    );
   });
 });

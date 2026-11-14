@@ -49,9 +49,51 @@ export interface SourceFileAudit {
 export function sourcePositions(
   source: string,
 ): (offset: number) => { line: number; column: number } {
+  let indexed: ((offset: number) => { line: number; column: number }) | undefined;
+  let plain: boolean | undefined;
+  let knownOffset = 0;
+  let knownLine = 1;
+  let knownStart = 0;
+  let scanned = 0;
+  return (offset) => {
+    // Exceptional offsets must not contaminate the forward cursor.
+    if (Number.isNaN(offset) || offset < 0) {
+      return { line: 1, column: offset + 1 };
+    }
+    if (indexed) {
+      return indexed(offset);
+    }
+    const position = Math.min(source.length, Math.floor(offset));
+    if (position === knownOffset) {
+      return { line: knownLine, column: offset - knownStart + 1 };
+    }
+    const distance = position - knownOffset;
+    plain ??= !/[\r\u2028\u2029]/.test(source);
+    // Sparse forward lookups avoid indexing unused function/class bodies. Switch
+    // permanently for backwards queries, mixed breaks, or repeated scanning cost.
+    if (distance < 0 || !plain || scanned + distance + 256 > 4 * source.length) {
+      indexed = indexedSourcePositions(source, plain);
+      return indexed(offset);
+    }
+    // Keep each search inside the newly queried prefix, even on a huge single line.
+    const between = source.slice(knownOffset, position);
+    for (let at = between.indexOf("\n"); at >= 0; at = between.indexOf("\n", at + 1)) {
+      knownLine++;
+      knownStart = knownOffset + at + 1;
+    }
+    scanned += distance + 256;
+    knownOffset = position;
+    return { line: knownLine, column: offset - knownStart + 1 };
+  };
+}
+
+function indexedSourcePositions(
+  source: string,
+  plain: boolean,
+): (offset: number) => { line: number; column: number } {
   const starts = [0];
   // Skip ordinary runs with the runtime's string search; retain all JS line breaks.
-  if (!/[\r\u2028\u2029]/.test(source)) {
+  if (plain) {
     for (let index = source.indexOf("\n"); index >= 0; index = source.indexOf("\n", index + 1)) {
       starts.push(index + 1);
     }
