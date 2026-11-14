@@ -23,7 +23,7 @@
     "docs:dev": "bun run docs:sync && bun run astro dev --root site",
     "docs:build": "bun run docs:sync && bun run astro build --root site",
     "docs:preview": "bun run astro preview --root site",
-    "test": "AGENT=1 bun --no-orphans scripts/run-bounded.ts --memory-mib 2048 --timeout-ms 180000 -- bun test --no-orphans --parallel=2 --timings=.bun-test-timings.json",
+    "test": "AGENT=1 bun --no-orphans scripts/run-bounded.ts --memory-mib 2048 --timeout-ms 180000 -- bun test --no-orphans --parallel=2 --no-isolate --randomize --timings=.bun-test-timings.json",
     "test:mutation:source": "AGENT=1 bun test --no-orphans --parallel=1",
     "test:changed": "bun test --changed",
     "test:isolate": "bun test --isolate",
