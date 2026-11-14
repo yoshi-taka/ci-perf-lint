@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { analyzeRepositoryForRule, createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
+import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 
 const tempDirs = createTempDirTracker();
 afterEach(() => tempDirs.cleanup());
@@ -117,6 +118,48 @@ test('api', async ({ page }) => { await page.route('/api', r => r.fulfill({ body
     expect(findings).toHaveLength(1);
     expect(findings[0]!.location.path).toBe("e2e/kept.spec.ts");
   });
+
+  test("rejects certainly oversized bundles before loading their text", async () => {
+    // oxlint-disable-next-line typescript/unbound-method -- Called with the original receiver below.
+    const original = RepositoryScanContext.prototype.readTextFileOrWarn;
+    const loaded: string[] = [];
+    const reader = spyOn(RepositoryScanContext.prototype, "readTextFileOrWarn").mockImplementation(
+      function (this: RepositoryScanContext, path: string) {
+        loaded.push(path);
+        return original.call(this, path);
+      },
+    );
+    try {
+      const findings = await scan({
+        "generated.js.snapshot/bundle.js": `// ${"x".repeat(4 * 256 * 1024)}`,
+      });
+      expect(findings).toEqual([]);
+      expect(loaded.some((path) => path.endsWith("/generated.js.snapshot/bundle.js"))).toBe(false);
+    } finally {
+      reader.mockRestore();
+    }
+  });
+
+  test.each(["x", "漢", "😀"])(
+    "keeps the UTF-16 limit for %s padding, not a smaller byte limit",
+    async (character) => {
+      const routeSource = `import { test } from '@playwright/test';
+test('api', async ({ page }) => { await page.route('/api', r => r.fulfill({ body: '{}' })); });
+// `;
+      const remaining = 256 * 1024 - routeSource.length;
+      const source =
+        routeSource +
+        character.repeat(Math.floor(remaining / character.length)) +
+        "x".repeat(remaining % character.length);
+      expect(source.length).toBe(256 * 1024);
+      const findings = await scan({
+        "e2e/exact.spec.ts": source,
+        "e2e/over.spec.ts": `${source}x`,
+      });
+      expect(findings).toHaveLength(1);
+      expect(findings[0]!.location.path).toBe("e2e/exact.spec.ts");
+    },
+  );
 
   test("does not warn for fetch patches, unrelated routes, comments, or custom cross-file imports", async () => {
     const findings = await scan({

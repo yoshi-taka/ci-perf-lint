@@ -1,4 +1,5 @@
 import nodePath from "node:path";
+import { open, stat } from "node:fs/promises";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
@@ -58,6 +59,26 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
   const fileSet = new Set(files);
 
   async function read(path: string): Promise<string | undefined> {
+    // The existing limit counts UTF-16 code units, not bytes. UTF-8 needs at
+    // most three bytes per unit, plus a possible stripped BOM. Reject only
+    // files guaranteed not to fit; retain the exact string-length check below.
+    const byteLimit = MAX_SOURCE_LENGTH * 3 + 3;
+    const absolute = context.scanContext.resolve(path);
+    try {
+      if ((await stat(absolute)).size > byteLimit) {
+        const file = await open(absolute, "r");
+        try {
+          const metadata = await file.stat();
+          if (metadata.isFile() && metadata.size > byteLimit) {
+            return undefined;
+          }
+        } finally {
+          await file.close();
+        }
+      }
+    } catch {
+      // Keep the normal reader's warning/cache behavior on access/stat errors.
+    }
     const source = await context.fileIndex.readTextFile(path);
     return source !== undefined && source.length <= MAX_SOURCE_LENGTH ? source : undefined;
   }
