@@ -101,8 +101,23 @@ function isolatedScenario(body: string): void {
               dynamicImports: mode === "dynamic" ? [{}] : [],
             };
           },
-          get program() { throw new Error("lazy AST must not be read"); },
-          get comments() { throw new Error("lazy comments must not be read"); },
+          get program() {
+            if (mode === "static") return {
+              body: [{
+                type: "ImportDeclaration", start: 0, importKind: "value",
+                source: {value: "./entry"},
+                specifiers: [{
+                  type: "ImportSpecifier", importKind: "value",
+                  imported: {type: "Unsupported"},
+                }],
+              }],
+            };
+            throw new Error("lazy AST must not be read");
+          },
+          get comments() {
+            if (mode === "static") return [];
+            throw new Error("lazy comments must not be read");
+          },
           dispose() { events.push("dispose"); },
         };
       },
@@ -133,7 +148,7 @@ test("metadata results are disposed without touching lazy AST, including failure
   `);
 });
 
-test("static and dynamic metadata dispose before the eager fallback", () => {
+test("unsupported static schema and dynamic metadata dispose before the eager fallback", () => {
   isolatedScenario(`
     for (mode of ["static", "dynamic"]) {
       expect(await parseSourceAudit("a.js", large)).toBeDefined();
@@ -142,11 +157,13 @@ test("static and dynamic metadata dispose before the eager fallback", () => {
   `);
 });
 
-test("small sources, TypeScript, snapshots, captures and unsupported runtimes bypass preflight", () => {
+test("small sources and TS use static transfer; snapshots, captures and unsupported runtimes bypass it", () => {
   isolatedScenario(`
+    for (const filename of ["small.js", "a.ts"]) {
+      expect(await parseSourceAudit(filename, "const local = 1;")).toBeDefined();
+      expect(events.splice(0)).toEqual(["lazy", "dispose"]);
+    }
     for (const [filename, source, capture] of [
-      ["small.js", large.slice(1), undefined],
-      ["a.ts", large, undefined],
       ["snapshot.js", large + "InlineSnapshot", undefined],
       ["capture.js", large, () => {}],
     ]) {
@@ -194,19 +211,29 @@ test("real Node metadata preflight matches eager facts and rejection across repe
         '/* unterminated',
         'const x = "\\\\uD800";',
         'expect(x).toMatchInlineSnapshot(\`one\\ntwo\`);',
+        '// 日本語🌟\\r\\n// oxlint-disable-next-line no-restricted-imports\\r\\nimport {format} from "date-fns";',
+        '/* oxlint-disable import/extensions */\\nimport "./entry";\\n/* oxlint-enable import/extensions */\\nimport "./other";',
+        'import type {} from "./types";',
+        'export {} from "./empty";',
+        'import {"string-name" as local} from "pkg"; export {"string-name" as other} from "pkg";',
+        '#!oxlint-disable import/extensions\\nimport "./entry";',
       ];
+      let compared = 0;
       for (let round = 0; round < 3; round++) {
-        for (const extension of ["js", "jsx", "mjs", "cjs"]) {
+        for (const extension of ["js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts"]) {
           for (const sample of samples) {
             const filename = "large." + extension;
-            const source = pad + sample;
+            const source = sample.startsWith("#!")
+              ? sample.slice(0, sample.indexOf("\\n") + 1) + pad + sample.slice(sample.indexOf("\\n") + 1)
+              : pad + sample;
             const actual = await parseSourceAudit(filename, source);
             const eager = await parseSourceAudit(filename, source, undefined, filename, () => {});
             if (!isDeepStrictEqual(actual, eager)) throw new Error("Metadata mismatch: " + sample);
+            compared++;
           }
         }
       }
-      console.log(JSON.stringify({ compared: 156, rawTransfer: rawTransferSupported() }));
+      console.log(JSON.stringify({ compared, rawTransfer: rawTransferSupported() }));
     }
   `,
     ],
@@ -214,5 +241,5 @@ test("real Node metadata preflight matches eager facts and rejection across repe
   );
   expect(result.error).toBeUndefined();
   expect(result.status, result.stderr).toBe(0);
-  expect(JSON.parse(result.stdout)).toMatchObject({ compared: 156 });
+  expect(JSON.parse(result.stdout)).toMatchObject({ compared: 456 });
 }, 20000);

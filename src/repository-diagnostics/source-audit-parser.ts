@@ -2,6 +2,10 @@ import { loadOxcParser } from "./oxc-parser.ts";
 import { importAuditDecisions, importSourceShape } from "./source-import-policy.ts";
 import { sourceSuppressions } from "./source-suppressions.ts";
 import { findInlineSnapshots } from "./jest-inline-snapshots.ts";
+import {
+  readStaticSourceTransfer,
+  type StaticSourceTransfer,
+} from "./source-audit-static-transfer.ts";
 import type { Node, Program } from "oxc-parser";
 
 export interface SourceProgramCapture {
@@ -83,15 +87,10 @@ export async function parseSourceAudit(
   const { parseSync, visitorKeys, rawTransferSupported } = await loadOxcParser();
   const parserFilename =
     typeof syntaxFilename === "string" ? syntaxFilename : syntaxFilename.filename;
-  if (
-    source.length >= 128 * 1024 &&
-    /\.[cm]?jsx?$/i.test(parserFilename) &&
-    !capture &&
-    !source.includes("InlineSnapshot") &&
-    rawTransferSupported()
-  ) {
-    // Large classic bundles often have no facts. Validate syntax and module metadata
-    // without expanding their AST. Never pass lazy nodes to the ESTree visitors below.
+  const raw = rawTransferSupported();
+  if (raw && !capture && !source.includes("InlineSnapshot")) {
+    // Import-only rules need declarations, not function/class bodies. Normalize the
+    // limited lazy schema explicitly; AST visitors and captures stay on eager ESTree.
     const metadataOptions: NonNullable<Parameters<typeof parseSync>[2]> & {
       experimentalLazy: boolean;
     } = { experimentalLazy: true };
@@ -106,6 +105,12 @@ export async function parseSourceAudit(
       if (!metadata.module.hasModuleSyntax && metadata.module.dynamicImports.length === 0) {
         return { imports: [], wildcardExports: [], snapshots: [] };
       }
+      if (metadata.module.dynamicImports.length === 0) {
+        const transferred = readStaticSourceTransfer(metadata, source, parserFilename);
+        if (transferred) {
+          return collect(transferred);
+        }
+      }
     } finally {
       // Also release before reparsing a module through the eager fallback.
       metadata.dispose();
@@ -117,148 +122,156 @@ export async function parseSourceAudit(
   const transferOptions: NonNullable<Parameters<typeof parseSync>[2]> & {
     experimentalRawTransfer: boolean;
   } = { experimentalRawTransfer: true };
-  const parsed = parseSync(
-    parserFilename,
-    source,
-    rawTransferSupported() ? transferOptions : undefined,
-  );
-  if (parsed.errors.length) {
+  const eagerParsed = parseSync(parserFilename, source, raw ? transferOptions : undefined);
+  if (eagerParsed.errors.length) {
     return undefined;
   }
-  // Component scaffolds may overwrite markup/newlines, but never shift offsets.
-  const position = sourcePositions(
-    typeof syntaxFilename === "string" ? source : syntaxFilename.positionSource,
-  );
-  const suppressed = sourceSuppressions(parsed.comments, (offset) => position(offset).line);
-  capture?.({
-    program: parsed.program,
-    visitorKeys,
-    position,
-    suppressed: (offset) => suppressed("jest/no-large-snapshots", offset),
-  });
-  const facts: SourceImport[] = [];
-  function add(
-    start: number,
-    request: string,
-    runtime: boolean,
-    names: string[],
-    options: { namespace: boolean; dynamic?: true },
-  ) {
-    const shape = importSourceShape(request);
-    if (
-      shape.relative &&
-      shape.hasExtension &&
-      !shape.hasQuery &&
-      resolvesOmittedExtension(request)
-    ) {
-      shape.hasExtension = false;
-    }
-    facts.push({
-      relativePath: filename,
-      source: request,
-      ...position(start),
-      names,
-      namespace: options.namespace,
-      ...(options.dynamic ? { dynamic: true as const } : {}),
-      ...importAuditDecisions({
-        runtime,
-        hasBindings: options.namespace || names.length > 0,
-        ...shape,
-        restrictedSuppressed: suppressed("no-restricted-imports", start),
-        extensionsSuppressed: suppressed("import/extensions", start),
-      }),
-    });
-  }
-  const wildcardExports: SourceWildcardExport[] = [];
-  for (const declaration of parsed.program.body) {
-    if (declaration.type === "ImportDeclaration") {
-      const values =
-        declaration.importKind === "type"
-          ? []
-          : declaration.specifiers.filter(
-              (entry) => entry.type !== "ImportSpecifier" || entry.importKind !== "type",
-            );
-      add(
-        declaration.start,
-        declaration.source.value,
-        declaration.importKind !== "type" &&
-          (declaration.specifiers.length === 0 || values.length > 0),
-        values.flatMap((entry) =>
-          entry.type === "ImportDefaultSpecifier"
-            ? ["default"]
-            : entry.type === "ImportSpecifier"
-              ? [entry.imported.type === "Identifier" ? entry.imported.name : entry.imported.value]
-              : [],
-        ),
-        { namespace: values.some((entry) => entry.type === "ImportNamespaceSpecifier") },
-      );
-    } else if (declaration.type === "ExportNamedDeclaration" && declaration.source) {
-      const values =
-        declaration.exportKind === "type"
-          ? []
-          : declaration.specifiers.filter((entry) => entry.exportKind !== "type");
-      add(
-        declaration.start,
-        declaration.source.value,
-        values.length > 0,
-        values.map((entry) =>
-          entry.local.type === "Identifier" ? entry.local.name : entry.local.value,
-        ),
-        { namespace: false },
-      );
-    } else if (declaration.type === "ExportAllDeclaration") {
-      if (!suppressed("oxc/no-barrel-file", declaration.start)) {
-        wildcardExports.push({
-          relativePath: filename,
-          ...position(declaration.start),
-          source: declaration.source.value,
-        });
-      }
-      add(declaration.start, declaration.source.value, declaration.exportKind !== "type", [], {
-        namespace: declaration.exportKind !== "type",
+  return collect(eagerParsed);
+
+  function collect(parsed: ReturnType<typeof parseSync> | StaticSourceTransfer): SourceFileAudit {
+    const eager = "staticOnly" in parsed ? undefined : parsed;
+    // Component scaffolds may overwrite markup/newlines, but never shift offsets.
+    const position = sourcePositions(
+      typeof syntaxFilename === "string" ? source : syntaxFilename.positionSource,
+    );
+    const suppressed = sourceSuppressions(parsed.comments, (offset) => position(offset).line);
+    if (eager) {
+      capture?.({
+        program: eager.program,
+        visitorKeys,
+        position,
+        suppressed: (offset) => suppressed("jest/no-large-snapshots", offset),
       });
     }
-  }
-  function visit(node: Node) {
-    if (node.type === "ImportExpression") {
-      const request =
-        node.source.type === "Literal" && typeof node.source.value === "string"
-          ? node.source.value
-          : node.source.type === "TemplateLiteral" && node.source.expressions.length === 0
-            ? node.source.quasis[0]?.value.cooked
-            : undefined;
-      if (request !== undefined && request !== null) {
-        // The namespace is loaded regardless of how the promise result is consumed.
-        add(node.start, request, true, [], { namespace: true, dynamic: true });
+    const facts: SourceImport[] = [];
+    function add(
+      start: number,
+      request: string,
+      runtime: boolean,
+      names: string[],
+      options: { namespace: boolean; dynamic?: true },
+    ) {
+      const shape = importSourceShape(request);
+      if (
+        shape.relative &&
+        shape.hasExtension &&
+        !shape.hasQuery &&
+        resolvesOmittedExtension(request)
+      ) {
+        shape.hasExtension = false;
+      }
+      facts.push({
+        relativePath: filename,
+        source: request,
+        ...position(start),
+        names,
+        namespace: options.namespace,
+        ...(options.dynamic ? { dynamic: true as const } : {}),
+        ...importAuditDecisions({
+          runtime,
+          hasBindings: options.namespace || names.length > 0,
+          ...shape,
+          restrictedSuppressed: suppressed("no-restricted-imports", start),
+          extensionsSuppressed: suppressed("import/extensions", start),
+        }),
+      });
+    }
+    const wildcardExports: SourceWildcardExport[] = [];
+    for (const declaration of parsed.program.body) {
+      if (declaration.type === "ImportDeclaration") {
+        const values =
+          declaration.importKind === "type"
+            ? []
+            : declaration.specifiers.filter(
+                (entry) => entry.type !== "ImportSpecifier" || entry.importKind !== "type",
+              );
+        add(
+          declaration.start,
+          declaration.source.value,
+          declaration.importKind !== "type" &&
+            (declaration.specifiers.length === 0 || values.length > 0),
+          values.flatMap((entry) =>
+            entry.type === "ImportDefaultSpecifier"
+              ? ["default"]
+              : entry.type === "ImportSpecifier"
+                ? [
+                    entry.imported.type === "Identifier"
+                      ? entry.imported.name
+                      : entry.imported.value,
+                  ]
+                : [],
+          ),
+          { namespace: values.some((entry) => entry.type === "ImportNamespaceSpecifier") },
+        );
+      } else if (declaration.type === "ExportNamedDeclaration" && declaration.source) {
+        const values =
+          declaration.exportKind === "type"
+            ? []
+            : declaration.specifiers.filter((entry) => entry.exportKind !== "type");
+        add(
+          declaration.start,
+          declaration.source.value,
+          values.length > 0,
+          values.map((entry) =>
+            entry.local.type === "Identifier" ? entry.local.name : entry.local.value,
+          ),
+          { namespace: false },
+        );
+      } else if (declaration.type === "ExportAllDeclaration") {
+        if (!suppressed("oxc/no-barrel-file", declaration.start)) {
+          wildcardExports.push({
+            relativePath: filename,
+            ...position(declaration.start),
+            source: declaration.source.value,
+          });
+        }
+        add(declaration.start, declaration.source.value, declaration.exportKind !== "type", [], {
+          namespace: declaration.exportKind !== "type",
+        });
       }
     }
-    const record = node as unknown as Record<string, unknown>;
-    for (const key of visitorKeys[node.type] ?? []) {
-      const value = record[key];
-      for (const child of Array.isArray(value) ? value : [value]) {
-        if (child && typeof child === "object" && "type" in child) {
-          visit(child as Node);
+    function visit(node: Node) {
+      if (node.type === "ImportExpression") {
+        const request =
+          node.source.type === "Literal" && typeof node.source.value === "string"
+            ? node.source.value
+            : node.source.type === "TemplateLiteral" && node.source.expressions.length === 0
+              ? node.source.quasis[0]?.value.cooked
+              : undefined;
+        if (request !== undefined && request !== null) {
+          // The namespace is loaded regardless of how the promise result is consumed.
+          add(node.start, request, true, [], { namespace: true, dynamic: true });
+        }
+      }
+      const record = node as unknown as Record<string, unknown>;
+      for (const key of visitorKeys[node.type] ?? []) {
+        const value = record[key];
+        for (const child of Array.isArray(value) ? value : [value]) {
+          if (child && typeof child === "object" && "type" in child) {
+            visit(child as Node);
+          }
         }
       }
     }
+    // Native module metadata also recognizes comments/whitespace and templates.
+    // Avoid walking every expression in repositories with no dynamic imports.
+    if (eager?.module.dynamicImports.length) {
+      visit(eager.program);
+      facts.sort((left, right) => left.line - right.line || left.column - right.column);
+    }
+    return {
+      imports: facts,
+      wildcardExports,
+      snapshots:
+        eager && source.includes("InlineSnapshot")
+          ? findInlineSnapshots(eager.program, visitorKeys, (offset) =>
+              suppressed("jest/no-large-snapshots", offset),
+            ).map(({ offset, lineCount }) => ({
+              relativePath: filename,
+              ...position(offset),
+              lineCount,
+            }))
+          : [],
+    };
   }
-  // Native module metadata also recognizes comments/whitespace and templates.
-  // Avoid walking every expression in repositories with no dynamic imports.
-  if (parsed.module.dynamicImports.length) {
-    visit(parsed.program);
-    facts.sort((left, right) => left.line - right.line || left.column - right.column);
-  }
-  return {
-    imports: facts,
-    wildcardExports,
-    snapshots: source.includes("InlineSnapshot")
-      ? findInlineSnapshots(parsed.program, visitorKeys, (offset) =>
-          suppressed("jest/no-large-snapshots", offset),
-        ).map(({ offset, lineCount }) => ({
-          relativePath: filename,
-          ...position(offset),
-          lineCount,
-        }))
-      : [],
-  };
 }
