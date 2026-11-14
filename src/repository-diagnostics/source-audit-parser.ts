@@ -123,7 +123,8 @@ export async function parseSourceAudit(
   filename: string,
   source: string,
   resolvesOmittedExtension: (request: string) => boolean = () => false,
-  syntaxFilename: string | { filename: string; positionSource: string } = filename,
+  syntaxFilename:
+    string | { filename: string; positionSource: string; positionOffset?: number } = filename,
   capture?: (parsed: SourceProgramCapture) => void,
 ): Promise<SourceFileAudit | undefined> {
   const { parseSync, visitorKeys, rawTransferSupported } = await loadOxcParser();
@@ -172,10 +173,15 @@ export async function parseSourceAudit(
 
   function collect(parsed: ReturnType<typeof parseSync> | StaticSourceTransfer): SourceFileAudit {
     const eager = "staticOnly" in parsed ? undefined : parsed;
-    // Component scaffolds may overwrite markup/newlines, but never shift offsets.
-    const position = sourcePositions(
+    // Compact component units use parser-local offsets, mapped into the original file.
+    const originalPosition = sourcePositions(
       typeof syntaxFilename === "string" ? source : syntaxFilename.positionSource,
     );
+    const positionOffset =
+      typeof syntaxFilename === "string" ? 0 : (syntaxFilename.positionOffset ?? 0);
+    const position = positionOffset
+      ? (offset: number) => originalPosition(offset + positionOffset)
+      : originalPosition;
     const suppressed = sourceSuppressions(parsed.comments, (offset) => position(offset).line);
     if (eager) {
       capture?.({

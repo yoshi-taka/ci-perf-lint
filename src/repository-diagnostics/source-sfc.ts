@@ -14,6 +14,8 @@ export interface ScriptRegion {
 export interface SfcScripts {
   units: {
     source: string;
+    /** Add to parser offsets to recover positions in the original component. */
+    positionOffset?: number;
     extension: string;
     skipSnapshots?: boolean;
     role?: ScriptRegion["role"];
@@ -54,7 +56,7 @@ function units(
   if (expressionRegions.length > 128) {
     incomplete.push("more than 128 template expressions");
   }
-  const blank = source.replace(/[^\r\n\u2028\u2029]/g, " ");
+  let sharedBlank: string | undefined;
   const unsafeBindings = incomplete.some((note) => /external|language|syntax|span/.test(note));
   const sharedScope =
     combine &&
@@ -69,38 +71,52 @@ function units(
     sharedScope,
     references,
     units: accepted.map((region) => {
+      const prefix =
+        region.role === "template"
+          ? (region.prefix ?? (region.declaration ? "{" : region.statements ? "(()=>{" : "("))
+          : "";
+      const suffix =
+        region.role === "template"
+          ? (region.suffix ?? (region.declaration ? "}" : region.statements ? "})()" : ")"))
+          : "";
+      // Shared captures keep absolute AST offsets. Otherwise retain just the
+      // scaffold and one bordering character, so a script hashbang stays noninitial.
+      const absolute = sharedScope || region.start < prefix.length;
+      const positionOffset = absolute ? 0 : Math.max(0, region.start - prefix.length - 1);
+      const limit = absolute
+        ? source.length
+        : Math.min(source.length, region.end + suffix.length + 1);
+      const blank = absolute
+        ? (sharedBlank ??= source.replace(/[^\r\n\u2028\u2029]/g, " "))
+        : source.slice(positionOffset, limit).replace(/[^\r\n\u2028\u2029]/g, " ");
+      const begin = region.start - positionOffset;
+      const end = region.end - positionOffset;
       let masked =
-        blank.slice(0, region.start) +
-        source.slice(region.start, region.end) +
-        blank.slice(region.end);
+        blank.slice(0, begin) + source.slice(region.start, region.end) + blank.slice(end);
       for (const span of region.omit ?? []) {
-        masked = `${masked.slice(0, span.start)}0${blank.slice(
-          span.start + 1,
-          span.end,
-        )}${masked.slice(span.end)}`;
+        const left = span.start - positionOffset;
+        const right = span.end - positionOffset;
+        masked = `${masked.slice(0, left)}0${blank.slice(left + 1, right)}${masked.slice(right)}`;
       }
       if (region.role === "template") {
-        const prefix =
-          region.prefix ?? (region.declaration ? "{" : region.statements ? "(()=>{" : "(");
-        const suffix =
-          region.suffix ?? (region.declaration ? "}" : region.statements ? "})()" : ")");
         if (region.start < prefix.length) {
           incomplete.push("template expression scaffold span unavailable");
           masked = blank;
         } else {
-          masked = masked.padEnd(region.end + suffix.length, " ");
+          masked = masked.padEnd(end + suffix.length, " ");
           masked =
-            masked.slice(0, region.start - prefix.length) +
+            masked.slice(0, begin - prefix.length) +
             prefix +
-            masked.slice(region.start, region.end) +
+            masked.slice(begin, end) +
             suffix +
-            masked.slice(region.end + suffix.length);
+            masked.slice(end + suffix.length);
         }
       }
       const jsx = region.language.endsWith("sx");
       const typescript = ["ts", "tsx", "typescript"].includes(region.language);
       return {
         source: masked,
+        positionOffset,
         extension: typescript ? (jsx ? ".tsx" : ".ts") : jsx ? ".jsx" : ".js",
         skipSnapshots: skipSnapshots || region.role === "template",
         role: region.role,

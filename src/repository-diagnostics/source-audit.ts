@@ -115,7 +115,11 @@ export function collectSourceAudit(context: RepositoryScanContext): Promise<Sour
             filename,
             unit.source,
             omittedExtension,
-            { filename: filename + unit.extension, positionSource: source },
+            {
+              filename: filename + unit.extension,
+              positionSource: source,
+              positionOffset: unit.positionOffset,
+            },
             scripts.sharedScope && unit.role !== "template"
               ? (capture) =>
                   programs.push({
