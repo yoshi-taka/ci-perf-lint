@@ -155,6 +155,73 @@ test("inherited paths use an explicit child baseUrl; include/exclude/files gate 
   expect(resolve("outside/from.ts", "@/a")).toBeUndefined();
 });
 
+test("repeated ownership checks keep included and excluded sibling files separate", async () => {
+  const files = {
+    "tsconfig.json": json({
+      include: ["src/**"],
+      exclude: ["src/excluded.ts"],
+      compilerOptions: { paths: { "@/*": ["lib/*"] } },
+    }),
+    "lib/a.ts": "",
+    "lib/b.ts": "",
+  };
+  const first = await ts(files);
+  for (let repeat = 0; repeat < 4; repeat++) {
+    expect(first.resolve("src/excluded.ts", "@/a")).toBeUndefined();
+    expect(first.resolve("src/included.ts", "@/a")).toBe("file:lib/a.ts");
+    expect(first.resolve("src/included.ts", "@/b")).toBe("file:lib/b.ts");
+    expect(first.resolve("src/excluded.ts", "@/b")).toBeUndefined();
+    expect(first.resolve("outside/from.ts", "@/a")).toBeUndefined();
+  }
+  const second = await ts({
+    ...files,
+    "tsconfig.json": json({
+      include: ["src/excluded.ts"],
+      compilerOptions: { paths: { "@/*": ["other/*"] } },
+    }),
+    "other/a.ts": "",
+  });
+  expect(second.resolve("src/excluded.ts", "@/a")).toBe("file:other/a.ts");
+  expect(second.resolve("src/included.ts", "@/a")).toBeUndefined();
+  expect(first.resolve("src/included.ts", "@/a")).toBe("file:lib/a.ts");
+  expect(first.warnings).toEqual([]);
+  expect(second.warnings).toEqual([]);
+});
+
+test("package memoization separates nearest manifests, misses and fresh audits", async () => {
+  const files = {
+    "package.json": json({ private: true, workspaces: ["packages/*"] }),
+    "packages/a/package.json": json({
+      name: "@local/a",
+      imports: { "#entry": "./one.ts", "#missing": "./absent.ts" },
+      exports: "./one.ts",
+    }),
+    "packages/b/package.json": json({
+      name: "@local/b",
+      imports: { "#entry": "./two.ts", "#missing": "./two.ts" },
+      exports: "./two.ts",
+    }),
+    "packages/a/one.ts": "",
+    "packages/b/two.ts": "",
+  };
+  const first = await packages(files);
+  for (let repeat = 0; repeat < 4; repeat++) {
+    expect(first.resolve("packages/a/from.ts", "#missing")).toBeUndefined();
+    expect(first.resolve("packages/b/from.ts", "#missing")).toBe("file:packages/b/two.ts");
+    expect(first.resolve("packages/a/from.ts", "#entry")).toBe("file:packages/a/one.ts");
+    expect(first.resolve("packages/a/sibling.ts", "#entry")).toBe("file:packages/a/one.ts");
+    expect(first.resolve("packages/b/from.ts", "#entry")).toBe("file:packages/b/two.ts");
+    expect(first.resolve("packages/b/from.ts", "@local/a")).toBe("file:packages/a/one.ts");
+    expect(first.resolve("packages/a/from.ts", "@local/b")).toBe("file:packages/b/two.ts");
+    expect(first.resolve("from.ts", "#entry")).toBeUndefined();
+  }
+  const second = await packages({ ...files, "packages/a/absent.ts": "" });
+  expect(second.resolve("packages/a/from.ts", "#missing")).toBe("file:packages/a/absent.ts");
+  expect(first.resolve("packages/a/from.ts", "#missing")).toBeUndefined();
+  expect(first.warnings).toEqual([]);
+  expect(second.warnings).toEqual([]);
+});
+
 test.each([
   { paths: { a: ["one", "two"] }, request: "a", files: ["one.ts", "two.ts"] },
   { paths: { "a*": ["one"], "a*b": ["two"] }, request: "ab", files: ["one.ts", "two.ts"] },

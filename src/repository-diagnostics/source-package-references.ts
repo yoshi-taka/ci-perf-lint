@@ -166,8 +166,7 @@ export async function createPackageReferences(
     );
     return resolved.every(Boolean) && new Set(resolved).size === 1 ? resolved[0] : undefined;
   }
-  return (from, request) => {
-    const own = forFile(from);
+  function resolve(own: Manifest | undefined, request: string): string | undefined {
     if (request.startsWith("#")) {
       const imports = sourceConfigRecord(own?.value.imports);
       const match = imports && sourceMapMatch(imports, request);
@@ -214,5 +213,20 @@ export async function createPackageReferences(
         : undefined,
     );
     return resolved.every(Boolean) && new Set(resolved).size === 1 ? resolved[0] : undefined;
+  }
+  // Resolution depends on the nearest manifest and request, not the individual
+  // importing file. Keep successful and missing targets local to this audit.
+  const resolutions = new Map<Manifest | undefined, Map<string, string | undefined>>();
+  return (from, request) => {
+    const own = forFile(from);
+    let requests = resolutions.get(own);
+    if (!requests) {
+      requests = new Map();
+      resolutions.set(own, requests);
+    }
+    if (!requests.has(request)) {
+      requests.set(request, resolve(own, request));
+    }
+    return requests.get(request);
   };
 }

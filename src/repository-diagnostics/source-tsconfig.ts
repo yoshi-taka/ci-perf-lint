@@ -24,19 +24,6 @@ interface Config {
   blocked?: boolean;
 }
 
-function selectionMatches(selection: Selection, filename: string): boolean {
-  return selection.values.some((value) => {
-    const target = sourcePath(selection.directory, value);
-    if (!target) {
-      return false;
-    }
-    if (target === filename || filename.startsWith(`${target}/`)) {
-      return true;
-    }
-    return sourceGlob(target)?.test(filename) ?? false;
-  });
-}
-
 /** Nearest static config, local single extends, paths/baseUrl; no config execution. */
 export async function createTsconfigReferences(
   context: RepositoryScanContext,
@@ -229,6 +216,27 @@ export async function createTsconfigReferences(
   }
   const nearest = new Map<string, Config | undefined>();
   const warnedOwnership = new Set<string>();
+  const selections = new WeakMap<
+    Selection,
+    { target: string | undefined; glob: RegExp | undefined }[]
+  >();
+  function selectionMatches(selection: Selection, filename: string): boolean {
+    let patterns = selections.get(selection);
+    if (!patterns) {
+      patterns = selection.values.map((value) => {
+        const target = sourcePath(selection.directory, value);
+        return { target, glob: target ? sourceGlob(target) : undefined };
+      });
+      selections.set(selection, patterns);
+    }
+    return patterns.some(
+      ({ target, glob }) =>
+        target !== undefined &&
+        (target === filename ||
+          filename.startsWith(`${target}/`) ||
+          (glob?.test(filename) ?? false)),
+    );
+  }
   function owns(config: Config, filename: string) {
     return (
       !(config.exclude && selectionMatches(config.exclude, filename)) &&
@@ -284,7 +292,10 @@ export async function createTsconfigReferences(
   }
   return (from, request) => {
     const config = forFile(from);
-    if (!config || config.blocked || !owns(config, from)) {
+    // forFile caches ownership per filename, not directory: includes/excludes
+    // can select different projects for sibling files. Do not repeat that work
+    // for every import in an already-owned file.
+    if (!config || config.blocked) {
       return undefined;
     }
     const mapping = config.paths && sourceMapMatch(config.paths, request, true);
