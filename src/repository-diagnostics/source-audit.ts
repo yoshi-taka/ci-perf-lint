@@ -9,7 +9,7 @@ import {
 } from "./source-audit-parser.ts";
 import {
   findLargeBarrels,
-  resolveSourceReference,
+  createSourceReferenceResolver,
   type SourceBarrel,
 } from "./source-barrel-graph.ts";
 import { createTsconfigReferences } from "./source-tsconfig.ts";
@@ -204,6 +204,7 @@ export function collectSourceAudit(context: RepositoryScanContext): Promise<Sour
     if (wildcardExports.length) {
       const tsconfig = await createTsconfigReferences(context, knownFiles, sourceFiles);
       const packages = await createPackageReferences(context, knownFiles, sourceFiles);
+      const relativeReference = createSourceReferenceResolver(sourceFiles);
       facts.barrels = findLargeBarrels(
         facts.imports,
         wildcardExports,
@@ -215,12 +216,10 @@ export function collectSourceAudit(context: RepositoryScanContext): Promise<Sour
             /^[a-z][\w+.-]*:/i.test(request) ||
             /[?#]/.test(request.slice(request.startsWith("#") ? 1 : 0))
           ) {
-            return resolveSourceReference(from, request, sourceFiles);
+            return relativeReference(from, request);
           }
           return (
-            tsconfig(from, request) ??
-            packages(from, request) ??
-            resolveSourceReference(from, request, sourceFiles)
+            tsconfig(from, request) ?? packages(from, request) ?? relativeReference(from, request)
           );
         },
       );

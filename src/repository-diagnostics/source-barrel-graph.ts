@@ -44,6 +44,36 @@ export function resolveSourceReference(
   return matches.length === 1 ? `file:${matches[0]}` : `relative:${target}`;
 }
 
+/** Relative resolution depends on directory and request in a fixed audit inventory. */
+export function createSourceReferenceResolver(
+  files: ReadonlySet<string>,
+): (from: string, source: string) => string {
+  const directories = new Map<string, Map<string, string>>();
+  const importers = new Map<string, Map<string, string>>();
+  return (from, source) => {
+    if (!/^\.{1,2}(?:\/|$)/.test(source)) {
+      return `package:${source}`;
+    }
+    let requests = importers.get(from);
+    if (!requests) {
+      const directory = path.posix.dirname(from);
+      requests = directories.get(directory);
+      if (!requests) {
+        requests = new Map();
+        directories.set(directory, requests);
+      }
+      importers.set(from, requests);
+    }
+    const cached = requests.get(source);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const resolved = resolveSourceReference(from, source, files);
+    requests.set(source, resolved);
+    return resolved;
+  };
+}
+
 /** Bounded static reference graph, not a full bundler/TypeScript resolver. */
 export function findLargeBarrels(
   imports: readonly SourceImport[],
