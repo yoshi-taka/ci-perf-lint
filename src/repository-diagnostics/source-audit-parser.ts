@@ -46,15 +46,15 @@ export function sourcePositions(
   source: string,
 ): (offset: number) => { line: number; column: number } {
   const starts = [0];
-  for (let index = 0; index < source.length; index++) {
-    const character = source[index];
-    if (character === "\r") {
-      if (source[index + 1] === "\n") {
-        index++;
-      }
+  // Skip ordinary runs with the runtime's string search; retain all JS line breaks.
+  if (!/[\r\u2028\u2029]/.test(source)) {
+    for (let index = source.indexOf("\n"); index >= 0; index = source.indexOf("\n", index + 1)) {
       starts.push(index + 1);
-    } else if (character === "\n" || character === "\u2028" || character === "\u2029") {
-      starts.push(index + 1);
+    }
+  } else {
+    const breaks = /\r\n|[\r\n\u2028\u2029]/g;
+    for (let match = breaks.exec(source); match; match = breaks.exec(source)) {
+      starts.push(match.index + match[0].length);
     }
   }
   return (offset) => {
