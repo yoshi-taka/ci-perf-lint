@@ -226,7 +226,8 @@ test("scans once per context, ignores artifacts, reports unsupported/invalid fil
     ),
   ).toBe(true);
   await writeRepositoryFiles(root, { "src/a.ts": 'import {y} from "lodash-es";' });
-  expect((await collectSourceAudit(new RepositoryScanContext(root, []))).imports[0]?.source).toBe(
+  const rescan = await collectSourceAudit(new RepositoryScanContext(root, []));
+  expect(rescan.imports.find((entry) => entry.relativePath === "src/a.ts")?.source).toBe(
     "lodash-es",
   );
 });

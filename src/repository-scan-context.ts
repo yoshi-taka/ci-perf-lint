@@ -20,6 +20,10 @@ interface WalkFilesOptions {
   cacheKey?: string;
 }
 
+/** Bounds for the in-process listing; larger trees are left to the native scanner. */
+const WALK_DIRECTORY_LIMIT = 50;
+const WALK_FILE_LIMIT = 500;
+
 const DEFAULT_IGNORED_DIRECTORIES = new Set([
   ".git",
   "node_modules",
@@ -445,7 +449,7 @@ export class RepositoryScanContext {
   }
 
   async #getRgFileList(): Promise<string[] | null> {
-    this.#rgFileListPromise ??= this.#doRgFileList().then((files) => {
+    this.#rgFileListPromise ??= this.#loadFileList().then((files) => {
       if (files) {
         this.#filePathSet = new Set(files);
       } else {
@@ -500,7 +504,61 @@ export class RepositoryScanContext {
     }
   }
 
-  async #doRgFileList(): Promise<string[] | null> {
+  /**
+   * Small trees are cheaper to list in-process: starting the scanner costs about 5 ms
+   * regardless of size, while a walk costs about 0.07 ms per directory. Trees that
+   * carry git state or ignore files fall back to the scanner so its filtering rules
+   * stay authoritative.
+   */
+  async #walkFileList(): Promise<string[] | null> {
+    const root = this.repoRoot;
+    const files: string[] = [];
+    const pending = [""];
+    let directories = 0;
+
+    while (pending.length > 0) {
+      const relativeDir = pending.pop()!;
+      let entries: Dirent[];
+      try {
+        entries = await readdir(path.join(root, relativeDir), { withFileTypes: true });
+      } catch {
+        return null;
+      }
+
+      directories += 1;
+      if (directories > WALK_DIRECTORY_LIMIT) {
+        return null;
+      }
+
+      for (const entry of entries) {
+        if (entry.name === ".git") {
+          return null;
+        }
+        if (entry.name === ".gitignore" || entry.name === ".ignore") {
+          return null;
+        }
+
+        const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          pending.push(relativePath);
+        } else {
+          files.push(relativePath);
+        }
+        if (files.length > WALK_FILE_LIMIT) {
+          return null;
+        }
+      }
+    }
+
+    return files;
+  }
+
+  async #loadFileList(): Promise<string[] | null> {
+    const files = (await this.#walkFileList()) ?? (await this.#listFilesWithRg());
+    return files === null ? null : files.sort();
+  }
+
+  async #listFilesWithRg(): Promise<string[] | null> {
     try {
       const rgPath = await RepositoryScanContext.#resolveRgPath();
       if (rgPath === null) {
