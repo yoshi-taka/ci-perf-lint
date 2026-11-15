@@ -180,59 +180,77 @@ export function textHasOpaqueRepositoryExecution(text: string): boolean {
 export function shellFileRedirectionTargets(text: string): string[] {
   const targets: string[] = [];
   for (const source of shellExecutionTexts(text)) {
-    let quote = "";
-    for (let index = 0; index < source.length; index++) {
-      const char = source[index]!;
-      if (char === "\\" && quote !== "'") {
+    const length = source.length;
+    let quote = 0;
+    for (let index = 0; index < length; index++) {
+      const code = source.charCodeAt(index);
+      if (code === 92 && quote !== 39) {
         index++;
         continue;
       }
-      if (quote) {
-        if (char === quote) {
-          quote = "";
+      if (quote !== 0) {
+        if (code === quote) {
+          quote = 0;
         }
         continue;
       }
-      if (char === "'" || char === '"') {
-        quote = char;
+      if (code === 39 || code === 34) {
+        quote = code;
         continue;
       }
-      if ((char === ">" || char === "<") && source[index + 1] !== "(") {
-        while (source[index + 1] === char) {
+      if ((code === 62 || code === 60) && source.charCodeAt(index + 1) !== 40) {
+        while (source.charCodeAt(index + 1) === code) {
           index++;
         }
-        let start = index + 1;
-        while (/\s/.test(source[start] ?? "") && start < source.length) {
-          start++;
+        let startIndex = index + 1;
+        while (startIndex < length && isShellSpace(source.charCodeAt(startIndex))) {
+          startIndex++;
         }
-        let end = start;
-        let targetQuote = "";
-        for (; end < source.length; end++) {
-          const next = source[end]!;
-          if (next === "\\" && targetQuote !== "'") {
+        let end = startIndex;
+        let targetQuote = 0;
+        for (; end < length; end++) {
+          const next = source.charCodeAt(end);
+          if (next === 92 && targetQuote !== 39) {
             end++;
             continue;
           }
-          if (targetQuote) {
+          if (targetQuote !== 0) {
             if (next === targetQuote) {
-              targetQuote = "";
+              targetQuote = 0;
             }
             continue;
           }
-          if (next === "'" || next === '"') {
+          if (next === 39 || next === 34) {
             targetQuote = next;
             continue;
           }
-          if (/[\s;|<>()]/.test(next) || (next === "&" && end !== start)) {
+          if (isShellTerminator(next) || (next === 38 && end !== startIndex)) {
             break;
           }
         }
-        targets.push(source.slice(start, end));
+        targets.push(source.slice(startIndex, end));
         index = Math.max(index, end - 1);
       }
     }
   }
   return targets;
+}
+
+function isShellSpace(code: number): boolean {
+  return code === 32 || (code >= 9 && code <= 13);
+}
+
+function isShellTerminator(code: number): boolean {
+  return (
+    code === 32 ||
+    (code >= 9 && code <= 13) ||
+    code === 59 ||
+    code === 124 ||
+    code === 60 ||
+    code === 62 ||
+    code === 40 ||
+    code === 41
+  );
 }
 
 /** Unlike displayed '>' text, a real redirect may read/write checked-out files. */
