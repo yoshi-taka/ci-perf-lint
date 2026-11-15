@@ -1,6 +1,7 @@
 import type { Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { readTextFile } from "./read-text-file.ts";
+import { createRgRelativePath } from "./repository-relative-path.ts";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { dependencySectionsOf } from "./repository-package-helpers.ts";
@@ -508,6 +509,7 @@ export class RepositoryScanContext {
       }
 
       const repoRoot = this.repoRoot;
+      const relativePath = createRgRelativePath(repoRoot);
 
       if (hasBun) {
         const proc = Bun.spawn([rgPath, "--files", "--hidden", repoRoot], {
@@ -520,10 +522,7 @@ export class RepositoryScanContext {
         if (exitCode !== 0) {
           return null;
         }
-        return stdout
-          .split("\n")
-          .filter(Boolean)
-          .map((f) => path.relative(repoRoot, f));
+        return stdout.split("\n").filter(Boolean).map(relativePath);
       }
 
       const lines: string[] = [];
@@ -545,11 +544,7 @@ export class RepositoryScanContext {
       if (exitCode !== 0) {
         return null;
       }
-      return lines
-        .join("")
-        .split("\n")
-        .filter(Boolean)
-        .map((f) => path.relative(repoRoot, f));
+      return lines.join("").split("\n").filter(Boolean).map(relativePath);
     } catch {
       return null;
     }
