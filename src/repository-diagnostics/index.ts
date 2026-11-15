@@ -1,4 +1,10 @@
 import { availableParallelism } from "node:os";
+import {
+  prepareShared,
+  sharedCurrent,
+  finishShared,
+  SharedGenerationCancelled,
+} from "./source-shared-records.ts";
 import { collectBundlerExternalSubpathLeakDiagnostics } from "./bundler-external-subpath-leak.ts";
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
 import { collectJvmCdsOpportunityDiagnostics } from "./jvm-cds-opportunity.ts";
@@ -240,132 +246,145 @@ export async function collectRepositoryDiagnostics(
     );
   }
 
-  const resourceCache = new ResourceCache();
-  const resourceEvaluator = new ResourceEvaluator(resourceRegistry, resourceCache);
-  const resourceObservability: ResourceEvaluationObservability = {
-    resources: [],
-    evaluationOrder: [],
-    cacheHits: 0,
-    cacheMisses: 0,
-  };
-  const getResource = await resourceEvaluator.evaluate(context, [], {
-    observability: resourceObservability,
-  });
-  const resourceContext: RepositoryDiagnosticContext = {
-    ...context,
-    getResource,
-  };
-
-  const resourceTimingStartedAt = performance.now();
-
-  const collectorResults = await settleWithConcurrency(
-    scheduledCollectors,
-    collectorConcurrency(scheduledCollectors.length),
-    async (collector) => {
-      const startedAt = performance.now();
-      const result = await runRepositoryDiagnosticCollector(
-        collector as CollectorLike,
-        resourceContext,
-        proofs,
-      );
-      if (timingsEnabled()) {
-        process.stderr.write(
-          `[timing] diagnostics collector ${collector.id}=${(performance.now() - startedAt).toFixed(1)}ms findings=${result.length}\n`,
-        );
-      }
-      return result;
-    },
+  const sharing = prepareShared(
+    context.scanContext,
+    scheduledCollectors.some(
+      (collector) => collector.id === "playwright-route-disables-http-cache",
+    ),
   );
+  try {
+    const resourceCache = new ResourceCache();
+    const resourceEvaluator = new ResourceEvaluator(resourceRegistry, resourceCache);
+    const resourceObservability: ResourceEvaluationObservability = {
+      resources: [],
+      evaluationOrder: [],
+      cacheHits: 0,
+      cacheMisses: 0,
+    };
+    const getResource = await resourceEvaluator.evaluate(context, [], {
+      observability: resourceObservability,
+    });
+    const resourceContext: RepositoryDiagnosticContext = {
+      ...context,
+      getResource,
+    };
 
-  if (timingsEnabled() && resourceObservability.cacheMisses > 0) {
-    process.stderr.write(
-      `[timing] resources evaluated=${resourceObservability.cacheMisses} cached=${resourceObservability.cacheHits} total=${(performance.now() - resourceTimingStartedAt).toFixed(1)}ms\n`,
+    const resourceTimingStartedAt = performance.now();
+
+    const collectorResults = await settleWithConcurrency(
+      scheduledCollectors,
+      collectorConcurrency(scheduledCollectors.length),
+      async (collector) => {
+        const startedAt = performance.now();
+        const result = await runRepositoryDiagnosticCollector(
+          collector as CollectorLike,
+          resourceContext,
+          proofs,
+        );
+        if (timingsEnabled()) {
+          process.stderr.write(
+            `[timing] diagnostics collector ${collector.id}=${(performance.now() - startedAt).toFixed(1)}ms findings=${result.length}\n`,
+          );
+        }
+        return result;
+      },
     );
-  }
-  const diagnostics: Diagnostic[] = [];
-  const firedCollectors = new Set<string>();
 
-  for (const [index, result] of collectorResults.entries()) {
-    if (result.status === "fulfilled") {
-      if (result.value.length === 0) {
-        const collector = scheduledCollectors[index];
-        context.warnings.push({
-          kind: "empty-result",
-          source: collector?.id ?? "unknown",
-          message: `Collector ${collector?.id ?? "unknown"} ran and found nothing.`,
-        });
+    if (timingsEnabled() && resourceObservability.cacheMisses > 0) {
+      process.stderr.write(
+        `[timing] resources evaluated=${resourceObservability.cacheMisses} cached=${resourceObservability.cacheHits} total=${(performance.now() - resourceTimingStartedAt).toFixed(1)}ms\n`,
+      );
+    }
+    if (!sharedCurrent(context.scanContext, sharing)) {
+      throw new SharedGenerationCancelled();
+    }
+    const diagnostics: Diagnostic[] = [];
+    const firedCollectors = new Set<string>();
+
+    for (const [index, result] of collectorResults.entries()) {
+      if (result.status === "fulfilled") {
+        if (result.value.length === 0) {
+          const collector = scheduledCollectors[index];
+          context.warnings.push({
+            kind: "empty-result",
+            source: collector?.id ?? "unknown",
+            message: `Collector ${collector?.id ?? "unknown"} ran and found nothing.`,
+          });
+        }
+        if (result.value.length > 0) {
+          firedCollectors.add(scheduledCollectors[index]?.id ?? "unknown");
+        }
+        diagnostics.push(...result.value);
+        continue;
       }
-      if (result.value.length > 0) {
-        firedCollectors.add(scheduledCollectors[index]?.id ?? "unknown");
-      }
-      diagnostics.push(...result.value);
-      continue;
+
+      const collector = scheduledCollectors[index];
+      const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      context.warnings.push({
+        kind: "collector-error",
+        source: "collectRepositoryDiagnostics",
+        message: `Collector ${collector?.id ?? "unknown"} failed: ${detail}`,
+      });
     }
 
-    const collector = scheduledCollectors[index];
-    const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
-    context.warnings.push({
-      kind: "collector-error",
-      source: "collectRepositoryDiagnostics",
-      message: `Collector ${collector?.id ?? "unknown"} failed: ${detail}`,
-    });
-  }
+    if (dumpStateEnabled()) {
+      const activeGates = Object.entries(gateState)
+        .filter(([, v]) => v)
+        .map(([k]) => k.replace(/^has/, ""));
+      const collectorResultsDump = scheduledCollectors.map((c, i) => {
+        const r = collectorResults[i];
+        const collectorLike = c as CollectorLike;
+        return {
+          id: c.id,
+          gate: collectorLike.gate,
+          gates: collectorLike.gates,
+          gateExpr: collectorLike.gateExpr ? gateExprToString(collectorLike.gateExpr) : undefined,
+          findings: r?.status === "fulfilled" ? r.value.length : -1,
+          error: r?.status === "rejected" ? String(r.reason) : undefined,
+        };
+      });
+      process.stderr.write(
+        JSON.stringify({
+          type: "repo-diagnostics-state",
+          activeGates,
+          gateResults,
+          resourceAccessLog: context.featureIndex.resourceAccessLog,
+          collectorCount: applicableCollectors.length,
+          totalCollectors: repositoryDiagnosticCollectors.length,
+          collectors: collectorResultsDump,
+          collectorCooccurrence: buildCollectorCooccurrenceDebug([...firedCollectors]),
+          collectorSchedule,
+          gateObservability,
+          semanticResources:
+            resourceObservability.resources.length > 0 ? resourceObservability : undefined,
+          signals: extractSignals(context.repository),
+          warnings: context.warnings,
+          measureCompleteness: context.measureCompleteness
+            ? {
+                totalWorkflows: context.measureCompleteness.totalWorkflows,
+                evaluatedWorkflows: context.measureCompleteness.evaluatedWorkflowPaths.size,
+                skippedRepositoryDiagnostics:
+                  context.measureCompleteness.skippedRepositoryDiagnostics,
+                skippedGates: [...context.measureCompleteness.skippedGates].sort(),
+                maxFindingsHitRules: [...context.measureCompleteness.maxFindingsHitRules].sort(),
+                parserFailures:
+                  context.measureCompleteness.parserFailures.size > 0
+                    ? [...context.measureCompleteness.parserFailures].sort()
+                    : undefined,
+                workflowOnlyRules:
+                  context.measureCompleteness.workflowOnlyRules.size > 0
+                    ? [...context.measureCompleteness.workflowOnlyRules].sort()
+                    : undefined,
+              }
+            : undefined,
+          totalFindings: diagnostics.length,
+        }),
+      );
+      process.stderr.write("\n");
+    }
 
-  if (dumpStateEnabled()) {
-    const activeGates = Object.entries(gateState)
-      .filter(([, v]) => v)
-      .map(([k]) => k.replace(/^has/, ""));
-    const collectorResultsDump = scheduledCollectors.map((c, i) => {
-      const r = collectorResults[i];
-      const collectorLike = c as CollectorLike;
-      return {
-        id: c.id,
-        gate: collectorLike.gate,
-        gates: collectorLike.gates,
-        gateExpr: collectorLike.gateExpr ? gateExprToString(collectorLike.gateExpr) : undefined,
-        findings: r?.status === "fulfilled" ? r.value.length : -1,
-        error: r?.status === "rejected" ? String(r.reason) : undefined,
-      };
-    });
-    process.stderr.write(
-      JSON.stringify({
-        type: "repo-diagnostics-state",
-        activeGates,
-        gateResults,
-        resourceAccessLog: context.featureIndex.resourceAccessLog,
-        collectorCount: applicableCollectors.length,
-        totalCollectors: repositoryDiagnosticCollectors.length,
-        collectors: collectorResultsDump,
-        collectorCooccurrence: buildCollectorCooccurrenceDebug([...firedCollectors]),
-        collectorSchedule,
-        gateObservability,
-        semanticResources:
-          resourceObservability.resources.length > 0 ? resourceObservability : undefined,
-        signals: extractSignals(context.repository),
-        warnings: context.warnings,
-        measureCompleteness: context.measureCompleteness
-          ? {
-              totalWorkflows: context.measureCompleteness.totalWorkflows,
-              evaluatedWorkflows: context.measureCompleteness.evaluatedWorkflowPaths.size,
-              skippedRepositoryDiagnostics:
-                context.measureCompleteness.skippedRepositoryDiagnostics,
-              skippedGates: [...context.measureCompleteness.skippedGates].sort(),
-              maxFindingsHitRules: [...context.measureCompleteness.maxFindingsHitRules].sort(),
-              parserFailures:
-                context.measureCompleteness.parserFailures.size > 0
-                  ? [...context.measureCompleteness.parserFailures].sort()
-                  : undefined,
-              workflowOnlyRules:
-                context.measureCompleteness.workflowOnlyRules.size > 0
-                  ? [...context.measureCompleteness.workflowOnlyRules].sort()
-                  : undefined,
-            }
-          : undefined,
-        totalFindings: diagnostics.length,
-      }),
-    );
-    process.stderr.write("\n");
+    return diagnostics;
+  } finally {
+    await finishShared(context.scanContext, sharing);
   }
-
-  return diagnostics;
 }

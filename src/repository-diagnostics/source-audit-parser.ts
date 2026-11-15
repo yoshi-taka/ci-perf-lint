@@ -1,4 +1,6 @@
 import { loadOxcParser } from "./oxc-parser.ts";
+import { projectModuleFacts, emptyModuleFacts } from "./source-shared-module.ts";
+import type { PlaywrightModuleFacts } from "./playwright-route-detector.ts";
 import { importAuditDecisions, importSourceShape } from "./source-import-policy.ts";
 import { sourceSuppressions } from "./source-suppressions.ts";
 import { findInlineSnapshots } from "./jest-inline-snapshots.ts";
@@ -125,8 +127,13 @@ export async function parseSourceAudit(
   resolvesOmittedExtension: (request: string) => boolean = () => false,
   syntaxFilename:
     string | { filename: string; positionSource: string; positionOffset?: number } = filename,
-  capture?: (parsed: SourceProgramCapture) => void,
+  captureOrOptions?:
+    | ((parsed: SourceProgramCapture) => void)
+    | { moduleObserver: (facts: PlaywrightModuleFacts | undefined) => void },
 ): Promise<SourceFileAudit | undefined> {
+  const capture = typeof captureOrOptions === "function" ? captureOrOptions : undefined;
+  const moduleObserver =
+    typeof captureOrOptions === "object" ? captureOrOptions.moduleObserver : undefined;
   const { parseSync, visitorKeys, rawTransferSupported } = await loadOxcParser();
   const parserFilename =
     typeof syntaxFilename === "string" ? syntaxFilename : syntaxFilename.filename;
@@ -146,11 +153,24 @@ export async function parseSourceAudit(
         return undefined;
       }
       if (!metadata.module.hasModuleSyntax && metadata.module.dynamicImports.length === 0) {
+        moduleObserver?.(emptyModuleFacts());
         return { imports: [], wildcardExports: [], snapshots: [] };
       }
       if (metadata.module.dynamicImports.length === 0) {
         const transferred = readStaticSourceTransfer(metadata, source, parserFilename);
         if (transferred) {
+          if (moduleObserver) {
+            let facts: PlaywrightModuleFacts | undefined;
+            try {
+              facts = projectModuleFacts(
+                (metadata as unknown as { program: unknown }).program,
+                true,
+              );
+            } catch {
+              // Unrecognized native shape falls back to the original Playwright path.
+            }
+            moduleObserver(facts);
+          }
           return collect(transferred);
         }
       }
@@ -168,6 +188,9 @@ export async function parseSourceAudit(
   const eagerParsed = parseSync(parserFilename, source, raw ? transferOptions : undefined);
   if (eagerParsed.errors.length) {
     return undefined;
+  }
+  if (moduleObserver) {
+    moduleObserver(projectModuleFacts(eagerParsed.program, false));
   }
   return collect(eagerParsed);
 

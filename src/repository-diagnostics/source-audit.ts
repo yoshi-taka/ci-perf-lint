@@ -1,5 +1,15 @@
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
+  sharedEnabled,
+  registerSharedAudit,
+  getSharedRecord,
+  assertSharedCurrent,
+  SharedGenerationCancelled,
+  PLAYWRIGHT_LIMIT,
+  routeCallPattern,
+} from "./source-shared-records.ts";
+import type { PlaywrightModuleFacts } from "./playwright-route-detector.ts";
+import {
   parseSourceAudit,
   type SourceImport,
   type SourceSnapshot,
@@ -53,10 +63,98 @@ export function collectSourceAudit(context: RepositoryScanContext): Promise<Sour
       files.push(filename);
     }
     const knownFiles = new Set(files);
+    // Use exactly the audit's inventory, not Playwright's broader scope.
+    if (sharedEnabled(context) && context.usesStandardTextReader()) {
+      registerSharedAudit(
+        context,
+        (filename) => knownFiles.has(filename) && jsSource.test(filename),
+        async (filename) => {
+          const source = await context.readTextFileOrWarn(context.resolve(filename));
+          if (source === undefined) {
+            return {
+              audit: { ok: true, value: undefined },
+              mode: "read-failed",
+              module: undefined,
+            };
+          }
+          const oversized = source.length > PLAYWRIGHT_LIMIT;
+          const negative = !oversized && !routeCallPattern.test(source);
+          let projected: PlaywrightModuleFacts | undefined;
+          const parsed = await parseSourceAudit(
+            filename,
+            source,
+            omittedExtensionResolver(filename),
+            filename,
+            negative
+              ? {
+                  moduleObserver: (moduleFacts) => {
+                    projected = moduleFacts;
+                  },
+                }
+              : undefined,
+          );
+          const mode = oversized
+            ? "oversized"
+            : negative && (projected !== undefined || parsed === undefined)
+              ? "negative"
+              : "legacy";
+          return {
+            audit: { ok: true, value: parsed },
+            mode,
+            module: mode === "negative" ? projected : undefined,
+          };
+        },
+      );
+    }
+    function omittedExtensionResolver(filename: string) {
+      let directory: string | undefined;
+      return (request: string) => {
+        directory ??= path.posix.dirname(filename);
+        const target = path.posix.join(directory, request);
+        // Exact assets win. Require an unambiguous source file.
+        if (knownFiles.has(target)) {
+          return false;
+        }
+        return (
+          [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"].filter((extension) =>
+            knownFiles.has(target + extension),
+          ).length === 1
+        );
+      };
+    }
     for (const filename of files) {
       const component = unsupportedSource.test(filename);
       if (!jsSource.test(filename) && !component) {
         continue;
+      }
+      if (!component) {
+        const pending = getSharedRecord(context, filename);
+        if (pending) {
+          try {
+            const record = await pending;
+            assertSharedCurrent(context, record);
+            if (!record.audit.ok) {
+              throw record.audit.error;
+            }
+            const parsed = record.audit.value;
+            if (parsed) {
+              facts.imports.push(...parsed.imports);
+              wildcardExports.push(...parsed.wildcardExports);
+              facts.snapshots.push(...parsed.snapshots);
+              sourceFiles.add(filename);
+            } else {
+              failed++;
+              firstFailure ||= filename;
+            }
+          } catch (error) {
+            if (error instanceof SharedGenerationCancelled) {
+              throw error;
+            }
+            failed++;
+            firstFailure ||= `${filename}: ${String(error)}`;
+          }
+          continue;
+        }
       }
       try {
         const source = await context.readTextFileOrWarn(context.resolve(filename));
@@ -65,20 +163,7 @@ export function collectSourceAudit(context: RepositoryScanContext): Promise<Sour
           firstFailure ||= filename;
           continue;
         }
-        let directory: string | undefined;
-        const omittedExtension = (request: string) => {
-          directory ??= path.posix.dirname(filename);
-          const target = path.posix.join(directory, request);
-          // Exact assets win. Require an unambiguous source file; never infer from dots alone.
-          if (knownFiles.has(target)) {
-            return false;
-          }
-          return (
-            [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"].filter((extension) =>
-              knownFiles.has(target + extension),
-            ).length === 1
-          );
-        };
+        const omittedExtension = omittedExtensionResolver(filename);
         const scripts: SfcScripts = component
           ? await extractSfcScripts(filename, source)
           : { units: [{ source, extension: "" }], incomplete: [] };

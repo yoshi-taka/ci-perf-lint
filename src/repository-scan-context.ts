@@ -1,6 +1,7 @@
 import type { Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { readTextFile } from "./read-text-file.ts";
+import { clearShared } from "./repository-diagnostics/source-shared-records.ts";
 import { createRgRelativePath } from "./repository-relative-path.ts";
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -244,6 +245,10 @@ export class RepositoryScanContext {
       }
     }
     return null;
+  }
+
+  usesStandardTextReader(): boolean {
+    return this.readTextFileOrWarn === standardTextReader;
   }
 
   async readTextFileOrWarn(filePath: string): Promise<string | undefined> {
@@ -631,6 +636,7 @@ export class RepositoryScanContext {
   }
 
   clearCaches(): void {
+    clearShared(this);
     this.#packageJsonLoads.clear();
     this.#dependencyIndexLoads.clear();
     this.#pathExistsLoads.clear();
@@ -645,3 +651,5 @@ export class RepositoryScanContext {
     this.#hasGitDir = undefined;
   }
 }
+// oxlint-disable-next-line typescript/unbound-method -- Identity only, never invoked unbound.
+const standardTextReader = RepositoryScanContext.prototype.readTextFileOrWarn;

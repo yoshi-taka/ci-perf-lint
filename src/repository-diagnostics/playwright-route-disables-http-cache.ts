@@ -4,6 +4,12 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import { findPlaywrightRoutes, playwrightModuleFacts } from "./playwright-route-detector.ts";
+import {
+  getSharedRecord,
+  assertSharedCurrent,
+  PLAYWRIGHT_LIMIT,
+  routeCallPattern,
+} from "./source-shared-records.ts";
 
 const meta = {
   id: "playwright-route-disables-http-cache",
@@ -16,14 +22,13 @@ const sourceSuffixes = ["", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts"
 
 // Minified bundles and checked-in tool releases can be megabytes of one line.
 // Parsing them costs seconds and hundreds of MB while never containing tests.
-const MAX_SOURCE_LENGTH = 256 * 1024;
+const MAX_SOURCE_LENGTH = PLAYWRIGHT_LIMIT;
 
 const sourceFilePattern = /\.(?:[cm]?[jt]sx?)$/i;
 const declarationFilePattern = /\.d\.[cm]?ts$/i;
 const ignoredPathPattern =
   /(?:^|\/)(?:node_modules|vendor|dist|build|coverage|\.next|\.turbo|\.yarn|assets|[^/]*-output)(?:\/|$)|\.min\.[cm]?js$/i;
 // `page.route(`, `context.route(` and `page["route"](`.
-const routeCallPattern = /\.route\s*\(|\[\s*["']route["']\s*\]/;
 const playwrightHintPattern = /playwright/i;
 const testPathPattern =
   /(?:^|\/)(?:e2e|tests?|__tests__|playwright|support|fixtures|test-utils)(?:\/|$)|\.(?:spec|test)\.[cm]?[jt]sx?$/i;
@@ -58,7 +63,23 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
   const files = (await context.scanContext.walkFiles(".")).sort();
   const fileSet = new Set(files);
 
-  async function read(path: string): Promise<string | undefined> {
+  function shared(path: string) {
+    return context.fileIndex.usesScanContextTextReader?.() === true
+      ? getSharedRecord(context.scanContext, path, "playwright")
+      : undefined;
+  }
+
+  async function read(path: string, scan = false): Promise<string | undefined> {
+    if (scan) {
+      const pending = shared(path);
+      if (pending) {
+        const record = await pending;
+        assertSharedCurrent(context.scanContext, record);
+        if (record.mode !== "legacy") {
+          return undefined;
+        }
+      }
+    }
     // The existing limit counts UTF-16 code units, not bytes. UTF-8 needs at
     // most three bytes per unit, plus a possible stripped BOM. Reject only
     // files guaranteed not to fit; retain the exact string-length check below.
@@ -135,12 +156,25 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
     if (seen.has(modulePath)) {
       return false;
     }
-    const source = await read(modulePath);
-    if (!source) {
-      fixtureCache.set(cacheKey, false);
-      return false;
+    let facts: Awaited<ReturnType<typeof playwrightModuleFacts>>;
+    const pending = shared(modulePath);
+    let reused = false;
+    if (pending) {
+      const record = await pending;
+      assertSharedCurrent(context.scanContext, record);
+      if (record.mode !== "legacy") {
+        facts = record.module;
+        reused = true;
+      }
     }
-    const facts = await playwrightModuleFacts(modulePath, source);
+    if (!reused) {
+      const source = await read(modulePath);
+      if (!source) {
+        fixtureCache.set(cacheKey, false);
+        return false;
+      }
+      facts = await playwrightModuleFacts(modulePath, source);
+    }
     if (!facts || (requireTestExport && !facts.exportsTest)) {
       fixtureCache.set(cacheKey, false);
       return false;
@@ -175,7 +209,7 @@ export async function collectPlaywrightRouteDisablesHttpCacheDiagnostics(
       if (path !== undefined) {
         pending.set(
           index,
-          read(path).then(
+          read(path, true).then(
             (value) => ({ ok: true as const, value }),
             (error: unknown) => ({ ok: false as const, error }),
           ),

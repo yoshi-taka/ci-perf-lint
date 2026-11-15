@@ -5,12 +5,13 @@ export interface RepositoryFileIndex {
   fileExists(relativePath: string): Promise<boolean>;
   hasGlob(pattern: string): Promise<boolean>;
   readTextFile(relativePath: string): Promise<string | undefined>;
+  usesScanContextTextReader?(): boolean;
   readTextFileLines(relativePath: string): Promise<string[] | undefined>;
   globFiles(pattern: string): Promise<readonly string[]>;
 }
 
 export function buildRepositoryFileIndex(scanContext: RepositoryScanContext): RepositoryFileIndex {
-  return {
+  const index: RepositoryFileIndex = {
     repoRoot: scanContext.repoRoot,
 
     async fileExists(relativePath: string): Promise<boolean> {
@@ -40,6 +41,11 @@ export function buildRepositoryFileIndex(scanContext: RepositoryScanContext): Re
       return files;
     },
   };
+  // oxlint-disable-next-line typescript/unbound-method -- Identity only, never invoked unbound.
+  const standardRead = index.readTextFile;
+  index.usesScanContextTextReader = () =>
+    index.readTextFile === standardRead && scanContext.usesStandardTextReader();
+  return index;
 }
 
 function matchGlob(filePath: string, pattern: string): boolean {

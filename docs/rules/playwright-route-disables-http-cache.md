@@ -12,6 +12,12 @@ Initial limitations: no cross-file custom-test imports, CommonJS imports, browse
 
 An `unroute()` call does not suppress the finding: requests before cleanup can still pay the cache-disabled cost, and a matching cleanup call alone does not prove that every other route was removed. Review the actual route lifetime before acting on the warning.
 
+When this collector and the source audit both run, eligible route-free JS/TS files
+share one read outcome and detached facts per analysis. Edits after that selected
+read appear in the next analysis. Route candidates, SFC files, unsupported parser
+shapes, custom readers and budget fallback retain their existing paths. This is
+not an atomic snapshot of the repository.
+
 ## What to do
 
 First, remove mocks as soon as they are no longer needed, before subsequent navigations:
