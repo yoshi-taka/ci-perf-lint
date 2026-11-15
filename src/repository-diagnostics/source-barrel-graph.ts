@@ -24,24 +24,45 @@ export function resolveSourceReference(
   if (files.has(target)) {
     return `file:${target}`;
   }
-  const candidates = [
-    ...sourceExtensions.map((extension) => target + extension),
-    ...sourceExtensions.map((extension) => `${target}/index${extension}`),
-  ];
+  let match: string | undefined;
+  let ambiguous = false;
+  for (let phase = 0; phase < 2; phase++) {
+    const prefix = phase === 0 ? target : `${target}/index`;
+    for (const extension of sourceExtensions) {
+      const candidate = prefix + extension;
+      if (files.has(candidate)) {
+        if (match === undefined) {
+          match = candidate;
+        } else if (match !== candidate) {
+          ambiguous = true;
+        }
+      }
+    }
+  }
   const runtimeExtension = /\.(mjs|cjs|js|jsx)$/.exec(target)?.[1];
   if (runtimeExtension) {
     const stem = target.slice(0, -runtimeExtension.length - 1);
-    candidates.push(
-      ...(runtimeExtension === "mjs"
-        ? [".mts"]
-        : runtimeExtension === "cjs"
-          ? [".cts"]
-          : [".ts", ".tsx"]
-      ).map((extension) => stem + extension),
-    );
+    const candidate =
+      stem + (runtimeExtension === "mjs" ? ".mts" : runtimeExtension === "cjs" ? ".cts" : ".ts");
+    if (files.has(candidate)) {
+      if (match === undefined) {
+        match = candidate;
+      } else if (match !== candidate) {
+        ambiguous = true;
+      }
+    }
+    if (runtimeExtension === "js" || runtimeExtension === "jsx") {
+      const tsx = `${stem}.tsx`;
+      if (files.has(tsx)) {
+        if (match === undefined) {
+          match = tsx;
+        } else if (match !== tsx) {
+          ambiguous = true;
+        }
+      }
+    }
   }
-  const matches = [...new Set(candidates.filter((candidate) => files.has(candidate)))];
-  return matches.length === 1 ? `file:${matches[0]}` : `relative:${target}`;
+  return match !== undefined && !ambiguous ? `file:${match}` : `relative:${target}`;
 }
 
 /** Relative resolution depends on directory and request in a fixed audit inventory. */
