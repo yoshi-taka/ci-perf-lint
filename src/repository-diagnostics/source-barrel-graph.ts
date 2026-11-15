@@ -85,14 +85,29 @@ export function findLargeBarrels(
   if (!wildcardExports.length) {
     return [];
   }
-  const edges = new Map<string, Set<string>>();
+  const ids = new Map<string, number>();
+  function idFor(target: string): number {
+    let id = ids.get(target);
+    if (id === undefined) {
+      ids.set(target, (id = ids.size));
+    }
+    return id;
+  }
+  const fromIds = new Uint32Array(imports.length);
+  const targetIds = new Uint32Array(imports.length);
+  let edgeCount = 0;
+  let previousFile: string | undefined;
+  let previousId = 0;
   for (const entry of imports) {
     if (entry.dynamic) {
       continue;
     }
-    const targets = edges.get(entry.relativePath) ?? new Set<string>();
-    targets.add(resolve(entry.relativePath, entry.source));
-    edges.set(entry.relativePath, targets);
+    if (entry.relativePath !== previousFile) {
+      previousFile = entry.relativePath;
+      previousId = idFor(`file:${previousFile}`);
+    }
+    fromIds[edgeCount] = previousId;
+    targetIds[edgeCount++] = idFor(resolve(entry.relativePath, entry.source));
   }
   const roots = new Map<string, SourceWildcardExport[]>();
   for (const entry of wildcardExports) {
@@ -100,32 +115,81 @@ export function findLargeBarrels(
     entries.push(entry);
     roots.set(entry.relativePath, entries);
   }
-  const findings: SourceBarrel[] = [];
+  const ready: {
+    filename: string;
+    first: SourceWildcardExport;
+    id: number;
+    targets: number[];
+  }[] = [];
   for (const [filename, exports] of roots) {
     const first = exports[0]!;
-    const seen = new Set([`file:${filename}`]);
-    const pending = [...new Set(exports.map((entry) => resolve(filename, entry.source)))];
-    while (pending.length) {
-      const target = pending.pop()!;
-      if (seen.has(target)) {
+    const id = idFor(`file:${filename}`);
+    const targets = exports.map((entry) => idFor(resolve(filename, entry.source)));
+    ready.push({ filename, first, id, targets });
+  }
+  const nodeCount = ids.size;
+  ids.clear();
+  roots.clear();
+  const offsets = new Uint32Array(nodeCount + 1);
+  const adjacency = new Uint32Array(edgeCount);
+  for (let at = 0; at < edgeCount; at++) {
+    const index = fromIds[at]! + 1;
+    offsets[index] = offsets[index]! + 1;
+  }
+  for (let id = 1; id <= nodeCount; id++) {
+    offsets[id] = offsets[id]! + offsets[id - 1]!;
+  }
+  // Reuse the scatter cursors as generation stamps after construction.
+  const seen = offsets.slice();
+  for (let at = 0; at < edgeCount; at++) {
+    const from = fromIds[at]!;
+    const cursor = seen[from]!;
+    adjacency[cursor] = targetIds[at]!;
+    seen[from] = cursor + 1;
+  }
+  seen.fill(0);
+  // Mark on enqueue: every node enters the frontier at most once per root.
+  // The source-ID staging buffer is no longer needed after the scatter.
+  const pending =
+    fromIds.length >= nodeCount ? fromIds.subarray(0, nodeCount) : new Uint32Array(nodeCount);
+  const findings: SourceBarrel[] = [];
+  let generation = 0;
+  for (const root of ready) {
+    if (++generation > 0xffffffff) {
+      seen.fill(0);
+      generation = 1;
+    }
+    seen[root.id] = generation;
+    let top = 0;
+    let count = 0;
+    for (const target of root.targets) {
+      if (seen[target] === generation) {
         continue;
       }
-      seen.add(target);
-      if (exceedsSourceLimit(seen.size - 1, MAX_BARREL_SOURCES)) {
+      seen[target] = generation;
+      pending[top++] = target;
+    }
+    while (top > 0) {
+      const target = pending[--top]!;
+      count++;
+      if (exceedsSourceLimit(count, MAX_BARREL_SOURCES)) {
         break;
       }
-      if (target.startsWith("file:")) {
-        for (const edge of edges.get(target.slice(5)) ?? []) {
-          pending.push(edge);
+      for (let at = offsets[target]!; at < offsets[target + 1]!; at++) {
+        const next = adjacency[at]!;
+        if (seen[next] === generation) {
+          continue;
         }
+        seen[next] = generation;
+        pending[top++] = next;
       }
     }
-    if (exceedsSourceLimit(seen.size - 1, MAX_BARREL_SOURCES)) {
+    if (exceedsSourceLimit(count, MAX_BARREL_SOURCES)) {
       findings.push({
-        relativePath: filename,
-        line: first.line,
-        column: first.column,
-        sourceCount: seen.size - 1,
+        relativePath: root.filename,
+        line: root.first.line,
+        column: root.first.column,
+        sourceCount: count,
       });
     }
   }
