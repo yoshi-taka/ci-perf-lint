@@ -1,5 +1,5 @@
 import type { Node } from "oxc-parser";
-import { loadOxcParser, oxcParserOptions } from "./oxc-parser.ts";
+import { loadOxcParser } from "./oxc-parser.ts";
 
 function children(node: Node, visitorKeys: Record<string, string[]>): Node[] {
   const record = node as unknown as Record<string, unknown>;
@@ -57,7 +57,7 @@ export async function findTestcontainersNodeSleeps(
   source: string,
 ): Promise<{ offset: number; millis: number }[]> {
   const { parseSync, visitorKeys } = await loadOxcParser();
-  const parsed = parseSync(filename, source, await oxcParserOptions(false));
+  const parsed = parseSync(filename, source, { preserveParens: false });
   if (parsed.errors.length) {
     return [];
   }
