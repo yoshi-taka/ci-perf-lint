@@ -1,0 +1,14 @@
+{
+  "name": "ci-perf-lint-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && bun ../scripts/generate-sitemap.ts",
+    "preview": "astro preview"
+  },
+  "devDependencies": {
+    "astro": "^7.4.7"
+  }
+}

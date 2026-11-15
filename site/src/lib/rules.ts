@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -7,7 +8,10 @@ interface RuleDocSummary {
   summary: string;
 }
 
-const rulesDir = path.join(process.cwd(), "docs", "rules");
+// The site runs from `site/` as a workspace, but its source lives at the repo root.
+const rulesDir = [path.resolve(process.cwd(), "docs/rules"), path.resolve(process.cwd(), "../docs/rules")].find(
+  (candidate) => existsSync(candidate),
+) ?? path.resolve(process.cwd(), "../docs/rules");
 
 function normalizeTitle(title: string, slug: string): string {
   const trimmed = title.trim();

@@ -1,7 +1,6 @@
-import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "astro/config";
+import { SITE_URL } from "./site.config.mjs";
 
 export default defineConfig({
-  site: "https://ci-perf-lint.veritycost.com/",
-  integrations: [sitemap()],
+  site: SITE_URL,
 });
