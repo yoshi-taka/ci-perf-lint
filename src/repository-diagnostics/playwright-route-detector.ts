@@ -1,5 +1,5 @@
 import type { Node, Expression } from "oxc-parser";
-import { loadOxcParser } from "./oxc-parser.ts";
+import { loadOxcParser, oxcParserOptions } from "./oxc-parser.ts";
 
 type Kind = "test" | "page" | "context";
 interface Binding {
@@ -133,7 +133,7 @@ export async function playwrightModuleFacts(
   source: string,
 ): Promise<PlaywrightModuleFacts | undefined> {
   const { parseSync } = await loadOxcParser();
-  const parsed = parseSync(filename, source, { preserveParens: false });
+  const parsed = parseSync(filename, source, await oxcParserOptions(false));
   if (parsed.errors.length > 0) {
     return undefined;
   }
@@ -211,7 +211,7 @@ export async function findPlaywrightRoutes(
   localFixtureSpecs: ReadonlySet<string> = new Set(),
 ): Promise<number[]> {
   const { parseSync, visitorKeys } = await loadOxcParser();
-  const parsed = parseSync(filename, source, { preserveParens: false });
+  const parsed = parseSync(filename, source, await oxcParserOptions(false));
   if (parsed.errors.length > 0) {
     return [];
   }

@@ -1,4 +1,4 @@
-import { loadOxcParser } from "./oxc-parser.ts";
+import { loadOxcParser, oxcParserOptions } from "./oxc-parser.ts";
 import { importAuditDecisions, importSourceShape } from "./source-import-policy.ts";
 import { sourceSuppressions } from "./source-suppressions.ts";
 import { findInlineSnapshots } from "./jest-inline-snapshots.ts";
@@ -81,7 +81,7 @@ export async function parseSourceAudit(
   capture?: (parsed: SourceProgramCapture) => void,
 ): Promise<SourceFileAudit | undefined> {
   const { parseSync, visitorKeys } = await loadOxcParser();
-  const parsed = parseSync(syntaxFilename, source);
+  const parsed = parseSync(syntaxFilename, source, await oxcParserOptions());
   if (parsed.errors.length) {
     return undefined;
   }
