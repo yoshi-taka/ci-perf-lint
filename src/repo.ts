@@ -86,6 +86,12 @@ interface AnalyzeOptions {
   workflowOnly?: boolean;
   repositoryOnly?: boolean;
   repositoryVisibility?: "private" | "public";
+  /** Test seam for GitHub telemetry; production callers leave this unset. */
+  innerLoopActivity?: {
+    env?: NodeJS.ProcessEnv;
+    request?: typeof fetch;
+    now?: number;
+  };
 }
 
 interface ScannedRepo {
@@ -99,6 +105,11 @@ interface ScannedRepo {
   readonly workflowOnly: boolean;
   readonly repositoryOnly: boolean;
   readonly repositoryVisibility?: "private" | "public";
+  readonly innerLoopActivity?: {
+    env?: NodeJS.ProcessEnv;
+    request?: typeof fetch;
+    now?: number;
+  };
   readonly timer: PhaseTimer;
   readonly mode: AuditMode;
   readonly topCount: number;
@@ -275,6 +286,7 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     jobSummaries,
     signals: repositoryAnalysis.signals,
     repositoryVisibility: options.repositoryVisibility,
+    innerLoopActivity: options.innerLoopActivity,
     scanContext,
     repoRoot: target.repoRoot,
     analysisWarnings,
@@ -397,6 +409,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
         })()
       : collectRepositoryDiagnostics({
           repositoryVisibility: scanned.repositoryVisibility,
+          innerLoopActivity: scanned.innerLoopActivity,
           repoRoot,
           repository: ruleContext.repository,
           workflows: githubWorkflows as WorkflowDocument[],

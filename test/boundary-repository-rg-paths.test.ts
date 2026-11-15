@@ -51,6 +51,8 @@ test.each([false, true])(
   "rg mapping preserves paths and caller filters (Bun spawn: %s)",
   async (useBun) => {
     const repoRoot = await tempDirs.create("relative-rg-paths-");
+    // Keep this scanner-specific fixture out of the small-tree walker fast path.
+    await mkdir(path.join(repoRoot, ".git"));
     const rgPath = path.join(repoRoot, "fake-rg");
     const raw = ["src/z.ts", "src/./a.ts", "src//b.ts", "skip/c.ts", "node_modules/d.ts"];
     const lines = raw
@@ -61,12 +63,12 @@ test.each([false, true])(
     for (const root of [repoRoot, `${repoRoot}/`]) {
       const context = new Context(root, []);
       expect(await context.walkFiles(".")).toEqual([
-        "src/z.ts",
+        "skip/c.ts",
         "src/a.ts",
         "src/b.ts",
-        "skip/c.ts",
+        "src/z.ts",
       ]);
-      expect(await context.walkFiles("src")).toEqual(["src/z.ts", "src/a.ts", "src/b.ts"]);
+      expect(await context.walkFiles("src")).toEqual(["src/a.ts", "src/b.ts", "src/z.ts"]);
       expect(
         await context.walkFiles(".", {
           ignoredDirectories: new Set(["skip"]),
@@ -82,6 +84,8 @@ test.each([false, true])(
   "rg error and absence retain readdir fallback (Bun spawn: %s)",
   async (useBun) => {
     const repoRoot = await tempDirs.create("relative-rg-fallback-");
+    // Otherwise the small-tree walker succeeds without exercising rg failure.
+    await mkdir(path.join(repoRoot, ".git"));
     await mkdir(path.join(repoRoot, "src"));
     await mkdir(path.join(repoRoot, "node_modules"));
     await writeFile(path.join(repoRoot, "src", "a.ts"), "");
