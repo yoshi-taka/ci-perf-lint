@@ -25,7 +25,7 @@ async function findPlaywrightConfigs(context: RepositoryDiagnosticContext): Prom
   const files = await context.scanContext.walkFiles(".");
   return files
     .filter((file) => {
-      const base = file.split("/").pop() ?? file;
+      const base = file.slice(file.lastIndexOf("/") + 1);
       return playwrightConfigFileNames.has(base);
     })
     .sort();

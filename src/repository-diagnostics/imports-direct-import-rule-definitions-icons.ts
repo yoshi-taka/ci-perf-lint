@@ -19,6 +19,8 @@ import {
   type RestrictedImportRuleDefinition,
 } from "./imports-direct-import-shared.ts";
 
+const svgComponentSource = suffixMatcher(".svg", ".svg?react", ".svg?vue", ".svg?component");
+
 interface IconEntryData extends MakeContentOptions {
   depNames: readonly string[];
   meta:
@@ -162,7 +164,7 @@ export function createIconAndAssetImportRuleDefinitions(
     {
       enabled: dependencyIndexHasAnyDependency(dependencyIndex, ["react-icons"]),
       meta: reactIconsDirectImportMeta,
-      matches: (source) => regexMatcher("^react-icons/[^/]+$")(source),
+      matches: regexMatcher("^react-icons/[^/]+$"),
       content: makeContent({
         flaggedDescription: "a grouped react-icons import",
         why: "Next.js optimizes `react-icons/*` by default because each icon set entry can expose many icons. CI tooling such as Jest, TypeScript, lint, and build steps may pay module graph and transform cost when importing from grouped icon-set entries.",
@@ -179,8 +181,7 @@ export function createIconAndAssetImportRuleDefinitions(
       enabled: true,
       meta: svgComponentImportMeta,
       matches: (source, relativePath) =>
-        !isAllowedSvgComponentImporterPath(relativePath) &&
-        suffixMatcher(".svg", ".svg?react", ".svg?vue", ".svg?component")(source),
+        svgComponentSource(source) && !isAllowedSvgComponentImporterPath(relativePath),
       accepts: (entry) =>
         !entry.source.endsWith(".svg") || entry.namespace || entry.names.includes("ReactComponent"),
       content: makeContent({

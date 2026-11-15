@@ -20,7 +20,7 @@ export function resolveSourceReference(
   if (!/^\.{1,2}(?:\/|$)/.test(source)) {
     return `package:${source}`;
   }
-  const target = path.posix.normalize(path.posix.join(path.posix.dirname(from), source));
+  const target = path.posix.join(path.posix.dirname(from), source);
   if (files.has(target)) {
     return `file:${target}`;
   }

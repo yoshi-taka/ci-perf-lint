@@ -65,10 +65,10 @@ export function collectSourceAudit(context: RepositoryScanContext): Promise<Sour
           firstFailure ||= filename;
           continue;
         }
+        let directory: string | undefined;
         const omittedExtension = (request: string) => {
-          const target = path.posix.normalize(
-            path.posix.join(path.posix.dirname(filename), request),
-          );
+          directory ??= path.posix.dirname(filename);
+          const target = path.posix.join(directory, request);
           // Exact assets win. Require an unambiguous source file; never infer from dots alone.
           if (knownFiles.has(target)) {
             return false;

@@ -12,7 +12,7 @@ export function sourcePath(directory: string, target: string): string | undefine
   if (path.posix.isAbsolute(target) || target.includes("\\") || /[?#\0]/.test(target)) {
     return undefined;
   }
-  const joined = path.posix.normalize(path.posix.join(directory, target));
+  const joined = path.posix.join(directory, target);
   return joined === ".." || joined.startsWith("../") ? undefined : joined;
 }
 
