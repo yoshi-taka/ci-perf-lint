@@ -225,6 +225,21 @@ export async function parseSourceAudit(
       });
     }
     const wildcardExports: SourceWildcardExport[] = [];
+    if ("staticOnly" in parsed) {
+      for (const reference of parsed.references) {
+        if (reference.wildcard && !suppressed("oxc/no-barrel-file", reference.start)) {
+          wildcardExports.push({
+            relativePath: filename,
+            ...position(reference.start),
+            source: reference.source,
+          });
+        }
+        add(reference.start, reference.source, reference.runtime, reference.names, {
+          namespace: reference.namespace,
+        });
+      }
+      return { imports: facts, wildcardExports, snapshots: [] };
+    }
     for (const declaration of parsed.program.body) {
       if (declaration.type === "ImportDeclaration") {
         const values =

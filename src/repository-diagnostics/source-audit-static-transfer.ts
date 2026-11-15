@@ -1,36 +1,18 @@
 import type { Comment } from "oxc-parser";
 
-type ModuleName = { type: "Identifier"; name: string } | { type: "Literal"; value: string };
-type ImportKind = "type" | "value";
-type ImportSpecifier =
-  | { type: "ImportSpecifier"; imported: ModuleName; importKind: ImportKind }
-  | { type: "ImportDefaultSpecifier" | "ImportNamespaceSpecifier" };
-type StaticDeclaration =
-  | {
-      type: "ImportDeclaration";
-      start: number;
-      source: { value: string };
-      importKind: ImportKind;
-      specifiers: ImportSpecifier[];
-    }
-  | {
-      type: "ExportNamedDeclaration";
-      start: number;
-      source: { value: string };
-      exportKind: ImportKind;
-      specifiers: { local: ModuleName; exportKind: ImportKind }[];
-    }
-  | {
-      type: "ExportAllDeclaration";
-      start: number;
-      source: { value: string };
-      exportKind: ImportKind;
-    };
+interface StaticReference {
+  start: number;
+  source: string;
+  runtime: boolean;
+  names: string[];
+  namespace: boolean;
+  wildcard: boolean;
+}
 
-/** Detached fields consumed by the static collector, not an ESTree AST. */
+/** Detached final reference fields, without declaration/specifier AST-shaped objects. */
 export interface StaticSourceTransfer {
   staticOnly: true;
-  program: { body: StaticDeclaration[] };
+  references: StaticReference[];
   comments: Comment[];
 }
 
@@ -40,27 +22,27 @@ function record(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function moduleName(value: unknown): ModuleName | undefined {
+function moduleName(value: unknown): string | undefined {
   const node = record(value);
   if (
     node &&
     ["IdentifierName", "Identifier", "BindingIdentifier"].includes(String(node.type)) &&
     typeof node.name === "string"
   ) {
-    return { type: "Identifier", name: node.name };
+    return node.name;
   }
   if (node?.type === "StringLiteral" && typeof node.value === "string") {
-    return { type: "Literal", value: node.value };
+    return node.value;
   }
   return undefined;
 }
 
-function importKind(value: unknown): value is ImportKind {
+function importKind(value: unknown): value is "type" | "value" {
   return value === "type" || value === "value";
 }
 
 /** null skips unrelated declarations; undefined requests the eager fallback. */
-function declaration(value: unknown): StaticDeclaration | null | undefined {
+function reference(value: unknown): StaticReference | null | undefined {
   const node = record(value);
   if (!node || typeof node.type !== "string") {
     return undefined;
@@ -80,11 +62,13 @@ function declaration(value: unknown): StaticDeclaration | null | undefined {
     }
     return null;
   }
-  const source = record(node.source);
-  if (typeof source?.value !== "string" || typeof node.start !== "number") {
+  const source = record(node.source)?.value;
+  if (typeof source !== "string" || typeof node.start !== "number") {
     return undefined;
   }
-  const common = { start: node.start, source: { value: source.value } };
+  const names: string[] = [];
+  let namespace = false;
+  let runtime = false;
   if (node.type === "ImportDeclaration") {
     if (
       !importKind(node.importKind) ||
@@ -92,46 +76,68 @@ function declaration(value: unknown): StaticDeclaration | null | undefined {
     ) {
       return undefined;
     }
-    const specifiers: ImportSpecifier[] = [];
+    const specifiers = node.specifiers ?? [];
+    let valueCount = 0;
     // Native lazy imports use null for side-effect-only specifiers.
-    for (const specifier of node.specifiers ?? []) {
+    for (const specifier of specifiers) {
       const entry = record(specifier);
       if (entry?.type === "ImportSpecifier") {
         const imported = moduleName(entry.imported);
-        if (!imported || !importKind(entry.importKind)) {
+        if (imported === undefined || !importKind(entry.importKind)) {
           return undefined;
         }
-        specifiers.push({ type: entry.type, imported, importKind: entry.importKind });
+        if (node.importKind === "value" && entry.importKind === "value") {
+          names.push(imported);
+          valueCount++;
+        }
       } else if (
         entry?.type === "ImportDefaultSpecifier" ||
         entry?.type === "ImportNamespaceSpecifier"
       ) {
-        specifiers.push({ type: entry.type });
+        if (node.importKind === "value") {
+          valueCount++;
+          if (entry.type === "ImportDefaultSpecifier") {
+            names.push("default");
+          } else {
+            namespace = true;
+          }
+        }
       } else {
         return undefined;
       }
     }
-    return { ...common, type: "ImportDeclaration", importKind: node.importKind, specifiers };
-  }
-  if (!importKind(node.exportKind)) {
-    return undefined;
-  }
-  if (node.type === "ExportAllDeclaration") {
-    return { ...common, type: node.type, exportKind: node.exportKind };
-  }
-  if (!Array.isArray(node.specifiers)) {
-    return undefined;
-  }
-  const specifiers: { local: ModuleName; exportKind: ImportKind }[] = [];
-  for (const specifier of node.specifiers) {
-    const entry = record(specifier);
-    const local = moduleName(entry?.local);
-    if (!local || !importKind(entry?.exportKind)) {
+    runtime = node.importKind === "value" && (specifiers.length === 0 || valueCount > 0);
+  } else {
+    if (!importKind(node.exportKind)) {
       return undefined;
     }
-    specifiers.push({ local, exportKind: entry.exportKind });
+    if (node.type === "ExportAllDeclaration") {
+      runtime = namespace = node.exportKind === "value";
+    } else {
+      if (!Array.isArray(node.specifiers)) {
+        return undefined;
+      }
+      for (const specifier of node.specifiers) {
+        const entry = record(specifier);
+        const local = moduleName(entry?.local);
+        if (local === undefined || !importKind(entry?.exportKind)) {
+          return undefined;
+        }
+        if (node.exportKind === "value" && entry.exportKind === "value") {
+          names.push(local);
+        }
+      }
+      runtime = names.length > 0;
+    }
   }
-  return { ...common, type: "ExportNamedDeclaration", exportKind: node.exportKind, specifiers };
+  return {
+    start: node.start,
+    source,
+    runtime,
+    names,
+    namespace,
+    wildcard: node.type === "ExportAllDeclaration",
+  };
 }
 
 /**
@@ -148,14 +154,14 @@ export function readStaticSourceTransfer(
   if (!Array.isArray(program?.body) || !Array.isArray(native?.comments)) {
     return undefined;
   }
-  const body: StaticDeclaration[] = [];
+  const references: StaticReference[] = [];
   for (const node of program.body) {
-    const normalized = declaration(node);
+    const normalized = reference(node);
     if (normalized === undefined) {
       return undefined;
     }
     if (normalized !== null) {
-      body.push(normalized);
+      references.push(normalized);
     }
   }
   const comments: Comment[] = [];
@@ -193,5 +199,5 @@ export function readStaticSourceTransfer(
       type: "Line",
     });
   }
-  return { staticOnly: true, program: { body }, comments };
+  return { staticOnly: true, references, comments };
 }

@@ -97,11 +97,17 @@ function isolatedScenario(body: string): void {
           get module() {
             if (mode === "throw") throw new Error("metadata read failed");
             return {
-              hasModuleSyntax: mode === "static",
+              hasModuleSyntax: mode === "static" || mode === "partial",
               dynamicImports: mode === "dynamic" ? [{}] : [],
             };
           },
-          get program() {
+           get program() {
+             if (mode === "partial") return {
+               body: [
+                 {type:"ImportDeclaration",start:0,source:{value:"./entry.js"},importKind:"value",specifiers:null},
+                 {type:"ImportFutureDeclaration"},
+               ],
+             };
             if (mode === "static") return {
               body: [{
                 type: "ImportDeclaration", start: 0, importKind: "value",
@@ -115,7 +121,7 @@ function isolatedScenario(body: string): void {
             throw new Error("lazy AST must not be read");
           },
           get comments() {
-            if (mode === "static") return [];
+            if (mode === "static" || mode === "partial") return [];
             throw new Error("lazy comments must not be read");
           },
           dispose() { events.push("dispose"); },
@@ -154,6 +160,18 @@ test("unsupported static schema and dynamic metadata dispose before the eager fa
       expect(await parseSourceAudit("a.js", large)).toBeDefined();
       expect(events.splice(0)).toEqual(["lazy", "dispose", "eager"]);
     }
+  `);
+});
+
+test("partial static projection never invokes resolution callbacks before eager fallback", () => {
+  isolatedScenario(`
+    mode = "partial";
+    let calls = 0;
+    expect(await parseSourceAudit("a.js", large, () => {calls++;return false})).toEqual({
+      imports: [], wildcardExports: [], snapshots: [],
+    });
+    expect(calls).toBe(0);
+    expect(events).toEqual(["lazy", "dispose", "eager"]);
   `);
 });
 
