@@ -13,6 +13,7 @@ import { collectPreferPydanticV2Diagnostics } from "./prefer-pydantic-v2.ts";
 import { collectPreferPandasV2OrPolarsDiagnostics } from "./prefer-pandas-v2-or-polars.ts";
 import { collectPreferPandas31Diagnostics } from "./prefer-pandas-3-1.ts";
 import { collectPreferPolars21Diagnostics } from "./prefer-polars-2-1.ts";
+import { collectPreferNumpy25Diagnostics } from "./prefer-numpy-2-5.ts";
 import { collectPyramidConfigScanDiagnostics } from "./pyramid-config-scan.ts";
 import { collectPdmWithoutUseUvDiagnostics } from "./pdm-without-use-uv.ts";
 import { collectPythonTopLevelHeavyClientInitDiagnostics } from "./python-top-level-heavy-client-init.ts";
@@ -106,6 +107,11 @@ export const pythonDiagnosticCollectors = [
     gate: gateKeys.pythonHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectMypyMilestoneDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-numpy-2-5",
+    gate: gateKeys.pythonHeavy,
+    collect: (context) => collectPreferNumpy25Diagnostics(context),
   },
   {
     id: "prefer-pandas-3-1",

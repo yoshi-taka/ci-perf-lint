@@ -201,6 +201,7 @@ Current rule registry:
 - `prefer-nock-memory-fixes`
 - `prefer-node-run-over-npm-run`
 - `prefer-npm-ci`
+- `prefer-numpy-2-5`
 - `prefer-oxfmt-over-prettier`
 - `prefer-oxlint-over-eslint`
 - `prefer-oxlint-type-check-over-tsc`

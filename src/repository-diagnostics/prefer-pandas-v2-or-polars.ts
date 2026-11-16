@@ -1,6 +1,6 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
-import { findDataframeDependencyBelow } from "./dataframe-dependencies.ts";
+import { findScientificPythonDependencyBelow } from "./python-scientific-dependencies.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 // Retain the published ID for existing suppressions and report consumers.
@@ -14,7 +14,7 @@ const meta = {
 export async function collectPreferPandasV2OrPolarsDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
-  const pin = await findDataframeDependencyBelow(context, "pandas", [2, 0, 0]);
+  const pin = await findScientificPythonDependencyBelow(context, "pandas", [2, 0, 0]);
   if (!pin) {
     return [];
   }

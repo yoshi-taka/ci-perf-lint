@@ -1,6 +1,6 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
-import { findDataframeDependencyBelow } from "./dataframe-dependencies.ts";
+import { findScientificPythonDependencyBelow } from "./python-scientific-dependencies.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 const meta = {
@@ -14,10 +14,10 @@ export async function collectPreferPandas31Diagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
   // Legacy requirements get the migration-choice rule, not a duplicate upgrade.
-  if (await findDataframeDependencyBelow(context, "pandas", [2, 0, 0])) {
+  if (await findScientificPythonDependencyBelow(context, "pandas", [2, 0, 0])) {
     return [];
   }
-  const pin = await findDataframeDependencyBelow(context, "pandas", [3, 1, 0]);
+  const pin = await findScientificPythonDependencyBelow(context, "pandas", [3, 1, 0]);
   if (!pin) {
     return [];
   }

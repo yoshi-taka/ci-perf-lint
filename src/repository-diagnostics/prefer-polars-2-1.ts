@@ -1,6 +1,6 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
-import { findDataframeDependencyBelow } from "./dataframe-dependencies.ts";
+import { findScientificPythonDependencyBelow } from "./python-scientific-dependencies.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 
 const meta = {
@@ -13,7 +13,7 @@ const meta = {
 export async function collectPreferPolars21Diagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
-  const pin = await findDataframeDependencyBelow(context, "polars", [2, 1, 0]);
+  const pin = await findScientificPythonDependencyBelow(context, "polars", [2, 1, 0]);
   if (!pin) {
     return [];
   }

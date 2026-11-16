@@ -103,6 +103,7 @@ export const RULE_REGISTRY = {
   "prefer-oxlint-over-eslint": { kind: "workflow" },
   "prefer-oxlint-type-check-over-tsc": { kind: "workflow" },
   "prefer-oxfmt-over-prettier": { kind: "workflow" },
+  "prefer-numpy-2-5": { kind: "repository" },
   "prefer-pandas-v2-or-polars": { kind: "repository" },
   "prefer-pandas-3-1": { kind: "repository" },
   "prefer-polars-2-1": { kind: "repository" },

@@ -1,7 +1,7 @@
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 
 type Version = readonly [number, number, number];
-type PackageName = "pandas" | "polars";
+type PackageName = "numpy" | "pandas" | "polars";
 interface Pin {
   spec: string;
   line: number;
@@ -202,7 +202,7 @@ function declarationPin(
   return undefined;
 }
 
-export async function findDataframeDependencyBelow(
+export async function findScientificPythonDependencyBelow(
   context: RepositoryDiagnosticContext,
   packageName: PackageName,
   milestone: Version,
