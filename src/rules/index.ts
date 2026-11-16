@@ -82,6 +82,7 @@ import { preferInstallAction238ForNextestRule } from "./prefer-install-action-2-
 import { preferLefthookForComplexGitHooksRule } from "./prefer-lefthook-for-complex-git-hooks.ts";
 import { preferLocalstackAlternativesRule } from "./prefer-localstack-alternatives.ts";
 import { preferLocalstackPerformanceMilestoneRule } from "./prefer-localstack-performance-milestone.ts";
+import { preferMiseOverNvmInCiRule } from "./prefer-mise-over-nvm-in-ci.ts";
 import { preferMoto5121Rule } from "./prefer-moto-5-1-21.ts";
 import {
   preferMockserver91Rule,
@@ -207,6 +208,7 @@ export const allRules = [
   preferJest30ForJest29Rule,
   preferLocalstackAlternativesRule,
   preferLocalstackPerformanceMilestoneRule,
+  preferMiseOverNvmInCiRule,
   preferMockserver91Rule,
   preferMoto5121Rule,
   preferBuildxBuildOverDockerBuildRule,

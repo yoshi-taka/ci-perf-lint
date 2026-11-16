@@ -185,6 +185,7 @@ Current rule registry:
 - `prefer-localstack-alternatives`
 - `prefer-localstack-performance-milestone`
 - `prefer-mise-over-asdf`
+- `prefer-mise-over-nvm-in-ci`
 - `prefer-mockserver-9-1`
 - `prefer-moto-5-1-21`
 - `prefer-msw-2-memory-fixes`

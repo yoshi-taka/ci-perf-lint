@@ -91,6 +91,7 @@ export const RULE_REGISTRY = {
   "prefer-lefthook-for-complex-git-hooks": { kind: "workflow" },
   "prefer-localstack-alternatives": { kind: "workflow" },
   "prefer-localstack-performance-milestone": { kind: "workflow" },
+  "prefer-mise-over-nvm-in-ci": { kind: "workflow" },
   "prefer-mockserver-9-1": { kind: "workflow" },
   "prefer-moto-5-1-21": { kind: "workflow" },
   "prefer-native-arm-runner-over-qemu": { kind: "workflow" },
