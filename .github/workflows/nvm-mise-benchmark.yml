@@ -21,14 +21,16 @@ jobs:
         tool: [nvm, mise]
         trial: [1, 2, 3]
     env:
-      BENCH_ROOT: ${{ runner.temp }}/nvm-mise-benchmark
       BENCH_TOOL: ${{ matrix.tool }}
       BENCH_TRIAL: ${{ matrix.trial }}
       BENCH_RUNNER: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
       - name: Prepare isolated environment
-        run: python3 .github/bench/nvm-mise.py prepare
+        run: |
+          export BENCH_ROOT="$RUNNER_TEMP/nvm-mise-benchmark"
+          echo "BENCH_ROOT=$BENCH_ROOT" >> "$GITHUB_ENV"
+          python3 .github/bench/nvm-mise.py prepare
       - name: Cold setup including manager download
         run: python3 .github/bench/nvm-mise.py cold
       - name: Save installed-tool cache
