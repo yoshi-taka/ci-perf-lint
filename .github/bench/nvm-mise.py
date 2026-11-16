@@ -86,6 +86,7 @@ def mise():
 
 
 def install():
+    (DATA / "home").mkdir(parents=True, exist_ok=True)
     if TOOL == "nvm":
         value = bash(f'. "{DATA}/nvm/nvm.sh" --no-use; nvm install {NODE_VERSION} >&2; printf "%s" "$PATH"')
     else:
@@ -139,6 +140,7 @@ if mode == "prepare":
         "runner": os.environ["BENCH_RUNNER"], "arch": platform.machine(),
         "trial": int(os.environ["BENCH_TRIAL"]), "tool": TOOL,
         "node": NODE_VERSION, "nvm": "0.41.0", "mise": MISE_VERSION,
+        "cache_scope": "installed-only",
         "image_version": os.environ.get("ImageVersion"),
         "cpu": Path("/proc/cpuinfo").read_text().splitlines()[:25],
     })

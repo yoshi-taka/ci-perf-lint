@@ -38,7 +38,9 @@ jobs:
       - name: Save installed-tool cache
         uses: actions/cache/save@v5
         with:
-          path: ${{ env.BENCH_ROOT }}/data
+          path: |
+            ${{ env.BENCH_ROOT }}/data/${{ matrix.tool }}
+            !${{ env.BENCH_ROOT }}/data/${{ matrix.tool }}/.cache
           key: nvm-mise-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.runner }}-${{ matrix.tool }}-${{ matrix.trial }}
       - name: Move original installation aside and start warm timer
         run: python3 .github/bench/nvm-mise.py rotate
@@ -46,7 +48,9 @@ jobs:
         id: restore
         uses: actions/cache/restore@v5
         with:
-          path: ${{ env.BENCH_ROOT }}/data
+          path: |
+            ${{ env.BENCH_ROOT }}/data/${{ matrix.tool }}
+            !${{ env.BENCH_ROOT }}/data/${{ matrix.tool }}/.cache
           key: nvm-mise-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.runner }}-${{ matrix.tool }}-${{ matrix.trial }}
           fail-on-cache-miss: true
       - name: Warm setup and identical Node workload
