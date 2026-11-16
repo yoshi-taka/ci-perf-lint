@@ -172,7 +172,7 @@ self-hosted / custom imageにはhosted imageの前提を適用しない。
 | □ | [mypy](https://mypy-lang.blogspot.com/) | 1.x / 2.x milestone、num-workers、cache・plugin・Python要件 | mypy milestone / upgrade / workers系 |
 | □ | [Ruff](https://github.com/astral-sh/ruff/releases) / [Black](https://github.com/psf/black/releases) / [isort](https://github.com/PyCQA/isort/releases) | formatter / import sort互換性、plugin・設定・出力差 | Ruff format / import sorting推奨 |
 | □ | [Husky](https://github.com/typicode/husky/releases) / [lint-staged](https://github.com/lint-staged/lint-staged/releases) / [Lefthook](https://github.com/evilmartians/lefthook/releases) | hook起動、bootstrap、並列化、stage処理、migration | outdated Husky / redundant hook bootstrap / Lefthook推奨 |
-| □ | [Knip](https://github.com/webpro-nl/knip/releases) / [cargo-shear](https://github.com/Boshen/cargo-shear/releases) | 未使用解析の精度・workspace・例外設定、実行コスト | `prefer-knip-in-ci`、`prefer-cargo-shear-in-ci` |
+| □ | [Knip](https://github.com/webpro-nl/knip/releases) / [fallow](https://github.com/fallow-rs/fallow/releases) / [cargo-shear](https://github.com/Boshen/cargo-shear/releases) | 未使用解析の精度・workspace・例外設定、実行コスト | `prefer-unused-code-check-in-ci`、`prefer-cargo-shear-in-ci` |
 
 ## 7. Test・Python library
 

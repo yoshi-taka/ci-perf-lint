@@ -82,7 +82,7 @@ describe("command performance regressions", () => {
       },
       `npm run ${scriptName}`,
     );
-    expect(report.findings.some((f) => f.ruleId === "prefer-knip-in-ci")).toBe(false);
+    expect(report.findings.some((f) => f.ruleId === "prefer-unused-code-check-in-ci")).toBe(false);
   });
 
   test.each(["--threads\n1C\n", "-T1C\n", "# threads\n--threads=2\n"])(

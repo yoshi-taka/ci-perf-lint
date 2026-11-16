@@ -27,7 +27,7 @@ import { collectPreferMsw2MemoryFixDiagnostics } from "./prefer-msw-2-memory-fix
 import { collectPreferAzurite336Diagnostics } from "./prefer-azurite-3-36.ts";
 import { collectRecommendModernTestRunnerDiagnostics } from "./recommend-modern-test-runner.ts";
 import { collectPreferCargoShearInCiDiagnostics } from "./prefer-cargo-shear-in-ci.ts";
-import { collectPreferKnipInCiDiagnostics } from "./prefer-knip-in-ci.ts";
+import { collectPreferUnusedCodeCheckInCiDiagnostics } from "./prefer-unused-code-check-in-ci.ts";
 import { collectTypeScriptMilestoneDiagnostics } from "./typescript-5-milestone.ts";
 import { collectPreferTypeScript7NativeCompilerDiagnostics } from "./typescript-7-native-compiler.ts";
 import { collectAvoidEslintPluginPrettierDiagnostics } from "./avoid-eslint-plugin-prettier.ts";
@@ -240,11 +240,6 @@ export const javascriptDiagnosticCollectors = [
     collect: (context) => collectRecommendModernTestRunnerDiagnostics(context),
   },
   {
-    id: "prefer-knip-in-ci",
-    gate: gateKeys.javascriptTooling,
-    collect: (context) => collectPreferKnipInCiDiagnostics(context),
-  },
-  {
     id: "prefer-typescript-5-performance-milestone",
     gate: gateKeys.javascriptHeavy,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
@@ -260,6 +255,11 @@ export const javascriptDiagnosticCollectors = [
         warnings,
         scanContext,
       ),
+  },
+  {
+    id: "prefer-unused-code-check-in-ci",
+    gate: gateKeys.javascriptTooling,
+    collect: (context) => collectPreferUnusedCodeCheckInCiDiagnostics(context),
   },
   {
     id: "recommend-webpack-4-latest-patch",

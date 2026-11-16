@@ -181,7 +181,6 @@ Current rule registry:
 - `prefer-inner-loop-checks`
 - `prefer-install-action-2-38-for-nextest`
 - `prefer-jest-30-for-jest-29`
-- `prefer-knip-in-ci`
 - `prefer-lefthook-for-complex-git-hooks`
 - `prefer-localstack-alternatives`
 - `prefer-localstack-performance-milestone`
@@ -232,6 +231,7 @@ Current rule registry:
 - `prefer-turborepo-over-npm-workspaces`
 - `prefer-typescript-5-performance-milestone`
 - `prefer-typescript-7-native-compiler`
+- `prefer-unused-code-check-in-ci`
 - `prefer-uv-0-12`
 - `prefer-uv-pip-over-pip`
 - `prefer-vitest-performance-milestone`

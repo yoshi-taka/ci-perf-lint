@@ -5,13 +5,13 @@ import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 
 const meta = {
-  id: "prefer-knip-in-ci",
+  id: "prefer-unused-code-check-in-ci",
   severity: "warning",
   confidence: "medium",
-  docsPath: "docs/rules/prefer-knip-in-ci.md",
+  docsPath: "docs/rules/prefer-unused-code-check-in-ci.md",
 } satisfies RuleMeta;
 
-const KNIP_COMMAND = /\bknip\b/;
+const UNUSED_CODE_COMMAND = /\b(?:knip|fallow)\b/;
 
 const CONFIG_FILE_NAMES = [
   "knip.json",
@@ -24,6 +24,10 @@ const CONFIG_FILE_NAMES = [
   "knip.config.cjs",
   "knip.ts",
   "knip.js",
+  ".fallowrc.json",
+  ".fallowrc.jsonc",
+  "fallow.toml",
+  ".fallow.toml",
 ] as const;
 
 const MIN_DIRECT_DEPENDENCIES = 5;
@@ -38,7 +42,7 @@ function countDependencies(packageJson: Record<string, unknown>): number {
   return count;
 }
 
-async function hasKnipConfigFile(context: RepositoryDiagnosticContext): Promise<boolean> {
+async function hasUnusedCodeConfigFile(context: RepositoryDiagnosticContext): Promise<boolean> {
   const checks = await Promise.all(
     CONFIG_FILE_NAMES.map((fileName) =>
       context.scanContext.pathExists(context.scanContext.resolve(fileName)),
@@ -47,7 +51,7 @@ async function hasKnipConfigFile(context: RepositoryDiagnosticContext): Promise<
   return checks.some(Boolean);
 }
 
-export async function collectPreferKnipInCiDiagnostics(
+export async function collectPreferUnusedCodeCheckInCiDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
   const packageJsonEntry = await context.scanContext.loadPackageJson();
@@ -56,11 +60,14 @@ export async function collectPreferKnipInCiDiagnostics(
     return [];
   }
 
-  if (packageJsonHasDependency(packageJson, "knip")) {
+  if (
+    packageJsonHasDependency(packageJson, "knip") ||
+    packageJsonHasDependency(packageJson, "fallow")
+  ) {
     return [];
   }
 
-  // A "knip" key in package.json is either a knip config field or a script that runs knip.
+  // Knip supports inline package.json configuration.
   if (/"knip"\s*:/.test(packageJsonEntry.text ?? "")) {
     return [];
   }
@@ -69,17 +76,17 @@ export async function collectPreferKnipInCiDiagnostics(
     scripts &&
     typeof scripts === "object" &&
     Object.values(scripts).some(
-      (command) => typeof command === "string" && KNIP_COMMAND.test(command),
+      (command) => typeof command === "string" && UNUSED_CODE_COMMAND.test(command),
     )
   ) {
     return [];
   }
 
-  if (context.workflows.some((workflow) => KNIP_COMMAND.test(workflow.source ?? ""))) {
+  if (context.workflows.some((workflow) => UNUSED_CODE_COMMAND.test(workflow.source ?? ""))) {
     return [];
   }
 
-  if (await hasKnipConfigFile(context)) {
+  if (await hasUnusedCodeConfigFile(context)) {
     return [];
   }
 
@@ -89,14 +96,14 @@ export async function collectPreferKnipInCiDiagnostics(
   return [
     buildRepositoryDiagnostic(context.repository, meta, {
       location: { path: packageJsonPath, line: 1, column: 1 },
-      message: "Repository has no visible knip unused-code/dependency check anywhere.",
-      why: "knip finds unused files, exports, and dependencies across a JavaScript/TypeScript project. Unused dependencies still get installed and can slow install and type-checking, and unused files/exports add build and test work. It is the JS/TS counterpart to cargo-shear for Rust, and removing its findings shrinks installs and CI time.",
+      message: "Repository has no visible knip or fallow unused-code/dependency check anywhere.",
+      why: "knip and fallow find unused files, exports, and dependencies across a JavaScript/TypeScript project. Unused dependencies still get installed and can slow install and type-checking, and unused files/exports add build and test work. Removing confirmed-unused code and dependencies can shrink installs and CI time.",
       suggestion:
-        "Add knip to the repository and run it in CI, for example with a `knip` devDependency and a `knip` or `npx knip` step. Start with the default config, review findings, and add ignore entries for intentional dynamic imports and entry points.",
+        "Add knip or fallow to the repository and run it in CI, for example with an `npx knip` or `npx fallow dead-code` step. Start with the default config, review findings, and add ignore entries for intentional dynamic imports and entry points.",
       measurementHint:
-        "Compare dependency count, install time, type-check time, and CI wall-clock time before and after removing knip findings.",
+        "Compare dependency count, install time, type-check time, and CI wall-clock time before and after removing confirmed-unused code and dependencies.",
       aiHandoff:
-        "Add knip to the project (devDependency + config), run it, review unused files/exports/dependencies, add ignore entries for intentional cases, remove the confirmed-unused dependencies and dead code, then compare install and type-check time and confirm the build and tests still pass.",
+        "Choose knip or fallow, add it to the project and CI, run it, review unused files/exports/dependencies, add ignore entries for intentional cases, remove the confirmed-unused dependencies and dead code, then compare install and type-check time and confirm the build and tests still pass.",
       score: 20,
     }),
   ];

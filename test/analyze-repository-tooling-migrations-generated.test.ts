@@ -291,7 +291,7 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
     return fixtureRoot;
   }
 
-  test("recommends knip when there is no visible unused-code check", async () => {
+  test("recommends knip or fallow when there is no visible unused-code check", async () => {
     const fixtureRoot = await jsRepo({
       name: "knip-like",
       scripts: { test: "jest" },
@@ -311,13 +311,15 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
       mode: "exploratory",
     });
 
-    const finding = report.findings.find((c) => c.ruleId === "prefer-knip-in-ci");
+    const finding = report.findings.find((c) => c.ruleId === "prefer-unused-code-check-in-ci");
     expect(finding).toBeDefined();
     expect(finding?.score).toBe(20);
     expect(finding?.severity).toBe("warning");
-    expect(finding?.docsPath).toBe("docs/rules/prefer-knip-in-ci.md");
+    expect(finding?.docsPath).toBe("docs/rules/prefer-unused-code-check-in-ci.md");
     expect(finding?.message).toContain("knip");
+    expect(finding?.message).toContain("fallow");
     expect(finding?.suggestion).toContain("npx knip");
+    expect(finding?.suggestion).toContain("npx fallow dead-code");
   });
 
   test("skips knip suggestion when knip is a dependency", async () => {
@@ -334,7 +336,7 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
       mode: "exploratory",
     });
 
-    expect(report.findings.some((c) => c.ruleId === "prefer-knip-in-ci")).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "prefer-unused-code-check-in-ci")).toBe(false);
   });
 
   test("skips knip suggestion when CI runs knip", async () => {
@@ -354,7 +356,7 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
       mode: "exploratory",
     });
 
-    expect(report.findings.some((c) => c.ruleId === "prefer-knip-in-ci")).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "prefer-unused-code-check-in-ci")).toBe(false);
   });
 
   test("skips knip suggestion when a knip config file exists", async () => {
@@ -374,7 +376,7 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
       mode: "exploratory",
     });
 
-    expect(report.findings.some((c) => c.ruleId === "prefer-knip-in-ci")).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "prefer-unused-code-check-in-ci")).toBe(false);
   });
 
   test("skips knip suggestion when the project has no dependencies", async () => {
@@ -387,6 +389,46 @@ describe("analyzeRepository repo-aware and tooling rules: migrations and platfor
       mode: "exploratory",
     });
 
-    expect(report.findings.some((c) => c.ruleId === "prefer-knip-in-ci")).toBe(false);
+    expect(report.findings.some((c) => c.ruleId === "prefer-unused-code-check-in-ci")).toBe(false);
   });
+
+  const unusedCodeAdoptionCases: {
+    label: string;
+    packageFields?: Record<string, unknown>;
+    workflowLines?: string[];
+    extraFiles?: Record<string, string>;
+  }[] = [
+    { label: "dependency", packageFields: { devDependencies: { fallow: "^3.0.0" } } },
+    { label: "script", packageFields: { scripts: { unused: "bunx fallow dead-code" } } },
+    { label: "CI command", workflowLines: ["      - run: fallow dead-code --production"] },
+    { label: "JSON config", extraFiles: { ".fallowrc.json": "{}" } },
+    { label: "JSONC config", extraFiles: { ".fallowrc.jsonc": "{}" } },
+    { label: "TOML config", extraFiles: { "fallow.toml": "" } },
+    { label: "hidden TOML config", extraFiles: { ".fallow.toml": "" } },
+    { label: "knip script", packageFields: { scripts: { unused: "npx knip" } } },
+    { label: "knip inline config", packageFields: { knip: { entry: ["index.ts"] } } },
+  ];
+
+  test.each(unusedCodeAdoptionCases)(
+    "skips unused-code suggestion with $label",
+    async (scenario) => {
+      const fixtureRoot = await jsRepo(
+        {
+          name: "unused-code-ok",
+          dependencies: { react: "*", lodash: "*", zod: "*", vite: "*", typescript: "*" },
+          ...scenario.packageFields,
+        },
+        { workflowLines: scenario.workflowLines, extraFiles: scenario.extraFiles },
+      );
+      const report = await memoizedAnalyzeRepository({
+        cwd: fixtureRoot,
+        targetPath: ".",
+        topCount: 20,
+        mode: "exploratory",
+      });
+      expect(report.findings.some((c) => c.ruleId === "prefer-unused-code-check-in-ci")).toBe(
+        false,
+      );
+    },
+  );
 });
