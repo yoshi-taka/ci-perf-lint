@@ -11,6 +11,11 @@ interface CliOptions {
   jobs: number;
 }
 
+function defaultJobs(): number {
+  const configured = Number(process.env.MUTATION_JOBS);
+  return Number.isInteger(configured) && configured > 0 ? configured : 2;
+}
+
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     configs: [],
@@ -18,7 +23,7 @@ function parseArgs(argv: string[]): CliOptions {
     failOnSurvivors: false,
     quiet: false,
     sandbox: false,
-    jobs: 1,
+    jobs: defaultJobs(),
   };
   for (const argument of argv) {
     if (argument === "--list") {

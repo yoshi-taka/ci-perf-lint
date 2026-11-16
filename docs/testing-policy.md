@@ -14,7 +14,7 @@
 | **Reporter rendering** | `test/reporters-render-report.test.ts` | Text / JSON / markdown / handoff output format |
 | **Reporter aggregation** | `test/reporters-aggregation*.test.ts` | Grouped findings, deduplication, preservation of distinct fixes |
 | **Metamorphic / differential** | `test/boundary-metamorphic.test.ts` | Oracle-less invariant verification |
-| **Mutation** | `stryker/stryker.*.config.mjs` | Stryker mutation testing (opt-in, slow) |
+| **Mutation** | `stryker/stryker.*.config.mjs` | Local mutation runner (opt-in, slow) |
 
 ## Lean and Z3: what they add
 
@@ -230,15 +230,17 @@ paramsDef → ParamSpec[] → generatePairwise() → combinations[]
 - Assert no crash + expected rule IDs present + no unexpected cluster rule IDs.
 - Do not assert total finding count (other clusters' rules may fire incidentally).
 
-## Mutation Testing (Stryker)
+## Mutation Testing (local runner)
 
-- Mutation testing via Stryker for targeted source files where correctness is critical.
-- Configs: `stryker/stryker.*.config.mjs`; each config's `mutate` list is the coverage boundary, not every rule in the repository.
+- Mutation testing uses `src/mutation/` for targeted source files where correctness is critical.
+- Configs remain `stryker/stryker.*.config.mjs` (Stryker-compatible shape); each config's `mutate` list is the coverage boundary, not every rule in the repository.
 - Run: `bun run test:slow:mutation` (not in default `bun test` path; intentionally slow).
-- Targets include core helpers, workflow/rule-engine paths, repository finding utilities, reporter paths, and a separate shell-evidence target. Inspect the config rather than assuming a whole directory is mutated.
-- Add a new Stryker config when adding a new module whose mutation coverage should be tracked.
-- Use `command` test runner with a focused test command to keep per-config runs fast.
-- Shell evidence: `bun run test:slow:mutation:shell-evidence` mutates `shell-invocations.ts` and runs the shell-evidence contract tests. It uses a sandbox (`inPlace: false`), so source files in the working tree are not temporarily rewritten. The sandbox excludes `tsconfig.json`: Bun runs the tests without it, avoiding Stryker's TypeScript 7 TSConfig API incompatibility. Type checking still belongs to `bun run lint`.
+- Scripts pass `--sandbox`, so the working tree is never rewritten. The sandbox copies `src`, `test`, `scripts`, `docs`, `package.json`, `bun.lock`, `bunfig.toml` and `tsconfig.json`, symlinks `node_modules` and `.fixture-cache`, and skips the `test/setup.ts` preload (about 40ms per mutant) because Bun isolates test files by default.
+- Each mutant gets its own `TMPDIR` under the sandbox, removed in `finally` even for timeouts. The runner itself is killed only by SIGKILL; the next run removes a stale sandbox root.
+- `--jobs` defaults to 2; set `MUTATION_JOBS` or pass `--jobs=N` to change it. Parallel workers use separate sandboxes and share the fixture cache. `--list` prints mutants without running tests.
+- Targets include core helpers, workflow/rule-engine paths, repository finding utilities, reporter paths, source audit/resolution, and a separate shell-evidence target. Inspect the config rather than assuming a whole directory is mutated.
+- Add a new config file when adding a new module whose mutation coverage should be tracked.
+- Known divergence from the former Stryker filter: two empty-expression mutants in `source-audit` are suppressed locally because nested arrow/object mutants count as being in scope (one was Killed, one Survived upstream).
 - `.github/workflows/mutation-smoke.yml` runs core then shell-evidence smoke steps in one job weekly and on manual dispatch, sharing checkout and dependency setup. The ordinary PR test job runs the input-transformation tests, not the slow mutation run.
 - Mutation testing changes **implementation** to check test strength; it does not automatically supply **input** transformations such as adding an echo. Both are needed.
 
@@ -331,8 +333,9 @@ wrapper. `--no-orphans` supplements this; it was insufficient alone for a
 microtask-starved worker. Cleanup regressions inspect liveness at the runner's exit,
 not only after output EOF, which can hide a surviving child.
 
-The three `test:slow:mutation:source-*` commands run one Stryker worker and one
-Bun file worker, with a 1,536 MiB tree budget and a 30-minute overall deadline.
+The three `test:slow:mutation:source-*` commands run the local runner with one
+bounded parent, two mutant workers and Bun file workers, with a 1,536 MiB tree
+budget and a 30-minute overall deadline.
 `test:mutation:source` is the internal command used inside that bounded runner;
 do not use it for unbounded manual mutant replay. Do not overlap full tests,
 mutation trials and manual replay jobs.
@@ -365,7 +368,7 @@ using allocation fixtures capped at 128 MiB, not unrestricted OOM experiments.
   duplicate/reordered facts must not inflate results. Interrupts fail, not pass.
 - Combinatorial: `test/pairwise-cluster-source-audit.test.ts` checks all declared
   parameter pairs and real findings; it is not exhaustive over all combinations.
-- Mutation: `bun --bun stryker run stryker/stryker.source-audit.config.mjs`.
+- Mutation: `bun run test:slow:mutation:source-audit`.
   The sandbox mutates eight named modules, including scan orchestration and
   external snapshot parsing, not all repository
   collectors. No in-place rewrite. JSON evidence is saved under `docs/internal/`.

@@ -60,6 +60,7 @@ const sandboxEntries = [
   "scripts",
   "docs",
   "package.json",
+  "bun.lock",
   "bunfig.toml",
   "tsconfig.json",
 ];

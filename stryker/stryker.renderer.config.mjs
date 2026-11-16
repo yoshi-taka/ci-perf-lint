@@ -1,4 +1,4 @@
-/** @type {import('@stryker-mutator/core').PartialStrykerOptions} */
+/** Local mutation runner config (src/mutation). */
 export default {
   testRunner: "command",
   commandRunner: {

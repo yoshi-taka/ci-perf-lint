@@ -1,12 +1,28 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["packages/ci-perf-lint/**", "test/fixtures/**", "test/arbitraries/index.ts"],
-  "ignoreBinaries": ["hyperfine", "rg"],
-  "ignoreDependencies": ["@codspeed/core", "@stryker-mutator/command-runner", "tsrs"],
+  "ignore": [
+    "packages/ci-perf-lint/**",
+    "test/fixtures/**",
+    "test/arbitraries/index.ts"
+  ],
+  "ignoreBinaries": [
+    "hyperfine",
+    "rg"
+  ],
+  "ignoreDependencies": [
+    "@codspeed/core",
+    "tsrs"
+  ],
   "ignoreIssues": {
-    "src/repository-similar-workflows-similarity.ts": ["exports"],
-    "src/rules/shared/similar-workflow-consensus-consensus.ts": ["exports"],
-    "src/rules/shared/evidence-propagation.ts": ["exports"]
+    "src/repository-similar-workflows-similarity.ts": [
+      "exports"
+    ],
+    "src/rules/shared/similar-workflow-consensus-consensus.ts": [
+      "exports"
+    ],
+    "src/rules/shared/evidence-propagation.ts": [
+      "exports"
+    ]
   },
   "ignoreExportsUsedInFile": true,
   "workspaces": {
@@ -15,13 +31,16 @@
         "bench/**/*.bench.ts",
         "bench/run.ts",
         "bench/source-memory/run.ts",
-        "stryker/stryker.source-*.config.mjs",
         "fuzz/**/*.mjs",
-        "test/**/*.test.ts"
+        "test/**/*.test.ts",
+        "stryker/stryker.*.config.mjs"
       ]
     },
     "site": {
-      "entry": ["src/pages/**/*.astro", "src/layouts/**/*.astro"]
+      "entry": [
+        "src/pages/**/*.astro",
+        "src/layouts/**/*.astro"
+      ]
     },
     "formal": {}
   }
