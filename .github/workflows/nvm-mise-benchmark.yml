@@ -26,6 +26,8 @@ jobs:
       BENCH_RUNNER: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
+      - name: Test benchmark harness
+        run: python3 .github/bench/test_nvm_mise.py
       - name: Prepare isolated environment
         run: |
           export BENCH_ROOT="$RUNNER_TEMP/nvm-mise-benchmark"

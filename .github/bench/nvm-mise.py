@@ -60,6 +60,7 @@ def download(url, target, sha256):
 
 def bootstrap():
     if TOOL == "nvm":
+        (DATA / "nvm").mkdir(parents=True, exist_ok=True)
         script = DATA / "nvm-install.sh"
         download(
             "https://raw.githubusercontent.com/nvm-sh/nvm/v0.41.0/install.sh",
