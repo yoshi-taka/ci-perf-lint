@@ -114,6 +114,7 @@ export const RULE_REGISTRY = {
   "prefer-rails-performance-milestone": { kind: "workflow" },
   "prefer-ruff-format-over-black": { kind: "workflow" },
   "prefer-ruff-import-sorting-over-isort": { kind: "workflow" },
+  "prefer-scipy-1-18": { kind: "repository" },
   "prefer-sccache-action-0-0-6": { kind: "workflow" },
   "prefer-setup-bun-for-lightweight-node-tooling": { kind: "workflow" },
   "prefer-setup-gradle-6-2-for-enhanced-cache": { kind: "workflow" },

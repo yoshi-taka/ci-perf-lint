@@ -219,6 +219,7 @@ Current rule registry:
 - `prefer-ruff-import-sorting-over-isort`
 - `prefer-rust-cache-2-9-2`
 - `prefer-sccache-action-0-0-6`
+- `prefer-scipy-1-18`
 - `prefer-setup-bun-for-lightweight-node-tooling`
 - `prefer-setup-gradle-6-2-for-enhanced-cache`
 - `prefer-setup-java-v6`

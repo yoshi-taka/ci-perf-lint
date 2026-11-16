@@ -14,6 +14,7 @@ import { collectPreferPandasV2OrPolarsDiagnostics } from "./prefer-pandas-v2-or-
 import { collectPreferPandas31Diagnostics } from "./prefer-pandas-3-1.ts";
 import { collectPreferPolars21Diagnostics } from "./prefer-polars-2-1.ts";
 import { collectPreferNumpy25Diagnostics } from "./prefer-numpy-2-5.ts";
+import { collectPreferScipy118Diagnostics } from "./prefer-scipy-1-18.ts";
 import { collectPyramidConfigScanDiagnostics } from "./pyramid-config-scan.ts";
 import { collectPdmWithoutUseUvDiagnostics } from "./pdm-without-use-uv.ts";
 import { collectPythonTopLevelHeavyClientInitDiagnostics } from "./python-top-level-heavy-client-init.ts";
@@ -150,6 +151,11 @@ export const pythonDiagnosticCollectors = [
         warnings,
         scanContext,
       ),
+  },
+  {
+    id: "prefer-scipy-1-18",
+    gate: gateKeys.pythonHeavy,
+    collect: (context) => collectPreferScipy118Diagnostics(context),
   },
   {
     id: "prefer-uv-0-12",

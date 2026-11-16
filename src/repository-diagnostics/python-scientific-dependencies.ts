@@ -1,7 +1,7 @@
 import type { RepositoryDiagnosticContext } from "./collector-types.ts";
 
 type Version = readonly [number, number, number];
-type PackageName = "numpy" | "pandas" | "polars";
+type PackageName = "numpy" | "pandas" | "polars" | "scipy";
 interface Pin {
   spec: string;
   line: number;
