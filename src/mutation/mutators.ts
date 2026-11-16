@@ -1,5 +1,5 @@
 import { parseSync } from "oxc-parser";
-import { mutate as mutateRegex } from "weapon-regex";
+import { mutateRegexPattern } from "./regex-mutator.ts";
 
 export type MutatorName =
   | "ArithmeticOperator"
@@ -353,13 +353,8 @@ export function generateMutants(file: string, source: string): GenerateResult {
           regexSites += 1;
           const { pattern, flags } = literal.regex;
           if (pattern.length > 0) {
-            try {
-              const replacements = mutateRegex(pattern, flags, { mutationLevels: [1] });
-              for (const replacement of replacements) {
-                addWholeNode(node, "Regex", `/${replacement.pattern}/${flags}`);
-              }
-            } catch {
-              unsupportedSites.push(`${file}:${node.start} regex-parse`);
+            for (const replacement of mutateRegexPattern(pattern, flags)) {
+              addWholeNode(node, "Regex", `/${replacement}/${flags}`);
             }
           }
           break;

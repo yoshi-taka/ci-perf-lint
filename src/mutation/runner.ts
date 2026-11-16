@@ -384,9 +384,11 @@ async function createWorkspace(
   if (existsSync(nodeModules)) {
     await symlink(nodeModules, path.join(sandboxDir, "node_modules"), "dir");
   }
-  const fixtureCache = path.join(projectRoot, ".fixture-cache");
-  if (existsSync(fixtureCache)) {
-    await symlink(fixtureCache, path.join(sandboxDir, ".fixture-cache"), "dir");
+  if (process.env.MUTATION_SHARE_CACHE === "1") {
+    const fixtureCache = path.join(projectRoot, ".fixture-cache");
+    if (existsSync(fixtureCache)) {
+      await symlink(fixtureCache, path.join(sandboxDir, ".fixture-cache"), "dir");
+    }
   }
   return {
     dir: sandboxDir,

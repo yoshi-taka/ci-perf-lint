@@ -96,6 +96,16 @@ The Stryker-replacement runner has its own bounded models; they are not part of
   bounds, the no-op condition, the filter postcondition, and concrete temp-path
   injectivity/containment. Planted violations must be SAT so the encoding is not
   vacuous.
+- `RegexMutator.lean` and `RegexAnchor.als`: Boolean decision rules for regex
+  level-1 mutation (predefined-class involution, anchor removal length, and the
+  requirement that a two-character anchor removal starts an alternative). Lean
+  proves the rules; Alloy checks them in a three-flag scope and rejects a broken
+  rule. `regex-models.ts` bridges the table to `anchorRemovalLength` and finite
+  flip cases with Z3. Full regex parsing and weapon-regex parity are **not**
+  formalized. Equivalence evidence: 1,444 repository/curated patterns, 3,564
+  random valid patterns, and 14,290,326 exhaustive (pattern, flag) checks from
+  grammar enumeration, all with zero mismatches (one empty-pattern difference
+  found and fixed).
 
 ```sh
 LEAN_BIN=/path/to/lean-4.35.0/bin/lean
@@ -106,6 +116,9 @@ ALLOY_JAR=/path/to/org.alloytools.alloy.dist.jar
 "$JAVA_BIN" -jar "$ALLOY_JAR" exec -o "$TMPDIR/alloy-lifecycle" -f formal/MutationLifecycle.als
 bun install --cwd formal --frozen-lockfile   # z3-solver
 bun run --cwd formal verify:mutation
+"$LEAN_BIN" formal/RegexMutator.lean
+"$JAVA_BIN" -jar "$ALLOY_JAR" exec -o "$TMPDIR/alloy-regex" -f formal/RegexAnchor.als
+bun run --cwd formal verify:regex
 ```
 
 The ordinary mutation tests check that applied mutants keep the original prefix

@@ -5,7 +5,8 @@
   "scripts": {
     "verify:source": "bun import-audit.ts",
     "verify:models": "bun source-models.ts",
-    "verify:mutation": "bun mutation-models.ts"
+    "verify:mutation": "bun mutation-models.ts",
+    "verify:regex": "bun regex-models.ts"
   },
   "devDependencies": {
     "z3-solver": "5.4.1"

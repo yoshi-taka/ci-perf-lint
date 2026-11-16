@@ -94,7 +94,7 @@ describe("mutation operators", () => {
     expect(replacements('const a = "value" as const;', "StringLiteral")).toEqual([]);
   });
 
-  test("regex literals use weapon-regex mutations", () => {
+  test("regex literals use the local level-1 mutator", () => {
     const mutantReplacements = replacements("const a = /(\\d+)\\.(\\d+)/;", "Regex");
     expect(mutantReplacements).toContain("/(\\d)\\.(\\d+)/");
     expect(mutantReplacements.length).toBeGreaterThan(0);
