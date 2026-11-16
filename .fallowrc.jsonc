@@ -25,6 +25,8 @@
   },
   "usedClassMembers": ["clear", "has", "ids", "pythonFiles", "prerequisites", "findRootFile"],
   "ignoreExports": [
+    // Unit-test seam for config validation; loadMutationConfig is the production path.
+    { "file": "src/mutation/config.ts", "exports": ["resolveMutationConfig"] },
     // Unit-test seams; production callers are inside the same benchmark module.
     { "file": "bench/source-memory/measure.ts", "exports": ["memoryRows", "memoryTree", "treeSamplingLimited", "validateMemoryOutput"] },
     { "file": "bench/source-memory/scenarios.ts", "exports": ["sourceMemoryFiles"] },

@@ -23,6 +23,7 @@
     "docs:dev": "bun run docs:sync && bun run --filter ci-perf-lint-site dev",
     "docs:build": "bun run docs:sync && bun run --filter ci-perf-lint-site build",
     "docs:preview": "bun run --filter ci-perf-lint-site preview",
+    "mutation": "bun run src/mutation/main.ts",
     "test": "AGENT=1 bun --no-orphans scripts/run-bounded.ts --memory-mib 2048 --timeout-ms 180000 -- bun test --no-orphans --parallel=2 --no-isolate --randomize --timings=.bun-test-timings.json",
     "test:mutation:source": "AGENT=1 bun test --no-orphans --parallel=1",
     "test:changed": "bun test --changed",
@@ -93,6 +94,7 @@
     "tinybench": "^6.2.3",
     "tsrs": "0.23.0-ts7.1.0-beta",
     "typescript": "^7.0.2",
+    "weapon-regex": "^2.0.6",
     "yaml": "^2.9.1"
   }
 }

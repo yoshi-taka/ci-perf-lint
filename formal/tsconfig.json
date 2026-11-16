@@ -1,4 +1,4 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["import-audit.ts", "source-models.ts"]
+  "include": ["import-audit.ts", "source-models.ts", "mutation-models.ts"]
 }

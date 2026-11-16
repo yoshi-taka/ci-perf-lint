@@ -69,6 +69,49 @@ bun run --cwd formal verify:models
 
 Run Z3 separately with `bun run verify:source-audit`. The four tools answer
 different questions; their results do not combine into a whole-program proof.
+
+### Mutation runner models (local, optional)
+
+The Stryker-replacement runner has its own bounded models; they are not part of
+`verify:formal` or CI.
+
+- `MutationRunner.lean`: splice prefix/suffix preservation and the no-op
+  characterization for `applyMutant` (runner.ts shares that function). It also
+  models temp paths as segment lists: worker sandboxes are disjoint, mutant temp
+  dirs are injective in `(worker, index)`, and cleanup removes every path owned
+  by a run. It models `List Char`; the implementation slices UTF-16 code units,
+  so astral characters and AST/process behavior are outside the model. Cleanup
+  assumes the child honors `TMPDIR`; a runner SIGKILL is covered only by the
+  next run removing the stale root.
+- `MutationIntervals.als`: empty-expression filter. A CallExpression candidate is
+  dropped when another site lies inside its interval; other sites are never
+  dropped. Scope is five atoms per signature. A deliberately broken filter is
+  checked with `expect 1`; the three normal checks use `expect 0`.
+- `MutationLifecycle.als`: terminal outcomes (completed, failed, timed out)
+  remove all live temp dirs and restore the original source; unrelated temp
+  dirs survive cleanup. Broken timeout and over-broad cleanup variants are
+  checked with `expect 1`.
+- `mutation-models.ts`: Bun + Z3 bridge over concrete mutants generated from
+  `src/finding-grouping.ts` and `src/cli-option-resolver.ts`. It checks splice
+  bounds, the no-op condition, the filter postcondition, and concrete temp-path
+  injectivity/containment. Planted violations must be SAT so the encoding is not
+  vacuous.
+
+```sh
+LEAN_BIN=/path/to/lean-4.35.0/bin/lean
+JAVA_BIN=/path/to/java
+ALLOY_JAR=/path/to/org.alloytools.alloy.dist.jar
+"$LEAN_BIN" formal/MutationRunner.lean
+"$JAVA_BIN" -jar "$ALLOY_JAR" exec -o "$TMPDIR/alloy-mutation" -f formal/MutationIntervals.als
+"$JAVA_BIN" -jar "$ALLOY_JAR" exec -o "$TMPDIR/alloy-lifecycle" -f formal/MutationLifecycle.als
+bun install --cwd formal --frozen-lockfile   # z3-solver
+bun run --cwd formal verify:mutation
+```
+
+The ordinary mutation tests check that applied mutants keep the original prefix
+and suffix and are never no-ops. None of these checks establishes process
+isolation, timeouts or mutation-score correctness.
+
 Finite Alloy/TLC exploration is bounded evidence. Lean proves the stated model
 properties generally, **not implementation equivalence**. Ordinary tests link the
 model to real AST extraction, resolver/cache behavior and all four CI entrypoints.
