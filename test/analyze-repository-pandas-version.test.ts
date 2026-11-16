@@ -31,6 +31,8 @@ async function analyze(files: Record<string, string>, command = "python -m pytes
 }
 
 test.each([
+  "==0.25.3",
+  ">=0.23",
   "==1.5.3",
   "==1.*",
   "==1.5.*",
@@ -54,7 +56,9 @@ test.each([
   expect(finding.location.path).toBe("requirements.txt");
   expect(finding.location.line).toBe(2);
   expect(finding.docsPath).toBe(`docs/rules/${ruleId}.md`);
-  expect(finding.suggestion).toContain("2.x or newer");
+  expect(finding.suggestion).toContain("pandas >=3.1");
+  expect(finding.suggestion).toContain("Polars >=2.1");
+  expect(finding.suggestion).toContain("Python >=3.11");
   expect(finding.suggestion).toContain("Polars");
   expect(finding.message).toContain("allows pandas versions below 2");
   expect(finding.aiHandoff).toContain("compatibility jobs");

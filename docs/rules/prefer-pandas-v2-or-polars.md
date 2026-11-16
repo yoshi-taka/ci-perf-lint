@@ -1,10 +1,12 @@
-# Prefer pandas 2+ or Polars over pandas 1
+# Prefer pandas 3.1+ or Polars 2.1+ over legacy pandas
 
 ## Why it matters
 
-Tests and CI data-processing scripts use the repository's dataframe library too. Keeping pandas below version 2 prevents adopting newer performance improvements, Arrow-backed dtypes, and Copy-on-Write optimizations. Polars is another option for parallel and lazy dataframe processing.
+Tests and CI data-processing scripts use the repository's dataframe library too. pandas 2.2 accelerated dataframe/series equality assertions; 3.0 made Copy-on-Write and dedicated string dtype the default; 3.1 improves groupby, Arrow reductions/casts, concat/merge and rolling. Polars 2.1 is an alternative with parallel lazy execution, streaming out-of-core groupby and improved memory management.
 
-The rule does not infer that a dataset is large or a test is slow. It identifies an old resolved version or a dependency policy that still permits pandas below 2. It does not promise that upgrading alone makes every operation faster: pandas 2's Arrow and Copy-on-Write features require appropriate configuration and workloads.
+The rule does not infer that a dataset is large or a test is slow. It identifies an old resolved version or a dependency policy that still permits pandas below 2, including 0.x. It recommends choosing pandas >=3.1 or Polars >=2.1, not stopping at pandas 2. Both targets require Python >=3.11. Arrow-backed pandas strings require PyArrow; eager Polars operations remain in-memory. No uniform speedup is promised.
+
+The historical rule ID remains `prefer-pandas-v2-or-polars` for existing suppressions. pandas 2.x/3.0 baselines are handled by [prefer-pandas-3-1](prefer-pandas-3-1.md); existing Polars dependencies by [prefer-polars-2-1](prefer-polars-2-1.md).
 
 ## What it flags
 
@@ -33,9 +35,11 @@ It emits one repository-level `warning`, including in strict mode. Dynamic `setu
 
 ## Suggested action
 
-Require **pandas >=2**, upgrade old resolutions to a compatible 2.x or newer release, or migrate suitable processing to Polars. Update the dependency declaration even if a current lockfile already selects pandas 2+, and regenerate the existing lockfile as needed.
+Choose **pandas >=3.1** or migrate suitable processing to **Polars >=2.1**. Update Python to >=3.11, raise the dependency minimum even if a current lockfile already selects a newer version, and regenerate the existing lockfile.
 
 Do not simply replace dataframe types inside tests that exist to verify pandas interoperability. Preserve dtype, index, null/NaN, ordering, timezone, and mutation semantics. Polars is not a drop-in API replacement. Review Python/NumPy compatibility and pandas API removals as part of the upgrade.
+
+For pandas, 2.3 can be an intermediate migration checkpoint: resolve warnings and test Copy-on-Write/new strings before moving to 3.1. Replace chained assignments with `.loc` and review read-only arrays. For Polars, review lazy result ordering and explicitly sort or use supported `maintain_order` options. Retain intentional legacy compatibility jobs.
 
 ## Verification
 
@@ -45,3 +49,7 @@ Compare fixture setup time, data-processing tests, peak memory, package installa
 
 - [pandas 2.0 changes](https://pandas.pydata.org/docs/whatsnew/v2.0.0.html)
 - [Coming from pandas to Polars](https://docs.pola.rs/user-guide/migration/pandas/)
+- [pandas 2.2 changes](https://pandas.pydata.org/docs/whatsnew/v2.2.0.html)
+- [pandas 3.0 changes](https://pandas.pydata.org/docs/whatsnew/v3.0.0.html)
+- [pandas 3.1 changes](https://pandas.pydata.org/docs/whatsnew/v3.1.0.html)
+- [Polars 2.1 release](https://github.com/pola-rs/polars/releases/tag/py-2.1.0)
