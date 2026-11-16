@@ -204,6 +204,7 @@ Current rule registry:
 - `prefer-oxfmt-over-prettier`
 - `prefer-oxlint-over-eslint`
 - `prefer-oxlint-type-check-over-tsc`
+- `prefer-pandas-v2-or-polars`
 - `prefer-pnpm-12-10`
 - `prefer-pnpm-setup-for-store-only-cache`
 - `prefer-pulumi-actions-4-2`
