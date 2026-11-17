@@ -1,4 +1,8 @@
 pre-commit:
+  # Skip repository-wide checks when every staged file is Markdown.
+  exclude:
+    - "*.md"
+    - "**/*.md"
   commands:
     lint-all:
       run: bun run lint
