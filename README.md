@@ -2,266 +2,105 @@
 
 [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/yoshi-taka/ci-perf-lint?utm_source=badge)
 
-Repository-first CI audit across major CI platforms.
+Find CI waste. Know what to fix first.
 
-CI Perf Lint scans workflows plus repository context, prioritizes CI waste, and produces a shareable improvement plan with measurement hints and AI-ready handoff instructions.
+CI Perf Lint scans CI workflows, source code, and tooling configuration for avoidable work—from redundant installs to expensive build patterns.
 
-It does not just list warnings. It tells you what to fix first.
+Get a prioritized improvement plan, not just warnings: where the waste is, what to change, and how to verify the result.
 
-## Quick Start
+## Quick start
 
-Run once against a repository:
+Run from your repository. No configuration required.
 
 ```sh
-# recommended (faster startup)
 bunx ci-perf-lint
 # or
 npx ci-perf-lint
 ```
 
-Pipe directly into AI tools:
+## Example
 
-```sh
-bunx ci-perf-lint | opencode
-bunx ci-perf-lint | claude -p "Apply the findings above to fix workflows"
-bunx ci-perf-lint | gemini
-bunx ci-perf-lint | codex exec
-```
-
-Install globally for repeated use:
-
-```sh
-bun install -g ci-perf-lint
-# or
-npm install -g ci-perf-lint
-```
-
-## What You Get
-
-Each run returns:
-
-- Top findings
-- What to fix first
-- Measurement hints
-- AI-ready handoff
-
-The output is designed to be:
-
-- readable by humans
-- directly usable by AI
-- easy to paste into Slack, issues, or PRs
-
-## When To Use This
-
-Use CI Perf Lint when:
-
-- CI has become slow
-- runner cost needs review
-- PR feedback loops are too long
-- workflows have accumulated over time
-- you need a quick CI improvement report
-- you want to safely delegate fixes to AI
-
-This is not a daily lint tool. It is a high-value audit tool for CI owners.
-
-## Example Output
+An abbreviated, illustrative report:
 
 ```text
-CI Perf Lint
-Repository: acme/api
-Workflows scanned: 5
-
 Top findings
 
 1. missing-path-ignore-for-non-code
-   Context: docs/, *.md, and *.txt changes trigger full CI in 3 workflows
-   Why it matters: avoidable runs increase runner cost and PR latency
-   Suggested action: add paths-ignore for non-code files
-   Measurement hint: confirm docs-only PR skips all heavy workflows
+   Context: a heavy workflow has no path filter for docs-only changes.
+   Why it matters: small documentation changes can still trigger expensive CI.
+   Suggested action: add safe path exclusions, or gate heavy jobs if checks are required.
+   Measurement hint: confirm docs-only changes skip heavy work without leaving required checks pending.
 
-2. duplicate-install-or-lint
-   Context: npm install runs in both ci.yml and lint.yml
-   Why it matters: repeated dependency installs add cost and delay feedback
-   Suggested action: consolidate into a shared job or reuse artifacts
-   Measurement hint: compare total workflow duration before and after
-
-3. missing-dependency-cache
-   Context: actions/setup-node used without cache in 2 workflows
-   Why it matters: install cost is paid on every run
-   Suggested action: enable package-manager-aware caching
-   Measurement hint: compare install step duration
-
-4. avoid-svg-component-imports (src/icons.tsx:12:1 +3 more) [repository-wide source/tooling]
-   Context: avoid-svg-component-imports appears in 4 source/tooling locations; apply one consistent fix pattern where appropriate.
-   Why it matters: SVG component imports can increase transform cost and module count when plain asset URLs would be enough.
-   Suggested action: replace ordinary SVG component imports with asset URL imports where dynamic component behavior is not needed
-   Measurement hint: compare transform time, bundle/module counts, and build output before and after
+2. avoid-svg-component-imports
+   Context: SVG component imports found in source files.
+   Why it matters: component transforms add work when asset URLs suffice.
+   Suggested action: use asset URL imports where component behavior is unnecessary.
+   Measurement hint: compare transform time and bundle/module counts.
 ```
 
-## Repository-First Approach
+CI YAML is only part of the picture. Slow builds and tests can come from source imports, package scripts, Dockerfiles, or tool configuration. CI Perf Lint checks those alongside your workflows.
 
-CI Perf Lint is designed as a repository-level audit tool.
+## Why not just ask AI?
 
-Default scope:
+I build this tool with AI, too. In my experience, it rarely brings up niche CI performance optimizations unless I explicitly ask it to focus on that area.
 
-- workflows under `.github/workflows/`
-- repository-level context such as configuration, structure, and cross-workflow patterns
+CI Perf Lint encodes that specialized knowledge as repeatable static checks. It identifies patterns worth investigating and gives your agent concrete findings to work from.
 
-Repository context includes signals such as:
+Let the tool find the patterns. Let AI adapt the fixes to your repository.
 
-- duplicated logic across workflows
-- inconsistent caching strategies
-- repo-level tool usage
-- trigger patterns across workflows
+```sh
+bunx ci-perf-lint | claude -p "Review these findings and propose fixes"
+```
 
-Typical flow:
+The default output is an AI-ready handoff with prioritized findings, affected locations, suggested changes, and measurement hints.
 
-1. scan the repository and workflows
-2. identify repository-wide waste patterns
-3. prioritize top improvements
-4. optionally drill down per workflow
+## Coverage
 
-CI inefficiencies are often repository-wide:
+GitHub Actions · Buildkite · CircleCI · GitLab CI
 
-- docs changes trigger multiple workflows
-- similar lint or setup logic is duplicated across files
-- caching strategy differs between workflows
-- only some workflows use concurrency controls
+Checks cover triggers, concurrency, dependency caching, checkout and artifact overhead, duplicate work, Docker builds, and source/tooling performance patterns.
 
-## Human + AI Workflow
+Depot workflows use GitHub Actions support. Individual rule coverage varies by platform.
 
-CI Perf Lint separates CI optimization into two phases:
-
-1. Deterministic audit
-2. AI-driven implementation
-
-Typical usage:
-
-1. run the audit
-2. review top findings
-3. pipe output to AI or copy and paste it
-4. apply fixes
-5. verify using measurement hints
-
-## Why Not Just Ask AI?
-
-You can.
-
-CI Perf Lint improves that workflow by:
-
-- avoiding repeated context reconstruction
-- providing deterministic findings
-- separating higher-confidence issues from broader suggestions
-- including measurement steps for verification
-
-AI becomes more reliable when given structured constraints.
+[Browse the rules →](https://ci-perf-lint.veritycost.com/rules/)
 
 ## Usage
 
-Default run:
-
 ```sh
-ci-perf-lint
+# Audit another repository
+bunx ci-perf-lint /path/to/repo
+
+# Export a shareable report
+bunx ci-perf-lint --format markdown
+
+# Export all findings as JSON
+bunx ci-perf-lint --findings-only --format json
+
+# Focus on workflows or repository source/tooling
+bunx ci-perf-lint --workflow-only
+bunx ci-perf-lint --repository-only
+
+# Include broader suggestions
+bunx ci-perf-lint --mode exploratory
 ```
 
-Render AI handoff:
+By default, the report shows the top five rule groups. Use `--top N` to change the limit, or `--findings-only` for the full, ungrouped list. With `--findings-only`, an explicit `--top N` limits individual findings instead.
 
-```sh
-ci-perf-lint . --format handoff
-```
+Strict mode is the default; exploratory mode includes broader suggestions.
 
-Include exploratory suggestions:
+Static analysis identifies opportunities, not guaranteed savings. Review changes and measure their effect.
 
-```sh
-ci-perf-lint . --mode exploratory
-```
+Exit codes: `0` no findings · `1` findings · `2` CLI or target error.
 
-Markdown output:
-
-```sh
-ci-perf-lint . --format markdown
-```
-
-JSON output:
-
-```sh
-ci-perf-lint . --format json --top 10
-```
-
-Findings-only flat output:
-
-```sh
-ci-perf-lint . --findings-only
-ci-perf-lint . --findings-only --format json --top 20
-```
-
-`--findings-only` skips aggregation and handoff guidance and emits a flat finding list. With
-`--format json` it becomes a raw finding array. `--top N` limits this flat list only when passed
-explicitly; without `--top`, the full list is emitted.
-
-`--top N` counts rule groups (aggregated findings) in the default and handoff output, but raw
-findings with `--findings-only`.
-
-Focus modes:
-
-```sh
-ci-perf-lint . --workflow-only
-ci-perf-lint . --repository-only
-```
-
-Show selected workflows:
-
-```sh
-ci-perf-lint . --show-workflows
-```
-
-Strict mode shows higher-confidence warnings by default. Exploratory mode also includes broader suggestions.
-
-Malformed workflow files are skipped with a warning on stderr; valid workflows continue to be audited.
-JSON stdout remains parseable. Exit status is `0` for no findings, `1` for findings, and `2` for CLI/target errors;
-parse warnings alone do not make the exit status nonzero.
-
-Workflow/action-specific rules have platform-specific coverage. Command evidence from all four CI
-platforms participates in shared repository ecosystem gates and dependency-file diagnostics.
-
-## Current Scope
-
-CI Perf Lint includes dozens of rules covering:
-
-- trigger conditions
-- concurrency
-- dependency caching
-- checkout patterns
-- duplicate steps
-- Docker build patterns
-- language-specific CI optimizations
-- AI-oriented migration suggestions
-
-See https://ci-perf-lint.veritycost.com/rules/ for the current rule index.
-
-## Positioning
-
-CI Perf Lint is:
-
-- not a correctness linter
-- not a runtime profiler
-- not a generic AI wrapper
-
-It is a static analyzer for CI/CD waste, designed to produce actionable, shareable improvement plans.
+See `bunx ci-perf-lint --help` for all options.
 
 ## Development
 
 ```sh
+bun install
 bun run lint
 bun run audit:static
 bun run test
 ```
 
-## Summary
-
-CI Perf Lint tells you:
-
-- what to fix
-- what to fix first
-- how to verify it
-- how to safely apply it with AI
+[Adding a rule](docs/adding-a-rule.md)
