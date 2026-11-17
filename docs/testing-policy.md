@@ -188,6 +188,7 @@ const report = await analyzeRepositoryForRule(
   `bun build src/workflow.ts --outdir dist --target node --external oxc-parser`
   `bun run fuzz:local fuzz/workflow.fuzz.mjs fuzz/corpus/workflow --out=.fuzz-work --max-time=2000`
 - A stalled input is killed by the supervising process; `--max-len`, `--seed`, `--stall-ms` bound the run. Coverage is V8 precise coverage from `node:inspector`.
+- JSON targets must narrow input with `parseJsonObject` (`src/fuzz/json.ts`); manifests must not call `JSON.parse` directly, because it can return `null`, arrays or primitives. `test/fuzz-json-guard.test.ts` enforces this.
 
 ## Pairwise / Combinatorial Testing
 

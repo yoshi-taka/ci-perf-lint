@@ -1,4 +1,5 @@
 import { renderReport } from "../dist/reporters.js";
+import { parseJsonObject } from "../src/fuzz/json.ts";
 
 function makeString(value) {
   return typeof value === "string" ? value : "";
@@ -41,15 +42,8 @@ function coerceDiagnostic(value, index) {
 }
 
 export function fuzz(data) {
-  let parsed;
-
-  try {
-    parsed = JSON.parse(data.toString("utf8"));
-  } catch {
-    return;
-  }
-
-  if (!parsed || typeof parsed !== "object") {
+  const parsed = parseJsonObject(data.toString("utf8"));
+  if (!parsed) {
     return;
   }
 

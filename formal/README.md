@@ -130,10 +130,26 @@ and `fuzz-models.ts` bridges the boolean table to `retainCoverage` plus mutation
 length/determinism bounds. Fuzzer search quality and timeout supervision are
 not formalized.
 
+The JSON guard models cover the fuzz-target crash class where `JSON.parse`
+returns `null`/an array/a primitive and the target reads a field anyway.
+`FuzzJson.lean` proves the guard contract: accepted values are objects, every
+non-object is rejected, and field lookup requires acceptance.
+`FuzzJson.als` checks the decision rule over all six JSON value classes with
+three broken-guard controls (missing null check, missing array check,
+`typeof`-only check). `fuzz-json-models.ts` proves the Z3 class partition and
+runs `parseJsonObject` on concrete JSON literals.
+`test/fuzz-json-guard.test.ts` checks every `fuzz/*.fuzz.mjs` manifest for
+direct `JSON.parse` and unit-tests the shared guard, so the model is connected
+to the call sites. Non-JSON values, prototypes and accessors are outside the
+model; guard completeness is not "all JS semantics".
+
 ```sh
 "$LEAN_BIN" formal/FuzzCoverage.lean
+"$LEAN_BIN" formal/FuzzJson.lean
 "$JAVA_BIN" -jar "$ALLOY_JAR" exec -o "$TMPDIR/alloy-fuzz" -f formal/FuzzRetention.als
+"$JAVA_BIN" -jar "$ALLOY_JAR" exec -o "$TMPDIR/alloy-fuzz" -f formal/FuzzJson.als
 bun run --cwd formal verify:fuzz
+bun run --cwd formal verify:fuzz-json
 ```
 
 The ordinary mutation tests check that applied mutants keep the original prefix
