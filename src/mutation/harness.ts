@@ -49,24 +49,20 @@ function testFilesFromCommand(command: string): string[] {
     .map((token) => token.replace(/^test\//, ""));
 }
 
-export function supportsHarness(
+export function harnessEligibleTargets(
   config: ResolvedMutationConfig,
   sources?: Map<string, string>,
-): boolean {
+): string[] {
   if (testFilesFromCommand(config.command).length === 0) {
-    return false;
+    return [];
   }
-  if (!sources) {
-    return true;
-  }
-  for (const target of config.targets) {
-    const source = sources.get(target.file);
-    if (source && /^export\s+(?:const|let|var|class)\b/m.test(source)) {
+  return config.targets
+    .map((target) => target.file)
+    .filter((file) => {
+      const source = sources?.get(file);
       // Non-function exports cannot be updated through stable wrappers.
-      return false;
-    }
-  }
-  return true;
+      return !source || !/^export\s+(?:const|let|var|class)\b/m.test(source);
+    });
 }
 
 export async function runHarnessMutation(input: HarnessInput): Promise<RunSummary> {

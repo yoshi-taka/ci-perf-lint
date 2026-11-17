@@ -4,7 +4,7 @@ import path from "node:path";
 import type { ResolvedMutationConfig } from "./config.ts";
 import { applyMutant } from "./apply.ts";
 import { deriveTestCommands } from "./test-selection.ts";
-import { runHarnessMutation, supportsHarness } from "./harness.ts";
+import { harnessEligibleTargets, runHarnessMutation } from "./harness.ts";
 import { generateMutants, type Mutant, type MutatorName } from "./mutators.ts";
 
 export type MutantStatus = "Killed" | "Survived" | "Timeout";
@@ -160,23 +160,64 @@ export async function runMutationConfig(
       )
     : new Map(config.targets.map((target) => [target.file, config.command]));
   const jobs = Math.max(1, Math.floor(options.jobs ?? 1));
+  const eligibleTargets = harnessEligibleTargets(config, sources);
   if (
     options.harness !== false &&
     process.env.MUTATION_HARNESS !== "0" &&
-    supportsHarness(config, sources)
+    eligibleTargets.length > 0
   ) {
     try {
-      const summary = await runHarnessMutation({
-        config,
+      const eligibleSet = new Set(eligibleTargets);
+      const harnessTargets = config.targets.filter((target) => eligibleSet.has(target.file));
+      const processTargets = config.targets.filter((target) => !eligibleSet.has(target.file));
+      const harnessMutants = generated.filter((mutant) => eligibleSet.has(mutant.file));
+      const harnessCommands = new Map(
+        eligibleTargets.map((file) => [file, commandsByTarget.get(file) ?? config.command]),
+      );
+      const harnessSummary = await runHarnessMutation({
+        config: { ...config, targets: harnessTargets, jsonFile: undefined },
         projectRoot,
-        mutants: generated,
+        mutants: harnessMutants,
         sources,
         unsupportedSites,
         regexSites,
         options,
-        commandsByTarget,
+        commandsByTarget: harnessCommands,
         jobs,
       });
+      let summary = harnessSummary;
+      if (processTargets.length > 0) {
+        const processConfig = {
+          ...config,
+          name: `${config.name}:process`,
+          targets: processTargets,
+          tempDirName: `${config.tempDirName}-process`,
+          jsonFile: undefined,
+        };
+        const processSummary = await runMutationConfig(processConfig, {
+          ...options,
+          harness: false,
+        });
+        const completed = [...harnessSummary.files, ...processSummary.files];
+        const total = harnessSummary.metrics.total + processSummary.metrics.total;
+        const killed = harnessSummary.metrics.killed + processSummary.metrics.killed;
+        const survived = harnessSummary.metrics.survived + processSummary.metrics.survived;
+        const timeout = harnessSummary.metrics.timeout + processSummary.metrics.timeout;
+        summary = {
+          name: config.name,
+          files: completed,
+          metrics: {
+            total,
+            killed,
+            survived,
+            timeout,
+            score: total === 0 ? 0 : (killed + timeout) / total,
+            durationMS: harnessSummary.metrics.durationMS + processSummary.metrics.durationMS,
+          },
+          unsupportedSites,
+          regexSites,
+        };
+      }
       if (config.jsonFile) {
         await writeJsonReport(config, summary, projectRoot);
       }

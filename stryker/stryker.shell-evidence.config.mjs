@@ -1,7 +1,10 @@
 /** Local mutation runner config (src/mutation). */
 export default {
   testRunner: "command",
-  commandRunner: { command: "bun run test:shell-evidence" },
+  commandRunner: {
+    command:
+      "bun test test/analyze-repository-shell-evidence-metamorphic.test.ts test/boundary-shell-evidence-metamorphic.test.ts test/boundary-shell-command-evidence.test.ts",
+  },
   mutate: ["src/rules/shared/shell-invocations.ts"],
   reporters: ["clear-text", "progress", "json"],
   jsonReporter: { fileName: "reports/mutation/shell-evidence.json" },
