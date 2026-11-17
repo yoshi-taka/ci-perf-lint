@@ -16,6 +16,7 @@ interface FuzzConfig {
 
 const config = JSON.parse(process.env.FUZZ_CONFIG ?? "{}") as FuzzConfig;
 const corpusDir = path.resolve(config.corpusDir);
+await mkdir(corpusDir, { recursive: true });
 const outDir = path.resolve(config.outDir);
 const corpusOut = path.join(outDir, "corpus");
 const crashOut = path.join(outDir, "crashes");
@@ -34,6 +35,7 @@ const corpus: Buffer[] = [];
 let inputs = 0;
 let retained = 0;
 let crashes = 0;
+const crashHashes = new Set<string>();
 let coverageKeys = 0;
 
 function hash(data: Buffer): string {
@@ -45,8 +47,13 @@ async function saveCorpus(data: Buffer): Promise<void> {
 }
 
 async function saveCrash(data: Buffer, kind: string): Promise<void> {
+  const key = `${kind}-${hash(data)}`;
+  if (crashHashes.has(key)) {
+    return;
+  }
+  crashHashes.add(key);
   crashes += 1;
-  await writeFile(path.join(crashOut, `${kind}-${hash(data)}`), data);
+  await writeFile(path.join(crashOut, key), data);
 }
 
 async function execute(data: Buffer): Promise<void> {

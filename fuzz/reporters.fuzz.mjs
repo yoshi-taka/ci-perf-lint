@@ -49,6 +49,10 @@ export function fuzz(data) {
     return;
   }
 
+  if (!parsed || typeof parsed !== "object") {
+    return;
+  }
+
   const findings = makeArray(parsed.findings).slice(0, 50).map(coerceDiagnostic);
   const report = {
     targetPath: makeString(parsed.targetPath),
