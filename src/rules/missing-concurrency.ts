@@ -15,7 +15,7 @@ import { workflowFact, or } from "./shared/predicate.ts";
 
 const meta = {
   id: "missing-concurrency",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/missing-concurrency.md",
   maxFindings: 3,
@@ -67,7 +67,6 @@ export const missingConcurrencyRule = {
 
     const base = buildDiagnostic(workflow, meta, workflow.onNode ?? workflow.nameNode, {
       message: "The workflow has no workflow-level or job-level concurrency setting.",
-      severity: agentic ? "warning" : undefined,
       why: agentic
         ? "Agentic and AI-assisted runs are often long-lived, so older runs can keep burning runner time after newer commits or comments arrive on the same PR or branch."
         : "Older runs can continue burning runner time after newer commits arrive on the same PR or branch.",

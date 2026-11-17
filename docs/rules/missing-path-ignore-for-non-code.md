@@ -1,5 +1,7 @@
 # `missing-path-ignore-for-non-code`
 
+Reported as a warning in default strict mode.
+
 Detects heavy workflows that do not ignore obviously non-code changes such as docs and markdown.
 
 Meta-workflow exclusions distinguish executable work and explicit intent from printed examples or comments. Displaying a word such as `triage` does not exempt an otherwise heavy workflow.

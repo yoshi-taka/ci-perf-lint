@@ -17,7 +17,7 @@ import { withRepositorySingleCacheStrategyPrecedent } from "./shared/similar-wor
 
 const meta = {
   id: "redundant-manual-cache-with-setup-action",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/redundant-manual-cache-with-setup-action.md",
 } satisfies RuleMeta;

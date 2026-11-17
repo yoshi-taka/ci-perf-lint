@@ -58,7 +58,7 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     expect(report.findings.length).toBeLessThan(280);
     expect(ruleIds.has("missing-paths-filter")).toBe(true);
     expect(ruleIds.has("missing-concurrency")).toBe(true);
-    expect(ruleIds.has("ungated-heavy-job")).toBe(true);
+    expect(ruleIds.has("ungated-heavy-job")).toBe(false);
     expect(ungatedCount).toBeLessThan(200);
   });
 
@@ -203,7 +203,7 @@ describe("analyzeRepository workflow and execution rules: general", () => {
     expect(findings.every((finding) => finding.severity === "warning")).toBe(true);
   });
 
-  test("keeps path-filter suggestions exploratory-only when strict findings already exist", async () => {
+  test("includes path-filter warnings alongside other strict findings", async () => {
     const fixtureRoot = await tempDirs.create("apl-strict-path-filter-no-fallback-");
     await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
     await writeFile(
@@ -240,11 +240,11 @@ describe("analyzeRepository workflow and execution rules: general", () => {
       ),
     ).toBe(true);
     expect(report.findings.some((candidate) => candidate.ruleId === "missing-paths-filter")).toBe(
-      false,
+      true,
     );
     expect(
       report.findings.some((candidate) => candidate.ruleId === "missing-path-ignore-for-non-code"),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   test("flags outdated setup-java without cache", async () => {

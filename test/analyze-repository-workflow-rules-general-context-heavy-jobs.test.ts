@@ -19,7 +19,7 @@ function getFixtureReport(
 }
 
 describe("analyzeRepository workflow and execution rules: heavy jobs and release guards", () => {
-  test("suggests dorny paths-filter for component-scoped heavy jobs", async () => {
+  test("warns in strict mode about ungated component-scoped heavy jobs", async () => {
     const fixtureRoot = await tempDirs.create("apl-dorny-paths-filter-");
     await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
     await writeFile(path.join(fixtureRoot, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
@@ -46,13 +46,14 @@ describe("analyzeRepository workflow and execution rules: heavy jobs and release
     const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
       targetPath: ".",
       topCount: 20,
-      mode: "exploratory",
+      mode: "strict",
     });
 
     const finding = report.findings.find(
       (candidate) => candidate.ruleId === "prefer-dorny-paths-filter-for-scoped-jobs",
     );
 
+    expect(finding?.severity).toBe("warning");
     expect(finding?.message).toContain('"backend"');
     expect(finding?.message).toContain('"frontend"');
     expect(finding?.suggestion).toContain("dorny/paths-filter@v3");

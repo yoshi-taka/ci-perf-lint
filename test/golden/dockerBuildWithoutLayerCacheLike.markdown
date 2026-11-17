@@ -16,7 +16,7 @@
 
 - Workflow: `.github/workflows/docker.yml`
 - Location: `.github/workflows/docker.yml:4:3`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-concurrency`
 - Message: The workflow has no workflow-level or job-level concurrency setting.

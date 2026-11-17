@@ -1,5 +1,7 @@
 # `missing-concurrency`
 
+Reported as a warning in default strict mode.
+
 Detects heavy workflows that do not define workflow-level or job-level `concurrency`.
 
 Why this rule exists:

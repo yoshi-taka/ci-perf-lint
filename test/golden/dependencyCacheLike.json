@@ -1,7 +1,7 @@
 [
   {
     "ruleId": "missing-paths-filter",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "high",
     "docsPath": "docs/rules/missing-paths-filter.md",
     "workflow": ".github/workflows/cache.yml",
@@ -19,7 +19,7 @@
   },
   {
     "ruleId": "missing-path-ignore-for-non-code",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "high",
     "docsPath": "docs/rules/missing-path-ignore-for-non-code.md",
     "workflow": ".github/workflows/cache.yml",
@@ -37,7 +37,7 @@
   },
   {
     "ruleId": "missing-concurrency",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "high",
     "docsPath": "docs/rules/missing-concurrency.md",
     "workflow": ".github/workflows/cache.yml",
@@ -145,7 +145,7 @@
   },
   {
     "ruleId": "missing-timeout-minutes",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "medium",
     "docsPath": "docs/rules/missing-timeout-minutes.md",
     "workflow": ".github/workflows/cache.yml",
@@ -163,7 +163,7 @@
   },
   {
     "ruleId": "missing-timeout-minutes",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "medium",
     "docsPath": "docs/rules/missing-timeout-minutes.md",
     "workflow": ".github/workflows/cache.yml",
@@ -181,7 +181,7 @@
   },
   {
     "ruleId": "missing-timeout-minutes",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "medium",
     "docsPath": "docs/rules/missing-timeout-minutes.md",
     "workflow": ".github/workflows/cache.yml",
@@ -199,7 +199,7 @@
   },
   {
     "ruleId": "missing-timeout-minutes",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "medium",
     "docsPath": "docs/rules/missing-timeout-minutes.md",
     "workflow": ".github/workflows/cache.yml",

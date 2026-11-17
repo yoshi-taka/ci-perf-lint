@@ -22,7 +22,7 @@ describe("analyzeRepository Buildkite pipeline rules", () => {
     const report = await getFixtureReport(fixtures.buildkiteTimeoutLike, {
       targetPath: ".",
       topCount: 10,
-      mode: "exploratory",
+      mode: "strict",
     });
 
     const ruleIds = report.findings.map((finding) => finding.ruleId);
@@ -34,6 +34,7 @@ describe("analyzeRepository Buildkite pipeline rules", () => {
       (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
     );
     expect(timeoutFinding).toBeDefined();
+    expect(timeoutFinding?.severity).toBe("warning");
     expect(timeoutFinding?.message).toContain("timeout_in_minutes");
   });
 

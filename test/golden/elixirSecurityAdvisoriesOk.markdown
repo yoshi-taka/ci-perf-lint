@@ -4,7 +4,7 @@
 
 - Workflow: `.github/workflows/elixir-ci.yml`
 - Location: `.github/workflows/elixir-ci.yml:3:5`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-paths-filter`
 - Message: This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.
@@ -16,7 +16,7 @@
 
 - Workflow: `.github/workflows/elixir-ci.yml`
 - Location: `.github/workflows/elixir-ci.yml:3:5`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-path-ignore-for-non-code`
 - Message: No docs or markdown-oriented paths-ignore rule was found for push/pull_request.
@@ -64,7 +64,7 @@
 
 - Workflow: `.github/workflows/elixir-ci.yml`
 - Location: `.github/workflows/elixir-ci.yml:10:3`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `medium`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-timeout-minutes`
 - Message: Job "ci" does not define job-level timeout-minutes.

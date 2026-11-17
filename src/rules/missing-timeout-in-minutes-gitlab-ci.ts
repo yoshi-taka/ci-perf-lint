@@ -5,7 +5,7 @@ import { buildDiagnostic } from "./shared/diagnostics.ts";
 
 const meta = {
   id: "missing-timeout-in-minutes-gitlab-ci",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/missing-timeout-in-minutes-gitlab-ci.md",
   scope: "gitlab-ci",
@@ -44,7 +44,6 @@ export const missingTimeoutInMinutesGitlabCiRule = {
       const node = job.nameNode ?? job.node;
       findings.push(
         buildDiagnostic(doc, meta, node, {
-          severity: "warning",
           message: `Job "${job.name}" does not define timeout.`,
           why: "GitLab CI uses a project-level default timeout (60 minutes). Heavy jobs should explicitly declare a timeout to prevent runaway builds and wasted CI minutes.",
           suggestion: `Add a timeout to the job, e.g. timeout: 30m.`,

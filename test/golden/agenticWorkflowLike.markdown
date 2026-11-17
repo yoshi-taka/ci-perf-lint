@@ -4,7 +4,7 @@
 
 - Workflow: `.github/workflows/claude-review.yml`
 - Location: `.github/workflows/claude-review.yml:4:3`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-paths-filter`
 - Message: This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.
@@ -16,7 +16,7 @@
 
 - Workflow: `.github/workflows/claude-review.yml`
 - Location: `.github/workflows/claude-review.yml:4:3`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-path-ignore-for-non-code`
 - Message: No docs or markdown-oriented paths-ignore rule was found for push/pull_request.

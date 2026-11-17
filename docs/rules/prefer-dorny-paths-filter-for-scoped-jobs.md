@@ -1,5 +1,7 @@
 # `prefer-dorny-paths-filter-for-scoped-jobs`
 
+Reported as a warning in default strict mode.
+
 Detects workflows where multiple heavy component-scoped jobs run on broad PR or branch push triggers without a visible `dorny/paths-filter` gate.
 
 Why this rule exists:

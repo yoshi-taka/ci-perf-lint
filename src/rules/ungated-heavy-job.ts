@@ -1,5 +1,5 @@
 import type { RuleMeta } from "../types.ts";
-import type { WorkflowDocument } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import {
   hasDirectHeavySignals,
@@ -7,11 +7,7 @@ import {
   workflowHasConcurrency,
   workflowJobCount,
 } from "./shared/workflow-jobs.ts";
-import {
-  workflowHasPullRequestTrigger,
-  workflowHasPushTrigger,
-  workflowHasTriggerPathFilter,
-} from "./shared/workflow-triggers.ts";
+import { getTriggerFacts } from "./shared/trigger-facts.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
@@ -21,10 +17,50 @@ const looksLargeOrComplex = selectSignal((s) => s.looksLargeOrComplex);
 
 const meta = {
   id: "ungated-heavy-job",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/ungated-heavy-job.md",
 } satisfies RuleMeta;
+
+function condition(job: WorkflowJob): string {
+  const value = job.raw.if;
+  return typeof value === "string"
+    ? value
+        .trim()
+        .replace(/^\$\{\{([\s\S]*)\}\}$/, "$1")
+        .replace(/\s+/g, "")
+        .toLowerCase()
+    : typeof value === "boolean"
+      ? String(value)
+      : value == null
+        ? ""
+        : "unknown";
+}
+
+function hasJobFilter(
+  job: WorkflowJob,
+  jobs: Map<string, WorkflowJob>,
+  seen = new Set<string>(),
+): boolean {
+  if (seen.has(job.id)) {
+    return false;
+  }
+  seen.add(job.id);
+  const expression = condition(job);
+  if (expression && !["true", "success()", "always()"].includes(expression)) {
+    return true;
+  }
+  // always() overrides the default dependency-success requirement.
+  if (expression === "always()") {
+    return false;
+  }
+  const needs = job.raw.needs;
+  const dependencies = typeof needs === "string" ? [needs] : Array.isArray(needs) ? needs : [];
+  return dependencies.some((id) => {
+    const upstream = typeof id === "string" ? jobs.get(id) : undefined;
+    return upstream ? hasJobFilter(upstream, jobs, seen) : false;
+  });
+}
 
 export const ungatedHeavyJobRule = {
   meta,
@@ -33,12 +69,27 @@ export const ungatedHeavyJobRule = {
       return [];
     }
 
-    if (!workflowHasPullRequestTrigger(workflow) && !workflowHasPushTrigger(workflow)) {
+    const triggers = getTriggerFacts(workflow);
+    if (!triggers.hasPullRequest && !triggers.hasPush) {
+      return [];
+    }
+    // This rule asks only whether filtering exists, not whether it is optimal.
+    // Component-specific filtering opportunities belong to the scoped-job rule.
+    if (
+      triggers.hasTriggerPathFilter ||
+      triggers.push.hasBranches ||
+      triggers.push.hasBranchesIgnore ||
+      triggers.push.hasTags ||
+      triggers.push.hasTagsIgnore ||
+      triggers.pullRequest.hasBranches ||
+      triggers.pullRequest.hasBranchesIgnore
+    ) {
       return [];
     }
 
+    const jobs = new Map(workflow.jobs.map((job) => [job.id, job]));
     return workflow.jobs
-      .filter((job) => isHeavyJob(job) && hasDirectHeavySignals(job) && !job.hasIf)
+      .filter((job) => isHeavyJob(job) && hasDirectHeavySignals(job) && !hasJobFilter(job, jobs))
       .map((job) =>
         pipe(
           withStackedDiffContext(context, {
@@ -49,10 +100,8 @@ export const ungatedHeavyJobRule = {
           }),
         )(
           buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
-            message: `Job "${job.id}" looks heavy and has no visible job-level gating.`,
-            why: `Expensive jobs can still run on changes that do not need them, even when workflow-level safeguards such as ${
-              workflowHasTriggerPathFilter(workflow) ? "trigger filters" : "broad triggers"
-            } or ${workflowHasConcurrency(workflow) ? "concurrency" : "missing concurrency"} are present.`,
+            message: `Job "${job.id}" looks heavy, but no workflow branch/tag/path filter or job execution filter is visible.`,
+            why: "Neither the workflow triggers nor this job's execution path narrow which branches or changes run the heavy work. Concurrency can stop stale runs, but does not select relevant changes.",
             suggestion:
               "Review whether this job should be narrowed by branch, event, paths, or another condition.",
             measurementHint:
@@ -60,7 +109,6 @@ export const ungatedHeavyJobRule = {
             aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and add safe gating only if the job does not need to run for every event. This suggestion is prioritized because the repository looks large or CI-complex.`,
             score:
               78 -
-              (workflowHasTriggerPathFilter(workflow) ? 12 : 0) -
               (workflowHasConcurrency(workflow) ? 8 : 0) -
               (workflowJobCount(workflow) > 6 ? 8 : 0),
           }),

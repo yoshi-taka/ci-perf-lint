@@ -13,7 +13,7 @@ import { workflowFact } from "./shared/predicate.ts";
 
 const meta = {
   id: "duplicate-install-or-lint",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/duplicate-install-or-lint.md",
   skipIf: workflowFact("looksMetaCheckLike", true),

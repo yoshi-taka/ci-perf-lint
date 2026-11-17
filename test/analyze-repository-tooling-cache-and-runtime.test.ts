@@ -199,7 +199,7 @@ describe("analyzeRepository repo-aware and tooling rules: cache and runtime", ()
     );
 
     expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("suggestion");
+    expect(finding?.severity).toBe("warning");
     expect(finding?.message).toContain("shard-like matrix keys");
     expect(finding?.suggestion).toContain("jest --shard");
   });

@@ -14,7 +14,7 @@ import {
 
 const meta = {
   id: "missing-path-ignore-for-non-code",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/missing-path-ignore-for-non-code.md",
   requiredFeatures: {

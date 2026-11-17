@@ -4,7 +4,7 @@
 
 - Workflow: `.github/workflows/ci.yml`
 - Location: `.github/workflows/ci.yml:4:3`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-paths-filter`
 - Message: This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.
@@ -16,7 +16,7 @@
 
 - Workflow: `.github/workflows/ci.yml`
 - Location: `.github/workflows/ci.yml:4:3`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-path-ignore-for-non-code`
 - Message: No docs or markdown-oriented paths-ignore rule was found for push/pull_request.
@@ -28,7 +28,7 @@
 
 - Workflow: `.github/workflows/ci.yml`
 - Location: `.github/workflows/ci.yml:4:3`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-concurrency`
 - Message: The workflow has no workflow-level or job-level concurrency setting.
@@ -52,7 +52,7 @@
 
 - Workflow: `.github/workflows/ci.yml`
 - Location: `.github/workflows/ci.yml:7:3`
-- Severity: `suggestion`
+- Severity: `warning`
 - Confidence: `medium`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-timeout-minutes`
 - Message: Job "build_native" does not define job-level timeout-minutes.

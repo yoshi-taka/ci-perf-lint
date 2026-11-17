@@ -25,6 +25,19 @@ const files = (source: string, extra: Record<string, string> = {}) => ({
 
 const scenarios: ShellEvidenceScenario[] = [
   {
+    name: "matching build command evidence",
+    command: "npm run build",
+    build: (run) => {
+      const job = { "runs-on": "ubuntu-latest", steps: [{ uses: "actions/checkout@v4" }, { run }] };
+      return files(
+        stringify({ name: "CI", on: "pull_request", jobs: { first: job, second: job } }),
+      );
+    },
+    expectations: [
+      { id: "repeated-build-in-same-workflow", severity: "warning", count: 1, literalCount: 0 },
+    ],
+  },
+  {
     name: "portable runner safety",
     command: "ruff check .",
     build: (run) => files(workflow([{ run }])),
@@ -65,10 +78,10 @@ const scenarios: ShellEvidenceScenario[] = [
         }),
       ),
     expectations: [
-      { id: "missing-paths-filter", severity: "suggestion", count: 1 },
-      { id: "missing-path-ignore-for-non-code", severity: "suggestion", count: 1 },
-      { id: "duplicate-install-or-lint", severity: "suggestion", count: 1 },
-      { id: "missing-timeout-minutes", severity: "suggestion", count: 2 },
+      { id: "missing-paths-filter", severity: "warning", count: 1 },
+      { id: "missing-path-ignore-for-non-code", severity: "warning", count: 1 },
+      { id: "duplicate-install-or-lint", severity: "warning", count: 1 },
+      { id: "missing-timeout-minutes", severity: "warning", count: 2 },
     ],
   },
   {

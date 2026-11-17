@@ -157,6 +157,8 @@ const fixtureNames = {
   huskyComplexLike: "husky-complex-like",
   huskyLike: "husky-like",
   huskyModernLike: "husky-modern-like",
+  ineffectiveConcurrencyGroupLike: "ineffective-concurrency-group-like",
+  ungatedHeavyJobLike: "ungated-heavy-job-like",
   iamtrailLike: "iamtrail-like",
   importPluginLike: "import-plugin-like",
   importXLike: "import-x-like",

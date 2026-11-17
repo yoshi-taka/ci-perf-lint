@@ -239,13 +239,13 @@ describe("analyzeRepository repo-aware and tooling rules: python repository diag
         cwd: fixtureRoot,
         targetPath: ".",
         topCount: 20,
-        mode: "exploratory",
+        mode: "strict",
       });
 
       const finding = report.findings.find((c) => c.ruleId === "pytest-norecursedirs-override");
       expect(finding).toBeDefined();
       expect(finding?.scope).toBe("repository");
-      expect(finding?.severity).toBe("suggestion");
+      expect(finding?.severity).toBe("warning");
       expect(finding?.confidence).toBe("high");
       expect(finding?.docsPath).toBe("docs/rules/pytest-norecursedirs-override.md");
       expect(finding?.location.path).toBe("pytest.ini");

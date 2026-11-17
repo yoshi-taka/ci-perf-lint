@@ -215,9 +215,9 @@ jobs:
 
     const ruleIds = new Set(report.findings.map((finding) => finding.ruleId));
 
-    expect(ruleIds.has("missing-concurrency")).toBe(false);
-    expect(ruleIds.has("missing-paths-filter")).toBe(false);
-    expect(ruleIds.has("missing-path-ignore-for-non-code")).toBe(false);
+    expect(ruleIds.has("missing-concurrency")).toBe(true);
+    expect(ruleIds.has("missing-paths-filter")).toBe(true);
+    expect(ruleIds.has("missing-path-ignore-for-non-code")).toBe(true);
     expect(ruleIds.has("missing-dependency-cache")).toBe(false);
     expect(ruleIds.has("ungated-heavy-job")).toBe(false);
   });

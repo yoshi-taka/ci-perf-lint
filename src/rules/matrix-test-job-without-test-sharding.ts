@@ -11,7 +11,7 @@ import { declaredShellEnvironmentNames } from "./shared/shell-environment-eviden
 
 const meta = {
   id: "matrix-test-job-without-test-sharding",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/matrix-test-job-without-test-sharding.md",
 } satisfies RuleMeta;

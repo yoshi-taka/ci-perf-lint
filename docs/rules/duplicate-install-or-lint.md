@@ -1,5 +1,7 @@
 # `duplicate-install-or-lint`
 
+Reported as a warning in default strict mode.
+
 Detects non-matrix jobs that repeat the same dependency install and lint combination within one workflow.
 
 Printed/commented meta-tool names do not exempt repeated real installs and lint runs. Actual meta commands/actions and meaningful workflow/job intent remain exclusion signals.

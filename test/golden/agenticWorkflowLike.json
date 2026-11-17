@@ -1,7 +1,7 @@
 [
   {
     "ruleId": "missing-paths-filter",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "high",
     "docsPath": "docs/rules/missing-paths-filter.md",
     "workflow": ".github/workflows/claude-review.yml",
@@ -19,7 +19,7 @@
   },
   {
     "ruleId": "missing-path-ignore-for-non-code",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "high",
     "docsPath": "docs/rules/missing-path-ignore-for-non-code.md",
     "workflow": ".github/workflows/claude-review.yml",

@@ -26,7 +26,7 @@ import {
 
 const meta = {
   id: "missing-timeout-minutes",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/missing-timeout-minutes.md",
 } satisfies RuleMeta;
@@ -85,12 +85,6 @@ export const missingTimeoutMinutesRule = {
           }),
         )(
           buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
-            severity:
-              (workflowLooksReleaseLike(workflow, job) ||
-                workflowLooksAgenticLike(workflow, job)) &&
-              !jobHasHeavyStepTimeout(job)
-                ? "warning"
-                : undefined,
             message: `Job "${job.id}" does not define job-level timeout-minutes.`,
             why: jobHasHeavyStepTimeout(job)
               ? "This job already times out at least one heavy step, but without a job-level timeout the rest of the job still falls back to the platform default timeout."

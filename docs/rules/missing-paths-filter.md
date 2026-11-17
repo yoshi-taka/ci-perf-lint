@@ -1,5 +1,7 @@
 # `missing-paths-filter`
 
+Reported as a warning in default strict mode.
+
 Detects heavy workflows that respond to `push` or `pull_request` without `paths` or `paths-ignore`.
 
 Meta-workflow exclusions use executable tool/task identities, action references, and meaningful workflow/job intent. Printed examples, comments, and unrelated command arguments cannot turn a real build/lint workflow into a meta workflow and suppress this finding.

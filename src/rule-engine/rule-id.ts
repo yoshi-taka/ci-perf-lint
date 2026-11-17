@@ -42,6 +42,7 @@ export const RULE_REGISTRY = {
   "go-test-broad-package-serial-p-one": { kind: "workflow" },
   "go-test-repeats-vet-after-go-vet": { kind: "workflow" },
   "hatch-without-uv-installer": { kind: "workflow" },
+  "ineffective-concurrency-group": { kind: "workflow" },
   "missing-angular-cli-cache": { kind: "workflow" },
   "missing-concurrency": { kind: "workflow" },
   "missing-dependency-cache": { kind: "workflow" },

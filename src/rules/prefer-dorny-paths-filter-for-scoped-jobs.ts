@@ -13,7 +13,7 @@ function isYamlMap(node: unknown): node is YAMLMap<unknown, unknown> {
 
 const meta = {
   id: "prefer-dorny-paths-filter-for-scoped-jobs",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/prefer-dorny-paths-filter-for-scoped-jobs.md",
 } satisfies RuleMeta;

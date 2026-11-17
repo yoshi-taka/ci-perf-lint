@@ -164,7 +164,7 @@ describe("workflow audit: compatibility and component scope", () => {
         "test-failed": { "runs-on": "ubuntu-slim", steps: [{ run: 'echo "Build Failed"' }] },
         lint: { "runs-on": "ubuntu-latest", steps: [{ run: "pnpm run lint" }] },
       },
-      { id: "prefer-dorny-paths-filter-for-scoped-jobs", severity: "suggestion" },
+      { id: "prefer-dorny-paths-filter-for-scoped-jobs", severity: "warning" },
       { "pnpm-workspace.yaml": "packages:\n  - apps/*\n" },
     );
     expect(findings).toHaveLength(0);
@@ -176,7 +176,7 @@ describe("workflow audit: compatibility and component scope", () => {
         backend: { "runs-on": "ubuntu-latest", steps: [{ run: "pnpm run test:api" }] },
         frontend: { "runs-on": "ubuntu-latest", steps: [{ run: "pnpm run test:web" }] },
       },
-      { id: "prefer-dorny-paths-filter-for-scoped-jobs", severity: "suggestion" },
+      { id: "prefer-dorny-paths-filter-for-scoped-jobs", severity: "warning" },
     );
     expect(findings).toHaveLength(1);
     expect(findings[0]?.message).toContain('"backend"');

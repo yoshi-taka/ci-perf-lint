@@ -22,7 +22,7 @@ describe("analyzeRepository GitLab CI rules", () => {
     const report = await getFixtureReport(fixtures.gitlabCiTimeoutLike, {
       targetPath: ".",
       topCount: 10,
-      mode: "exploratory",
+      mode: "strict",
     });
 
     const ruleIds = report.findings.map((finding) => finding.ruleId);
@@ -34,6 +34,7 @@ describe("analyzeRepository GitLab CI rules", () => {
       (finding) => finding.ruleId === "missing-timeout-in-minutes-gitlab-ci",
     );
     expect(timeoutFinding).toBeDefined();
+    expect(timeoutFinding?.severity).toBe("warning");
     expect(timeoutFinding?.message).toContain("timeout");
   });
 

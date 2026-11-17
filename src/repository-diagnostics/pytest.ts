@@ -14,7 +14,7 @@ const testpathsMeta = {
 
 const norecursedirsMeta = {
   id: "pytest-norecursedirs-override",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/pytest-norecursedirs-override.md",
 } satisfies RuleMeta;

@@ -406,11 +406,11 @@ describe("analyzeRepository workflow and execution rules: release and scope", ()
     expect(findings.some((f) => f.message.includes('job "publish"'))).toBe(true);
   });
 
-  test("keeps missing-timeout-minutes advisory when a heavy step already has its own timeout", async () => {
+  test("warns in strict mode when a heavy step has a timeout but its job does not", async () => {
     const report = await getFixtureReport(fixtures.stepTimeoutOnlyLike, {
       targetPath: ".",
       topCount: 20,
-      mode: "exploratory",
+      mode: "strict",
     });
 
     const finding = report.findings.find(
@@ -418,7 +418,7 @@ describe("analyzeRepository workflow and execution rules: release and scope", ()
     );
 
     expect(report.workflowCount).toBe(1);
-    expect(finding?.severity).toBe("suggestion");
+    expect(finding?.severity).toBe("warning");
     expect(finding?.message).toContain("job-level timeout-minutes");
     expect(finding?.why).toContain("already times out at least one heavy step");
   });

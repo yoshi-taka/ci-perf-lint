@@ -1,0 +1,12 @@
+name: Apps
+on: [pull_request, push]
+concurrency:
+  group: apps-${{ github.run_id }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test

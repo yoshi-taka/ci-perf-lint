@@ -37,7 +37,7 @@
   },
   {
     "ruleId": "missing-concurrency",
-    "severity": "suggestion",
+    "severity": "warning",
     "confidence": "high",
     "docsPath": "docs/rules/missing-concurrency.md",
     "workflow": ".github/workflows/docker.yml",

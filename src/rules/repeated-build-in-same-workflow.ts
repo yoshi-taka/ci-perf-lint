@@ -2,19 +2,12 @@ import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { detectBuildTool } from "./shared/tools.ts";
 import { jobHasMatrix } from "./shared/workflow-jobs.ts";
-import {
-  buildStepSequence,
-  computePairProximity,
-  type StepPosition,
-} from "./shared/step-proximity.ts";
-
-const REPEATED_PROXIMITY_THRESHOLD = 0.3;
+import { comparableBuilds } from "./shared/repeated-build-context.ts";
 
 const meta = {
   id: "repeated-build-in-same-workflow",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/repeated-build-in-same-workflow.md",
 } satisfies RuleMeta;
@@ -22,78 +15,41 @@ const meta = {
 interface BuildOccurrence {
   jobId: string;
   step: WorkflowStep;
-  position: StepPosition;
+  tool: string;
 }
 
 export const repeatedBuildInSameWorkflowRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
-    const seq = buildStepSequence(workflow);
-    const positionByJobStep = new Map<string, StepPosition>();
-    for (const pos of seq.positions) {
-      positionByJobStep.set(`${pos.jobId}:${pos.jobStepIndex}`, pos);
-    }
-
-    const occurrencesByTool = new Map<string, BuildOccurrence[]>();
+    const occurrencesByInputs = new Map<string, Map<string, BuildOccurrence>>();
 
     for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow || jobHasMatrix(job)) {
         continue;
       }
 
-      const seenTools = new Set<string>();
-
-      for (let stepIdx = 0; stepIdx < job.steps.length; stepIdx++) {
-        const step = job.steps[stepIdx]!;
-        const tool = detectBuildTool(step);
-        if (!tool || seenTools.has(tool)) {
-          continue;
-        }
-
-        seenTools.add(tool);
-        const pos = positionByJobStep.get(`${job.id}:${stepIdx}`);
-        if (!pos) {
-          continue;
-        }
-
-        const occurrences = occurrencesByTool.get(tool) ?? [];
-        occurrences.push({ jobId: job.id, step, position: pos });
-        occurrencesByTool.set(tool, occurrences);
+      for (const { key, step, tool } of comparableBuilds(workflow, job)) {
+        const occurrences = occurrencesByInputs.get(key) ?? new Map<string, BuildOccurrence>();
+        occurrences.set(job.id, { jobId: job.id, step, tool });
+        occurrencesByInputs.set(key, occurrences);
       }
     }
 
-    return [...occurrencesByTool.entries()]
-      .filter(([, occurrences]) => {
-        if (occurrences.length < 2) {
-          return false;
-        }
-        let maxProx = 0;
-        for (let i = 0; i < occurrences.length; i++) {
-          for (let j = i + 1; j < occurrences.length; j++) {
-            const prox = computePairProximity(
-              occurrences[i]!.position,
-              occurrences[j]!.position,
-              seq.boundaries,
-            );
-            if (prox > maxProx) {
-              maxProx = prox;
-            }
-          }
-        }
-        return maxProx >= REPEATED_PROXIMITY_THRESHOLD;
-      })
-      .map(([tool, occurrences]) => {
+    return [...occurrencesByInputs.values()]
+      .filter((occurrences) => occurrences.size >= 2)
+      .map((group) => {
+        const occurrences = [...group.values()];
         const jobIds = occurrences.map((occ) => occ.jobId).sort();
         const first = occurrences[0]!;
 
         return buildDiagnostic(workflow, meta, first.step.runNode ?? first.step.node, {
-          message: `${tool} appears in multiple jobs (${jobIds.join(", ")}) within the same workflow.`,
-          why: "Repeating the same build family across jobs can increase total runner time without adding new coverage.",
+          message: `Jobs (${jobIds.join(", ")}) repeat the same ${first.tool} command with matching visible build inputs.`,
+          why: "Checkout, working directory, command, runner, setup sequence and environment match. Rebuilding may repeat work, but this does not prove artifact equivalence or that downstream validation is redundant.",
           suggestion:
-            "Confirm whether the repeated build paths are intentionally different, or whether one shared build output would be enough.",
+            "Consider sharing build artifacts while preserving each job's downstream tests and isolation. Compare artifact upload/download overhead with the avoided build time.",
           measurementHint:
             "Compare workflow duration and runner minutes after removing or consolidating one duplicated build path.",
-          aiHandoff: `Review repeated ${tool} execution in ${workflow.relativePath} across jobs ${jobIds.join(", ")} and consolidate only if the outputs are truly overlapping.`,
+          aiHandoff: `Review matching ${first.tool} build inputs in ${workflow.relativePath} jobs ${jobIds.join(", ")}. Share outputs only after verifying artifact compatibility, preserving downstream checks, and measuring total runner time.`,
           score: 59,
         });
       });

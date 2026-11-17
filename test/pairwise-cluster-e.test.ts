@@ -64,8 +64,8 @@ function expectedClusterERules(p: Params): Set<string> {
     expected.add("missing-timeout-minutes");
   }
 
-  // ungated-heavy-job: push/PR + heavy job + no if, when repo looks large
-  if (hasPushOrPR && p.heavyJob && !p.jobHasIf) {
+  // ungated-heavy-job: no workflow path filter and no job condition.
+  if (hasPushOrPR && p.heavyJob && !p.jobHasIf && !p.hasPathsFilter) {
     expected.add("ungated-heavy-job");
   }
 

@@ -10,7 +10,7 @@ import {
 
 const meta = {
   id: "missing-timeout-in-minutes-buildkite",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "medium",
   docsPath: "docs/rules/missing-timeout-in-minutes-buildkite.md",
   scope: "buildkite",
@@ -65,7 +65,6 @@ export const missingTimeoutInMinutesBuildkiteRule = {
         const node = step.labelNode ?? step.commandNode ?? step.node;
         findings.push(
           buildDiagnostic(pipeline, meta, node, {
-            severity: "warning",
             message: `Step "${step.label ?? step.key ?? "unnamed"}" does not define timeout_in_minutes.`,
             why: "Buildkite has no default timeout. Without timeout_in_minutes, a hung or degraded step can run indefinitely and consume agent capacity.",
             suggestion: `Add timeout_in_minutes to the step to prevent unbounded execution.`,

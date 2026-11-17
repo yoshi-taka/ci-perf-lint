@@ -1,5 +1,7 @@
 # missing-timeout-in-minutes-gitlab-ci
 
+Reported as a warning in default strict mode.
+
 GitLab CI jobs use a project-level default timeout (60 minutes). Heavy jobs should use an explicit `timeout` to prevent runaway builds and wasted CI minutes.
 
 ## Why this matters

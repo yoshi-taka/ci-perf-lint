@@ -16,7 +16,7 @@ import { workflowFact, or } from "./shared/predicate.ts";
 
 const meta = {
   id: "missing-paths-filter",
-  severity: "suggestion",
+  severity: "warning",
   confidence: "high",
   docsPath: "docs/rules/missing-paths-filter.md",
   skipIf: or(workflowFact("isHeavyWorkflow", false), workflowFact("looksMetaCheckLike", true)),

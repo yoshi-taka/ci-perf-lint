@@ -1,5 +1,7 @@
 # pytest norecursedirs is explicitly set, overriding defaults
 
+Reported as a warning in default strict mode.
+
 ## What it detects
 
 The project has `norecursedirs` explicitly set in a pytest config file **and**

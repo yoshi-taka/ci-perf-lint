@@ -58,7 +58,7 @@ describe("timeout workload evidence", () => {
   });
 
   test.each(["echo 'claude review'", "# claude review\necho audit", "grep 'codex exec' README.md"])(
-    "logs do not upgrade a real lint job: %s",
+    "logs do not turn a real lint job into agentic work: %s",
     async (run) => {
       const { report, facts } = await scan(
         [{ run: "pip install ruff" }, { run: "ruff check ." }, { run }],
@@ -67,7 +67,7 @@ describe("timeout workload evidence", () => {
         "lint",
       );
       const finding = report.findings.find((f) => f.ruleId === timeoutRule);
-      expect(finding?.severity).toBe("suggestion");
+      expect(finding?.severity).toBe("warning");
       expect(finding?.why).not.toContain("AI-assisted");
       expect(facts.looksAgenticLike).toBe(false);
     },
@@ -166,7 +166,7 @@ describe("timeout workload evidence", () => {
       "Release",
     );
     const finding = report.findings.find((f) => f.ruleId === timeoutRule);
-    expect(finding?.severity).toBe("suggestion");
+    expect(finding?.severity).toBe("warning");
     expect(finding?.why).toContain("already times out");
   });
 });

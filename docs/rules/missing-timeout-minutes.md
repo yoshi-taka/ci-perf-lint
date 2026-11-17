@@ -1,5 +1,7 @@
 # `missing-timeout-minutes`
 
+Reported as a warning in default strict mode, including when a heavy step has its own timeout.
+
 Detects non-matrix jobs of interest that do not define job-level `timeout-minutes`.
 
 Why this rule exists:
