@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import path from "node:path";
 import type { ResolvedMutationConfig } from "./config.ts";
 import { applyMutant } from "./apply.ts";
+import { deriveTestCommands } from "./test-selection.ts";
+import { runHarnessMutation, supportsHarness } from "./harness.ts";
 import { generateMutants, type Mutant, type MutatorName } from "./mutators.ts";
 
 export type MutantStatus = "Killed" | "Survived" | "Timeout";
@@ -44,6 +46,10 @@ export interface RunOptions {
   forceSandbox?: boolean;
   /** Number of mutants to run concurrently. Values above 1 force sandboxes. */
   jobs?: number;
+  /** Narrow each mutant's test command to tests importing its target file. */
+  testSelection?: boolean;
+  /** Run tests through the persistent in-process harness. */
+  harness?: boolean;
   onProgress?: (done: number, total: number, mutant: LocatedMutant) => void;
   log?: (message: string) => void;
 }
@@ -145,7 +151,40 @@ export async function runMutationConfig(
     );
   }
 
+  const selectionEnabled = options.testSelection !== false;
+  const commandsByTarget = selectionEnabled
+    ? await deriveTestCommands(
+        config.command,
+        config.targets.map((target) => target.file),
+        projectRoot,
+      )
+    : new Map(config.targets.map((target) => [target.file, config.command]));
   const jobs = Math.max(1, Math.floor(options.jobs ?? 1));
+  if (
+    options.harness !== false &&
+    process.env.MUTATION_HARNESS !== "0" &&
+    supportsHarness(config, sources)
+  ) {
+    try {
+      const summary = await runHarnessMutation({
+        config,
+        projectRoot,
+        mutants: generated,
+        sources,
+        unsupportedSites,
+        regexSites,
+        options,
+        commandsByTarget,
+        jobs,
+      });
+      if (config.jsonFile) {
+        await writeJsonReport(config, summary, projectRoot);
+      }
+      return summary;
+    } catch (error) {
+      log(`[mutation:${config.name}] harness unavailable: ${String(error)}`);
+    }
+  }
   const useSandbox = !config.inPlace || options.forceSandbox === true || jobs > 1;
   const tempRoot = path.resolve(projectRoot, config.tempDirName);
   if (useSandbox && config.cleanTempDir) {
@@ -180,7 +219,7 @@ export async function runMutationConfig(
         config.command,
         workspaces[0]!.dir,
         Math.max(config.timeoutMS * 20, 60_000),
-        { TMPDIR: baselineTmp },
+        { TMPDIR: baselineTmp, CI_PERF_LINT_TEST_TMP: baselineTmp },
       );
     } finally {
       await rm(baselineTmp, { recursive: true, force: true });
@@ -219,9 +258,12 @@ export async function runMutationConfig(
           const commandStartedAt = Date.now();
           let result: CommandResult;
           try {
-            result = await runCommand(config.command, workspace.dir, config.timeoutMS, {
-              TMPDIR: mutantTmp,
-            });
+            result = await runCommand(
+              commandsByTarget.get(mutant.file) ?? config.command,
+              workspace.dir,
+              config.timeoutMS,
+              { TMPDIR: mutantTmp, CI_PERF_LINT_TEST_TMP: mutantTmp },
+            );
           } finally {
             await workspace.write(mutant.file, source);
           }

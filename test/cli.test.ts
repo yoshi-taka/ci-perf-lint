@@ -1,6 +1,6 @@
+import { testTempRoot } from "./temp-root.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { runCli } from "../src/main.ts";
 import { fixtures } from "./fixtures.ts";
@@ -41,7 +41,7 @@ describe("runCli", () => {
 
   test("returns an error for a missing target path with show-workflows", async () => {
     const { logger, lines, errors } = createLogger();
-    const missingPath = path.join(os.tmpdir(), "apl-missing-show-workflows-path");
+    const missingPath = path.join(testTempRoot(), "apl-missing-show-workflows-path");
 
     const exitCode = await runCli(["--show-workflows", missingPath], process.cwd(), logger);
 
@@ -224,7 +224,7 @@ describe("runCli", () => {
 
   test("returns an error for a missing target path", async () => {
     const { logger, lines, errors } = createLogger();
-    const missingPath = path.join(os.tmpdir(), "apl-missing-target-path");
+    const missingPath = path.join(testTempRoot(), "apl-missing-target-path");
 
     const exitCode = await runCli([missingPath], process.cwd(), logger);
 

@@ -1,6 +1,6 @@
+import { testTempRoot } from "./temp-root.ts";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
 import { expect } from "bun:test";
 import type { Diagnostic, Severity, Confidence } from "../src/types.ts";
 
@@ -144,7 +144,7 @@ export function expectEveryPlatformHasFindings(findings: Diagnostic[], ruleId: s
 export async function makeEquivalentWorkflowFixtures(
   config: CrossPlatformFixtureConfig,
 ): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "cross-platform-invariant-"));
+  const dir = await mkdtemp(path.join(testTempRoot(), "cross-platform-invariant-"));
   const dockerImage = config.dockerImage ?? "node:22";
   const jobName = config.jobName ?? "ci";
   const steps = config.steps;

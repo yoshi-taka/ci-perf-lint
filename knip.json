@@ -22,6 +22,9 @@
     ],
     "src/rules/shared/evidence-propagation.ts": [
       "exports"
+    ],
+    "src/mutation/harness-runtime.ts": [
+      "exports"
     ]
   },
   "ignoreExportsUsedInFile": true,
@@ -33,7 +36,8 @@
         "bench/source-memory/run.ts",
         "fuzz/**/*.mjs",
         "test/**/*.test.ts",
-        "stryker/stryker.*.config.mjs"
+        "stryker/stryker.*.config.mjs",
+        "src/mutation/harness-child.ts"
       ]
     },
     "site": {

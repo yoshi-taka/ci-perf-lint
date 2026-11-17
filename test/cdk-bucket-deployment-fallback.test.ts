@@ -1,6 +1,6 @@
+import { testTempRoot } from "./temp-root.ts";
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 import { collectCdkBucketDeploymentMemoryDiagnostics } from "../src/repository-diagnostics/cdk-bucket-deployment-memory.ts";
@@ -8,7 +8,7 @@ import type { RepositorySignals } from "../src/repository-signals-types.ts";
 
 describe("cdk-bucket-deployment fallback (no rg)", () => {
   test("detects BucketDeployment via walkFiles when rg unavailable", async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "apl-cdk-"));
+    const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-cdk-"));
     try {
       await mkdir(path.join(tmpDir, ".github", "workflows"), { recursive: true });
       await mkdir(path.join(tmpDir, "lib"), { recursive: true });
@@ -47,7 +47,7 @@ describe("cdk-bucket-deployment fallback (no rg)", () => {
   });
 
   test("returns empty when no BucketDeployment usage", async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "apl-cdk-"));
+    const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-cdk-"));
     try {
       await mkdir(path.join(tmpDir, ".github", "workflows"), { recursive: true });
       await mkdir(path.join(tmpDir, "lib"), { recursive: true });

@@ -1,6 +1,6 @@
+import { testTempRoot } from "./temp-root.ts";
 import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
 import { afterAll, describe, expect, test } from "bun:test";
 import { analyzeRepository } from "../src/repo.ts";
 import { generatePairwise, type ParamSpec } from "./pairwise-utils.ts";
@@ -132,7 +132,7 @@ function makeLabel(p: Params): string {
 const tempDirs: string[] = [];
 
 async function setupFixture(p: Params): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "apl-pairwise-e-"));
+  const dir = await mkdtemp(path.join(testTempRoot(), "apl-pairwise-e-"));
   tempDirs.push(dir);
   const wfDir = path.join(dir, ".github", "workflows");
   await mkdir(wfDir, { recursive: true });

@@ -1,5 +1,5 @@
+import { testTempRoot } from "./temp-root.ts";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { analyzeRepository } from "../src/repo.ts";
 import { runCli } from "../src/main.ts";
@@ -31,7 +31,7 @@ export function createTempDirTracker() {
 
   return {
     async create(prefix: string): Promise<string> {
-      const tempDir = await mkdtemp(path.join(os.tmpdir(), prefix));
+      const tempDir = await mkdtemp(path.join(testTempRoot(), prefix));
       tempDirs.add(tempDir);
       return tempDir;
     },

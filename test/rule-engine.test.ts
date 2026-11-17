@@ -1,7 +1,7 @@
+import { testTempRoot } from "./temp-root.ts";
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
 import {
   evaluateRules,
   evaluateRulesCoarseToFine,
@@ -219,7 +219,7 @@ function fingerprintDiagnostics(diagnostics: Diagnostic[]): string[] {
 async function createWorkflowDoc(
   yaml: string,
 ): Promise<{ workflow: ReturnType<typeof parseWorkflow>; cleanup: () => Promise<void> }> {
-  const tmpDir = await mkdtemp(path.join(os.tmpdir(), "apl-rule-engine-"));
+  const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-rule-engine-"));
   const dir = path.join(tmpDir, ".github/workflows");
   await mkdir(dir, { recursive: true });
   const filePath = path.join(dir, "test.yml");

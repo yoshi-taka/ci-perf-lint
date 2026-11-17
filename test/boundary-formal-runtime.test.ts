@@ -1,7 +1,7 @@
+import { testTempRoot } from "./temp-root.ts";
 import { afterAll, expect, test } from "bun:test";
 import { rejects } from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { createFormalRunner, formalModels, runFormalCommand } from "../scripts/formal-runtime.ts";
 
@@ -11,7 +11,7 @@ afterAll(async () => {
 });
 
 async function directory() {
-  const base = path.join(tmpdir(), "opencode");
+  const base = path.join(testTempRoot(), "opencode");
   await mkdir(base, { recursive: true });
   const root = await mkdtemp(path.join(base, "formal-runtime-"));
   roots.push(root);

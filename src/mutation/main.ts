@@ -9,6 +9,8 @@ interface CliOptions {
   quiet: boolean;
   sandbox: boolean;
   jobs: number;
+  testSelection: boolean;
+  harness: boolean;
 }
 
 function defaultJobs(): number {
@@ -24,6 +26,8 @@ function parseArgs(argv: string[]): CliOptions {
     quiet: false,
     sandbox: false,
     jobs: defaultJobs(),
+    testSelection: true,
+    harness: true,
   };
   for (const argument of argv) {
     if (argument === "--list") {
@@ -34,6 +38,10 @@ function parseArgs(argv: string[]): CliOptions {
       options.quiet = true;
     } else if (argument === "--sandbox") {
       options.sandbox = true;
+    } else if (argument === "--no-test-selection") {
+      options.testSelection = false;
+    } else if (argument === "--no-harness") {
+      options.harness = false;
     } else if (argument.startsWith("--jobs=")) {
       const jobs = Number(argument.slice("--jobs=".length));
       if (!Number.isInteger(jobs) || jobs < 1) {
@@ -48,7 +56,7 @@ function parseArgs(argv: string[]): CliOptions {
   }
   if (options.configs.length === 0) {
     throw new Error(
-      "Usage: bun run src/mutation/main.ts <config...> [--list] [--sandbox] [--jobs=N] [--fail-on-survivors] [--quiet]",
+      "Usage: bun run src/mutation/main.ts <config...> [--list] [--sandbox] [--jobs=N] [--no-test-selection] [--no-harness] [--fail-on-survivors] [--quiet]",
     );
   }
   return options;
@@ -119,6 +127,8 @@ async function main(): Promise<void> {
       projectRoot,
       forceSandbox: options.sandbox,
       jobs: options.jobs,
+      testSelection: options.testSelection,
+      harness: options.harness,
       log: options.quiet ? undefined : (message) => console.log(message),
       onProgress: options.quiet
         ? undefined

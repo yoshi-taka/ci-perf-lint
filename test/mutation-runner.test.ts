@@ -1,7 +1,7 @@
+import { testTempRoot } from "./temp-root.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { rejects } from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { resolveMutationConfig, type ResolvedMutationConfig } from "../src/mutation/config.ts";
 import { runMutationConfig } from "../src/mutation/runner.ts";
@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 async function makeProject(source: string): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "ci-perf-lint-mutation-"));
+  const root = await mkdtemp(path.join(testTempRoot(), "ci-perf-lint-mutation-"));
   tempDirs.push(root);
   await mkdir(path.join(root, "src"), { recursive: true });
   await writeFile(path.join(root, "src", "value.ts"), source);
@@ -69,7 +69,7 @@ describe("mutation runner", () => {
   test("classifies timed out mutants and removes per-mutant temp dirs", async () => {
     const root = await makeProject("export const value = 1 + 1;\n");
     const command =
-      "bun -e \"const fs=require('fs');const os=require('os');if(!os.tmpdir().includes('.mutation-tmp')) process.exit(7); fs.writeFileSync(os.tmpdir()+'/leak.txt','x'); const s=fs.readFileSync('src/value.ts','utf8'); if (s.includes('1 - 1')) { await Bun.sleep(5000); }\"";
+      "bun -e \"const fs=require('fs');const root=process.env.CI_PERF_LINT_TEST_TMP;if(!root?.includes('.mutation-tmp')) process.exit(7); fs.writeFileSync(root+'/leak.txt','x'); const s=fs.readFileSync('src/value.ts','utf8'); if (s.includes('1 - 1')) { await Bun.sleep(5000); }\"";
     const summary = await runMutationConfig(configFor(root, { command, timeoutMS: 300 }));
     expect(summary.metrics.timeout).toBe(1);
     expect(await Bun.file(path.join(root, ".mutation-tmp", "test")).exists()).toBe(false);

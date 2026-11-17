@@ -1,6 +1,6 @@
+import { testTempRoot } from "./temp-root.ts";
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, cp, rm } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { collectSourceAudit } from "../src/repository-diagnostics/source-audit.ts";
@@ -22,7 +22,7 @@ function ensureCliBuilt() {
   cliBuilt = true;
 }
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "apl-source-e2e-"));
+  const dir = await mkdtemp(path.join(testTempRoot(), "apl-source-e2e-"));
   try {
     await fn(dir);
   } finally {

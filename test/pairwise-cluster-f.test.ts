@@ -1,5 +1,5 @@
+import { testTempRoot } from "./temp-root.ts";
 import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
 import { analyzeRepository } from "../src/repo.ts";
@@ -94,7 +94,7 @@ function generateWorkflowYAML(p: Params): string {
 const tempDirs: string[] = [];
 
 async function setupFixture(p: Params): Promise<string> {
-  const dir = await mkdtemp(path.join(tmpdir(), "apl-pairwise-f-"));
+  const dir = await mkdtemp(path.join(testTempRoot(), "apl-pairwise-f-"));
   tempDirs.push(dir);
   const wfDir = path.join(dir, ".github", "workflows");
   await mkdir(wfDir, { recursive: true });

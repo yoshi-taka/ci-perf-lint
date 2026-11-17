@@ -1,7 +1,7 @@
+import { testTempRoot } from "./temp-root.ts";
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
 import { evaluateRules, type RuleContext } from "../src/rule-engine.ts";
 import { RepositoryScanContext } from "../src/repository-scan-context.ts";
 import { parseWorkflow } from "../src/workflow.ts";
@@ -294,7 +294,7 @@ describe("makefile-parser", () => {
 
   describe("integration with rule engine", () => {
     test("suppresses missing-make-j-flag when make target uses go test", async () => {
-      const tmpDir = await mkdtemp(path.join(os.tmpdir(), "apl-make-go-"));
+      const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-make-go-"));
       const workflowDir = path.join(tmpDir, ".github/workflows");
       const collectorDir = path.join(tmpDir, "collector");
       await mkdir(workflowDir, { recursive: true });
@@ -374,7 +374,7 @@ describe("makefile-parser", () => {
     });
 
     test("emits finding when make target does not use internal-parallel tool", async () => {
-      const tmpDir = await mkdtemp(path.join(os.tmpdir(), "apl-make-cc-"));
+      const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-make-cc-"));
       const workflowDir = path.join(tmpDir, ".github/workflows");
       await mkdir(workflowDir, { recursive: true });
 
@@ -409,7 +409,7 @@ describe("makefile-parser", () => {
     });
 
     test("emits finding when Makefile cannot be read", async () => {
-      const tmpDir = await mkdtemp(path.join(os.tmpdir(), "apl-make-nomf-"));
+      const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-make-nomf-"));
       const workflowDir = path.join(tmpDir, ".github/workflows");
       await mkdir(workflowDir, { recursive: true });
 

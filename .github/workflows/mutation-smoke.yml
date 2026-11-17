@@ -29,8 +29,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Snapshot global temp dirs
+        run: echo "MUTATION_TMP_BEFORE=$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'apl-*' | wc -l)" >> "$GITHUB_ENV"
+
       - name: Mutation smoke (core)
         run: bun run test:slow:mutation:smoke
 
       - name: Mutation smoke (shell evidence, sandboxed)
         run: bun run test:slow:mutation:shell-evidence
+
+      - name: Check global temp leaks
+        run: test "$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'apl-*' | wc -l)" -le "$MUTATION_TMP_BEFORE"

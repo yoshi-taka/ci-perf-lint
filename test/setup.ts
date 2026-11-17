@@ -1,4 +1,6 @@
 import { afterAll } from "bun:test";
+import { rmSync } from "node:fs";
+import { testTempRoot } from "./temp-root.ts";
 import fc from "fast-check";
 import { clearTestCaches } from "./helpers.ts";
 
@@ -10,4 +12,5 @@ if (fastCheckSeed !== undefined && /^\d+$/.test(fastCheckSeed)) {
 
 afterAll(() => {
   clearTestCaches();
+  rmSync(testTempRoot(), { recursive: true, force: true });
 });
