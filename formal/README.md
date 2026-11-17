@@ -121,6 +121,21 @@ bun run --cwd formal verify:mutation
 bun run --cwd formal verify:regex
 ```
 
+### Fuzzer models (local, optional)
+
+`FuzzCoverage.lean` proves the retention branch invariants (new coverage is
+retained, known coverage is skipped, seen/corpus grow monotonically).
+`FuzzRetention.als` checks the full decision rule with a broken-rule control,
+and `fuzz-models.ts` bridges the boolean table to `retainCoverage` plus mutation
+length/determinism bounds. Fuzzer search quality and timeout supervision are
+not formalized.
+
+```sh
+"$LEAN_BIN" formal/FuzzCoverage.lean
+"$JAVA_BIN" -jar "$ALLOY_JAR" exec -o "$TMPDIR/alloy-fuzz" -f formal/FuzzRetention.als
+bun run --cwd formal verify:fuzz
+```
+
 The ordinary mutation tests check that applied mutants keep the original prefix
 and suffix and are never no-ops. None of these checks establishes process
 isolation, timeouts or mutation-score correctness.

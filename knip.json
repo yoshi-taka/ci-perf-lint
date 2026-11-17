@@ -37,7 +37,8 @@
         "fuzz/**/*.mjs",
         "test/**/*.test.ts",
         "stryker/stryker.*.config.mjs",
-        "src/mutation/harness-child.ts"
+        "src/mutation/harness-child.ts",
+        "src/fuzz/worker.ts"
       ]
     },
     "site": {

@@ -180,12 +180,14 @@ const report = await analyzeRepositoryForRule(
 - Keep properties simple (one invariant per `fc.property` call).
 - Set `numRuns` and `interruptAfterTimeLimit` to keep CI-friendly.
 
-### Coverage-guided fuzzing (jazzer.js)
+### Coverage-guided fuzzing (local)
 
-- `jazzer.js` for isolated coverage-guided targets: `fuzz/*.fuzz.mjs`.
-- Kept out of default `bun test` path.
-- Build targets: `bun run build:fuzz-targets`.
-- Run: `bun run test:fuzz:jazzer -max_total_time=2`.
+- `src/fuzz/` implements a coverage-guided havoc fuzzer with no fuzzer dependency. Targets keep the `fuzz(data: Buffer)` contract in `fuzz/*.fuzz.mjs`.
+- Kept out of the default `bun test` path.
+- Build a target first, then run (seeds from the existing corpus, new inputs and crashes under the output directory):
+  `bun build src/workflow.ts --outdir dist --target node --external oxc-parser`
+  `bun run fuzz:local fuzz/workflow.fuzz.mjs fuzz/corpus/workflow --out=.fuzz-work --max-time=2000`
+- A stalled input is killed by the supervising process; `--max-len`, `--seed`, `--stall-ms` bound the run. Coverage is V8 precise coverage from `node:inspector`.
 
 ## Pairwise / Combinatorial Testing
 
@@ -383,8 +385,8 @@ using allocation fixtures capped at 128 MiB, not unrestricted OOM experiments.
 - Coverage-guided: build with
   `bun build src/repository-diagnostics/source-audit-parser.ts --target node --format esm --outfile dist/fuzz-source-audit.mjs --external oxc-parser`.
   Copy `fuzz/corpus/source-audit/` to a temporary/ignored corpus directory, then run
-  `bunx --no-install jazzer fuzz/source-audit.fuzz.mjs <corpus> -- -max_total_time=20 -max_len=4096`.
-  This instruments the JS extraction boundary, not the native Rust parser.
+  `bun run fuzz:local fuzz/source-audit.fuzz.mjs <corpus> --out=.fuzz-work/source-audit --max-time=20000 --max-len=4096`.
+  This fuzzes the JS extraction boundary, not the native Rust parser.
 - Line/function coverage can be collected with `bun run test --coverage` on those
   tests. High line coverage is not branch completeness or mutation strength.
 - Existing golden/reporter, CLI, workflow partitioning and cross-platform suites
