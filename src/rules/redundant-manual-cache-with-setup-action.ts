@@ -14,6 +14,10 @@ import {
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositorySingleCacheStrategyPrecedent } from "./shared/similar-workflow-consensus.ts";
+import {
+  manualCacheCanOverlap,
+  setupCacheHasCheckoutInputs,
+} from "./shared/setup-cache-readiness.ts";
 
 const meta = {
   id: "redundant-manual-cache-with-setup-action",
@@ -31,9 +35,9 @@ export const redundantManualCacheWithSetupActionRule = {
       if (!jobAllowsActionsCacheRestore(workflow, job)) {
         continue;
       }
-      for (const step of job.steps) {
+      for (const [setupIndex, step] of job.steps.entries()) {
         const action = getSetupActionKind(step);
-        if (!action) {
+        if (!action || !setupCacheHasCheckoutInputs(job, setupIndex)) {
           continue;
         }
 
@@ -41,8 +45,9 @@ export const redundantManualCacheWithSetupActionRule = {
           (family) =>
             setupActionHasBuiltInCacheForFamily(step, family) &&
             job.steps.some(
-              (candidate) =>
+              (candidate, manualIndex) =>
                 manualCacheStepMatchesDependencyFamily(candidate, family) &&
+                manualCacheCanOverlap(job, setupIndex, manualIndex) &&
                 (!candidate.uses?.toLowerCase().startsWith("actions/cache/save@") ||
                   jobAllowsActionsCacheSave(workflow, job)),
             ),
@@ -54,13 +59,13 @@ export const redundantManualCacheWithSetupActionRule = {
         findings.push(
           pipe(withRepositorySingleCacheStrategyPrecedent(_context, workflow.relativePath, job.id))(
             buildDiagnostic(workflow, meta, step.usesNode ?? step.node, {
-              message: `${step.uses} already handles ${overlappingFamilies.join(", ")} caching in job "${job.id}", but the job also defines a matching manual cache step.`,
+              message: `${step.uses} configures ${overlappingFamilies.join(", ")} caching after checkout in job "${job.id}", which also defines a matching manual cache step.`,
               why: "Layering built-in cache and manual cache for the same dependency family can add maintenance cost and duplicate restore/save work.",
               suggestion:
                 "Keep one cache strategy for the same dependency family unless the manual cache is covering something extra that the setup action does not.",
               measurementHint:
                 "Compare restore/save time and cache hit behavior after removing the overlapping manual cache layer.",
-              aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and remove overlapping manual cache steps when ${step.uses} already covers the same dependency family.`,
+              aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Verify dependency-file availability and actual cache paths before removing manual cache steps that overlap ${step.uses}.`,
               score: 61,
             }),
           ),

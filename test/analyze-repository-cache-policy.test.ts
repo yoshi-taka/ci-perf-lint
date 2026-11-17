@@ -126,6 +126,7 @@ describe("Actions cache policy", () => {
         build: {
           "runs-on": "ubuntu-latest",
           steps: [
+            { uses: "actions/checkout@v4" },
             { uses: "actions/setup-node@v6", with: { cache: "npm" } },
             { uses: action, with: { path: "~/.npm", key: "npm" } },
             { run: "npm ci" },
