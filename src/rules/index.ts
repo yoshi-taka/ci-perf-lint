@@ -35,6 +35,7 @@ import { deepCheckoutWithoutNeedRule } from "./deep-checkout-without-need.ts";
 import { elixirOtpVersionPerformanceRule } from "./elixir-otp-version-performance.ts";
 import { hatchWithoutUvInstallerRule } from "./hatch-without-uv-installer.ts";
 import { ineffectiveConcurrencyGroupRule } from "./ineffective-concurrency-group.ts";
+import { ineffectiveCacheSaveConditionRule } from "./ineffective-cache-save-condition.ts";
 import {
   goBuildBeforeRaceTestRule,
   goTestBroadPackageSerialPOneRule,
@@ -174,6 +175,7 @@ export const allRules = [
   dockerGhaCacheScopeCollisionRule,
   dockerBakeFileUnusedInCiRule,
   ineffectiveConcurrencyGroupRule,
+  ineffectiveCacheSaveConditionRule,
   missingConcurrencyRule,
   missingPathsFilterRule,
   missingDependencyCacheRule,

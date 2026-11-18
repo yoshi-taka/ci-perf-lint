@@ -101,6 +101,7 @@ Current rule registry:
 - `go-test-repeats-vet-after-go-vet`
 - `gradle-parallel-not-enabled`
 - `hatch-without-uv-installer`
+- `ineffective-cache-save-condition`
 - `ineffective-concurrency-group`
 - `jvm-cds-opportunity-for-repeated-startup`
 - `jvm-production-image-uses-jdk-runtime`

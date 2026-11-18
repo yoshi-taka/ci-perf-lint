@@ -15,6 +15,14 @@ Current MVP heuristic:
 - the workflow is classified as "heavy"
 - no `paths` or `paths-ignore` is present for `push` or `pull_request`
 
+Tag-only push handling:
+
+- a workflow with only `push: tags` and no `pull_request` stays exempt (path
+  filters are meaningless for release tags)
+- a workflow with `push: tags` **and** an unfiltered `pull_request` is still
+  reported, because every PR runs the heavy jobs; the finding names the
+  `pull_request` side only
+
 Typical remediation:
 
 - add `paths` for code areas that should trigger the workflow

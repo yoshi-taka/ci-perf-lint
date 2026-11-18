@@ -28,7 +28,9 @@ export const missingPathsFilterRule = {
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const ts = getTriggerSemantics(workflow);
 
-    if ((!ts.hasPullRequest && !ts.hasBranchPush) || ts.hasTagOnlyPush) {
+    // Tag-only push workflows have no branch-push side to filter, but a
+    // pull_request trigger still runs the heavy jobs on every PR.
+    if (!ts.hasPullRequest && !ts.hasBranchPush) {
       return [];
     }
 
@@ -57,8 +59,9 @@ export const missingPathsFilterRule = {
         }),
       )(
         buildDiagnostic(workflow, meta, workflow.onNode ?? workflow.nameNode, {
-          message:
-            "This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.",
+          message: ts.hasTagOnlyPush
+            ? "This workflow looks heavy, and its pull_request trigger does not narrow execution with paths or paths-ignore."
+            : "This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.",
           why: "Docs-only and unrelated changes are more likely to trigger the same expensive workflow.",
           suggestion:
             "Add paths or paths-ignore to focus runs on code changes that actually need this workflow. If branch protection requires this workflow check, prefer keeping the workflow runnable and gating only the heavy jobs inside it.",

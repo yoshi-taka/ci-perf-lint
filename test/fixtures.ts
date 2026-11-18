@@ -157,6 +157,8 @@ const fixtureNames = {
   huskyComplexLike: "husky-complex-like",
   huskyLike: "husky-like",
   huskyModernLike: "husky-modern-like",
+  ineffectiveCacheSaveConditionLike: "ineffective-cache-save-condition-like",
+  ineffectiveCacheSaveConditionOk: "ineffective-cache-save-condition-ok",
   ineffectiveConcurrencyGroupLike: "ineffective-concurrency-group-like",
   ungatedHeavyJobLike: "ungated-heavy-job-like",
   iamtrailLike: "iamtrail-like",
