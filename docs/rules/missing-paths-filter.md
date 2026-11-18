@@ -10,6 +10,8 @@ Why this rule exists:
 
 - broad triggers make docs-only and unrelated changes run the same expensive workflow
 
+- as pull requests increasingly come from automation and AI-assisted tools, unfiltered triggers scale that waste with the volume of machine-generated PRs, so the cost of skipping a filter grows over time
+
 Current MVP heuristic:
 
 - the workflow is classified as "heavy"

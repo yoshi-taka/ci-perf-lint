@@ -114,7 +114,7 @@ export const missingPathsFilterRule = {
           message: ts.hasTagOnlyPush
             ? "This workflow looks heavy, and its pull_request trigger does not narrow execution with paths or paths-ignore."
             : "This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.",
-          why: "Docs-only and unrelated changes are more likely to trigger the same expensive workflow.",
+          why: "Docs-only and unrelated changes are more likely to trigger the same expensive workflow. As pull requests increasingly come from automation and AI-assisted tools, unfiltered triggers scale that waste with the volume of machine-generated PRs.",
           suggestion:
             "Add paths or paths-ignore to focus runs on code changes that actually need this workflow. If branch protection requires this workflow check, prefer keeping the workflow runnable and gating only the heavy jobs inside it.",
           measurementHint:

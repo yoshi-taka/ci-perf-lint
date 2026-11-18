@@ -11,7 +11,7 @@
       "column": 3
     },
     "message": "This workflow looks heavy, but push/pull_request do not narrow execution with paths or paths-ignore.",
-    "why": "Docs-only and unrelated changes are more likely to trigger the same expensive workflow. This repository already uses trigger path filters in `.github/workflows/docs.yml`.",
+    "why": "Docs-only and unrelated changes are more likely to trigger the same expensive workflow. As pull requests increasingly come from automation and AI-assisted tools, unfiltered triggers scale that waste with the volume of machine-generated PRs. This repository already uses trigger path filters in `.github/workflows/docs.yml`.",
     "suggestion": "Add paths or paths-ignore to focus runs on code changes that actually need this workflow. If branch protection requires this workflow check, prefer keeping the workflow runnable and gating only the heavy jobs inside it.",
     "measurementHint": "Open a docs-only PR and confirm either the workflow no longer runs unnecessarily or the heavy jobs skip without leaving required checks pending.",
     "aiHandoff": "Review trigger filters in .github/workflows/ci.yml. If required checks would become pending, keep the workflow runnable and gate only the heavy jobs that do not need docs-only changes. Use an existing paths/paths-ignore pattern from this repository as the starting point if it matches this workflow.",
