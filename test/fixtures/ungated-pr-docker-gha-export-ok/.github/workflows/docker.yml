@@ -1,0 +1,32 @@
+name: Docker
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      # Push-only expression (buffa shape): PR runs export nothing.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=build' || '' }}
+      # min exports stay unflagged.
+      - uses: docker/build-push-action@v6
+        with:
+          context: tools
+          push: false
+          cache-to: type=gha,mode=min,scope=tools
+      # Registry backend has no Actions-cache semantics.
+      - uses: docker/build-push-action@v6
+        with:
+          context: bench
+          push: false
+          cache-to: type=registry,ref=ghcr.io/org/buildcache:bench,mode=max

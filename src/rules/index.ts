@@ -146,6 +146,7 @@ import { repeatedLintInSameWorkflowRule } from "./repeated-lint-in-same-workflow
 import { scheduledHeavyWorkflowWithoutThrottlingRule } from "./scheduled-heavy-workflow-without-throttling.ts";
 import { ungatedHeavyJobRule } from "./ungated-heavy-job.ts";
 import { ungatedPrCacheSaveRule } from "./ungated-pr-cache-save.ts";
+import { ungatedPrDockerGhaExportRule } from "./ungated-pr-docker-gha-export.ts";
 import { unnecessaryAppInstallForLintJobRule } from "./unnecessary-app-install-for-lint-job.ts";
 import { unnecessaryNpmGlobalUpgradeBeforeNpmInstallRule } from "./unnecessary-npm-global-upgrade-before-npm-install.ts";
 import { unnecessaryCheckoutWhenOnlyUsingArtifactsRule } from "./unnecessary-checkout-when-only-using-artifacts.ts";
@@ -200,6 +201,7 @@ export const allRules = [
   pdmWithoutUseUvRule,
   ungatedHeavyJobRule,
   ungatedPrCacheSaveRule,
+  ungatedPrDockerGhaExportRule,
   unnecessaryAppInstallForLintJobRule,
   unnecessaryNpmGlobalUpgradeBeforeNpmInstallRule,
   unnecessaryCheckoutWhenOnlyUsingArtifactsRule,

@@ -74,10 +74,10 @@ export const dockerBuildWithoutLayerCacheRule = {
           message,
           why: "Without layer caching, every CI run rebuilds all Docker layers from scratch, adding minutes per build. docker/build-push-action supports cache-from and cache-to natively; the simplest setup uses the GitHub Actions cache backend.",
           suggestion:
-            "Add cache-from and cache-to to the docker/build-push-action step. For example: `cache-from: type=gha` and `cache-to: type=gha,mode=max`.",
+            "Add cache-from and cache-to to the docker/build-push-action step. For example: `cache-from: type=gha` and `cache-to: type=gha,mode=max`. If this build also runs on pull requests, note GHA cache entries written there are readable only within that same PR and mode=max exports every stage: prefer `mode=min` on PR runs or keep the export for branch builds only, and keep mode=max for branch builds.",
           measurementHint:
-            "Compare Docker build wall-clock time before and after adding layer caching. A multi-minute reduction is common for images with several layers.",
-          aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and add \`cache-from: type=gha\` and \`cache-to: type=gha,mode=max\` to the docker/build-push-action step unless \`no-cache: true\` is intentional.`,
+            "Compare Docker build wall-clock time before and after adding layer caching, including any export upload time on PR runs and eviction of branch-scoped entries. A multi-minute reduction is common for images with several layers.",
+          aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and add \`cache-from: type=gha\` and \`cache-to: type=gha,mode=max\` to the docker/build-push-action step unless \`no-cache: true\` is intentional. If the job also runs on pull requests, scope the export to branch builds or use mode=min there.`,
           score: 78,
         }),
       );

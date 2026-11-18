@@ -9,8 +9,8 @@
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/docker-build-without-layer-cache`
 - Message: Job "docker" uses docker/build-push-action without cache-from and cache-to configuration.
 - Why it matters: Without layer caching, every CI run rebuilds all Docker layers from scratch, adding minutes per build. docker/build-push-action supports cache-from and cache-to natively; the simplest setup uses the GitHub Actions cache backend.
-- Suggested action: Add cache-from and cache-to to the docker/build-push-action step. For example: `cache-from: type=gha` and `cache-to: type=gha,mode=max`.
-- Measurement hint: Compare Docker build wall-clock time before and after adding layer caching. A multi-minute reduction is common for images with several layers.
+- Suggested action: Add cache-from and cache-to to the docker/build-push-action step. For example: `cache-from: type=gha` and `cache-to: type=gha,mode=max`. If this build also runs on pull requests, note GHA cache entries written there are readable only within that same PR and mode=max exports every stage: prefer `mode=min` on PR runs or keep the export for branch builds only, and keep mode=max for branch builds.
+- Measurement hint: Compare Docker build wall-clock time before and after adding layer caching, including any export upload time on PR runs and eviction of branch-scoped entries. A multi-minute reduction is common for images with several layers.
 
 ## prefer-native-arm-runner-over-qemu
 

@@ -25,6 +25,8 @@ const fixtureNames = {
   pushAndPullRequestDoubleRunOk: "push-and-pull-request-double-run-ok",
   ungatedPrCacheSaveLike: "ungated-pr-cache-save-like",
   ungatedPrCacheSaveOk: "ungated-pr-cache-save-ok",
+  ungatedPrDockerGhaExportLike: "ungated-pr-docker-gha-export-like",
+  ungatedPrDockerGhaExportOk: "ungated-pr-docker-gha-export-ok",
   preferOxlintTypeCheckOverTscOk: "prefer-oxlint-type-check-over-tsc-ok",
   preferOxlintTypeCheckOverTscNoOxlint: "prefer-oxlint-type-check-over-tsc-no-oxlint",
   preferOxlintTypeCheckOverTscTsrsLike: "prefer-oxlint-type-check-over-tsc-tsrs-like",

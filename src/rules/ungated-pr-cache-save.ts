@@ -1,14 +1,10 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import {
-  getScalarValue,
-  type WorkflowDocument,
-  type WorkflowJob,
-  type WorkflowStep,
-} from "../workflow.ts";
+import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { getTriggerFacts } from "./shared/trigger-facts.ts";
 import { jobAllowsActionsCacheSave } from "./shared/workflow-caches.ts";
+import { jobEnabledOnPullRequests, stepEnabledOnPullRequests } from "./shared/pr-run-scope.ts";
 import { jobIsStaticallyDisabled } from "./shared/workflow-jobs.ts";
 
 const meta = {
@@ -22,24 +18,6 @@ const meta = {
 // ref, which makes pull-request saves of them single-PR at best.
 const commitPinnedKeyPattern =
   /github\.sha|github\.event\.pull_request\.head\.sha|github\.event\.merge_group\.head_sha|github\.run_id/;
-
-// Conditions that keep a step or job from ever executing on pull_request runs.
-const pullRequestExcludingPattern =
-  /github\.event_name\s*(?:==\s*['"](?:push|workflow_dispatch|schedule)['"]|!=\s*['"]pull_request['"])|github\.ref\s*==\s*['"]refs\/heads\//;
-
-function stepEnabledOnPullRequests(step: WorkflowStep): boolean {
-  if (getScalarValue(step.node, "if") === false || step.if?.trim() === "false") {
-    return false;
-  }
-  return step.if === undefined || !pullRequestExcludingPattern.test(step.if);
-}
-
-function jobEnabledOnPullRequests(job: WorkflowJob): boolean {
-  const jobIf = job.raw.if;
-  return (
-    jobIf === undefined || typeof jobIf !== "string" || !pullRequestExcludingPattern.test(jobIf)
-  );
-}
 
 function isCacheSaveStep(step: WorkflowStep): boolean {
   const uses = step.uses?.toLowerCase() ?? "";

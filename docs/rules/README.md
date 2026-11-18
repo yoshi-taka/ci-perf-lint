@@ -285,6 +285,7 @@ Current rule registry:
 - `ts-loader-fork-ts-checker`
 - `ungated-heavy-job`
 - `ungated-pr-cache-save`
+- `ungated-pr-docker-gha-export`
 - `unnecessary-app-install-for-lint-job`
 - `unnecessary-checkout-when-only-using-artifacts`
 - `unnecessary-npm-global-upgrade-before-npm-install`
