@@ -44,6 +44,7 @@ import {
 } from "./go-test-efficiency.ts";
 import { missingConcurrencyRule } from "./missing-concurrency.ts";
 import { missingDependencyCacheRule } from "./missing-dependency-cache.ts";
+import { missingFailFastCancellationRule } from "./missing-fail-fast-cancellation.ts";
 import { missingAngularCliCacheRule } from "./missing-angular-cli-cache.ts";
 import { noxWithoutUvBackendRule } from "./nox-without-uv-backend.ts";
 import { npmCiOverNpmInstallRule } from "./npm-ci-over-npm-install.ts";
@@ -183,6 +184,7 @@ export const allRules = [
   missingConcurrencyRule,
   missingPathsFilterRule,
   missingDependencyCacheRule,
+  missingFailFastCancellationRule,
   missingAngularCliCacheRule,
   missingGradleBuildCacheRule,
   missingMakeJFlagRule,

@@ -47,6 +47,7 @@ export const RULE_REGISTRY = {
   "missing-angular-cli-cache": { kind: "workflow" },
   "missing-concurrency": { kind: "workflow" },
   "missing-dependency-cache": { kind: "workflow" },
+  "missing-fail-fast-cancellation": { kind: "workflow" },
   "missing-gradle-build-cache": { kind: "workflow" },
   "missing-make-j-flag": { kind: "workflow" },
   "missing-next-build-cache": { kind: "workflow" },

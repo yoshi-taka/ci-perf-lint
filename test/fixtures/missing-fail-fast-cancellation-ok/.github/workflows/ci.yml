@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci
+      - run: npm run lint
+
+  # The cancellation mechanism (openmapx stop-after-lint-failure shape).
+  stop-after-gate-failure:
+    needs: lint
+    if: failure() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel this pull request's remaining jobs
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel "${GITHUB_RUN_ID}" --repo "${GITHUB_REPOSITORY}"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci
+      - run: npm test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci
+      - run: npm run build

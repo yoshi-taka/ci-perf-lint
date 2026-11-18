@@ -112,6 +112,7 @@ Current rule registry:
 - `missing-concurrency`
 - `missing-dependency-cache`
 - `missing-dockerignore-for-build-context`
+- `missing-fail-fast-cancellation`
 - `missing-gradle-build-cache`
 - `missing-make-j-flag`
 - `missing-next-build-cache`
