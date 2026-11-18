@@ -145,6 +145,166 @@ describe("ungated-heavy-job requires absence of workflow and job filters", () =>
     expect(matches).toHaveLength(1);
   });
 
+  test("an always() job that summarizes needs results is a required-check reporter", async () => {
+    expect(
+      await findings({
+        jobs: {
+          select: {
+            "runs-on": "ubuntu-latest",
+            if: "github.ref == 'refs/heads/main'",
+            steps: [{ run: "echo selected" }],
+          },
+          "fast-tests": {
+            "runs-on": "ubuntu-latest",
+            needs: "select",
+            if: "always()",
+            "timeout-minutes": 5,
+            steps: [
+              {
+                name: "Summarize upstream test results",
+                env: { SELECT_RESULT: "${{ needs.select.result }}" },
+                run: [
+                  "set -euo pipefail",
+                  "failures=()",
+                  "record_failure() {",
+                  '  failures+=("$1: $2")',
+                  "}",
+                  "require_success() {",
+                  '  local job="$1"',
+                  '  local result="$2"',
+                  '  if [[ "$result" != "success" ]]; then record_failure "$job" "did not succeed"; fi',
+                  "}",
+                  'require_success "Select" "$SELECT_RESULT"',
+                ].join("\n"),
+              },
+            ],
+          },
+        },
+      }),
+    ).toHaveLength(0);
+  });
+
+  test("an always() job doing real work without needs verdicts still reports", async () => {
+    expect(
+      await findings({
+        jobs: {
+          select: {
+            "runs-on": "ubuntu-latest",
+            if: "github.ref == 'refs/heads/main'",
+            steps: [{ run: "echo selected" }],
+          },
+          "fast-tests": {
+            ...heavyJob,
+            needs: "select",
+            if: "always()",
+          },
+        },
+      }),
+    ).toHaveLength(1);
+  });
+
+  test("an always() job reading toJSON(needs) is also a reporter", async () => {
+    expect(
+      await findings({
+        jobs: {
+          select: {
+            "runs-on": "ubuntu-latest",
+            if: "github.ref == 'refs/heads/main'",
+            steps: [{ run: "echo selected" }],
+          },
+          "build-gate": {
+            "runs-on": "ubuntu-latest",
+            needs: "select",
+            if: "always()",
+            steps: [
+              {
+                name: "Gate on scoped build results",
+                env: { NEEDS_JSON: "${{ toJSON(needs) }}" },
+                run: [
+                  "set -euo pipefail",
+                  "check() {",
+                  '  local job="$1"',
+                  '  local result="$2"',
+                  '  if [[ "$result" != "success" ]]; then echo "::error::$job failed"; exit 1; fi',
+                  "}",
+                  'node -e "const needs = JSON.parse(process.env.NEEDS_JSON); process.exit(0)"',
+                ].join("\n"),
+              },
+            ],
+          },
+        },
+      }),
+    ).toHaveLength(0);
+  });
+
+  test("a change-selection producer job is the gate itself, not ungated work", async () => {
+    const gatedConsumer = (key: string) => ({
+      ...heavyJob,
+      needs: "change-scope",
+      if: `needs.change-scope.outputs.${key} == 'true'`,
+    });
+    expect(
+      await findings({
+        jobs: {
+          "change-scope": {
+            "runs-on": "ubuntu-latest",
+            outputs: { build: "${{ steps.scope.outputs.build }}" },
+            steps: [
+              { run: "pnpm install --frozen-lockfile" },
+              { id: "scope", run: "node scripts/scope.js" },
+            ],
+          },
+          build: gatedConsumer("build"),
+          lint: gatedConsumer("lint"),
+          test: gatedConsumer("test"),
+        },
+      }),
+    ).toHaveLength(0);
+  });
+
+  test("a producer whose outputs gate too few jobs is not exempt", async () => {
+    expect(
+      await findings({
+        jobs: {
+          "change-scope": {
+            "runs-on": "ubuntu-latest",
+            outputs: { build: "${{ steps.scope.outputs.build }}" },
+            steps: [
+              { run: "pnpm install --frozen-lockfile" },
+              { id: "scope", run: "node scripts/scope.js" },
+            ],
+          },
+          build: {
+            ...heavyJob,
+            needs: "change-scope",
+            if: "needs.change-scope.outputs.build == 'true'",
+          },
+        },
+      }),
+    ).toHaveLength(1);
+    expect(
+      (
+        await findings({
+          jobs: {
+            "change-scope": {
+              "runs-on": "ubuntu-latest",
+              outputs: { build: "${{ steps.scope.outputs.build }}" },
+              steps: [
+                { run: "pnpm install --frozen-lockfile" },
+                { id: "scope", run: "node scripts/scope.js" },
+              ],
+            },
+            build: {
+              ...heavyJob,
+              needs: "change-scope",
+              if: "needs.change-scope.outputs.build == 'true'",
+            },
+          },
+        })
+      )[0]?.message,
+    ).toContain('"change-scope"');
+  });
+
   test("one gated sibling does not hide unfiltered work", async () => {
     const matches = await findings({
       jobs: {

@@ -1,7 +1,6 @@
 import type { RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
-import { getNode } from "../workflow.ts";
+import type { WorkflowDocument } from "../workflow.ts";
 import {
   withRepositoryPathsFilterPrecedent,
   withSimilarWorkflowPathsFilterConsensus,
@@ -10,6 +9,7 @@ import {
   getTriggerSemantics,
   workflowPullRequestTriggersOnlyOnClosed,
 } from "./shared/workflow-triggers.ts";
+import { workflowChangeSelectionProducerIds } from "./shared/workflow-jobs.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withStackedDiffContext } from "./shared/stacked-diffs.ts";
@@ -23,50 +23,16 @@ const meta = {
   skipIf: or(workflowFact("isHeavyWorkflow", false), workflowFact("looksMetaCheckLike", true)),
 } satisfies RuleMeta;
 
-function stepEnvText(step: WorkflowStep): string {
-  const env = getNode(step.node, "env")?.toJSON();
-  return env && typeof env === "object" ? JSON.stringify(env) : "";
-}
-
-function jobOutputs(job: WorkflowJob): Record<string, unknown> | undefined {
-  const outputs = getNode(job.node, "outputs")?.toJSON();
-  return outputs && typeof outputs === "object" && !Array.isArray(outputs)
-    ? (outputs as Record<string, unknown>)
-    : undefined;
-}
-
 /**
- * The workflow runs its own change-based selection: a producer job exposes
- * outputs (a planner/dorny-paths-filter/determinator job) and a substantial
- * share of jobs consume `needs.<producer>.outputs.*` in their conditions or
- * step environments. Trigger-level paths would duplicate that layer, so the
- * trigger-filter advice abstains (iyi's ci_plan and rue's affected-targets
- * lanes are real examples).
+ * The workflow runs its own change-based selection: a qualifying producer
+ * job (a planner/dorny-paths-filter/determinator job) exposes outputs and a
+ * substantial share of jobs consume `needs.<producer>.outputs.*` in their
+ * conditions or step environments. Trigger-level paths would duplicate that
+ * layer, so the trigger-filter advice abstains (iyi's ci_plan and rue's
+ * affected-targets lanes are real examples).
  */
 function workflowHasChangeBasedJobSelection(workflow: WorkflowDocument): boolean {
-  const producers = workflow.jobs
-    .filter((job) => Object.keys(jobOutputs(job) ?? {}).length > 0)
-    .map((job) => job.id);
-  if (producers.length === 0) {
-    return false;
-  }
-
-  const producerPattern = new RegExp(
-    `needs\\.(${producers.map((id) => id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\.outputs\\.`,
-  );
-
-  let consumers = 0;
-  for (const job of workflow.jobs) {
-    const jobText = [
-      typeof job.raw.if === "string" ? job.raw.if : "",
-      ...job.steps.map((step) => `${step.if ?? ""} ${stepEnvText(step)}`),
-    ].join(" ");
-    if (producerPattern.test(jobText)) {
-      consumers++;
-    }
-  }
-
-  return consumers >= 3 && consumers * 5 >= workflow.jobs.length * 2;
+  return workflowChangeSelectionProducerIds(workflow).size > 0;
 }
 
 export const missingPathsFilterRule = {

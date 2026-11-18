@@ -1,6 +1,6 @@
-import type { WorkflowDocument, WorkflowJob } from "../../workflow.ts";
+import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../../workflow.ts";
 import type { YAMLMap } from "../../yaml.ts";
-import { getScalarValue, getMapValue } from "../../workflow.ts";
+import { getScalarValue, getMapValue, getNode } from "../../workflow.ts";
 import { getJobFacts, getWorkflowFacts } from "./workflow-analysis.ts";
 
 export function isHeavyWorkflow(workflow: WorkflowDocument): boolean {
@@ -114,4 +114,58 @@ export function workflowLooksAgenticLike(workflow: WorkflowDocument, job?: Workf
   return job
     ? getJobFacts(job).looksAgenticLike || getWorkflowFacts(workflow).looksAgenticLike
     : getWorkflowFacts(workflow).looksAgenticLike;
+}
+
+function stepEnvText(step: WorkflowStep): string {
+  const env = getNode(step.node, "env")?.toJSON();
+  return env && typeof env === "object" ? JSON.stringify(env) : "";
+}
+
+function jobOutputs(job: WorkflowJob): Record<string, unknown> | undefined {
+  const outputs = getNode(job.node, "outputs")?.toJSON();
+  return outputs && typeof outputs === "object" && !Array.isArray(outputs)
+    ? (outputs as Record<string, unknown>)
+    : undefined;
+}
+
+function jobConditionText(job: WorkflowJob): string {
+  return [
+    typeof job.raw.if === "string" ? job.raw.if : "",
+    ...job.steps.map((step) => `${step.if ?? ""} ${stepEnvText(step)}`),
+  ].join(" ");
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Producer jobs whose `outputs` gate other jobs through
+ * `needs.<producer>.outputs.*` conditions — a planner, dorny-paths-filter,
+ * or determinator lane. A producer qualifies when at least three jobs and
+ * two-fifths of the workflow consume its outputs, the same calibration the
+ * trigger-filter rule uses to abstain (iyi's ci_plan, warp's params, rue's
+ * affected-targets are real examples).
+ */
+export function workflowChangeSelectionProducerIds(
+  workflow: WorkflowDocument,
+): ReadonlySet<string> {
+  const qualifying = new Set<string>();
+  const jobs = workflow.jobs;
+  for (const producer of jobs) {
+    if (Object.keys(jobOutputs(producer) ?? {}).length === 0) {
+      continue;
+    }
+    const pattern = new RegExp(`needs\\.${escapeRegex(producer.id)}\\.outputs\\.`);
+    let consumers = 0;
+    for (const job of jobs) {
+      if (job.id !== producer.id && pattern.test(jobConditionText(job))) {
+        consumers++;
+      }
+    }
+    if (consumers >= 3 && consumers * 5 >= jobs.length * 2) {
+      qualifying.add(producer.id);
+    }
+  }
+  return qualifying;
 }

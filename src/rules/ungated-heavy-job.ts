@@ -1,9 +1,11 @@
 import type { RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
+import { getNode } from "../workflow.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import {
   hasDirectHeavySignals,
   isHeavyJob,
+  workflowChangeSelectionProducerIds,
   workflowHasConcurrency,
   workflowJobCount,
 } from "./shared/workflow-jobs.ts";
@@ -35,6 +37,35 @@ function condition(job: WorkflowJob): string {
       : value == null
         ? ""
         : "unknown";
+}
+
+/**
+ * An `if: always()` job with dependencies whose steps read `needs.*`
+ * results or outputs is a required-check reporter: it exists to summarize
+ * upstream outcomes on every run, so it cannot be gated (agent-native's
+ * fast-tests and build-gate are real examples). Heavy jobs that only use
+ * always() to run real work keep reporting.
+ */
+function jobAggregatesUpstreamResults(job: WorkflowJob): boolean {
+  if (condition(job) !== "always()") {
+    return false;
+  }
+  const needs = job.raw.needs;
+  const hasNeeds =
+    typeof needs === "string" ? needs.trim().length > 0 : Array.isArray(needs) && needs.length > 0;
+  if (!hasNeeds) {
+    return false;
+  }
+  return job.steps.some((step) =>
+    /needs\.[\w-]+\.|tojson\(\s*needs\s*\)/i.test(
+      `${step.if ?? ""} ${stepEnvText(step)} ${step.run ?? ""}`,
+    ),
+  );
+}
+
+function stepEnvText(step: { readonly node: unknown }): string {
+  const env = getNode(step.node as never, "env")?.toJSON();
+  return env && typeof env === "object" ? JSON.stringify(env) : "";
 }
 
 function hasJobFilter(
@@ -88,8 +119,16 @@ export const ungatedHeavyJobRule = {
     }
 
     const jobs = new Map(workflow.jobs.map((job) => [job.id, job]));
+    const producers = workflowChangeSelectionProducerIds(workflow);
     return workflow.jobs
-      .filter((job) => isHeavyJob(job) && hasDirectHeavySignals(job) && !hasJobFilter(job, jobs))
+      .filter(
+        (job) =>
+          isHeavyJob(job) &&
+          hasDirectHeavySignals(job) &&
+          !producers.has(job.id) &&
+          !jobAggregatesUpstreamResults(job) &&
+          !hasJobFilter(job, jobs),
+      )
       .map((job) =>
         pipe(
           withStackedDiffContext(context, {

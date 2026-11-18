@@ -22,6 +22,16 @@ Current MVP heuristic:
 - the job has no execution condition, directly or through a required upstream job
 - constant `true`, `success()`, and `always()` do not count as selection;
   `always()` also does not inherit an upstream job's skip behavior
+- an `if: always()` job whose steps read `needs.*` results or outputs (or
+  `toJSON(needs)`) is a required-check reporter and is not reported: it exists
+  to summarize upstream outcomes on every run and cannot be gated (real
+  example: agent-native's fast-tests/build-gate). `always()` jobs that run
+  real work still report
+- a change-selection producer job (planner/dorny-paths-filter/determinator
+  whose `outputs` gate at least three jobs and two-fifths of the workflow, the
+  same calibration as `missing-paths-filter`'s abstention) is the gate itself
+  and is not reported (real example: agent-native's change-scope, iyi's
+  ci_plan). Producers gating too few jobs still report
 
 Tag/manual-only publication and workflows already using branch/path filters are
 not findings. Concurrency alone is not a change filter. Other job expressions are
