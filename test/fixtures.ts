@@ -30,6 +30,8 @@ const fixtureNames = {
   preferOxlintTypeCheckOverTscOk: "prefer-oxlint-type-check-over-tsc-ok",
   preferOxlintTypeCheckOverTscNoOxlint: "prefer-oxlint-type-check-over-tsc-no-oxlint",
   preferOxlintTypeCheckOverTscTsrsLike: "prefer-oxlint-type-check-over-tsc-tsrs-like",
+  preferTsrsOverTsgolintLike: "prefer-tsrs-over-tsgolint-like",
+  preferTsrsOverTsgolintOk: "prefer-tsrs-over-tsgolint-ok",
   blobNoneAgenticDocsEditLike: "blob-none-agentic-docs-edit-like",
   blobNoneBuildWithFlagsLike: "blob-none-build-with-flags-like",
   blobNoneChangelogActionLike: "blob-none-changelog-action-like",

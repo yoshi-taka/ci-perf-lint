@@ -13,6 +13,7 @@ import { collectPackageJsonCdkExpressDiagnostics } from "./package-json-cdk-expr
 import { collectPackageJsonCdkHotswapVersionDiagnostics } from "./package-json-cdk-hotswap-version.ts";
 import { collectPackageJsonCdkMethodDirectDiagnostics } from "./package-json-cdk-method-direct.ts";
 import { collectPackageJsonOxlintTypeCheckDiagnostics } from "./package-json-oxlint-type-check.ts";
+import { collectPreferTsrsOverTsgolintDiagnostics } from "./package-json-prefer-tsrs.ts";
 import { collectCypressGithubActionNpmRunDiagnostics } from "./cypress-github-action-npm-run.ts";
 import { collectPlaywrightConfigNpmRunDiagnostics } from "./playwright-config-npm-run.ts";
 import { collectPlaywrightRouteDisablesHttpCacheDiagnostics } from "./playwright-route-disables-http-cache.ts";
@@ -173,6 +174,11 @@ export const javascriptDiagnosticCollectors = [
     gate: gateKeys.javascriptLinting,
     collect: ({ repoRoot, repository, warnings, scanContext }) =>
       collectPackageJsonOxlintTypeCheckDiagnostics(repoRoot, repository, warnings, scanContext),
+  },
+  {
+    id: "prefer-tsrs-over-tsgolint",
+    gate: gateKeys.javascriptLinting,
+    collect: (context) => collectPreferTsrsOverTsgolintDiagnostics(context),
   },
   {
     id: "prefer-pnpm-12-10",

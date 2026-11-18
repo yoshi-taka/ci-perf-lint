@@ -237,6 +237,7 @@ Current rule registry:
 - `prefer-storybook-test-flag`
 - `prefer-tailwind-v4-upgrade-tool`
 - `prefer-test-reporter-2-3-for-xml`
+- `prefer-tsrs-over-tsgolint`
 - `prefer-turborepo-over-npm-workspaces`
 - `prefer-typescript-5-performance-milestone`
 - `prefer-typescript-7-native-compiler`

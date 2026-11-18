@@ -106,6 +106,7 @@ export const RULE_REGISTRY = {
   "prefer-nextjs-16-minor-performance-milestone": { kind: "workflow" },
   "prefer-oxlint-over-eslint": { kind: "workflow" },
   "prefer-oxlint-type-check-over-tsc": { kind: "workflow" },
+  "prefer-tsrs-over-tsgolint": { kind: "repository" },
   "prefer-oxfmt-over-prettier": { kind: "workflow" },
   "prefer-numpy-2-5": { kind: "repository" },
   "prefer-pandas-v2-or-polars": { kind: "repository" },
