@@ -131,9 +131,9 @@ export const preferSetupBunForLightweightNodeToolingRule = {
             message: `Job "${job.id}" looks like a lightweight ${packageManagerText} tooling path and does not use setup-bun.`,
             why: "For lint, format, docs, and similar non-product Node tooling jobs, Bun can reduce setup and command startup overhead compared with a plain setup-node plus npm/yarn path.",
             suggestion:
-              "If this job only runs lightweight tooling and does not rely on npm/yarn-specific behavior, consider switching the job to oven-sh/setup-bun and bun or bunx.",
+              "If this job only runs lightweight tooling and does not rely on npm/yarn-specific behavior, consider switching the job to oven-sh/setup-bun and bun or bunx. Note that setup-bun only caches the Bun executable, so pair the switch with an explicit dependency cache for ~/.bun/install/cache when install cost matters.",
             measurementHint:
-              "Compare total job duration after replacing setup-node plus npm/yarn-based lightweight tooling commands with setup-bun plus bun or bunx.",
+              "Compare total job duration after replacing setup-node plus npm/yarn-based lightweight tooling commands with setup-bun plus bun or bunx, including any dependency cache restore and save time.",
             aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and, if it only runs lightweight repository tooling, test replacing setup-node and npm/yarn-based commands with setup-bun and Bun equivalents without changing actual coverage.`,
             score: 52,
           },

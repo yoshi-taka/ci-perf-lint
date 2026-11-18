@@ -11,8 +11,8 @@ Why this rule exists:
 
 Current MVP heuristic:
 
-- a job uses an official cache-capable setup action such as `actions/setup-node`, `actions/setup-python`, `actions/setup-go`, `actions/setup-java`, `ruby/setup-ruby`, or `actions/setup-dotnet`
-- the same job also runs a supported dependency command family such as `npm ci`, `pip install`, `go mod download`, `bundle install`, `mvn`, `gradle`, or `dotnet restore`
+- a job uses an official cache-capable setup action such as `actions/setup-node`, `actions/setup-python`, `actions/setup-go`, `actions/setup-java`, `ruby/setup-ruby`, `actions/setup-dotnet`, or `oven-sh/setup-bun`
+- the same job also runs a supported dependency command family such as `npm ci`, `pip install`, `go mod download`, `bundle install`, `mvn`, `gradle`, `dotnet restore`, or `bun install`
 - the setup action does not visibly enable its built-in cache for that dependency family
 - and the job does not already use one explicit matching `actions/cache` strategy
 
@@ -22,6 +22,7 @@ Only visible workflow install commands are considered. Installs hidden in Makefi
 Built-in cache defaults considered by the rule:
 
 - `setup-go` is treated as cache-enabled by default
+- `setup-bun` is treated as never caching dependencies: its `cache`/`no-cache` input covers only the downloaded Bun executable, not bun's install cache (`~/.bun/install/cache`)
 - other setup actions require visible cache inputs such as `cache: ...`, `cache: true`, or `bundler-cache: true`
 
 Conservative bias:

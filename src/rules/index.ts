@@ -36,6 +36,7 @@ import { elixirOtpVersionPerformanceRule } from "./elixir-otp-version-performanc
 import { hatchWithoutUvInstallerRule } from "./hatch-without-uv-installer.ts";
 import { ineffectiveConcurrencyGroupRule } from "./ineffective-concurrency-group.ts";
 import { ineffectiveCacheSaveConditionRule } from "./ineffective-cache-save-condition.ts";
+import { pushAndPullRequestDoubleRunRule } from "./push-and-pull-request-double-run.ts";
 import {
   goBuildBeforeRaceTestRule,
   goTestBroadPackageSerialPOneRule,
@@ -176,6 +177,7 @@ export const allRules = [
   dockerBakeFileUnusedInCiRule,
   ineffectiveConcurrencyGroupRule,
   ineffectiveCacheSaveConditionRule,
+  pushAndPullRequestDoubleRunRule,
   missingConcurrencyRule,
   missingPathsFilterRule,
   missingDependencyCacheRule,

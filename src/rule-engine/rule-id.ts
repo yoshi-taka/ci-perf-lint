@@ -61,6 +61,7 @@ export const RULE_REGISTRY = {
   "matrix-test-job-without-test-sharding": { kind: "workflow" },
   "native-dependency-may-fall-back-to-source-build": { kind: "workflow" },
   "npm-audit-in-ci": { kind: "workflow" },
+  "push-and-pull-request-double-run": { kind: "workflow" },
   "nox-without-uv-backend": { kind: "workflow" },
   "prefer-npm-ci": { kind: "workflow" },
   "outdated-datadog-lambda-extension": { kind: "workflow" },

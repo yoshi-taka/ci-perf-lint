@@ -21,6 +21,8 @@ const fixtureNames = {
   preferOxlintTypeCheckOverTscLike: "prefer-oxlint-type-check-over-tsc-like",
   pnpmVersionLike: "pnpm-version-like",
   pnpmVersionOk: "pnpm-version-ok",
+  pushAndPullRequestDoubleRunLike: "push-and-pull-request-double-run-like",
+  pushAndPullRequestDoubleRunOk: "push-and-pull-request-double-run-ok",
   preferOxlintTypeCheckOverTscOk: "prefer-oxlint-type-check-over-tsc-ok",
   preferOxlintTypeCheckOverTscNoOxlint: "prefer-oxlint-type-check-over-tsc-no-oxlint",
   preferOxlintTypeCheckOverTscTsrsLike: "prefer-oxlint-type-check-over-tsc-tsrs-like",

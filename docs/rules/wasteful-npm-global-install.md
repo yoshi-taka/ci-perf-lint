@@ -40,6 +40,13 @@ The rule does not fire when the same job also uses npm for client work, includin
 This preserves npm-version compatibility tests even when the repository's own dependencies
 are installed with Yarn. Another job's npm use does not suppress an unrelated wasted upgrade.
 
+GitHub Actions jobs with trusted-publishing evidence also stay exempt, because
+upgrading npm globally is a documented requirement for OIDC provenance
+publishing (npm 11.5.1 or later). The rule abstains when the job (or its
+workflow) sets `NPM_CONFIG_PROVENANCE`, grants `id-token: write`, passes a
+`registry-url` to `actions/setup-node`, or passes `--provenance` to a publish
+command.
+
 ## Suggested Action
 
 Remove the `npm install -g npm` step. yarn, pnpm, and bun manage their own

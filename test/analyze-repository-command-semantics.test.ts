@@ -298,6 +298,48 @@ test("a real npm publish still suppresses wasteful global install", async () => 
   expect(report.findings.some((f) => f.ruleId === "wasteful-npm-global-install")).toBe(false);
 });
 
+test("OIDC trusted publishing evidence suppresses the wasteful npm global upgrade", async () => {
+  const root = await tempDirs.create("apl-npm-oidc-");
+  await writeRepositoryFiles(root, {
+    ".github/workflows/release.yml": `name: Release\non:\n  push:\n    branches: [main]\npermissions:\n  contents: read\n  id-token: write\njobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: oven-sh/setup-bun@v2\n      - uses: actions/setup-node@v7\n        with:\n          node-version: 24\n          registry-url: https://registry.npmjs.org\n      - run: npm install -g npm@11\n      - run: bun install --frozen-lockfile\n      - run: bun run release\n        env:\n          NPM_CONFIG_PROVENANCE: "true"\n`,
+  });
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 1000,
+    mode: "exploratory",
+  });
+  expect(report.findings.some((f) => f.ruleId === "wasteful-npm-global-install")).toBe(false);
+});
+
+test("registry-url alone suppresses the wasteful npm global upgrade", async () => {
+  const root = await tempDirs.create("apl-npm-registry-url-");
+  await writeRepositoryFiles(root, {
+    ".github/workflows/release.yml": `name: Release\non:\n  push:\n    branches: [main]\njobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: oven-sh/setup-bun@v2\n      - uses: actions/setup-node@v7\n        with:\n          node-version: 24\n          registry-url: https://registry.npmjs.org\n      - run: npm install -g npm@11\n      - run: bun install --frozen-lockfile\n`,
+  });
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 1000,
+    mode: "exploratory",
+  });
+  expect(report.findings.some((f) => f.ruleId === "wasteful-npm-global-install")).toBe(false);
+});
+
+test("npm global upgrade without trusted publishing evidence still fires", async () => {
+  const root = await tempDirs.create("apl-npm-no-oidc-");
+  await writeRepositoryFiles(root, {
+    ".github/workflows/ci.yml": `name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: oven-sh/setup-bun@v2\n      - run: npm install -g npm@latest\n      - run: bun install --frozen-lockfile\n`,
+  });
+  const report = await analyzeRepository({
+    cwd: root,
+    targetPath: ".",
+    topCount: 1000,
+    mode: "exploratory",
+  });
+  expect(report.findings.filter((f) => f.ruleId === "wasteful-npm-global-install")).toHaveLength(1);
+});
+
 test("npm ci advice requires a lockfile in the install directory", async () => {
   const withLock = await analyze(["cd sub && npm install"], {
     "sub/package.json": "{}",

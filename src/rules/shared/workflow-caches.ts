@@ -140,6 +140,10 @@ export function setupActionHasBuiltInCacheForFamily(
       return normalizedBundlerCacheValue === true || normalizedBundlerCacheValue === "true";
     case "dotnet":
       return normalizedCacheValue === true || normalizedCacheValue === "true";
+    case "bun":
+      // setup-bun's cache input covers only the downloaded Bun executable,
+      // never bun's dependency install cache (~/.bun/install/cache).
+      return false;
     default:
       const _exhaustive: never = action;
       throw new Error(`Unhandled SetupActionKind: ${String(_exhaustive)}`);

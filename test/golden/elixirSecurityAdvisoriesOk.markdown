@@ -48,6 +48,18 @@
 - Suggested action: Upgrade to OTP 26 for faster test and runtime performance in CI.
 - Measurement hint: Benchmark test suite runtime on OTP 26 vs 25.
 
+## push-and-pull-request-double-run
+
+- Workflow: `.github/workflows/elixir-ci.yml`
+- Location: `.github/workflows/elixir-ci.yml:3:5`
+- Severity: `warning`
+- Confidence: `high`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/push-and-pull-request-double-run`
+- Message: This workflow triggers on both unfiltered branch pushes and pull_request, so a same-repository PR runs it twice for every push.
+- Why it matters: Pushing to the head branch of a same-repository pull request fires both the push and pull_request events, and GitHub Actions does not deduplicate them. Each PR update then pays the full workflow cost twice, which also doubles runner demand on every synchronize.
+- Suggested action: Scope push to the integration branch (for example branches: [main]) so PR updates run once, and keep the pull_request side as the required check. Keep unfiltered push only if validating branches without PRs is intentional and the duplicate runs are worth the runner time.
+- Measurement hint: Compare workflow run counts and total runner minutes per PR commit before and after scoping push. Confirm required checks still complete on pull_request runs and that pushes without PRs are still covered if they matter.
+
 ## missing-make-j-flag
 
 - Workflow: `.github/workflows/elixir-ci.yml`

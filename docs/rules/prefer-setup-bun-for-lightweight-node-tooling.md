@@ -18,6 +18,28 @@ This rule is intended for repository tooling such as lint, formatting, markdown/
 
 For lightweight tooling-only jobs, Bun can often reduce setup and command startup overhead compared with a plain `setup-node` plus `npm` or `yarn` path.
 
+## Bun dependency caching
+
+`oven-sh/setup-bun` does **not** cache bun's dependencies. Its cache input
+covers only the downloaded Bun executable; bun's install cache lives in
+`~/.bun/install/cache` and is rebuilt on every fresh runner. When `bun
+install` cost matters, pair the switch with an explicit cache step:
+
+```yaml
+- uses: oven-sh/setup-bun@v2
+- uses: actions/cache@v5
+  with:
+    path: ~/.bun/install/cache
+    key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+    restore-keys: |
+      bun-${{ runner.os }}-
+- run: bun install --frozen-lockfile
+```
+
+The `missing-dependency-cache` rule flags `setup-bun` jobs that lack this
+cache; keep it only when total job duration actually improves, since cache
+restore and save overhead can outweigh a fast install.
+
 ## Current heuristic
 
 The rule looks for:
@@ -43,7 +65,7 @@ Ignore this finding when:
 
 ## Suggested verification
 
-- Compare total job duration before and after switching to `setup-bun`
+- Compare total job duration before and after switching to `setup-bun`, including dependency cache restore and save time
 - Confirm the same tools and file targets still run successfully
 
 ## Sources

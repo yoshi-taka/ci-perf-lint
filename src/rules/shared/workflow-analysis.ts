@@ -257,7 +257,12 @@ export function getJobFacts(job: WorkflowJob): JobFacts {
       /(?:commitlint|semantic-release|release-it|changeset|changelog)/i.test(step.uses ?? "");
     hasOpaqueRepoScriptExecution ||=
       textHasOpaqueRepositoryExecution(run) || workflowHasUnmodeledShell(undefined, job, step);
-    looksMetaCheckLike ||= metaCheckLikePattern.test(heavyStepText);
+    // docker/metadata-action generates OCI image labels; a step name like
+    // "Extract metadata (tags, labels)" must not turn the whole workflow into
+    // a meta-check in the eyes of rules that skip such workflows.
+    if (!usesSetupAction(step.uses, "docker/metadata-action@")) {
+      looksMetaCheckLike ||= metaCheckLikePattern.test(heavyStepText);
+    }
     looksAgenticLike ||= agenticLikePattern.test(heavyStepText);
     jobHasTest ||=
       /\b(test|tests|spec|jest|vitest|pytest|mocha|rspec|cargo test|go test|npm test|pnpm test|bun test)\b/i.test(

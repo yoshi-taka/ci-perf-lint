@@ -246,6 +246,7 @@ Current rule registry:
 - `prefer-wiremock-3-11`
 - `prefer-workflow-dispatch-run-details`
 - `prefer-zstd-compression-for-pushed-docker-images`
+- `push-and-pull-request-double-run`
 - `pyramid-config-scan-unrestricted`
 - `pytest-norecursedirs-override`
 - `pytest-testpaths-unconfigured`

@@ -69,6 +69,8 @@ function computeStepFacts(step: WorkflowStep): StepFacts {
     setupActionKind = "ruby";
   } else if (uses.startsWith("actions/setup-dotnet@")) {
     setupActionKind = "dotnet";
+  } else if (uses.startsWith("oven-sh/setup-bun@")) {
+    setupActionKind = "bun";
   }
 
   let installCommand: string | undefined = detectInstallCommandFromText(step.run ?? "");

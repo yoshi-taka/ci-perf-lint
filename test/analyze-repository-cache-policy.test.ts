@@ -144,6 +144,98 @@ describe("Actions cache policy", () => {
     );
   });
 
+  test("setup-bun does not cache bun dependencies and is reported", async () => {
+    const report = await analyze({
+      on: "push",
+      jobs: {
+        build: {
+          "runs-on": "ubuntu-latest",
+          steps: [
+            { uses: "actions/checkout@v4" },
+            { uses: "oven-sh/setup-bun@v2", with: { "bun-version": "1.4.4" } },
+            { run: "bun install --frozen-lockfile" },
+          ],
+        },
+      },
+    });
+    const findings = report.findings.filter(
+      (finding) =>
+        finding.ruleId === "missing-dependency-cache" &&
+        finding.message.includes("setup-bun") &&
+        finding.message.includes("bun"),
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.severity).toBe("suggestion");
+  });
+
+  test("a manual bun install cache silences the setup-bun dependency-cache finding", async () => {
+    const report = await analyze({
+      on: "push",
+      jobs: {
+        build: {
+          "runs-on": "ubuntu-latest",
+          steps: [
+            { uses: "actions/checkout@v4" },
+            { uses: "oven-sh/setup-bun@v2", with: { "bun-version": "1.4.4" } },
+            {
+              uses: "actions/cache@v4",
+              with: { path: "~/.bun/install/cache", key: "bun-${{ hashFiles('bun.lock') }}" },
+            },
+            { run: "bun install --frozen-lockfile" },
+          ],
+        },
+      },
+    });
+    expect(
+      report.findings.some(
+        (finding) =>
+          finding.ruleId === "missing-dependency-cache" && finding.message.includes("setup-bun"),
+      ),
+    ).toBe(false);
+  });
+
+  test("setup-bun beside a manual bun cache is not treated as redundant built-in caching", async () => {
+    const report = await analyze({
+      on: "push",
+      jobs: {
+        build: {
+          "runs-on": "ubuntu-latest",
+          steps: [
+            { uses: "actions/checkout@v4" },
+            { uses: "oven-sh/setup-bun@v2", with: { "bun-version": "1.4.4" } },
+            {
+              uses: "actions/cache@v4",
+              with: { path: "~/.bun/install/cache", key: "bun-${{ hashFiles('bun.lock') }}" },
+            },
+            { run: "bun install --frozen-lockfile" },
+          ],
+        },
+      },
+    });
+    expect(
+      report.findings.some(
+        (finding) =>
+          finding.ruleId === "redundant-manual-cache-with-setup-action" &&
+          finding.message.includes("setup-bun"),
+      ),
+    ).toBe(false);
+  });
+
+  test("bun install without a setup action stays out of setup-action cache scope", async () => {
+    const report = await analyze({
+      on: "push",
+      jobs: {
+        build: {
+          "runs-on": "ubuntu-latest",
+          steps: [{ uses: "actions/checkout@v4" }, { run: "bun install --frozen-lockfile" }],
+        },
+      },
+    });
+    expect(report.findings.some((finding) => finding.ruleId === "missing-dependency-cache")).toBe(
+      false,
+    );
+  });
+
   test("read-only GHA Docker restore does not require cache export", async () => {
     const report = await analyze({
       on: "push",

@@ -22,13 +22,19 @@
    Suggested action: Upgrade to OTP 26 for faster test and runtime performance in CI.
    Measurement hint: Benchmark test suite runtime on OTP 26 vs 25.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/elixir-otp-version-performance
-5. missing-make-j-flag (.github/workflows/elixir-ci.yml:21:14)
+5. push-and-pull-request-double-run (.github/workflows/elixir-ci.yml:3:5)
+   This workflow triggers on both unfiltered branch pushes and pull_request, so a same-repository PR runs it twice for every push.
+   Why it matters: Pushing to the head branch of a same-repository pull request fires both the push and pull_request events, and GitHub Actions does not deduplicate them. Each PR update then pays the full workflow cost twice, which also doubles runner demand on every synchronize.
+   Suggested action: Scope push to the integration branch (for example branches: [main]) so PR updates run once, and keep the pull_request side as the required check. Keep unfiltered push only if validating branches without PRs is intentional and the duplicate runs are worth the runner time.
+   Measurement hint: Compare workflow run counts and total runner minutes per PR commit before and after scoping push. Confirm required checks still complete on pull_request runs and that pushes without PRs are still covered if they matter.
+   Rule docs: https://ci-perf-lint.veritycost.com/rules/push-and-pull-request-double-run
+6. missing-make-j-flag (.github/workflows/elixir-ci.yml:21:14)
    Job "ci" runs make/gmake without visible parallel controls in steps #3, #4, #5.
    Why it matters: No applicable command or environment parallel settings are visible for this build path. Make normally runs serially unless its build configuration supplies parallelism; CMake defaults depend on the native generator. Matching available CPUs can reduce wall time for independent build work.
    Suggested action: Add -j$(nproc) to make/gmake or set MAKEFLAGS=-j$(nproc) in workflow/job/step env.
    Measurement hint: Compare build step duration before and after adding parallel flags.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-make-j-flag
-6. missing-timeout-minutes (.github/workflows/elixir-ci.yml:10:3)
+7. missing-timeout-minutes (.github/workflows/elixir-ci.yml:10:3)
    Job "ci" does not define job-level timeout-minutes.
    Why it matters: Without a job-level timeout, a hung or degraded job falls back to the platform default timeout and can keep consuming runner capacity much longer than intended.
    Suggested action: Set a job-level timeout-minutes that matches the expected duration and failure budget for this job.

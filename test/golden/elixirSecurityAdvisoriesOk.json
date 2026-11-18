@@ -72,6 +72,24 @@
     "score": 58
   },
   {
+    "ruleId": "push-and-pull-request-double-run",
+    "severity": "warning",
+    "confidence": "high",
+    "docsPath": "docs/rules/push-and-pull-request-double-run.md",
+    "workflow": ".github/workflows/elixir-ci.yml",
+    "location": {
+      "path": ".github/workflows/elixir-ci.yml",
+      "line": 3,
+      "column": 5
+    },
+    "message": "This workflow triggers on both unfiltered branch pushes and pull_request, so a same-repository PR runs it twice for every push.",
+    "why": "Pushing to the head branch of a same-repository pull request fires both the push and pull_request events, and GitHub Actions does not deduplicate them. Each PR update then pays the full workflow cost twice, which also doubles runner demand on every synchronize.",
+    "suggestion": "Scope push to the integration branch (for example branches: [main]) so PR updates run once, and keep the pull_request side as the required check. Keep unfiltered push only if validating branches without PRs is intentional and the duplicate runs are worth the runner time.",
+    "measurementHint": "Compare workflow run counts and total runner minutes per PR commit before and after scoping push. Confirm required checks still complete on pull_request runs and that pushes without PRs are still covered if they matter.",
+    "aiHandoff": "Review the triggers in .github/workflows/elixir-ci.yml. Scope the push trigger to the integration branch so pull_request runs are not duplicated, and verify branch protection still resolves its required checks from the pull_request runs.",
+    "score": 57
+  },
+  {
     "ruleId": "missing-make-j-flag",
     "severity": "warning",
     "confidence": "high",

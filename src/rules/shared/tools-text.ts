@@ -120,7 +120,7 @@ export type DependencyFamily =
   | "bundler"
   | "nuget";
 
-export type SetupActionKind = "node" | "python" | "go" | "java" | "ruby" | "dotnet";
+export type SetupActionKind = "node" | "python" | "go" | "java" | "ruby" | "dotnet" | "bun";
 
 export const KNOWN_INSTALLER_ACTIONS: [DependencyFamily, readonly string[]][] = [
   ["npm", ["e18e/action-dependency-diff@"]],

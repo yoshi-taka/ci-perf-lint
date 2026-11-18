@@ -4,7 +4,7 @@ Reported as a warning in default strict mode.
 
 Detects heavy workflows that respond to `push` or `pull_request` without `paths` or `paths-ignore`.
 
-Meta-workflow exclusions use executable tool/task identities, action references, and meaningful workflow/job intent. Printed examples, comments, and unrelated command arguments cannot turn a real build/lint workflow into a meta workflow and suppress this finding.
+Meta-workflow exclusions use executable tool/task identities, action references, and meaningful workflow/job intent. Printed examples, comments, and unrelated command arguments cannot turn a real build/lint workflow into a meta workflow and suppress this finding. A `docker/metadata-action` step does not count as meta-check evidence: its "labels" are OCI image labels, not PR triage.
 
 Why this rule exists:
 

@@ -26,6 +26,8 @@ export function getDependencyFamiliesUsedBySetupAction(
       return ["bundler"];
     case "dotnet":
       return ["nuget"];
+    case "bun":
+      return ["bun"];
     default:
       const _exhaustive: never = action;
       throw new Error(`Unhandled SetupActionKind: ${String(_exhaustive)}`);
