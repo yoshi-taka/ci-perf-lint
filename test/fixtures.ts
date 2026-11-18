@@ -23,6 +23,8 @@ const fixtureNames = {
   pnpmVersionOk: "pnpm-version-ok",
   pushAndPullRequestDoubleRunLike: "push-and-pull-request-double-run-like",
   pushAndPullRequestDoubleRunOk: "push-and-pull-request-double-run-ok",
+  ungatedPrCacheSaveLike: "ungated-pr-cache-save-like",
+  ungatedPrCacheSaveOk: "ungated-pr-cache-save-ok",
   preferOxlintTypeCheckOverTscOk: "prefer-oxlint-type-check-over-tsc-ok",
   preferOxlintTypeCheckOverTscNoOxlint: "prefer-oxlint-type-check-over-tsc-no-oxlint",
   preferOxlintTypeCheckOverTscTsrsLike: "prefer-oxlint-type-check-over-tsc-tsrs-like",

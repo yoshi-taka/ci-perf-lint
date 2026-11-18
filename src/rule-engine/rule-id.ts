@@ -154,6 +154,7 @@ export const RULE_REGISTRY = {
   "testcontainers-node-fixed-sleep-after-start": { kind: "repository" },
   "tox-without-tox-uv": { kind: "workflow" },
   "ungated-heavy-job": { kind: "workflow" },
+  "ungated-pr-cache-save": { kind: "workflow" },
   "unnecessary-app-install-for-lint-job": { kind: "workflow" },
   "unnecessary-checkout-when-only-using-artifacts": { kind: "workflow" },
   "unnecessary-npm-global-upgrade-before-npm-install": { kind: "workflow" },

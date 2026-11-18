@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Restores on every run; writes only where later runs can read.
+      - name: Restore Turbo build cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .turbo/cache
+          key: turbo-build-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            turbo-build-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Save Turbo build cache
+        uses: actions/cache/save@v5
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        with:
+          path: .turbo/cache
+          key: turbo-build-${{ runner.os }}-${{ github.sha }}
+
+      # File-hash keys can still serve same-PR iteration; not flagged.
+      - name: Dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}

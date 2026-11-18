@@ -284,6 +284,7 @@ Current rule registry:
 - `tox-without-tox-uv`
 - `ts-loader-fork-ts-checker`
 - `ungated-heavy-job`
+- `ungated-pr-cache-save`
 - `unnecessary-app-install-for-lint-job`
 - `unnecessary-checkout-when-only-using-artifacts`
 - `unnecessary-npm-global-upgrade-before-npm-install`
