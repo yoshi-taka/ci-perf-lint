@@ -1,4 +1,3 @@
-import { collectMakeBuildCommands } from "./make-build-commands.ts";
 import {
   parseBootstrapInvocation,
   shellCommandSegments,
@@ -9,6 +8,8 @@ export interface ParsedMakefile {
   targets: Map<string, string>;
   variables: Map<string, string>;
   includes: string[];
+  /** Target prerequisites, even for pure alias targets that carry no recipe. */
+  prereqs: Map<string, string[]>;
 }
 
 interface ToolMatch {
@@ -29,16 +30,24 @@ const INTERNAL_PARALLEL_PATTERNS: { pattern: RegExp; tool: string; category: str
   { pattern: /\bgradle\s+(?:test|build|check)\b/, tool: "gradle", category: "JVM" },
   { pattern: /\bmvn\s+-T\b/, tool: "mvn -T", category: "JVM" },
   { pattern: /\bsbt\s+(?:test|compile)\b/, tool: "sbt", category: "JVM" },
+  // Crystal's compiler parallelizes codegen across cores by default, so a make
+  // target wrapping `crystal build` gains nothing from make -j.
+  { pattern: /\bcrystal\s+build\b/, tool: "crystal build", category: "Crystal" },
 ];
 
 function detectToolInText(text: string): ToolMatch | null {
   for (const segment of shellCommandSegments(text)) {
-    const command = segment.trim().replace(/^[@+-]+/, "");
+    const command = segment
+      .trim()
+      .replace(/^[@+-]+/, "")
+      // Drop leading make variable groups ($(EXPORTS) …) so the real
+      // executable behind wrapper prefixes is visible to tokenization.
+      .replace(/^(?:\$\$?[{(][^)}]*[)}]\s*)+/, "");
     const tokens = shellCommands(parseBootstrapInvocation(command)?.command ?? command)[0] ?? [];
-    if (tokens[0] === "env") {
+    if (tokens[0] === "env" || tokens[0] === "export") {
       tokens.shift();
     }
-    while (/^[A-Za-z_]\w*=/.test(tokens[0] ?? "")) {
+    while (/^[A-Za-z_]\w*=/.test(tokens[0] ?? "") || /^\$\{?\(/.test(tokens[0] ?? "")) {
       tokens.shift();
     }
     if (
@@ -50,7 +59,7 @@ function detectToolInText(text: string): ToolMatch | null {
         tokens.shift();
       }
     }
-    const executable = tokens[0]?.split("/").at(-1);
+    const executable = tokens[0]?.split(/[\\/]/).at(-1);
     const normalized = [executable, ...tokens.slice(1)].join(" ");
     for (const entry of INTERNAL_PARALLEL_PATTERNS) {
       const expected = entry.tool.split(" ", 1)[0];
@@ -78,24 +87,32 @@ function expandExpression(expr: string, variables: Map<string, string>, maxPasse
 }
 
 const TARGET_CHAR = /^[-a-zA-Z0-9_./]+$/;
-const TARGET_DEF = /^([-a-zA-Z0-9_./][-a-zA-Z0-9_./]*)\s*:/;
+// Target names may carry make expressions ($(O)/$(BIN)); keys stay raw and are
+// aliased to their expanded form after parsing.
+const TARGET_DEF = /^([^:=#\s][^:=#]*?)\s*:/;
 
 export function parseMakefile(source: string): ParsedMakefile {
   const targets = new Map<string, string>();
   const variables = new Map<string, string>();
   const includes: string[] = [];
+  const prereqs = new Map<string, string[]>();
   const lines = source.split("\n");
 
   let currentTarget: string | null = null;
+  let currentPrereqs: string[] = [];
   let recipeLines: string[] = [];
   let inRecipe = false;
 
   function flushRecipe() {
+    if (currentTarget) {
+      prereqs.set(currentTarget, currentPrereqs);
+    }
     if (inRecipe && currentTarget && recipeLines.length > 0) {
       targets.set(currentTarget, recipeLines.join("\n"));
     }
     inRecipe = false;
     currentTarget = null;
+    currentPrereqs = [];
     recipeLines = [];
   }
 
@@ -124,7 +141,15 @@ export function parseMakefile(source: string): ParsedMakefile {
     const targetMatch = trimmed.match(TARGET_DEF);
     if (targetMatch && !rawLine.startsWith("\t")) {
       flushRecipe();
-      currentTarget = targetMatch[1]!;
+      // Windows makefiles use backslash separators; normalize structural
+      // names so chain lookups stay separator-agnostic (recipes are untouched).
+      currentTarget = targetMatch[1]!.replace(/\\/g, "/");
+      const rest = trimmed
+        .slice(targetMatch[0].length)
+        .replace(/\s*#.*$/, "")
+        .trim()
+        .replace(/\\/g, "/");
+      currentPrereqs = rest.length > 0 ? rest.split(/\s+/) : [];
       inRecipe = true;
       recipeLines = [];
       continue;
@@ -140,21 +165,51 @@ export function parseMakefile(source: string): ParsedMakefile {
 
   flushRecipe();
 
-  return { targets, variables, includes };
-}
+  // Alias expression keys to their expanded form so chain lookups like
+  // ".build/crystal" reach targets declared as $(O)/$(CRYSTAL_BIN).
+  for (const [name, recipe] of [...targets]) {
+    if (name.includes("$")) {
+      const expanded = expandExpression(name, variables).trim();
+      if (expanded !== name && TARGET_CHAR.test(expanded) && !targets.has(expanded)) {
+        targets.set(expanded, recipe);
+      }
+    }
+  }
 
-export function extractMakeTarget(run: string): string | null {
-  const target = collectMakeBuildCommands(run).find((command) => command.kind === "make")
-    ?.targets[0];
-  return target && TARGET_CHAR.test(target) ? target : null;
+  return { targets, variables, includes, prereqs };
 }
 
 const SUB_MAKE_RE = /(?:make|\$\(MAKE\))\s+(?:-C\s+\S+\s+)?([a-zA-Z0-9_./-]+)/g;
 
+interface ChainContext {
+  targets: Map<string, string>;
+  variables: Map<string, string>;
+  prereqs?: Map<string, string[]>;
+}
+
+function walkTargetEdges(
+  target: string,
+  ctx: ChainContext,
+  visited: Set<string>,
+  recipes: string[],
+): void {
+  const edges = ctx.prereqs?.get(target);
+  if (!edges) {
+    return;
+  }
+  for (const edge of edges.slice(0, 64)) {
+    const expanded = expandExpression(edge, ctx.variables).trim();
+    for (const token of expanded.split(/\s+/).slice(0, 64)) {
+      if (token && TARGET_CHAR.test(token)) {
+        walkTargetChain(token, ctx, visited, recipes);
+      }
+    }
+  }
+}
+
 function walkTargetChain(
   target: string,
-  targets: Map<string, string>,
-  variables: Map<string, string>,
+  ctx: ChainContext,
   visited: Set<string>,
   recipes: string[],
 ): void {
@@ -163,31 +218,37 @@ function walkTargetChain(
   }
   visited.add(target);
 
-  const recipe = targets.get(target);
+  const recipe = ctx.targets.get(target);
   if (!recipe) {
+    // A pure alias target carries no recipe; follow its prerequisites so a
+    // thin `make alias` still reveals the recipes it really runs.
+    walkTargetEdges(target, ctx, visited, recipes);
     return;
   }
 
   recipes.push(recipe);
 
+  // Prerequisites are built before the recipe runs; a heavy prereq build is
+  // part of what `make <target>` executes.
+  walkTargetEdges(target, ctx, visited, recipes);
+
   let m: RegExpExecArray | null;
   while ((m = SUB_MAKE_RE.exec(recipe)) !== null) {
-    walkTargetChain(m[1]!, targets, variables, visited, recipes);
+    walkTargetChain(m[1]!, ctx, visited, recipes);
   }
 
   const targetVarRe = /\bTARGET\s*=\s*"?(\w+)"?/g;
   while ((m = targetVarRe.exec(recipe)) !== null) {
-    walkTargetChain(m[1]!, targets, variables, visited, recipes);
+    walkTargetChain(m[1]!, ctx, visited, recipes);
   }
 }
 
 export function collectRecipeChain(
   target: string,
-  targets: Map<string, string>,
-  variables: Map<string, string>,
+  parsed: Pick<ParsedMakefile, "targets" | "variables" | "prereqs">,
 ): string[] {
   const recipes: string[] = [];
-  walkTargetChain(target, targets, variables, new Set(), recipes);
+  walkTargetChain(target, parsed, new Set(), recipes);
   return recipes;
 }
 

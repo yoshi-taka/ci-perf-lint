@@ -293,15 +293,20 @@ export class RepositoryScanContext {
     return linesLoad;
   }
 
-  async parseMakefileAtDir(dirPath: string): Promise<ParsedMakefile | null> {
-    const existing = this.#parsedMakefileLoads.get(dirPath);
+  async parseMakefileAtDir(dirPath: string, makefileName?: string): Promise<ParsedMakefile | null> {
+    if (makefileName && path.posix.isAbsolute(makefileName)) {
+      return null;
+    }
+    const cacheKey = makefileName ? `${dirPath}\u0000${makefileName}` : dirPath;
+    const existing = this.#parsedMakefileLoads.get(cacheKey);
     if (existing) {
       return existing;
     }
 
     const parseLoad = (async () => {
       const { parseMakefile } = await import("./rules/shared/makefile-parser.ts");
-      for (const name of ["GNUmakefile", "makefile", "Makefile"]) {
+      const names = makefileName ? [makefileName] : ["GNUmakefile", "makefile", "Makefile"];
+      for (const name of names) {
         const fp = path.resolve(dirPath, name);
         const source = await this.readTextFileOrWarn(fp);
         if (source !== undefined) {
@@ -311,7 +316,7 @@ export class RepositoryScanContext {
       return null;
     })();
 
-    this.#parsedMakefileLoads.set(dirPath, parseLoad);
+    this.#parsedMakefileLoads.set(cacheKey, parseLoad);
     return parseLoad;
   }
 

@@ -7,6 +7,8 @@ export interface MakeBuildCommand {
   directory?: string;
   targets: string[];
   customMakefile: boolean;
+  /** The -f/--file/--makefile filename, when it is a plain literal. */
+  makefile?: string;
   needsParallel: boolean;
   generator?: string;
 }
@@ -54,6 +56,7 @@ function makeArguments(args: string[], directory?: string) {
   let parallel = false;
   let inactive = false;
   let customMakefile = false;
+  let makefile: string | undefined;
   let options = true;
   const targets: string[] = [];
   for (let index = 0; index < args.length; index++) {
@@ -77,6 +80,9 @@ function makeArguments(args: string[], directory?: string) {
           directory = resolveDirectory(directory, value);
         } else if (["-f", "--file", "--makefile"].includes(name)) {
           customMakefile = true;
+          if (value && !/[$`]/.test(value)) {
+            makefile = path.posix.normalize(value);
+          }
         } else if (name === "--eval" || name === "-E") {
           customMakefile = true;
           parallel = true;
@@ -104,6 +110,9 @@ function makeArguments(args: string[], directory?: string) {
               directory = value ? resolveDirectory(directory, value) : undefined;
             } else if (flag === "f") {
               customMakefile = true;
+              if (value && !/[$`]/.test(value)) {
+                makefile = path.posix.normalize(value);
+              }
             } else if (flag === "E") {
               customMakefile = true;
               parallel = true;
@@ -121,7 +130,7 @@ function makeArguments(args: string[], directory?: string) {
       targets.push(arg);
     }
   }
-  return { parallel, inactive, customMakefile, directory, targets };
+  return { parallel, inactive, customMakefile, makefile, directory, targets };
 }
 
 function parallelEnvironment(
@@ -237,6 +246,7 @@ export function collectMakeBuildCommands(
         directory: parsed.directory,
         targets: parsed.targets,
         customMakefile: parsed.customMakefile,
+        makefile: parsed.makefile,
         needsParallel:
           !parsed.inactive && !parsed.parallel && !parallelEnvironment("make", localEnv),
       });

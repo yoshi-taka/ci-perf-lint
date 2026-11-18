@@ -3,7 +3,6 @@ import {
   collectMakeBuildCommands,
   textRunsUntunedMake,
 } from "../src/rules/shared/make-build-commands.ts";
-import { extractMakeTarget } from "../src/rules/shared/makefile-parser.ts";
 
 describe("Make/CMake parallel argument boundaries", () => {
   test.each([
@@ -67,8 +66,12 @@ describe("Make/CMake parallel argument boundaries", () => {
     expect(collectMakeBuildCommands(text, env)[0]?.needsParallel).toBe(expected);
   });
   test("Make directory options do not become target names", () => {
-    expect(extractMakeTarget("make -C app -I include target")).toBe("target");
-    expect(extractMakeTarget('make -f "other file.mk" target')).toBe("target");
+    expect(collectMakeBuildCommands("make -C app -I include target")[0]?.targets).toEqual([
+      "target",
+    ]);
+    expect(collectMakeBuildCommands('make -f "other file.mk" target')[0]?.makefile).toBe(
+      "other file.mk",
+    );
     expect(collectMakeBuildCommands("make -C app -C src target")[0]?.directory).toBe("app/src");
   });
   test("configure state stays associated with its build directory", () => {

@@ -8,7 +8,6 @@ import { parseWorkflow } from "../src/workflow.ts";
 import type { RepositorySignals } from "../src/repository-signals-types.ts";
 import {
   parseMakefile,
-  extractMakeTarget,
   collectRecipeChain,
   detectInternalParallelTool,
 } from "../src/rules/shared/makefile-parser.ts";
@@ -203,24 +202,6 @@ describe("makefile-parser", () => {
     });
   });
 
-  describe("extractMakeTarget", () => {
-    test("extracts target from simple make call", () => {
-      expect(extractMakeTarget("make gotest")).toBe("gotest");
-    });
-
-    test("extracts target from make -C call", () => {
-      expect(extractMakeTarget("make -C collector gotest")).toBe("gotest");
-    });
-
-    test("ignores flags", () => {
-      expect(extractMakeTarget("make -j gotest")).toBe("gotest");
-    });
-
-    test("returns null for bare make", () => {
-      expect(extractMakeTarget("make")).toBeNull();
-    });
-  });
-
   describe("collectRecipeChain and detectInternalParallelTool", () => {
     test("follows TARGET= variable to find go test chain", () => {
       const makefile = [
@@ -259,7 +240,7 @@ describe("makefile-parser", () => {
         }
       }
 
-      const recipes = collectRecipeChain("gotest", parsed.targets, parsed.variables);
+      const recipes = collectRecipeChain("gotest", parsed);
       expect(recipes.length).toBeGreaterThan(0);
 
       const match = detectInternalParallelTool(recipes, parsed.variables);
@@ -270,7 +251,7 @@ describe("makefile-parser", () => {
 
     test("detects direct go test in recipe", () => {
       const parsed = parseMakefile("test:\n\tgo test -race ./...\n");
-      const recipes = collectRecipeChain("test", parsed.targets, parsed.variables);
+      const recipes = collectRecipeChain("test", parsed);
       const match = detectInternalParallelTool(recipes, parsed.variables);
       expect(match).not.toBeNull();
       expect(match!.tool).toBe("go test");
@@ -278,7 +259,7 @@ describe("makefile-parser", () => {
 
     test("detects cargo test in recipe", () => {
       const parsed = parseMakefile("check:\n\tcargo test --all\n");
-      const recipes = collectRecipeChain("check", parsed.targets, parsed.variables);
+      const recipes = collectRecipeChain("check", parsed);
       const match = detectInternalParallelTool(recipes, parsed.variables);
       expect(match).not.toBeNull();
       expect(match!.tool).toBe("cargo");
@@ -286,7 +267,7 @@ describe("makefile-parser", () => {
 
     test("does not trigger for unknown tool", () => {
       const parsed = parseMakefile("build:\n\tgcc -o output *.c\n");
-      const recipes = collectRecipeChain("build", parsed.targets, parsed.variables);
+      const recipes = collectRecipeChain("build", parsed);
       const match = detectInternalParallelTool(recipes, parsed.variables);
       expect(match).toBeNull();
     });
@@ -434,6 +415,253 @@ describe("makefile-parser", () => {
 
       const makeFindings = result.filter((d) => d.ruleId === "missing-make-j-flag");
       expect(makeFindings.length).toBeGreaterThan(0);
+
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+  });
+
+  describe("wrapper makefiles and alias chains (iyi shape)", () => {
+    test("follows prerequisite aliases to a wrapper recipe", () => {
+      const parsed = parseMakefile(
+        [
+          "all: app",
+          "app: .build/app",
+          ".build/app:",
+          "\t$(EXPORTS) cargo build --release",
+          "",
+        ].join("\n"),
+      );
+      const recipes = collectRecipeChain("all", parsed);
+      expect(recipes.length).toBe(1);
+      const match = detectInternalParallelTool(recipes, parsed.variables);
+      expect(match?.tool).toBe("cargo");
+    });
+
+    test("aliases expression target keys to expanded names", () => {
+      const parsed = parseMakefile(
+        [
+          "O := .build",
+          "CRYSTAL_BIN := crystal",
+          "",
+          "crystal: $(O)/$(CRYSTAL_BIN) ## Build the compiler",
+          "",
+          "$(O)/$(CRYSTAL_BIN): $(DEPS)",
+          "\t$(EXPORTS) ./bin/crystal build src/compiler/crystal.cr",
+          "",
+        ].join("\n"),
+      );
+      expect(parsed.prereqs.get("crystal")).toEqual(["$(O)/$(CRYSTAL_BIN)"]);
+      const recipes = collectRecipeChain("crystal", parsed);
+      expect(recipes.length).toBe(1);
+      const match = detectInternalParallelTool(recipes, parsed.variables);
+      expect(match?.tool).toBe("crystal build");
+      expect(match?.category).toBe("Crystal");
+    });
+
+    test("walks prerequisite builds behind a runner recipe", () => {
+      const parsed = parseMakefile(
+        [
+          "O := .build",
+          "EXE :=",
+          "",
+          "compiler_spec: $(O)/compiler_spec$(EXE)",
+          "\t$(O)/compiler_spec$(EXE) $(SPEC_FLAGS)",
+          "",
+          "$(O)/compiler_spec$(EXE): $(DEPS)",
+          "\t$(EXPORT_CC) ./bin/crystal build -o $@ spec/compiler_spec.cr",
+          "",
+        ].join("\n"),
+      );
+      const recipes = collectRecipeChain("compiler_spec", parsed);
+      expect(recipes.length).toBe(2);
+      const match = detectInternalParallelTool(recipes, parsed.variables);
+      expect(match?.tool).toBe("crystal build");
+    });
+
+    test("normalizes windows backslash targets and recipes", () => {
+      const parsed = parseMakefile(
+        [
+          "O := .build",
+          "",
+          "crystal: $(O)\\crystal.exe",
+          "",
+          "$(O)\\crystal.exe:",
+          "\t.\\bin\\crystal build -o $@ src\\compiler\\crystal.cr",
+          "",
+        ].join("\n"),
+      );
+      expect(parsed.prereqs.get("crystal")).toEqual(["$(O)/crystal.exe"]);
+      const recipes = collectRecipeChain("crystal", parsed);
+      expect(recipes.length).toBe(1);
+      const match = detectInternalParallelTool(recipes, parsed.variables);
+      expect(match?.tool).toBe("crystal build");
+    });
+
+    test("suppresses missing-make-j-flag for a root-level wrapper target", async () => {
+      const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-make-wrapper-"));
+      const workflowDir = path.join(tmpDir, ".github/workflows");
+      await mkdir(workflowDir, { recursive: true });
+
+      await writeFile(
+        path.join(tmpDir, "Makefile"),
+        [
+          "O := .build",
+          "CRYSTAL_BIN := crystal",
+          "",
+          "crystal: $(O)/$(CRYSTAL_BIN)",
+          "",
+          "$(O)/$(CRYSTAL_BIN):",
+          "\t$(EXPORTS) ./bin/crystal build src/compiler/crystal.cr",
+          "",
+        ].join("\n"),
+      );
+
+      const yaml = [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: make crystal",
+      ].join("\n");
+
+      const filePath = path.join(workflowDir, "test.yml");
+      await writeFile(filePath, yaml);
+      const workflow = parseWorkflow(filePath, tmpDir, yaml);
+      const context: RuleContext = {
+        repository: createSignals(),
+        scanContext: new RepositoryScanContext(tmpDir, []),
+      };
+      const result = await evaluateRules(workflow, context);
+      expect(result.filter((d) => d.ruleId === "missing-make-j-flag")).toHaveLength(0);
+
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    test("suppresses missing-make-j-flag for a -f makefile with wrapper targets", async () => {
+      const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-make-f-"));
+      const workflowDir = path.join(tmpDir, ".github/workflows");
+      await mkdir(workflowDir, { recursive: true });
+
+      await writeFile(
+        path.join(tmpDir, "Makefile.win"),
+        [
+          "O := .build",
+          "",
+          "crystal: $(O)\\crystal.exe",
+          "",
+          "$(O)\\crystal.exe:",
+          "\t.\\bin\\crystal build -o $@ src\\compiler\\crystal.cr",
+          "",
+        ].join("\n"),
+      );
+
+      const yaml = [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: windows-latest",
+        "    steps:",
+        "      - run: make -f Makefile.win crystal",
+      ].join("\n");
+
+      const filePath = path.join(workflowDir, "test.yml");
+      await writeFile(filePath, yaml);
+      const workflow = parseWorkflow(filePath, tmpDir, yaml);
+      const context: RuleContext = {
+        repository: createSignals(),
+        scanContext: new RepositoryScanContext(tmpDir, []),
+      };
+      const result = await evaluateRules(workflow, context);
+      expect(result.filter((d) => d.ruleId === "missing-make-j-flag")).toHaveLength(0);
+
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    test("keeps the finding for per-file compile makefiles", async () => {
+      const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-make-perfile-"));
+      const workflowDir = path.join(tmpDir, ".github/workflows");
+      await mkdir(workflowDir, { recursive: true });
+
+      await writeFile(
+        path.join(tmpDir, "Makefile"),
+        [
+          "OBJS = main.o util.o",
+          "all: app",
+          "app: $(OBJS)",
+          "\t$(CC) -o app $(OBJS)",
+          "%.o: %.c",
+          "\t$(CC) -c $< -o $@",
+          "",
+        ].join("\n"),
+      );
+
+      const yaml = [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: make all",
+      ].join("\n");
+
+      const filePath = path.join(workflowDir, "test.yml");
+      await writeFile(filePath, yaml);
+      const workflow = parseWorkflow(filePath, tmpDir, yaml);
+      const context: RuleContext = {
+        repository: createSignals(),
+        scanContext: new RepositoryScanContext(tmpDir, []),
+      };
+      const result = await evaluateRules(workflow, context);
+      expect(result.filter((d) => d.ruleId === "missing-make-j-flag").length).toBeGreaterThan(0);
+
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    test("multi-target invocations stay silent when every target is internally parallel", async () => {
+      const tmpDir = await mkdtemp(path.join(testTempRoot(), "apl-make-multi-"));
+      const workflowDir = path.join(tmpDir, ".github/workflows");
+      await mkdir(workflowDir, { recursive: true });
+
+      await writeFile(
+        path.join(tmpDir, "Makefile"),
+        [
+          "O := .build",
+          "",
+          "iyi: $(O)/iyi",
+          "iyi-daemon: $(O)/iyi-daemon",
+          "",
+          "$(O)/iyi:",
+          "\t$(EXPORTS) ./bin/crystal build -o $@ src/iyi.cr",
+          "",
+          "$(O)/iyi-daemon:",
+          "\t$(EXPORTS) ./bin/crystal build -o $@ src/iyi-daemon.cr",
+          "",
+        ].join("\n"),
+      );
+
+      const yaml = [
+        "name: CI",
+        "on: push",
+        "jobs:",
+        "  build:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - run: make iyi iyi-daemon",
+      ].join("\n");
+
+      const filePath = path.join(workflowDir, "test.yml");
+      await writeFile(filePath, yaml);
+      const workflow = parseWorkflow(filePath, tmpDir, yaml);
+      const context: RuleContext = {
+        repository: createSignals(),
+        scanContext: new RepositoryScanContext(tmpDir, []),
+      };
+      const result = await evaluateRules(workflow, context);
+      expect(result.filter((d) => d.ruleId === "missing-make-j-flag")).toHaveLength(0);
 
       await rm(tmpDir, { recursive: true, force: true });
     });

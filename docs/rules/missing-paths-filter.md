@@ -23,6 +23,15 @@ Tag-only push handling:
   reported, because every PR runs the heavy jobs; the finding names the
   `pull_request` side only
 
+Change-based job selection:
+
+- a workflow that runs its own selection layer stays exempt: a producer job
+  exposes `outputs:` (a planner/dorny-paths-filter/determinator job) and at
+  least three jobs, at least two-fifths of the workflow, consume
+  `needs.<producer>.outputs.*` in their conditions or step environments
+  (real examples: iyi's `ci_plan`, warp's `params`, Pinvou's `changes`, rue's
+  `affected-targets`). Trigger-level paths would duplicate that layer.
+
 Typical remediation:
 
 - add `paths` for code areas that should trigger the workflow

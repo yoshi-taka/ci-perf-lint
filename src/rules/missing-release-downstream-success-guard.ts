@@ -2,7 +2,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { WorkflowDocument, WorkflowJob } from "../workflow.ts";
 import type { YAMLMap } from "../yaml.ts";
-import { getScalarValue, getStringOrArrayValue } from "../workflow.ts";
+import { getScalarValue, getStringOrArrayValue, getNode } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositoryReleaseDownstreamGuardPrecedent } from "./shared/similar-workflow-consensus.ts";
@@ -111,6 +111,36 @@ function isStatusAggregationJob(job: WorkflowJob): boolean {
   return checksFailure;
 }
 
+function stepEnvText(step: { readonly node: unknown }): string {
+  if (!step.node || typeof step.node !== "object" || !("items" in step.node)) {
+    return "";
+  }
+  const env = getNode(step.node as YAMLMap<unknown, unknown>, "env")?.toJSON();
+  return env && typeof env === "object" ? JSON.stringify(env) : "";
+}
+
+/**
+ * A guard implemented as a script over the needs context: the job runs under
+ * always()/!cancelled() and a step both receives toJSON(needs) (or a
+ * needs.<job>.result mapping) and checks for failure/cancelled verdicts in
+ * the same step. Real example: iyi's "result" job pipes toJSON(needs) into a
+ * python check that exits nonzero on failure/cancelled.
+ */
+function isScriptedNeedsVerdictJob(job: WorkflowJob): boolean {
+  const ifText = getJobIfText(job).replace(/\$\{\{|}}/g, "");
+  if (!/always\s*\(\s*\)/.test(ifText) && !/!cancelled\s*\(\s*\)/.test(ifText)) {
+    return false;
+  }
+  for (const step of job.steps) {
+    const text = `${step.run ?? ""} ${stepEnvText(step)}`;
+    const referencesNeedsContext = /toJSON\(\s*needs\s*\)|needs\.[\w-]+\.result/.test(text);
+    if (referencesNeedsContext && /["'](?:failure|cancelled)["']/.test(text)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function hasOptionalSkipBypass(ifText: string): boolean {
   return (
     /github\.event_name\s*(?:==|!=)\s*['"][^'"]+['"]/.test(ifText) ||
@@ -160,7 +190,11 @@ export const missingReleaseDownstreamSuccessGuardRule = {
         continue;
       }
 
-      if (isReportingOrUploadJob(job) || isStatusAggregationJob(job)) {
+      if (
+        isReportingOrUploadJob(job) ||
+        isStatusAggregationJob(job) ||
+        isScriptedNeedsVerdictJob(job)
+      ) {
         continue;
       }
 

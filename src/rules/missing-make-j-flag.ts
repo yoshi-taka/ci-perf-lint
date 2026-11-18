@@ -8,7 +8,6 @@ import { collectMakeBuildCommands, type MakeBuildCommand } from "./shared/make-b
 import { workflowStepEnv, workflowWorkingDirectory } from "./shared/workflow-command-context.ts";
 import {
   parseMakefile,
-  extractMakeTarget,
   collectRecipeChain,
   detectInternalParallelTool,
 } from "./shared/makefile-parser.ts";
@@ -32,27 +31,27 @@ async function stepTargetIsInternalParallel(
   command: MakeBuildCommand,
   scanContext?: RepositoryScanContext,
 ): Promise<boolean> {
+  // --eval (customMakefile without a captured filename) can inject arbitrary
+  // make content; treat it as opaque.
   if (
     !scanContext ||
-    command.customMakefile ||
-    command.targets.length !== 1 ||
-    command.directory === undefined ||
-    path.posix.isAbsolute(command.directory) ||
-    command.directory === ".." ||
-    command.directory.startsWith("../")
+    command.targets.length === 0 ||
+    (command.customMakefile && !command.makefile)
   ) {
     return false;
   }
 
-  const target = extractMakeTarget(command.text);
-  if (!target) {
+  const repoRoot = getRepoRoot(workflow);
+  if (path.posix.isAbsolute(command.directory ?? "")) {
     return false;
   }
+  if (command.directory === ".." || command.directory?.startsWith("../")) {
+    return false;
+  }
+  const dir =
+    command.directory === undefined ? repoRoot : path.resolve(repoRoot, command.directory);
 
-  const repoRoot = getRepoRoot(workflow);
-  const dir = path.resolve(repoRoot, command.directory);
-
-  const parsed = await scanContext.parseMakefileAtDir(dir);
+  const parsed = await scanContext.parseMakefileAtDir(dir, command.makefile);
   if (!parsed) {
     return false;
   }
@@ -75,10 +74,24 @@ async function stepTargetIsInternalParallel(
         parsed.variables.set(k, v);
       }
     }
+    for (const [k, v] of incParsed.prereqs) {
+      if (!parsed.prereqs.has(k)) {
+        parsed.prereqs.set(k, v);
+      }
+    }
   }
 
-  const recipes = collectRecipeChain(target, parsed.targets, parsed.variables);
-  return detectInternalParallelTool(recipes, parsed.variables) !== null;
+  // Every named target must resolve to internally parallel work; a mixed
+  // invocation keeps the finding so the serial part stays visible.
+  const targetRe = /^[-a-zA-Z0-9_./]+$/;
+  const targetNames = command.targets.filter((target) => targetRe.test(target));
+  if (targetNames.length === 0) {
+    return false;
+  }
+  return targetNames.every((name) => {
+    const recipes = collectRecipeChain(name, parsed);
+    return recipes.length > 0 && detectInternalParallelTool(recipes, parsed.variables) !== null;
+  });
 }
 
 interface DelinquentStep {

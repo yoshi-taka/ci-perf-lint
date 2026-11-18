@@ -24,15 +24,19 @@ Vercel CI's `vercel.json` → `ci.bootstrapping.installCommand` is also checked,
 
 Makefile analysis (new):
 
-The rule reads the default Makefile in the resolved command directory and follows a literal single-target chain
-to detect whether the build ultimately invokes tools that already parallelize internally.
-If such tools are detected, the warning is suppressed because adding `-j` at the make level
-would either be useless or counterproductive (resource contention from nested parallelism).
+The rule reads the Makefile in the resolved command directory (the default
+one, or the file named by a literal `-f`/`--file`/`--makefile`) and follows the
+selected targets' chains to detect whether the build ultimately invokes tools
+that already parallelize internally. If every named target resolves to such
+tools, the warning is suppressed because adding `-j` at the make level would
+either be useless or counterproductive (resource contention from nested
+parallelism).
 
 Detected tools and patterns:
 
 - **Go**: `go test`, `go build` (including via `$(GOTEST)`, `$(GOCMD)`, etc.)
 - **Rust**: `cargo test`, `cargo build`, `cargo check`, `cargo clippy`
+- **Crystal**: `crystal build` (the compiler parallelizes codegen across cores by default)
 - **Python**: `pytest -n` (`pytest-xdist` parallel execution)
 - **JavaScript/TypeScript**: `vitest`, `jest`, `turbo run`, `nx run-many`, `pnpm -r`
 - **JVM**: `gradle test`/`build`/`check`, `mvn -T`, `sbt test`/`compile`
@@ -43,11 +47,19 @@ The analysis handles:
 - `include` directives (resolved one level deep)
 - recursive make chains (`$(MAKE) for-all-target TARGET="test"`)
 - `TARGET=name` variable passing to sub-makes
+- pure alias targets with no recipe: their prerequisites are followed
+- prerequisites that carry their own build recipes (a `make spec` alias that
+  first builds the spec binary through `crystal build`/`cargo build`)
+- make expression target names (`$(O)/$(BIN)`), aliased to their expanded form
+- Windows-style backslash separators in target and prerequisite names
+- recipe variable prefixes (`$(EXPORTS) ...`) ahead of the real executable
+- multi-target invocations when every target is internally parallel
+- `make` run at the checkout root without `working-directory:`
 
 When the Makefile cannot be read or parsed, the rule falls back to the previous behavior
 (emit the warning).
 
-Custom `-f` Makefiles, multiple target selections and unresolved/out-of-repository directories do not reuse an unrelated default Makefile as parallelism evidence. Makefile options such as `-I`, `-f` and `-C` are not mistaken for target names.
+`--eval` injections and unresolved/out-of-repository directories do not reuse an unrelated Makefile as parallelism evidence. Makefile options such as `-I`, `-f` and `-C` are not mistaken for target names.
 
 Only tools actually invoked by selected recipes establish internal parallelism. Echoed tool names and unused variable definitions do not suppress the finding.
 
