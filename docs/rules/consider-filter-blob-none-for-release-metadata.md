@@ -4,6 +4,8 @@ Positive metadata and explicit fetch evidence comes from executed commands or re
 
 Flags history-aware metadata jobs that may be able to use checkout `filter: blob:none`.
 
+Diff-based jobs qualify too when the repository already demonstrated `filter: blob:none` elsewhere: a job running history-reading git commands (`git diff`, `git log`, `git rev-list`, `git merge-base`, `git show`, `git cat-file`, `git describe`) or binding a diff-base env variable (`github.base_ref`, the PR base SHA, or conventional `BASE_SHA`/`GITHUB_BASE_REF`-style names) for a script reads only the blobs its diff touches. This repo-wide precedent gates the advice: the finding cites jobs the maintainer can compare against directly (real examples: agent-native's mutation lanes beside blob:none siblings — measured same-commit fetch ~43s eager vs ~5s blobless; freenet's rule-review beside check-token-coalesce, whose own header documents lazy blob fetches; n8n's determine-version-info). Jobs that apply history rather than read it (`git checkout` of an old ref, `git cherry-pick`, `git tag` creation) stay silent in this path, and `git archive`, `git log -p`, or `git grep <rev>` eagerly walk historical blobs, so they are excluded. A sparse-checkout is its own optimization and never stacks this advice.
+
 Repository-local precedents use command-position metadata, fetch-option ownership, and real build/scan exclusions too. A peer's logs or comments cannot supply metadata execution or erase a valid structured `filter: blob:none` precedent.
 
 ## Why it matters

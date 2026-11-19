@@ -108,3 +108,132 @@ test.each([1, 2000])("explicit fetch must also transfer history: depth=%s", asyn
     report.findings.some((f) => f.ruleId === "consider-filter-blob-none-for-release-metadata"),
   ).toBe(depth > 1);
 });
+
+async function scanWithPrecedent(steps: unknown[], jobName = "process", workflowName = "CI") {
+  const cwd = await tempDirs.create("apl-blobnone-diff-");
+  await writeRepositoryFiles(cwd, {
+    // A sibling workflow in the same repository already checks out with
+    // filter: blob:none — the repo-wide precedent that gates the diff path.
+    ".github/workflows/precedent.yml": stringify({
+      name: "Plan",
+      on: "pull_request",
+      jobs: {
+        changes: {
+          "runs-on": "ubuntu-latest",
+          steps: [
+            { uses: "actions/checkout@v4", with: { "fetch-depth": 0, filter: "blob:none" } },
+            { run: "git diff --name-only origin/main...HEAD" },
+          ],
+        },
+      },
+    }),
+    ".github/workflows/ci.yml": stringify({
+      name: workflowName,
+      on: "pull_request",
+      jobs: { [jobName]: { "runs-on": "ubuntu-latest", steps } },
+    }),
+  });
+  return analyzeRepository({
+    cwd,
+    targetPath: ".",
+    mode: "strict",
+    topCount: 100,
+  });
+}
+
+test("diff-based history work with repo blob:none precedent gets the advice", async () => {
+  const report = await scanWithPrecedent([
+    { uses: "actions/checkout@v4", with: { "fetch-depth": 0 } },
+    {
+      name: "Re-run proof against the merge base",
+      run: 'BASE=$(git merge-base origin/main HEAD)\ngit diff --name-only "$BASE" HEAD',
+    },
+  ]);
+  const finding = report.findings.find(
+    (f) => f.ruleId === "consider-filter-blob-none-for-release-metadata",
+  );
+  expect(finding?.message).toContain("computes changes against git history");
+  expect(finding?.suggestion).toContain("blob:none");
+});
+
+test("a diff-base env binding for an opaque script qualifies as diff work", async () => {
+  const report = await scanWithPrecedent([
+    { uses: "actions/checkout@v4", with: { "fetch-depth": 0 } },
+    {
+      name: "Mutation plan",
+      run: "pnpm mutation:changed --plan",
+      env: { GITHUB_BASE_REF: "${{ github.base_ref }}" },
+    },
+  ]);
+  expect(
+    report.findings.some((f) => f.ruleId === "consider-filter-blob-none-for-release-metadata"),
+  ).toBe(true);
+});
+
+test("no repo blob:none precedent keeps the diff path silent", async () => {
+  const cwd = await tempDirs.create("apl-blobnone-no-precedent-");
+  await writeRepositoryFiles(cwd, {
+    ".github/workflows/ci.yml": stringify({
+      name: "CI",
+      on: "pull_request",
+      jobs: {
+        process: {
+          "runs-on": "ubuntu-latest",
+          steps: [
+            { uses: "actions/checkout@v4", with: { "fetch-depth": 0 } },
+            { run: "git diff --name-only origin/main...HEAD" },
+          ],
+        },
+      },
+    }),
+  });
+  const report = await analyzeRepository({
+    cwd,
+    targetPath: ".",
+    mode: "strict",
+    topCount: 100,
+  });
+  expect(
+    report.findings.some((f) => f.ruleId === "consider-filter-blob-none-for-release-metadata"),
+  ).toBe(false);
+});
+
+test.each([
+  ["git checkout --detach $BASE_SHA", "applying an old ref is not diff work"],
+  ["git archive --format=tar origin/main", "archive walks historical blobs wholesale"],
+  ["git grep TODO origin/main", "grep over a revision walks historical blobs"],
+])("diff path stays silent for %s", async (run) => {
+  const report = await scanWithPrecedent([
+    { uses: "actions/checkout@v4", with: { "fetch-depth": 0 } },
+    { name: "Process", run },
+  ]);
+  expect(
+    report.findings.some((f) => f.ruleId === "consider-filter-blob-none-for-release-metadata"),
+  ).toBe(false);
+});
+
+test("a sparse-checkout already optimizes transfer; the diff path stays silent", async () => {
+  const report = await scanWithPrecedent([
+    {
+      uses: "actions/checkout@v4",
+      with: {
+        "fetch-depth": 0,
+        "sparse-checkout": "src",
+      },
+    },
+    { run: "git diff --name-only origin/main...HEAD" },
+  ]);
+  expect(
+    report.findings.some((f) => f.ruleId === "consider-filter-blob-none-for-release-metadata"),
+  ).toBe(false);
+});
+
+test("the diff path requires a deep checkout", async () => {
+  const report = await scanWithPrecedent([
+    { uses: "actions/checkout@v4", with: { "fetch-depth": 50 } },
+    { run: "git diff --name-only origin/main...HEAD" },
+  ]);
+  expect(
+    report.findings.some((f) => f.ruleId === "consider-filter-blob-none-for-release-metadata"),
+  ).toBe(false);
+});

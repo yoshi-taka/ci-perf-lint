@@ -45,6 +45,7 @@ export interface RepositoryPrecedentLookups {
   setupCache: ReadonlyMap<string, readonly string[]>;
   releaseDownstreamSuccessGuard: ReadonlyMap<string, readonly string[]>;
   blobNoneReleaseMetadata: ReadonlyMap<string, readonly string[]>;
+  blobNoneCheckouts: ReadonlyMap<string, readonly string[]>;
   sparseCheckoutScoped: ReadonlyMap<string, readonly string[]>;
   throttledHeavySchedule: ReadonlyMap<string, readonly string[]>;
 }
@@ -80,6 +81,10 @@ export interface RepositoryPrecedentSignals {
     jobId: string;
   }[];
   blobNoneReleaseMetadata: {
+    workflowPath: string;
+    jobId: string;
+  }[];
+  blobNoneCheckouts: {
     workflowPath: string;
     jobId: string;
   }[];
@@ -512,6 +517,26 @@ export function collectRepositoryPrecedentSignals(
         left.jobId.localeCompare(right.jobId),
     )
     .slice(0, 10);
+  // Every job that already checks out with `filter: blob:none`, regardless of
+  // purpose. The release-metadata map above proves blob:none works for
+  // metadata lanes; this broader map is the repo-wide precedent that gates
+  // the diff-based blob:none advice (agent-native: ci.yml change-scope,
+  // feedback-fix-proof.yml proof; freenet: check-token-coalesce.yml).
+  const blobNoneCheckouts = workflows
+    .flatMap((workflow) =>
+      workflow.jobs
+        .filter((job) => {
+          const checkout = getCheckoutStep(job);
+          return Boolean(checkout && hasBlobNoneFilter(checkout));
+        })
+        .map((job) => ({ workflowPath: workflow.relativePath, jobId: job.id })),
+    )
+    .sort(
+      (left, right) =>
+        left.workflowPath.localeCompare(right.workflowPath) ||
+        left.jobId.localeCompare(right.jobId),
+    )
+    .slice(0, 10);
   const throttledHeavySchedule = workflows
     .filter((workflow) => {
       if (
@@ -541,6 +566,7 @@ export function collectRepositoryPrecedentSignals(
     setupCache,
     releaseDownstreamSuccessGuard,
     blobNoneReleaseMetadata,
+    blobNoneCheckouts,
     sparseCheckoutScoped,
     throttledHeavySchedule,
     lookups: {
@@ -553,6 +579,7 @@ export function collectRepositoryPrecedentSignals(
       setupCache: buildJobPrecedentLookup(setupCache),
       releaseDownstreamSuccessGuard: buildJobPrecedentLookup(releaseDownstreamSuccessGuard),
       blobNoneReleaseMetadata: buildJobPrecedentLookup(blobNoneReleaseMetadata),
+      blobNoneCheckouts: buildJobPrecedentLookup(blobNoneCheckouts),
       sparseCheckoutScoped: buildJobPrecedentLookup(sparseCheckoutScoped),
       throttledHeavySchedule: buildWorkflowPrecedentLookup(throttledHeavySchedule),
     },

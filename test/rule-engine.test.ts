@@ -56,6 +56,7 @@ function createSignals(): RepositorySignals {
       setupCache: [],
       releaseDownstreamSuccessGuard: [],
       blobNoneReleaseMetadata: [],
+      blobNoneCheckouts: [],
       sparseCheckoutScoped: [],
       throttledHeavySchedule: [],
       lookups: {
@@ -68,6 +69,7 @@ function createSignals(): RepositorySignals {
         setupCache: new Map(),
         releaseDownstreamSuccessGuard: new Map(),
         blobNoneReleaseMetadata: new Map(),
+        blobNoneCheckouts: new Map(),
         sparseCheckoutScoped: new Map(),
         throttledHeavySchedule: new Map(),
       },

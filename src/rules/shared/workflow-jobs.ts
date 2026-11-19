@@ -88,6 +88,27 @@ export function hasHistoryDependentCommand(job: WorkflowJob): boolean {
   return getJobFacts(job).hasHistoryDependentCommand;
 }
 
+/**
+ * A step env var that names a diff base — `github.base_ref`, the PR base SHA,
+ * or a conventional BASE_REF/BASE_SHA/MERGE_BASE/GUARD_DIFF_BASE binding —
+ * says the job computes changes against history (agent-native's
+ * mutation-shards passes `GITHUB_BASE_REF: ${{ github.base_ref }}` into a
+ * script that runs `git merge-base` and `git diff`). Script indirection can
+ * hide the git calls, so the env binding is the visible evidence.
+ */
+export function jobBindsDiffBaseVariable(job: WorkflowJob): boolean {
+  const diffBasePattern =
+    /github\.base_ref|github\.event\.pull_request\.base\.sha|github\.event\.merge_group\.base_sha|\b(?:GITHUB_BASE_REF|GUARD_DIFF_BASE|BASE_SHA|BASE_REF|MERGE_BASE|DIFF_BASE|BASE_BRANCH)\b/;
+  return job.steps.some((step) => {
+    const env = getNode(step.node, "env")?.toJSON();
+    if (!env || typeof env !== "object") {
+      return false;
+    }
+    const values = Object.values(env as Record<string, unknown>);
+    return values.some((value) => typeof value === "string" && diffBasePattern.test(value));
+  });
+}
+
 export function hasOpaqueRepoScriptExecution(job: WorkflowJob): boolean {
   return getJobFacts(job).hasOpaqueRepoScriptExecution;
 }

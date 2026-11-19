@@ -4,7 +4,7 @@ import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
 import { withRepositoryBlobNoneReleasePrecedent } from "./shared/similar-workflow-consensus.ts";
-import { hasHistoryDependentCommand } from "./shared/workflow-jobs.ts";
+import { hasHistoryDependentCommand, jobBindsDiffBaseVariable } from "./shared/workflow-jobs.ts";
 import { collectScopePrefixes } from "./shared/workflow-path-prefixes.ts";
 import { getCheckoutStep } from "./shared/workflow-analysis.ts";
 import { shellNonDisplayInvocations } from "./shared/shell-invocations.ts";
@@ -284,6 +284,117 @@ function jobLooksCommitMetadataLike(job: WorkflowJob): boolean {
   });
 }
 
+/**
+ * Verifiable history-reading work: the job runs git commands that compute
+ * over history metadata — `git diff`, `git log`, `git rev-list`,
+ * `git merge-base`, `git show`, `git cat-file`, `git describe` — or binds a
+ * diff-base env variable for a script (agent-native's mutation-shards, n8n's
+ * determine-version-info, freenet's rule-review are real examples). Such
+ * jobs read only the blobs their diff touches, so eager full-blob history
+ * transfer is waste. Applying history (`git checkout` of an old ref,
+ * `git cherry-pick`, `git tag` creation) does not qualify: the wording and
+ * the benefit argument are diff-shaped.
+ */
+const HISTORY_READING_GIT_ACTIONS = new Set([
+  "diff",
+  "log",
+  "rev-list",
+  "merge-base",
+  "show",
+  "cat-file",
+  "describe",
+]);
+
+function jobLooksDiffBasedLike(job: WorkflowJob): boolean {
+  const readsHistory = job.steps.some((step) =>
+    repositoryInvocations(step.run ?? "").some((words) => {
+      const [tool, action] = repositoryCommandHead(words);
+      return tool === "git" && HISTORY_READING_GIT_ACTIONS.has(action ?? "");
+    }),
+  );
+  return readsHistory || jobBindsDiffBaseVariable(job);
+}
+
+/**
+ * Raw commands that walk historical blobs wholesale. blob:none would not
+ * skip their transfer, only defer it, so the advice stays silent.
+ */
+function jobEagerlyReadsHistoricalBlobs(job: WorkflowJob): boolean {
+  return job.steps.some((step) =>
+    repositoryInvocations(step.run ?? "").some((words) => {
+      const head = repositoryCommandHead(words);
+      const [tool, action] = head;
+      if (tool !== "git") {
+        return false;
+      }
+      if (action === "archive") {
+        return true;
+      }
+      if (action === "log") {
+        return words.some((word) => /^-{1,2}(?:p|patch|full-diff|stat)$/.test(word));
+      }
+      if (action === "grep") {
+        // A grep over a revision walks every historical blob it matches.
+        return words.slice(2).some((word) => !word.startsWith("-") && word.length > 0);
+      }
+      return false;
+    }),
+  );
+}
+
+function evaluateDiffBasedJobForBlobNone(
+  workflow: WorkflowDocument,
+  job: WorkflowJob,
+  context: RuleContext,
+): Diagnostic | undefined {
+  if (!jobLooksDiffBasedLike(job)) {
+    return undefined;
+  }
+
+  // Repo-wide precedent gates this path: the repository already demonstrated
+  // that blob:none checkouts work for its jobs, so the advice cites evidence
+  // the maintainer can compare against directly.
+  const precedents = context.repository.repoPrecedents.blobNoneCheckouts;
+  if (precedents.length === 0) {
+    return undefined;
+  }
+
+  const checkout = getCheckoutStep(job);
+  if (!checkout || hasBlobNoneFilter(checkout)) {
+    return undefined;
+  }
+
+  // A sparse-checkout is its own optimization; do not stack advice on it.
+  if (hasSparseCheckout(checkout)) {
+    return undefined;
+  }
+
+  if (!hasDeepHistory(checkout)) {
+    return undefined;
+  }
+
+  if (
+    jobHasWideRepoAccess(job) ||
+    jobHasHeavyBuildOrInstall(job) ||
+    jobEagerlyReadsHistoricalBlobs(job)
+  ) {
+    return undefined;
+  }
+
+  return pipe(withRepositoryBlobNoneReleasePrecedent(context, workflow.relativePath, job.id))(
+    buildDiagnostic(workflow, meta, checkout.withNode ?? checkout.usesNode ?? checkout.node, {
+      message: `Job "${job.id}" computes changes against git history, but its checkout downloads every historical file blob eagerly.`,
+      why: `This job runs diff- or merge-base-style history work, which reads only the blobs its diff touches, yet the full-history checkout transfers every file version up front. \`filter: blob:none\` keeps the same commits and trees and fetches file contents only when something actually reads them (measured on agent-native: same-commit fetch dropped from ~43s to ~5s when sibling jobs already used it).`,
+      suggestion:
+        "Keep the same fetch depth and test checkout with `filter: blob:none`. The diff still works: git fetches the few blobs it reads on demand.",
+      measurementHint:
+        "Compare checkout fetch duration, transferred data, lazy blob fetches, and total job time before and after adding `filter: blob:none` at the same fetch depth.",
+      aiHandoff: `Review ${workflow.relativePath} job "${job.id}" and test whether checkout can use filter: blob:none while preserving its diff or merge-base behavior.`,
+      score: 62,
+    }),
+  );
+}
+
 function evaluateJobForBlobNone(
   workflow: WorkflowDocument,
   job: WorkflowJob,
@@ -365,7 +476,9 @@ export const considerFilterBlobNoneForReleaseMetadataRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
-      const finding = evaluateJobForBlobNone(workflow, job, _context);
+      const finding =
+        evaluateJobForBlobNone(workflow, job, _context) ??
+        evaluateDiffBasedJobForBlobNone(workflow, job, _context);
       if (finding) {
         findings.push(finding);
       }
