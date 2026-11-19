@@ -1,4 +1,4 @@
-import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../../workflow.ts";
+import type { WorkflowDocument, WorkflowJob } from "../../workflow.ts";
 import type { YAMLMap } from "../../yaml.ts";
 import { getScalarValue, getMapValue, getNode } from "../../workflow.ts";
 import { getJobFacts, getWorkflowFacts } from "./workflow-analysis.ts";
@@ -116,23 +116,54 @@ export function workflowLooksAgenticLike(workflow: WorkflowDocument, job?: Workf
     : getWorkflowFacts(workflow).looksAgenticLike;
 }
 
-function stepEnvText(step: WorkflowStep): string {
-  const env = getNode(step.node, "env")?.toJSON();
-  return env && typeof env === "object" ? JSON.stringify(env) : "";
-}
-
 function jobOutputs(job: WorkflowJob): Record<string, unknown> | undefined {
   const outputs = getNode(job.node, "outputs")?.toJSON();
-  return outputs && typeof outputs === "object" && !Array.isArray(outputs)
-    ? (outputs as Record<string, unknown>)
-    : undefined;
+  if (outputs && typeof outputs === "object" && !Array.isArray(outputs)) {
+    return outputs as Record<string, unknown>;
+  }
+  // A reusable-workflow call site re-exports the called workflow's outputs
+  // through `needs.<job>.outputs.*` (handsontable's test.yml orchestrating
+  // checks.yml is a real example), so a call job acts as a producer.
+  return job.usesReusableWorkflow ? { reusable: true } : undefined;
 }
 
 function jobConditionText(job: WorkflowJob): string {
-  return [
+  // Gate surfaces only: `if` expressions (job and step) and the `with`
+  // inputs of a reusable-workflow call (they gate the called pipeline's
+  // jobs). Plain action `with` values and step `env` assignments are data
+  // plumbing — managarm feeds `needs.cache-generic.outputs.caching-key`
+  // into an actions/cache key, and grafana's release pipeline passes
+  // `needs.setup.outputs.version` to builders as `VERSION`/`bucket-path`;
+  // neither is change selection.
+  const gateText = [
     typeof job.raw.if === "string" ? job.raw.if : "",
-    ...job.steps.map((step) => `${step.if ?? ""} ${stepEnvText(step)}`),
-  ].join(" ");
+    job.usesReusableWorkflow ? JSON.stringify(job.raw.with ?? {}) : "",
+    ...job.steps.map((step) => step.if ?? ""),
+  ];
+  return gateText.join(" ");
+}
+
+/**
+ * A producer-reference expression acts as change selection when it makes a
+ * decision — the template contains a comparison or boolean operator
+ * (`==`, `!=`, `&&`, `contains(`, ...). A bare reference
+ * `${{ needs.setup.outputs.version }}` only forwards data: grafana passes
+ * the release version into builder `with` inputs that way, and managarm
+ * feeds cache keys; neither gates execution.
+ */
+function referencesProducerAsGate(text: string, producerId: string): boolean {
+  const pattern = new RegExp(`needs\\.${escapeRegex(producerId)}\\.outputs\\.`);
+  const gateOperators = /[=!<>]|&&|\|\||\bcontains\(|\bstartsWith\(|\bendsWith\(/;
+  const exprPattern = /\$\{\{[^}]*\}\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = exprPattern.exec(text)) !== null) {
+    const expr = match[0];
+    if (pattern.test(expr) && gateOperators.test(expr)) {
+      return true;
+    }
+  }
+  // Unquoted `if:` conditions: the whole condition text is one expression.
+  return pattern.test(text) && gateOperators.test(text);
 }
 
 function escapeRegex(value: string): string {
@@ -156,10 +187,9 @@ export function workflowChangeSelectionProducerIds(
     if (Object.keys(jobOutputs(producer) ?? {}).length === 0) {
       continue;
     }
-    const pattern = new RegExp(`needs\\.${escapeRegex(producer.id)}\\.outputs\\.`);
     let consumers = 0;
     for (const job of jobs) {
-      if (job.id !== producer.id && pattern.test(jobConditionText(job))) {
+      if (job.id !== producer.id && referencesProducerAsGate(jobConditionText(job), producer.id)) {
         consumers++;
       }
     }

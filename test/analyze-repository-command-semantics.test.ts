@@ -173,6 +173,31 @@ test.each([
   expect(report.findings.filter((f) => f.ruleId === "prefer-frozen-lockfile")).toHaveLength(1);
 });
 
+test.each([
+  'out="$(mktemp -d)/app"\nnode ./cli.js create app --out "$out"\ncd "$out"\npnpm install',
+  'workspace_root=$(mktemp -d)\ncd "$workspace_root"\nnode ./cli.js create test-workspace\ncd test-workspace\npnpm install',
+  'cd "$(mktemp -d)"\npnpm install',
+  'cd "$RUNNER_TEMP"\npnpm install',
+  'cd "${{ runner.temp }}/project"\npnpm install',
+])(
+  "installs in throwaway scaffold directories have no committed lockfile to freeze: %j",
+  async (run) => {
+    const report = await analyze([run], { "pnpm-lock.yaml": "lockfileVersion: '9.0'\n" });
+    expect(report.findings.filter((f) => f.ruleId === "prefer-frozen-lockfile")).toHaveLength(0);
+  },
+);
+
+test.each([
+  'tmp="$(mktemp -d)"\ncp dist/*.tgz "$tmp/"\npnpm install',
+  'cd app\ntmp="$(mktemp -d)"\ncp dist/*.tgz "$tmp/"\ncd app\npnpm install',
+])(
+  "mktemp for artifacts does not excuse an install with a tracked repo directory: %j",
+  async (run) => {
+    const report = await analyze([run]);
+    expect(report.findings.filter((f) => f.ruleId === "prefer-frozen-lockfile")).toHaveLength(1);
+  },
+);
+
 test("pnpm respects an explicit workflow CI override", async () => {
   const report = await analyze(["pnpm install"], { "pnpm-lock.yaml": "lockfileVersion: '9.0'\n" }, [
     "        env:\n          CI: false\n",

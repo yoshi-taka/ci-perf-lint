@@ -28,11 +28,20 @@ Tag-only push handling:
 Change-based job selection:
 
 - a workflow that runs its own selection layer stays exempt: a producer job
-  exposes `outputs:` (a planner/dorny-paths-filter/determinator job) and at
-  least three jobs, at least two-fifths of the workflow, consume
-  `needs.<producer>.outputs.*` in their conditions or step environments
-  (real examples: iyi's `ci_plan`, warp's `params`, Pinvou's `changes`, rue's
-  `affected-targets`). Trigger-level paths would duplicate that layer.
+  exposes `outputs:` (a planner/dorny-paths-filter/determinator job, or a
+  reusable-workflow call site that re-exports the called workflow's outputs)
+  and at least three jobs, at least two-fifths of the workflow, gate on
+  `needs.<producer>.outputs.*` — the reference must appear in an `if`
+  condition (job or step) or a reusable-call `with` input, and it must make
+  a decision (contain a comparison such as `==`, `!=`, or `contains()`).
+  Real examples: iyi's `ci_plan`, warp's `params`, Pinvou's `changes`, rue's
+  `affected-targets`, handsontable's `checks` orchestrator, godot's
+  `static-checks`. Trigger-level paths would duplicate that layer.
+- data plumbing does not exempt the workflow: managarm feeds
+  `needs.cache-generic.outputs.caching-key` into actions/cache keys, and
+  grafana's release pipeline forwards `needs.setup.outputs.version` into
+  builder inputs as bare `${{ ... }}` references — neither is change
+  selection, so those workflows keep the advice
 
 Typical remediation:
 

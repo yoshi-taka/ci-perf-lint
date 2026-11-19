@@ -69,6 +69,15 @@ export const preferFrozenLockfileRule = {
       if (cwd.includes("${{")) {
         continue;
       }
+      // Variables assigned a mktemp path in this step, so a later cd into
+      // "$var" enters the throwaway directory.
+      const tempDirVars = [
+        ...step.text.matchAll(/^[ \t]*(?:export[ \t]+)?(\w+)=[^\n]*\bmktemp\b/gm),
+      ].map((match) => match[1]!);
+      const cdEntersThrowawayDir = (destinationText: string): boolean =>
+        /\bmktemp\b|runner\.temp|\bRUNNER_TEMP\b|\bTMPDIR\b/.test(destinationText) ||
+        tempDirVars.some((name) => new RegExp(`\\$\\{?${name}\\}?(?![\\w])`).test(destinationText));
+      let enteredThrowawayDir = false;
       const canTrackDirectory =
         !/\|\||[()]/.test(step.text) &&
         !shellCommands(step.text).some((words) =>
@@ -81,6 +90,9 @@ export const preferFrozenLockfileRule = {
         if (!words) {
           if (shellCommands(command)[0]?.[0] === "cd") {
             cwd = undefined;
+            if (cdEntersThrowawayDir(command)) {
+              enteredThrowawayDir = true;
+            }
           }
           continue;
         }
@@ -96,6 +108,9 @@ export const preferFrozenLockfileRule = {
             (path.posix.isAbsolute(destination) || cwd === ".." || cwd?.startsWith("../"))
           ) {
             cwd = undefined;
+          }
+          if (destination && cdEntersThrowawayDir(destination)) {
+            enteredThrowawayDir = true;
           }
           continue;
         }
@@ -120,6 +135,14 @@ export const preferFrozenLockfileRule = {
         const frozen = booleanFlag(words, "frozen-lockfile");
         const immutable = manager === "yarn" ? booleanFlag(words, "immutable") : undefined;
         if (frozen === true || immutable === true) {
+          continue;
+        }
+        // A throwaway directory (mktemp, runner temp) or a freshly
+        // scaffolded project outside the checkout has no committed lockfile
+        // to freeze, so the frozen-lockfile advice does not apply
+        // (agent-native's template smoke tests are real examples). Installs
+        // whose cd chain stays inside the tracked repo keep reporting.
+        if (enteredThrowawayDir) {
           continue;
         }
         const ciEnabled = ![false, "false", "0", ""].includes(commandEnv.CI as string | boolean);

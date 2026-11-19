@@ -12,6 +12,7 @@ Explicit flags are unnecessary when the package manager already enables equivale
 - Yarn Classic installs without `--frozen-lockfile`, and modern Yarn installs whose immutable behavior is disabled. Modern Yarn defaults to immutable in CI; unknown versions are not assumed to be Classic.
 - Flags are recognized anywhere after `install`/`i`, including `=true`, `=false` and negated forms. Visible CI and package-manager settings are considered.
 - Literal `cd` commands are resolved within each step when locating lockfiles and package-manager settings. Dynamic or conditional directory changes do not prove a CI default, and directory changes do not carry into another step.
+- Installs after a `cd` into a throwaway directory (a `mktemp` path or its assigned variable, `runner.temp`/`RUNNER_TEMP`/`TMPDIR`) are out of scope: a freshly scaffolded or temporary project has no committed lockfile to freeze. A `cd` back into a tracked repository directory restores the advice; `mktemp` used only for artifacts does not suppress anything.
 
 The separate `prefer-npm-ci` rule covers npm. `pnpm ci` is not the recommended pnpm command.
 
