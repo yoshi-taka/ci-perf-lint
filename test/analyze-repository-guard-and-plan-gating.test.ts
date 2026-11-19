@@ -92,6 +92,80 @@ describe("missing-release-downstream-success-guard", () => {
       report.filter((finding) => finding.ruleId === "missing-release-downstream-success-guard"),
     ).toHaveLength(1);
   });
+
+  test.each([
+    [
+      "full enumeration (lumia packages)",
+      "${{ !cancelled() && needs.publish.result == 'success' && needs.linux.result == 'success' }}",
+    ],
+    [
+      "partial enumeration with intentional optional upstreams (lumia publish)",
+      "${{ !cancelled() && needs.macos.result == 'success' && needs.android.result == 'success' }}",
+    ],
+    [
+      "mode-branched enumeration (agent-native publish-release)",
+      "${{ !cancelled() && inputs.mode != 'stage' && needs.prepare.result == 'success' && (inputs.mode == 'publish' || (needs.build.result == 'success' && needs.bundle.result == 'success')) }}",
+    ],
+    [
+      "single-need enumeration with !failure()",
+      "${{ !failure() && needs.promote.result == 'success' }}",
+    ],
+  ])(
+    "a !cancelled()/!failure() override with explicit needs-success enumeration is guarded: %s",
+    async (_label, ifText) => {
+      const report = await findings({
+        ...releaseLike,
+        jobs: {
+          ...upstreamJobs,
+          publish: {
+            needs: ["build", "test"],
+            if: ifText,
+            "runs-on": "ubuntu-latest",
+            steps: [{ run: "gh release upload v1 dist/*" }],
+          },
+        },
+      });
+      expect(
+        report.filter((finding) => finding.ruleId === "missing-release-downstream-success-guard"),
+      ).toHaveLength(0);
+    },
+  );
+
+  test("a !cancelled() override without needs-success enumeration still reports", async () => {
+    const report = await findings({
+      ...releaseLike,
+      jobs: {
+        ...upstreamJobs,
+        publish: {
+          needs: ["build", "test"],
+          if: "${{ !cancelled() && github.event_name == 'workflow_dispatch' }}",
+          "runs-on": "ubuntu-latest",
+          steps: [{ run: "gh release upload v1 dist/*" }],
+        },
+      },
+    });
+    expect(
+      report.filter((finding) => finding.ruleId === "missing-release-downstream-success-guard"),
+    ).toHaveLength(1);
+  });
+
+  test("a weaker != failure guard is not an explicit success enumeration", async () => {
+    const report = await findings({
+      ...releaseLike,
+      jobs: {
+        ...upstreamJobs,
+        publish: {
+          needs: ["build", "test"],
+          if: "${{ !cancelled() && needs.build.result != 'failure' }}",
+          "runs-on": "ubuntu-latest",
+          steps: [{ run: "gh release upload v1 dist/*" }],
+        },
+      },
+    });
+    expect(
+      report.filter((finding) => finding.ruleId === "missing-release-downstream-success-guard"),
+    ).toHaveLength(1);
+  });
 });
 
 describe("missing-paths-filter change-based job selection abstention", () => {

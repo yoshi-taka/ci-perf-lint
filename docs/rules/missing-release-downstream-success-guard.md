@@ -23,6 +23,15 @@ For those jobs, it usually expects a visible guard that combines:
 - upstream success checks such as `needs.*.result == 'success'`
 - `!failure() && !cancelled()`
 
+A `!cancelled()` or `!failure()` override paired with explicit
+`needs.<job>.result == 'success'` requirements already counts as a complete
+guard — the enumerated jobs must have succeeded, and the override only
+re-admits intentionally optional upstreams (lumia's release pipeline
+enumerates the gating jobs and deliberately ignores preview builds;
+agent-native's publish jobs enumerate builds behind a mode branch because a
+publish run skips the builds and the default `success()` check would skip
+the job too).
+
 ## Suggested fix
 
 If a release-like downstream job really needs a status-based `if:`, first confirm which upstream jobs truly must succeed and which may be intentionally skipped, then add explicit success checks without breaking those skip-allowing branches.

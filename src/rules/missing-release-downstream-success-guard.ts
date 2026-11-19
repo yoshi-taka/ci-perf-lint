@@ -53,6 +53,17 @@ function hasFailureCancelledGuard(ifText: string): boolean {
   return /!failure\(\)\s*&&\s*!cancelled\(\)|!cancelled\(\)\s*&&\s*!failure\(\)/.test(ifText);
 }
 
+/**
+ * A `!cancelled()` or `!failure()` override paired with explicit
+ * `needs.<job>.result == 'success'` requirements is already a complete
+ * guard: the enumerated jobs must have succeeded, and the override only
+ * re-admits intentionally optional upstreams (lumia's release pipeline
+ * enumerates the gating jobs and deliberately ignores preview builds).
+ */
+function hasNegativeStatusOverrideWithSuccessGuard(ifText: string): boolean {
+  return /!cancelled\s*\(\s*\)|!failure\s*\(\s*\)/.test(ifText) && hasNeedsSuccessGuard(ifText);
+}
+
 function hasStatusFunction(ifText: string): boolean {
   return /\b(?:always|failure|cancelled|success)\s*\(\s*\)/.test(ifText);
 }
@@ -205,7 +216,10 @@ export const missingReleaseDownstreamSuccessGuardRule = {
       ) {
         continue;
       }
-      if (hasNeedsSuccessGuard(ifText) && hasFailureAndCancellationGuard) {
+      if (
+        hasNeedsSuccessGuard(ifText) &&
+        (hasFailureAndCancellationGuard || hasNegativeStatusOverrideWithSuccessGuard(ifText))
+      ) {
         continue;
       }
 
