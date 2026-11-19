@@ -1,4 +1,4 @@
-import { renderReport } from "../dist/reporters.js";
+import { renderReport } from "../src/reporters.ts";
 import { parseJsonObject } from "../src/fuzz/json.ts";
 
 function makeString(value) {
