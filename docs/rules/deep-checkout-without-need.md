@@ -16,6 +16,7 @@ Current MVP heuristic:
 - `fetch-depth: 0` is present
 - no history-dependent command like `git diff`, `commitlint`, `semantic-release`, or `nx affected` is detected in the same job
 - no release, versioning, tag, opaque repo script, or write-capable repository mutation path is visible
+- no step env binds a diff-base variable (`github.base_ref`, the PR base SHA, or conventional `BASE_SHA`/`BASE_REF`/`MERGE_BASE`/`GITHUB_BASE_REF`/`GUARD_DIFF_BASE`/`DIFF_BASE`/`BASE_BRANCH` names) for an opaque script — a package-manager script like `pnpm mutation:changed` can hide `git merge-base`/`git diff` behind a package.json alias, and the env binding is the visible evidence that the job computes changes against history (real examples: agent-native's mutation-shards, aws-cdk's integ-test snapshots)
 
 Repo-local scripts under paths such as `scripts/`, `dev/`, `tools/`, `bin/`, `hack/`, or `tasks/` are treated as opaque on purpose.
 

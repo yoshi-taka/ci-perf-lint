@@ -129,6 +129,87 @@ jobs:
     );
   });
 
+  test("does not flag deep checkout when a step env binds a diff-base variable for an opaque script", async () => {
+    // agent-native's mutation-shards: `pnpm mutation:changed` resolves through
+    // package.json to scripts/mutation-changed.ts, which runs `git merge-base`
+    // and `git diff` against the commit named by GITHUB_BASE_REF. The script
+    // indirection hides the git calls, but the env binding is the visible
+    // evidence that the job computes changes against history.
+    const fixtureRoot = await tempDirs.create("apl-deep-checkout-diff-base-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "package.json"),
+      JSON.stringify({
+        name: "diff-base-fixture",
+        scripts: { "mutation:changed": "tsx scripts/mutation-changed.ts" },
+      }),
+    );
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: [pull_request]",
+        "jobs:",
+        "  mutation-shards:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "        with:",
+        "          fetch-depth: 0",
+        "      - run: pnpm mutation:changed --shard 1 4",
+        "        env:",
+        "          GITHUB_BASE_REF: ${{ github.base_ref }}",
+      ].join("\n"),
+    );
+
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "strict",
+    });
+
+    expect(report.findings.some((finding) => finding.ruleId === "deep-checkout-without-need")).toBe(
+      false,
+    );
+  });
+
+  test("a package-manager script without a diff-base binding keeps the deep-checkout advice", async () => {
+    const fixtureRoot = await tempDirs.create("apl-deep-checkout-no-diff-base-");
+    await mkdir(path.join(fixtureRoot, ".github", "workflows"), { recursive: true });
+    await writeFile(
+      path.join(fixtureRoot, "package.json"),
+      JSON.stringify({
+        name: "no-diff-base-fixture",
+        scripts: { test: "vitest run" },
+      }),
+    );
+    await writeFile(
+      path.join(fixtureRoot, ".github", "workflows", "ci.yml"),
+      [
+        "name: CI",
+        "on: [pull_request]",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "        with:",
+        "          fetch-depth: 0",
+        "      - run: pnpm test",
+      ].join("\n"),
+    );
+
+    const report = await getWorkflowFocusedFixtureReport(fixtureRoot, {
+      targetPath: ".",
+      topCount: 10,
+      mode: "strict",
+    });
+
+    expect(report.findings.some((finding) => finding.ruleId === "deep-checkout-without-need")).toBe(
+      true,
+    );
+  });
+
   test("does not flag deep checkout when a write-capable issue-management action may mutate the repository", async () => {
     const report = await getFixtureReport(fixtures.deepCheckoutMutatingAction, {
       targetPath: ".",
