@@ -9,8 +9,18 @@ recreating correct dependency links in large macOS workspaces.
 These are specific improvements, not an install-wide speed multiplier. Some metadata
 improvements also ship in 11.28.5. Actual gains depend on the workload and cache state.
 
+Later 12.x releases keep improving installs without changing this rule's 12.10
+threshold: 12.16 resolves dependencies faster in large workspaces on Linux, macOS,
+and Windows; 12.18 stops re-reading workspace manifests that did not change; 12.19
+unpacks large packages such as `typescript` about 30% faster on a cold store (and
+speeds up store cloning in macOS endpoint-security environments). Prefer the newest
+12.x release you can validate rather than stopping at 12.10.
+
 Sources: [pnpm 12](https://pnpm.io/blog/releases/12.0),
 [pnpm 12.10](https://pnpm.io/blog/releases/12.10.0),
+[pnpm 12.16](https://pnpm.io/blog/releases/12.16.0),
+[pnpm 12.18](https://pnpm.io/blog/releases/12.18.0),
+[pnpm 12.19](https://pnpm.io/blog/releases/12.19.0),
 [compatibility differences](https://pnpm.io/blog/whats-different-in-pnpm-12).
 
 ## What it flags
@@ -28,7 +38,8 @@ or complex ranges in that field are skipped rather than falling back to an overr
 
 ## Suggested action
 
-Pin a stable pnpm **12.10.0 or later** in package metadata and CI setup together.
+Pin a stable pnpm **12.10.0 or later** in package metadata and CI setup together,
+and prefer the newest 12.x release you can validate.
 An action reference such as `pnpm/action-setup@v4` is the action's version, not pnpm's.
 Update the effective package metadata pin and keep any legacy pin consistent.
 If the action reads `packageManager` automatically, update that field; action versions

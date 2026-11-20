@@ -25,9 +25,9 @@ export function pnpmVersionIsBelow1210(value: unknown): boolean {
 }
 
 export const pnpm1210Advice = {
-  why: "pnpm 12 rewrote the CLI in Rust. pnpm 12.10 adds faster cached registry metadata reads, avoids metadata requests waiting behind tarball downloads, and speeds up existing workspace dependency relinking on macOS. Benefits depend on the dependency graph, platform, and cache state.",
+  why: "pnpm 12 rewrote the CLI in Rust. pnpm 12.10 adds faster cached registry metadata reads, avoids metadata requests waiting behind tarball downloads, and speeds up existing workspace dependency relinking on macOS. Later 12.x releases keep improving installs: 12.16 resolves dependencies faster in large workspaces on Linux, macOS, and Windows, 12.18 skips re-reading unchanged workspace manifests, and 12.19 unpacks large packages (for example typescript) about 30% faster on a cold store. Benefits depend on the dependency graph, platform, and cache state.",
   suggestion:
-    "Upgrade pnpm pins to a stable 12.10.0 or later release, keeping packageManager, devEngines.packageManager, and CI setup versions aligned where declared. Review pnpm 12 compatibility differences before switching older major versions.",
+    "Upgrade pnpm pins to a stable 12.10.0 or later release and prefer the newest 12.x you can validate, keeping packageManager, devEngines.packageManager, and CI setup versions aligned where declared. Review pnpm 12 compatibility differences before switching older major versions.",
   measurementHint:
     "Compare dependency resolution and install wall-clock time with cold and warm caches, and verify frozen-lockfile installs and project scripts still pass. The first run after upgrading may refill the metadata cache.",
   score: 45,
