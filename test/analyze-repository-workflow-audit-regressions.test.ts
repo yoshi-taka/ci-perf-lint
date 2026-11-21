@@ -173,8 +173,20 @@ describe("workflow audit: compatibility and component scope", () => {
   test("still suggests gates for two ungated heavy component jobs", async () => {
     const findings = await analyze(
       {
-        backend: { "runs-on": "ubuntu-latest", steps: [{ run: "pnpm run test:api" }] },
-        frontend: { "runs-on": "ubuntu-latest", steps: [{ run: "pnpm run test:web" }] },
+        backend: {
+          "runs-on": "ubuntu-latest",
+          steps: [
+            { uses: "actions/checkout@v4" },
+            { run: "pnpm run test:api", "working-directory": "apps/api" },
+          ],
+        },
+        frontend: {
+          "runs-on": "ubuntu-latest",
+          steps: [
+            { uses: "actions/checkout@v4" },
+            { run: "pnpm run test:web", "working-directory": "apps/web" },
+          ],
+        },
       },
       { id: "prefer-dorny-paths-filter-for-scoped-jobs", severity: "warning" },
     );

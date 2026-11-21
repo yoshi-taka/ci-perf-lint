@@ -25,6 +25,31 @@ const files = (source: string, extra: Record<string, string> = {}) => ({
 
 const scenarios: ShellEvidenceScenario[] = [
   {
+    name: "component scope uses execution paths, not labels or logs",
+    command: "npm run build",
+    build: (run) => {
+      const job = (directory: string) => ({
+        "runs-on": "ubuntu-latest",
+        steps: [{ uses: "actions/checkout@v4" }, { run, "working-directory": directory }],
+      });
+      return files(
+        stringify({
+          name: "CI",
+          on: "pull_request",
+          jobs: { first: job("apps/api"), second: job("apps/web") },
+        }),
+      );
+    },
+    expectations: [
+      {
+        id: "prefer-dorny-paths-filter-for-scoped-jobs",
+        severity: "warning",
+        count: 1,
+        literalCount: 0,
+      },
+    ],
+  },
+  {
     name: "matching build command evidence",
     command: "npm run build",
     build: (run) => {
