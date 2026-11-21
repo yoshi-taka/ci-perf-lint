@@ -26,7 +26,7 @@ async function main() {
         ["simulation", "instrumentation", "memory"].includes(
           process.env.CODSPEED_RUNNER_MODE ?? "",
         );
-      if (!analysisCompleted) console.table(bench.table());
+      if (!analysisCompleted) {console.table(bench.table());}
       const failed = failedBenchmarkTasks(bench, analysisCompleted);
       if (failed.length > 0) {
         console.error(`[bench] Failed tasks: ${failed.join(", ")}`);

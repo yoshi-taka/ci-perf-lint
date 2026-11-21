@@ -49,7 +49,7 @@ async function runRules(workflow: WorkflowDocument, context: RuleContext) {
   const warnings: AnalysisWarning[] = [];
   await evaluateRules(workflow, context, warnings);
   const failures = warnings.filter((warning) => warning.kind === "rule-error");
-  if (failures.length > 0) throw new Error(failures.map((warning) => warning.message).join("\n"));
+  if (failures.length > 0) {throw new Error(failures.map((warning) => warning.message).join("\n"));}
 }
 const bench = withCodSpeed(
   new Bench({

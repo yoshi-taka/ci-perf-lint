@@ -7,7 +7,7 @@ import {
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../src/workflow.ts";
 
 function makeStep(name?: string, run?: string): WorkflowStep {
-  return { name, run, uses: undefined, node: undefined as never, runNode: undefined as never } as unknown as WorkflowStep;
+  return { name, run, uses: undefined, node: undefined as never, runNode: undefined as never };
 }
 
 function makeJob(id: string, stepCount: number): WorkflowJob {

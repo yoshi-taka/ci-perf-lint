@@ -109,7 +109,7 @@ const args = process.argv.slice(2);
 const listOnly = args.includes("--list");
 const all = args.includes("--all");
 const baseIndex = args.indexOf("--base");
-const base = baseIndex >= 0 ? args[baseIndex + 1]! : "HEAD";
+const base = baseIndex >= 0 ? args[baseIndex + 1] : "HEAD";
 const explicit = args.filter((arg, index) => {
   if (arg.startsWith("--")) {
     return false;
