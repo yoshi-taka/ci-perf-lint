@@ -5,7 +5,8 @@ Detects mypy declared in production dependency sections or bundled into CDK depl
 ## What it detects
 
 - `mypy` listed in production dependency sections such as:
-  - `[project.dependencies]` or `[project.optional-dependencies]` in `pyproject.toml`
+  - `[project.dependencies]` in `pyproject.toml` (PEP 621 extras under
+    `[project.optional-dependencies]` are development extras and are not flagged)
   - `[tool.poetry.dependencies]` or `[tool.poetry.extras]` in `pyproject.toml`
   - `requirements.txt`
   - `install_requires` in `setup.py` or `setup.cfg`
@@ -26,7 +27,8 @@ mypy is a static type checker and development-only tool. Shipping it to producti
 Move mypy to the appropriate development dependency group:
 
 - Poetry: `[tool.poetry.group.dev.dependencies]`
-- PEP 621 / `pyproject.toml`: `[dependency-groups.dev]` or a dedicated dev extra
+- PEP 621 / `pyproject.toml`: `[dependency-groups.dev]` or a dev extra under
+  `[project.optional-dependencies]` (for example `dev = ["mypy>=1.0"]`)
 - Pipfile: `[dev-packages]`
 - requirements: `requirements-dev.txt` or similar
 

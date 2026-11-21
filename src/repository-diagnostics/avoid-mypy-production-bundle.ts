@@ -20,8 +20,6 @@ interface MatchResult {
 function isProductionPyprojectSection(section: string): boolean {
   return (
     section === "project.dependencies" ||
-    section === "project.optional-dependencies" ||
-    section.startsWith("project.optional-dependencies.") ||
     section === "tool.poetry.dependencies" ||
     section === "tool.poetry.extras" ||
     section.startsWith("tool.poetry.extras.")
@@ -48,8 +46,8 @@ function checkPyprojectToml(text: string): MatchResult | undefined {
       currentSection === "project" &&
       /^(dependencies|optional-dependencies)\s*=\s*\[/.test(trimmed)
     ) {
-      inProjectDepsArray = true;
-      if (/\bmypy\b/.test(line)) {
+      inProjectDepsArray = /^dependencies\s*=\s*\[/.test(trimmed);
+      if (inProjectDepsArray && /\bmypy\b/.test(line)) {
         return { line: i, column: line.indexOf("mypy") + 1, section: "project" };
       }
       continue;
