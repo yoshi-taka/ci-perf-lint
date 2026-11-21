@@ -68,12 +68,13 @@ export const missingConcurrencyRule = {
     const base = buildDiagnostic(workflow, meta, workflow.onNode ?? workflow.nameNode, {
       message: "The workflow has no workflow-level or job-level concurrency setting.",
       why: agentic
-        ? "Agentic and AI-assisted runs are often long-lived, so older runs can keep burning runner time after newer commits or comments arrive on the same PR or branch."
-        : "Older runs can continue burning runner time after newer commits arrive on the same PR or branch.",
-      suggestion: "Add concurrency with cancel-in-progress for pull_request or branch-scoped runs.",
+        ? "Agentic and AI-assisted runs are often long-lived, so superseded read-only checks can keep burning runner time. Publication and deployment runs may instead need to finish and retain every queued release."
+        : "Superseded read-only checks can waste runner time, but publication and deployment runs may need to finish and retain every queued release.",
+      suggestion:
+        "Cancel superseded read-only PR/branch checks only, preferably at job level. Do not cancel release/publish/deploy work. For serialized publication consider cancel-in-progress: false with queue: max (up to 100 pending); this is not a lossless release queue or a dispatch-order guarantee.",
       measurementHint:
-        "Push multiple commits to the same PR and confirm only the latest run continues.",
-      aiHandoff: `Add safe concurrency to ${workflow.relativePath}, ideally scoped by workflow and ref, and keep existing behavior intact.`,
+        "For read-only checks, confirm superseded runs stop without canceling unrelated checks. For publication, verify in-progress completion, queued-release retention and required ordering under bursts.",
+      aiHandoff: `Review ${workflow.relativePath} before adding concurrency. Isolate superseded read-only validation from publication/deployment, including opaque scripts and reusable workflows. Do not cancel publication or copy a latest-only CI group onto it. Default concurrency replaces pending runs even with cancel-in-progress: false; queue: max retains at most 100 pending and does not guarantee dispatch order. Use a durable queue if every release must run.`,
       score: agentic ? 62 : 58,
     });
 
@@ -84,7 +85,7 @@ export const missingConcurrencyRule = {
         workflowPath: workflow.relativePath,
         label: "concurrency",
         aiHandoff:
-          "Reuse one of the repository's existing concurrency patterns where it fits this workflow.",
+          "Reuse an existing concurrency pattern only after checking its cancellation and pending-queue policy; never copy latest-only CI cancellation onto publication.",
       })),
       contramap(consensusEnricher, (ctx: RuleContext) => ({
         signal: ctx.repository.similarWorkflows.index.concurrency.get(workflow.relativePath),
@@ -92,13 +93,13 @@ export const missingConcurrencyRule = {
           scoreBonus: 8,
           why: "That makes this look more like a repository-local normalization gap than a one-off design choice.",
           aiHandoff:
-            "Prefer the repository's existing concurrency pattern over inventing a new grouping strategy unless this workflow has clearly different cancellation requirements.",
+            "Prefer an existing pattern only when its cancellation, pending-queue and publication requirements match; repository precedent does not establish cancellation safety.",
         },
         why: (evidence, peerText) =>
           `In this repository, ${evidence.peerCount} similar workflows already use concurrency.${peerText}`,
         peerText: "Similar workflows already using concurrency include",
         aiHandoff:
-          "Match the established concurrency pattern already used in similar workflows where it fits this workflow's trigger semantics.",
+          "Match established concurrency only where trigger, cancellation and queued-release retention requirements agree.",
       })),
       contramap(stackedDiffEnricher, (ctx: RuleContext) => {
         const provider =
@@ -118,9 +119,9 @@ export const missingConcurrencyRule = {
           evidenceText,
           adjustment: {
             scoreBonus: 10,
-            why: "Concurrency is more valuable because superseded runs from restacks can otherwise keep consuming runner time.",
+            why: "For read-only validation, superseded runs from restacks can otherwise keep consuming runner time; this does not justify canceling publication.",
             aiHandoff:
-              "Use a concurrency group scoped to the workflow and PR/head ref so newer restack runs cancel older runs from the same branch without canceling unrelated PRs.",
+              "For superseded read-only PR validation only, scope cancellation by workflow and PR/head ref. Keep publication/deployment outside the canceling group and preserve unrelated PRs.",
           },
         };
       }),

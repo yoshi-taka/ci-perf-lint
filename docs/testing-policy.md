@@ -16,10 +16,10 @@
 | **Metamorphic / differential** | `test/boundary-metamorphic.test.ts` | Oracle-less invariant verification |
 | **Mutation** | `stryker/stryker.*.config.mjs` | Local mutation runner (opt-in, slow) |
 
-## Lean and Z3: what they add
+## Lean, Z3 and Alloy: what they add
 
-Tests check examples. Lean and Z3 also help check the logic behind selected parts
-of the tool. Neither replaces tests or proves that the whole application is correct.
+Tests check examples. Formal tools also help check the logic behind selected parts
+of the tool. None replaces tests or proves that the whole application is correct.
 
 ### Lean: prove properties of a model
 
@@ -55,6 +55,53 @@ Run `bun install --cwd formal --frozen-lockfile`, then
 
 For either tool: state the property and assumptions, replay counterexamples against
 the implementation, and turn confirmed defects into ordinary regression tests.
+
+### Alloy: check relational structure
+
+Use Alloy for relationships such as membership, dependency edges, overlapping
+groups, duplicate ownership or missing evidence. A finite-scope check establishes
+only that no counterexample was found within that model and scope; it is not a
+general proof about arbitrarily large repositories.
+
+### Formal verification requirements for rule changes
+
+New or changed detection conditions, gates, exemptions and decision thresholds
+require a property check with Z3 or Alloy suited to the question:
+
+- Z3: conditions/constraints and inputs that violate an intended decision property.
+- Alloy: relationships/structure, overlap, dependencies, duplication or omissions.
+- For concurrency/state transitions, TLA+ may be more suitable; for a general
+  mathematical proof, Lean may be more suitable. Explain the choice. Do not force
+  every tool onto every rule or treat Lean as automatically integrating them all.
+
+Before running a tool, state the property, assumptions, modeled inputs and bounds.
+Do not encode the desired conclusion as an assumption. Include both:
+
+1. A satisfiable normal/positive example, so the property is not vacuously checked.
+2. An intentionally broken decision/model that the same checks detect, so the
+   verification can actually fail.
+
+Compare model decisions with actual TypeScript behavior where possible using
+differential/generated-input tests. Also test reachable inputs through the normal
+analyzer entry point: a synthetic model state need not be reachable from a real
+workflow. Reproduce counterexamples in code and confirm a specification violation
+before calling them implementation bugs; add ordinary regressions for confirmed bugs.
+
+Record the model/property, tool version, assumptions, scope, commands, result and
+model-to-code connection with the rule's real-repository validation record.
+Distinguish a theorem under assumptions from bounded counterexample search, and
+both from tested implementation agreement. A proof/check says nothing beyond its
+stated scope or about unmeasured runtime savings.
+
+Wording-only changes with unchanged decision logic need remediation-safety tests
+and a reference to existing formal evidence, or a stated reason no modeled property
+applies; do not manufacture a trivial proof of prose. Missing tools, unrun checks,
+timeouts and unknown/inconclusive results must be reported as such, not passed.
+Start experiments in a temporary/isolated environment. System installation,
+production dependencies and permanent CI integration need prior approval.
+
+See the [rule verification checklist](./adding-a-rule.md#verification) for required
+multi-repository TP/TN/FP/FN checks, remediation safety and record contents.
 
 ## Goals
 

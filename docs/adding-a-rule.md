@@ -317,15 +317,70 @@ Use this pattern (see `prefer-node-run-over-npm-run.ts` for a complete reference
 
 ## Verification
 
-When adding or changing a rule, validate it against real repository workflows or
-files in addition to local fixtures. Use immutable revisions when checking older
-versions. Review findings against the actual evidence for false positives and
-missed cases; where possible, compare affected and unaffected or upgraded cases.
-If no applicable real positive case is found, explicitly report that limitation.
-Static validation does not establish a measured performance improvement.
+The following checklist applies to both new rules and changes to existing rules,
+including gates, exemptions, severity promotions and remediation advice.
 
-Report the repositories, revisions and results. If a written validation record is
-needed, follow the existing layout and place it under `docs/internal/`.
+### Required checks
+
+1. **Define the intended behavior first.** State the expected property, evidence,
+   assumptions, exclusions and unknown-input policy. Do not infer identical inputs,
+   independent components or safe skips from names alone.
+2. **Validate against multiple real repositories.** Use at least two distinct
+   repositories, pinned to immutable revisions, with different relevant shapes.
+   Check positive and negative cases against source evidence and upstream behavior,
+   not merely whether the analyzer emits something. Examine known eligible cases
+   that do not emit findings to look for false negatives; reviewing only emitted
+   findings cannot establish FN coverage.
+3. **Classify results explicitly:** TP (intended finding), TN (correct exclusion),
+   FP (incorrect finding), FN (missed intended finding), or unresolved/unobserved.
+   A missing configuration is not by itself proof of avoidable work or a safe fix.
+   If an applicable real positive or negative cannot be found, record that gap;
+   do not call the rule fully real-repository validated. When narrowing a rule,
+   confirm that positive controls still fire, rather than merely making all
+   findings disappear. Compare old and new behavior on the same pinned corpus.
+4. **Verify decision logic with Z3 or Alloy**, as appropriate to the property.
+   Follow [Formal verification requirements](./testing-policy.md#formal-verification-requirements-for-rule-changes).
+   State model assumptions and bounds; connect the model to the implementation.
+   A bounded search without a counterexample is not an unrestricted proof.
+   For wording-only changes with unchanged logic, reference applicable existing
+   evidence and explain why a new model check is not applicable. Unavailable,
+   unexecuted, timed-out or inconclusive checks are not passes.
+5. **Keep ordinary regression tests.** Cover positive, negative, boundary,
+   compatibility and unknown-input cases through the analyzer's normal entry point,
+   including gates, registration and output. Replay model counterexamples in real
+   code; confirmed defects become regression tests. For command-based evidence,
+   include the shell-evidence controls described above.
+6. **Validate remediation safety, not just detection.** Preserve publication and
+   deployment completion, required checks, shared dependencies, compatibility and
+   useful downstream tests. Review the final suggestion and AI handoff, including
+   repository precedents/consensus and other enrichments. Configuration presence,
+   matching tool families and separate directories do not establish safety.
+7. **Separate static evidence from measured benefit.** Check that a recommendation
+   has a concrete performance rationale and a measurement plan. Do not claim faster
+   CI or fewer runner minutes without measurements; include added cache, artifact
+   transfer or change-detection overhead when measuring.
+
+### Reproducible validation record
+
+For each rule addition/change, keep a concise validation record under
+`docs/internal/`, using the existing layout. Markdown is sufficient; raw JSON or
+logs are optional supporting evidence. Record:
+
+- Rule ID, intended behavior, assumptions and verification scope.
+- Repository URL and commit SHA; relevant file path/line or job/step, including
+  source evidence for an expected finding that was absent.
+- Expected versus observed result, TP/TN/FP/FN classification, and unresolved cases.
+- Tool commit and command/options/mode. For uncommitted implementation changes,
+  include a reproducible patch/snapshot reference; a hash alone cannot reconstruct it.
+- Formal model/property, tool/version, assumptions/bounds, execution result,
+  implementation comparison and positive/broken-model controls, or an explicit
+  not-applicable/not-run reason.
+- Regression tests and their results; whether CI execution/performance measurement
+  occurred; remaining limitations and follow-up.
+
+The purpose is to let someone repeat the check, not just read “real repo checked.”
+Distinguish local-only/ignored records from version-controlled evidence; do not
+force-add ignored records or publish third-party/private material without approval.
 
 Run a focused test first when possible, then broaden.
 
@@ -334,7 +389,7 @@ Common commands:
 ```sh
 bun run lint
 bun run audit:static
-bun test --parallel
+bun run test
 ```
 
 Run the full suite after touching:

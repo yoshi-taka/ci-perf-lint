@@ -14,9 +14,9 @@ Findings: full finding list from strict mode.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-path-ignore-for-non-code
 3. missing-concurrency at .github/workflows/ci.yml:4:3
    Message: The workflow has no workflow-level or job-level concurrency setting.
-   Why: Older runs can continue burning runner time after newer commits arrive on the same PR or branch.
-   Suggested action: Add concurrency with cancel-in-progress for pull_request or branch-scoped runs.
-   Measurement hint: Push multiple commits to the same PR and confirm only the latest run continues.
+   Why: Superseded read-only checks can waste runner time, but publication and deployment runs may need to finish and retain every queued release.
+   Suggested action: Cancel superseded read-only PR/branch checks only, preferably at job level. Do not cancel release/publish/deploy work. For serialized publication consider cancel-in-progress: false with queue: max (up to 100 pending); this is not a lossless release queue or a dispatch-order guarantee.
+   Measurement hint: For read-only checks, confirm superseded runs stop without canceling unrelated checks. For publication, verify in-progress completion, queued-release retention and required ordering under bursts.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-concurrency
 4. native-dependency-may-fall-back-to-source-build at .github/workflows/ci.yml:1:1
    Message: Repository uses native-heavy packages and the workflow also shows install conditions that may bypass wheels or prebuilt binaries.

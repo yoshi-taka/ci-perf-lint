@@ -32,9 +32,9 @@
 - Confidence: `high`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-concurrency`
 - Message: The workflow has no workflow-level or job-level concurrency setting.
-- Why it matters: Older runs can continue burning runner time after newer commits arrive on the same PR or branch.
-- Suggested action: Add concurrency with cancel-in-progress for pull_request or branch-scoped runs.
-- Measurement hint: Push multiple commits to the same PR and confirm only the latest run continues.
+- Why it matters: Superseded read-only checks can waste runner time, but publication and deployment runs may need to finish and retain every queued release.
+- Suggested action: Cancel superseded read-only PR/branch checks only, preferably at job level. Do not cancel release/publish/deploy work. For serialized publication consider cancel-in-progress: false with queue: max (up to 100 pending); this is not a lossless release queue or a dispatch-order guarantee.
+- Measurement hint: For read-only checks, confirm superseded runs stop without canceling unrelated checks. For publication, verify in-progress completion, queued-release retention and required ordering under bursts.
 
 ## native-dependency-may-fall-back-to-source-build
 
