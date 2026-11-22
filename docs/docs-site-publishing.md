@@ -98,6 +98,10 @@ For Cloudflare Pages:
 - Bun version: 1.4.4 or newer
 - Dependency installation is unnecessary (`SKIP_DEPENDENCY_INSTALL=1` is retained)
 
+Run `bun run docs:test` for site-only regression tests. It runs from the site
+workspace with `site/bunfig.toml`, skipping the product test preload, so no `fast-check` or other
+package installation is needed. Product tests keep using the root test setup.
+
 The dedicated `Docs site` workflow also runs for rule Markdown-only changes,
 which the product CI intentionally ignores. It builds without installing
 dependencies and runs the site regression tests, including add/edit/rename/delete

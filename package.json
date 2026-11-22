@@ -25,6 +25,7 @@
     "docs:dev": "bun run --filter ci-perf-lint-site dev",
     "docs:build": "bun run --filter ci-perf-lint-site build",
     "docs:preview": "bun run --filter ci-perf-lint-site preview",
+    "docs:test": "bun run --filter ci-perf-lint-site test",
     "mutation": "bun run src/mutation/main.ts",
     "test": "AGENT=1 bun --no-orphans scripts/run-bounded.ts --memory-mib 2048 --timeout-ms 180000 -- bun test --no-orphans --parallel=2 --no-isolate --randomize --timings=.bun-test-timings.json",
     "test:mutation:source": "AGENT=1 bun test --no-orphans --parallel=1",

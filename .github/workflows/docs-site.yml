@@ -9,6 +9,8 @@ on:
       - "site/**"
       - "test/site-*.test.ts"
       - "test/temp-root.ts"
+      - "test/setup.ts"
+      - "bunfig.toml"
       - "scripts/run-bounded.ts"
       - "package.json"
       - "bun.lock"
@@ -22,6 +24,8 @@ on:
       - "site/**"
       - "test/site-*.test.ts"
       - "test/temp-root.ts"
+      - "test/setup.ts"
+      - "bunfig.toml"
       - "scripts/run-bounded.ts"
       - "package.json"
       - "bun.lock"
@@ -48,4 +52,4 @@ jobs:
       - name: Build and validate all public pages
         run: bun run docs:build
       - name: Test source updates, rendering, preview, and watch rebuilds
-        run: bun run test test/site-*.test.ts
+        run: bun run docs:test

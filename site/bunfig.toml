@@ -1,0 +1,3 @@
+[test]
+# Site tests use Bun APIs only, not the product's fast-check preload.
+preload = []

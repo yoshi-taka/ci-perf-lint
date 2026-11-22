@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "bun --watch serve.ts --watch",
     "build": "bun run build.ts",
-    "preview": "bun run serve.ts"
+    "preview": "bun run serve.ts",
+    "test": "AGENT=1 bun --no-orphans ../scripts/run-bounded.ts --memory-mib 2048 --timeout-ms 180000 -- bun test --no-orphans --parallel=2 --no-isolate --randomize ../test/site-build.test.ts ../test/site-documentation.test.ts"
   },
   "engines": {
     "bun": ">=1.4.4"
