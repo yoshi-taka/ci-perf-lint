@@ -2,6 +2,10 @@
 
 [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/yoshi-taka/ci-perf-lint?utm_source=badge)
 
+<a href="https://ci-perf-lint.veritycost.com/">
+  <img src="./docs/assets/home.png" alt="ci-perf-lint — Find CI waste. Know what to fix first." width="640">
+</a>
+
 Find CI waste. Know what to fix first.
 
 CI Perf Lint scans CI workflows, source code, and tooling configuration for avoidable work—from redundant installs to expensive build patterns.
