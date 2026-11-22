@@ -9,18 +9,19 @@ interface RuleDocSummary {
 }
 
 // The site runs from `site/` as a workspace, but its source lives at the repo root.
-const rulesDir = [path.resolve(process.cwd(), "docs/rules"), path.resolve(process.cwd(), "../docs/rules")].find(
-  (candidate) => existsSync(candidate),
-) ?? path.resolve(process.cwd(), "../docs/rules");
+const rulesDir =
+  [path.resolve(process.cwd(), "docs/rules"), path.resolve(process.cwd(), "../docs/rules")].find(
+    (candidate) => existsSync(candidate),
+  ) ?? path.resolve(process.cwd(), "../docs/rules");
 
 function normalizeTitle(title: string, slug: string): string {
   const trimmed = title.trim();
   const wrappedCode = trimmed.match(/^`(.+)`$/);
-  if (wrappedCode) {
+  if (wrappedCode?.[1]) {
     return wrappedCode[1];
   }
 
-  return trimmed || slug;
+  return trimmed.replace(/`/g, "") || slug;
 }
 
 function toSummary(markdown: string): string {
@@ -30,10 +31,17 @@ function toSummary(markdown: string): string {
     .map((chunk) => chunk.trim())
     .filter(Boolean);
 
-  return (
+  const paragraph =
     paragraphs.find((chunk) => !chunk.startsWith("#"))?.replace(/\n+/g, " ") ??
-    "Rule documentation."
-  );
+    "Rule documentation.";
+  const plain = paragraph
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1");
+  if (plain.length <= 240) return plain;
+  const shortened = plain.slice(0, 237);
+  const boundary = shortened.lastIndexOf(" ");
+  return `${shortened.slice(0, boundary > 180 ? boundary : shortened.length)}…`;
 }
 
 export async function listRuleDocs(): Promise<RuleDocSummary[]> {

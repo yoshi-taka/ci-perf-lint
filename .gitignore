@@ -19,3 +19,4 @@ site/.astro
 .astro/
 site/dist
 site/src/pages/rules/*.md
+site/src/pages/guides/*.md

@@ -1,0 +1,13 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { withBase } from "../lib/urls";
+---
+<BaseLayout title="Page not found | ci-perf-lint" noindex>
+  <section class="empty-page wrap">
+    <p class="eyebrow">404 / PAGE NOT FOUND</p>
+    <h1>This page doesn’t exist.</h1>
+    <p>The link may be out of date. Browse the rule documentation or return to the home page.</p>
+    <p><a href={withBase("/rules/")}>Browse rules →</a></p>
+    <p><a href={withBase("/")}>← Home</a></p>
+  </section>
+</BaseLayout>
