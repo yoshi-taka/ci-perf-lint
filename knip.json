@@ -43,8 +43,7 @@
     },
     "site": {
       "entry": [
-        "src/pages/**/*.astro",
-        "src/layouts/**/*.astro"
+        "public/site.js"
       ]
     },
     "formal": {}

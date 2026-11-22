@@ -220,6 +220,11 @@ The docs should include:
 - Measurement or verification guidance.
 - Compatibility notes when relevant.
 
+The docs site reads `docs/rules/*.md` directly on every `bun run docs:build`.
+Adding or editing a rule explainer automatically updates the rule index, page,
+summary, headings, and sitemap. No site page or registry entry is needed.
+The rule registries described above are still required for analyzer execution.
+
 Preferred section order for public rule docs:
 
 1. `Why it matters`

@@ -20,3 +20,5 @@ site/.astro
 site/dist
 site/src/pages/rules/*.md
 site/src/pages/guides/*.md
+site/.dist-build-*/
+site/dist-old-*/

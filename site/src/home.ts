@@ -1,31 +1,60 @@
----
-import BaseLayout from "../layouts/BaseLayout.astro";
-import CopyCommands from "../components/CopyCommands.astro";
-import { withBase } from "../lib/urls";
+import { escapeHtml, renderCopyCommands, renderPage } from "./html";
+import type { RuleDoc } from "./lib/rules";
 
 const featuredRules = [
   { slug: "missing-concurrency", category: "Workflow", title: "Stop running superseded commits" },
-  { slug: "dockerfile-copies-all-before-deps", category: "Docker", title: "Keep dependency layers reusable" },
-  { slug: "avoid-brew-update-on-hosted-macos", category: "Workflow", title: "Skip unnecessary Homebrew updates" },
-  { slug: "dockerfile-maven-build-without-cache-mount", category: "Docker", title: "Reuse Maven downloads on persistent builders" },
-  { slug: "missing-make-j-flag", category: "Build & test", title: "Check whether your build can use more cores" },
-  { slug: "pytest-xdist-installed-but-not-used", category: "Build & test", title: "Use the test parallelism you already installed" },
+  {
+    slug: "dockerfile-copies-all-before-deps",
+    category: "Docker",
+    title: "Keep dependency layers reusable",
+  },
+  {
+    slug: "avoid-brew-update-on-hosted-macos",
+    category: "Workflow",
+    title: "Skip unnecessary Homebrew updates",
+  },
+  {
+    slug: "dockerfile-maven-build-without-cache-mount",
+    category: "Docker",
+    title: "Reuse Maven downloads on persistent builders",
+  },
+  {
+    slug: "missing-make-j-flag",
+    category: "Build & test",
+    title: "Check whether your build can use more cores",
+  },
+  {
+    slug: "pytest-xdist-installed-but-not-used",
+    category: "Build & test",
+    title: "Use the test parallelism you already installed",
+  },
 ];
----
-<BaseLayout
-  title="ci-perf-lint — Find CI waste. Know what to fix first."
-  description="Scan CI workflows, source code, and tooling configuration for avoidable work. Get prioritized findings, suggested changes, and measurement hints."
-  home
->
-  <div class="wrap">
+
+export function renderHome(rules: RuleDoc[]): string {
+  const slugs = new Set(rules.map((rule) => rule.slug));
+  const ruleHref = (slug: string) => (slugs.has(slug) ? `/rules/${slug}/` : "/rules/");
+  const selected = featuredRules.filter((rule) => slugs.has(rule.slug));
+  const featured = selected.length
+    ? selected
+    : rules.slice(0, 6).map((rule) => ({
+        ...rule,
+        category: "Rule",
+      }));
+  return renderPage({
+    title: "ci-perf-lint — Find CI waste. Know what to fix first.",
+    description:
+      "Scan CI workflows, source code, and tooling configuration for avoidable work. Get prioritized findings, suggested changes, and measurement hints.",
+    pathname: "/",
+    home: true,
+    body: `<div class="wrap">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
         <p class="eyebrow hero-eyebrow"><span aria-hidden="true"></span> Static analysis for CI performance</p>
-        <h1 id="hero-title">Find CI waste.<br /><span>Know what to<br />fix first.</span></h1>
+        <h1 id="hero-title">Find CI waste.<br><span>Know what to<br>fix first.</span></h1>
         <p class="hero-description">Scan CI workflows, source code, and tooling configuration for avoidable work.</p>
         <p class="hero-detail">Get a prioritized improvement plan: where the waste is, what to change, and how to verify the result.</p>
-        <CopyCommands commands={["npx ci-perf-lint", "bunx ci-perf-lint"]} />
-        <a class="hero-docs-link" href={withBase("/rules/")}>Browse the performance checks <span aria-hidden="true">↗</span></a>
+        ${renderCopyCommands(["npx ci-perf-lint", "bunx ci-perf-lint"])}
+        <a class="hero-docs-link" href="/rules/">Browse the performance checks <span aria-hidden="true">↗</span></a>
       </div>
       <section class="report" aria-labelledby="report-title">
         <div class="report-heading">
@@ -42,7 +71,7 @@ const featuredRules = [
               <dt>Suggested action</dt><dd>Add safe path exclusions, or gate heavy jobs if checks are required.</dd>
               <dt>Measurement hint</dt><dd>Confirm docs-only changes skip heavy work without leaving required checks pending.</dd>
             </dl>
-            <a href={withBase("/rules/missing-path-ignore-for-non-code/")}>Read rule documentation</a>
+            <a href="${ruleHref("missing-path-ignore-for-non-code")}">Read rule documentation</a>
           </div>
         </details>
         <details class="finding">
@@ -54,7 +83,7 @@ const featuredRules = [
               <dt>Suggested action</dt><dd>Use asset URL imports where component behavior is unnecessary.</dd>
               <dt>Measurement hint</dt><dd>Compare transform time and bundle/module counts.</dd>
             </dl>
-            <a href={withBase("/rules/avoid-svg-component-imports/")}>Read rule documentation</a>
+            <a href="${ruleHref("avoid-svg-component-imports")}">Read rule documentation</a>
           </div>
         </details>
         <p class="report-footer">Review changes and measure their effect.</p>
@@ -64,42 +93,43 @@ const featuredRules = [
       <p>Supported CI platforms</p><ul><li>GitHub Actions</li><li>Buildkite</li><li>CircleCI</li><li>GitLab CI</li></ul>
     </div>
     <section class="content-section" id="how-it-works" aria-labelledby="coverage-title">
-      <div class="section-label"><p class="section-kicker"><span>01</span> Coverage</p><h2 id="coverage-title">Beyond <br />workflow YAML.</h2></div>
+      <div class="section-label"><p class="section-kicker"><span>01</span> Coverage</p><h2 id="coverage-title">Beyond <br>workflow YAML.</h2></div>
       <div>
         <p class="section-lead">Slow builds and tests can come from source imports, package scripts, Dockerfiles, or tool configuration. ci-perf-lint checks those alongside your workflows.</p>
         <div class="coverage-columns">
-          <div><h3>Workflows</h3><p>Triggers, concurrency, dependency caching, checkout and artifact overhead, and duplicate work.</p></div>
+          <div><h3>Workflows</h3><p>Triggers, concurrency, dependency caching, checkout and artifact overhead, and redundant installs.</p></div>
           <div><h3>Source &amp; tooling</h3><p>Source imports, package scripts, Docker builds, and build/test configuration.</p></div>
         </div>
         <p class="coverage-note">Individual rule coverage varies by platform.</p>
       </div>
     </section>
     <section class="content-section" aria-labelledby="rules-title">
-      <div class="section-label"><p class="section-kicker"><span>02</span> Rules</p><h2 id="rules-title">Performance <br />checks.</h2><a class="text-link" href={withBase("/rules/")}>All rule documentation</a></div>
-      <div class="featured-rules">
-        {featuredRules.map((rule) => (
-          <a class="featured-rule" href={withBase(`/rules/${rule.slug}/`)}>
-            <span class="rule-category">{rule.category}</span>
-            <span><h3>{rule.title}</h3><code>{rule.slug}</code></span>
-          </a>
-        ))}
+      <div class="section-label"><p class="section-kicker"><span>02</span> Rules</p><h2 id="rules-title">Performance <br>checks.</h2><a class="text-link" href="/rules/">All rule documentation</a></div>
+      <div class="featured-rules">${featured
+        .map(
+          (rule) => `
+        <a class="featured-rule" href="/rules/${rule.slug}/">
+          <span class="rule-category">${escapeHtml(rule.category)}</span>
+          <span><h3>${escapeHtml(rule.title)}</h3><code>${escapeHtml(rule.slug)}</code></span>
+        </a>`,
+        )
+        .join("")}
       </div>
     </section>
     <section class="content-section" aria-labelledby="agent-title">
-      <div class="section-label"><p class="section-kicker"><span>03</span> Usage</p><h2 id="agent-title">Work with <br />your AI agent.</h2></div>
+      <div class="section-label"><p class="section-kicker"><span>03</span> Usage</p><h2 id="agent-title">Work with <br>your AI agent.</h2></div>
       <div>
         <p class="section-lead">The default output includes prioritized findings, affected locations, suggested changes, and measurement hints. Pass it to your agent to review and propose fixes.</p>
-        <div class="agent-command">
-          <p class="eyebrow">Example / Claude Code</p>
-          <CopyCommands
-            commands={['bunx ci-perf-lint | claude -p "Review these findings and propose fixes"']}
-            note="Review proposed changes before applying them."
-            label="Pass findings to Claude Code"
-          />
+        <div class="agent-command"><p class="eyebrow">Example / Claude Code</p>
+          ${renderCopyCommands(
+            ['bunx ci-perf-lint | claude -p "Review these findings and propose fixes"'],
+            "Review proposed changes before applying them.",
+            "Pass findings to Claude Code",
+          )}
         </div>
         <p class="verification-note">Static analysis finds opportunities, not guaranteed savings. Review changes and measure their effect.</p>
         <a class="text-link" href="https://github.com/yoshi-taka/ci-perf-lint#usage">Usage and output options</a>
       </div>
-    </section>
-  </div>
-</BaseLayout>
+    </section></div>`,
+  });
+}

@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build && bun ../scripts/generate-sitemap.ts",
-    "preview": "astro preview"
+    "dev": "bun --watch serve.ts --watch",
+    "build": "bun run build.ts",
+    "preview": "bun run serve.ts"
   },
-  "devDependencies": {
-    "astro": "^7.4.7"
+  "engines": {
+    "bun": ">=1.4.4"
   }
 }

@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import {
-  formatRuleMarkdown,
-  rewriteDocHref,
-  rewriteMarkdownDocLinks,
-} from "../site/src/lib/markdown-links";
+import { formatRuleMarkdown, createDocLinkResolver } from "../site/src/lib/markdown-links";
 import { listRuleDocs } from "../site/src/lib/rules";
+import { renderMarkdown } from "../site/src/lib/markdown";
+
+const routes = new Map([
+  ["docker-cache-mount-persistence.md", "/guides/docker-cache-mount-persistence/"],
+  ["source-import-audit.md", "/guides/source-import-audit/"],
+  ["rules/prefer-pandas-3-1.md", "/rules/prefer-pandas-3-1/"],
+  ["rules/detected-large-barrel-file.md", "/rules/detected-large-barrel-file/"],
+]);
+const rewriteDocHref = createDocLinkResolver("rules/example.md", routes);
 
 describe("site documentation", () => {
   test("turns known standalone section labels into headings without changing body text", () => {
@@ -49,9 +54,12 @@ describe("site documentation", () => {
       "/guides/source-import-audit/#static-reference-maps",
     );
     expect(rewriteDocHref("prefer-pandas-3-1.md")).toBe("/rules/prefer-pandas-3-1/");
-    expect(rewriteDocHref("rules/detected-large-barrel-file.md")).toBe(
-      "/rules/detected-large-barrel-file/",
-    );
+    expect(
+      createDocLinkResolver(
+        "source-import-audit.md",
+        routes,
+      )("rules/detected-large-barrel-file.md"),
+    ).toBe("/rules/detected-large-barrel-file/");
   });
 
   test("leaves external, unknown, and non-Markdown links unchanged", () => {
@@ -67,15 +75,26 @@ describe("site documentation", () => {
     }
   });
 
-  test("rewrites Markdown links, not inline or fenced code examples", () => {
+  test("rewrites rendered links including reference links, not code examples", async () => {
     const link = "[guide](../source-import-audit.md)";
-    const code = `\`${link}\`\n\`\`\`\`md\n${link}\n\`\`\`\n${link}\n\`\`\`\`\n    ${link}`;
-    expect(rewriteMarkdownDocLinks(`${link}\n${code}`)).toBe(
-      `[guide](/guides/source-import-audit/)\n${code}`,
+    const { html } = await renderMarkdown(
+      `${link}\n\n\`${link}\`\n\n~~~md\n${link}\n~~~\n\n[reference][guide]\n\n[guide]: ../source-import-audit.md`,
+      rewriteDocHref,
     );
-    expect(rewriteMarkdownDocLinks(`~~~md\n${link}\n~~~\n${link}`)).toBe(
-      `~~~md\n${link}\n~~~\n[guide](/guides/source-import-audit/)`,
+    expect(html.match(/href="\/guides\/source-import-audit\/"/g)).toHaveLength(2);
+    expect(html).toContain(`<code>${link}</code>`);
+    expect(html).toContain(`<pre><code class="language-md">${link}\n</code></pre>`);
+  });
+
+  test("renders tables and unique heading anchors while escaping HTML and unsafe URLs", async () => {
+    const { html, headings } = await renderMarkdown(
+      "# Rule\n\n## Cache & test\n\n## Cache & test\n\n| Tool | Cache |\n| --- | --- |\n| Bun | yes |\n\n<script>alert(1)</script>\n\n[x](javascript:alert%281%29)",
+      (href) => href,
     );
+    expect(headings.map((heading) => heading.id)).toEqual(["rule", "cache-test", "cache-test-1"]);
+    expect(html).toContain("<table>");
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain('href="javascript:');
   });
 
   test("rule summaries are readable plain text and have deterministic ordering", async () => {

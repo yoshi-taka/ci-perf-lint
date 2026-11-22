@@ -1,0 +1,51 @@
+name: Docs site
+
+on:
+  pull_request:
+    paths:
+      - "docs/rules/**"
+      - "docs/docker-cache-mount-persistence.md"
+      - "docs/source-import-audit.md"
+      - "site/**"
+      - "test/site-*.test.ts"
+      - "test/temp-root.ts"
+      - "scripts/run-bounded.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/docs-site.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/rules/**"
+      - "docs/docker-cache-mount-persistence.md"
+      - "docs/source-import-audit.md"
+      - "site/**"
+      - "test/site-*.test.ts"
+      - "test/temp-root.ts"
+      - "scripts/run-bounded.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/docs-site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: docs-site-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      # Intentionally no dependency install: the site uses only Bun and Node APIs.
+      - name: Build and validate all public pages
+        run: bun run docs:build
+      - name: Test source updates, rendering, preview, and watch rebuilds
+        run: bun run test test/site-*.test.ts

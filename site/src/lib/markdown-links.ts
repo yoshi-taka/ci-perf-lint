@@ -1,20 +1,18 @@
-import { readdirSync } from "node:fs";
+import path from "node:path";
 
-const ruleSlugs = new Set(
-  readdirSync(new URL("../../../docs/rules/", import.meta.url))
-    .filter((name) => name.endsWith(".md") && name !== "README.md")
-    .map((name) => name.slice(0, -3)),
-);
-const guides = new Set(["docker-cache-mount-persistence", "source-import-audit"]);
-
-export function rewriteDocHref(href: string): string {
-  const match = href.match(/^(?:(?:\.\.?\/)+|rules\/)?([a-z0-9-]+)\.md([?#].*)?$/);
-  const slug = match?.[1];
-  if (!slug) return href;
-  const suffix = match?.[2] ?? "";
-  if (guides.has(slug)) return `/guides/${slug}/${suffix}`;
-  if (ruleSlugs.has(slug)) return `/rules/${slug}/${suffix}`;
-  return href;
+// The route map belongs to one build, never to a cached module-level scan.
+export function createDocLinkResolver(sourcePath: string, routes: ReadonlyMap<string, string>) {
+  return (href: string): string => {
+    if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href)) return href;
+    const match = href.match(/^([^?#]+\.md)([?#].*)?$/);
+    const target = match?.[1];
+    if (!target) return href;
+    const source = target.startsWith("/")
+      ? target.slice(1)
+      : path.posix.join(path.posix.dirname(sourcePath), target);
+    const route = routes.get(path.posix.normalize(source));
+    return route ? `${route}${match?.[2] ?? ""}` : href;
+  };
 }
 
 function mapProseLines(
@@ -44,18 +42,6 @@ function mapProseLines(
       return transform(line, index, lines);
     })
     .join("\n");
-}
-
-// Source docs use inline Markdown links. Keep code samples unchanged while
-// mapping these documentation links to the generated site's routes.
-export function rewriteMarkdownDocLinks(markdown: string): string {
-  return mapProseLines(markdown, (line) =>
-    line.replace(
-      /(`+)[^\n]*?\1|(\[[^\]\n]+\]\()([^\s)]+)(\))/g,
-      (match, ticks, prefix, href, suffix) =>
-        ticks ? match : `${prefix}${rewriteDocHref(href)}${suffix}`,
-    ),
-  );
 }
 
 // Older explainers use standalone paragraph labels instead of Markdown
