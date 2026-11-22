@@ -102,6 +102,20 @@ Run `bun run docs:test` for site-only regression tests. It runs from the site
 workspace with `site/bunfig.toml`, skipping the product test preload, so no `fast-check` or other
 package installation is needed. Product tests keep using the root test setup.
 
+## OG image prototype
+
+Run `bun run --filter ci-perf-lint-site og:prototype` after building the site.
+It writes three review images to `site/dist/og-prototype/`: `home.png`,
+`missing-concurrency.png`, and `long-rule.png`. These are prototypes, not
+production OG metadata; the next site build clears them.
+
+The prototype uses bundled OFL-licensed Jost outlines, a small TrueType reader,
+2x supersampled shape/text rasterization, and PNG encoding via `node:zlib`.
+No package dependency, browser, system font, or network request is required.
+The reader is deliberately limited to the bundled font: no hinting, kerning,
+complex-script shaping, variable-font axes, or point-attached composites.
+Unsupported characters fail explicitly instead of silently rendering blank.
+
 The dedicated `Docs site` workflow also runs for rule Markdown-only changes,
 which the product CI intentionally ignores. It builds without installing
 dependencies and runs the site regression tests, including add/edit/rename/delete
