@@ -7,6 +7,15 @@
 - npm に同じ version が未存在であること（CI が重複チェックするが事前確認推奨）
 - GitHub への push 権限があること
 
+## npm README
+
+- 編集元はルートの `README.md` のみ。`packages/ci-perf-lint/README.md` はコピー。
+- 編集後は `bun run sync:package-readme` で同期し、両方をコミットする。
+- 両パッケージの `prepack` が公開・pack時にも同期する。既存公開版のREADMEは次のpublishまで変わらない。
+- `audit:static` と docs専用CIの `--check` がずれを検出する。
+- npmとGitHubの両方で読めるよう、画像・ドキュメントへのリンクは絶対URLにする。
+- 長いコード例は手動改行し、npmの狭い本文幅でも横スクロールを抑える。
+
 ## Git 操作は非対話で実行する
 
 - リリース作業では Vim 等のエディタを起動しない。commit / tag のメッセージは必ず `-m` で指定する。

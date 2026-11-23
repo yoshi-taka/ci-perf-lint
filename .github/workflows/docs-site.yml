@@ -11,6 +11,9 @@ on:
       - "test/temp-root.ts"
       - "test/setup.ts"
       - "bunfig.toml"
+      - "README.md"
+      - "packages/ci-perf-lint/README.md"
+      - "scripts/sync-package-readme.ts"
       - "scripts/run-bounded.ts"
       - "package.json"
       - "bun.lock"
@@ -26,6 +29,9 @@ on:
       - "test/temp-root.ts"
       - "test/setup.ts"
       - "bunfig.toml"
+      - "README.md"
+      - "packages/ci-perf-lint/README.md"
+      - "scripts/sync-package-readme.ts"
       - "scripts/run-bounded.ts"
       - "package.json"
       - "bun.lock"
@@ -49,6 +55,8 @@ jobs:
         with:
           bun-version: 1.4.4
       # Intentionally no dependency install: the site uses only Bun and Node APIs.
+      - name: Check published README consistency
+        run: bun run sync:package-readme --check
       - name: Build and validate all public pages
         run: bun run docs:build
       - name: Test source updates, rendering, preview, and watch rebuilds

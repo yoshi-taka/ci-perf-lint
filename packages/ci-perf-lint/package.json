@@ -4,6 +4,9 @@
   "description": "Static analysis tool for CI workflow performance",
   "license": "MIT",
   "type": "module",
+  "scripts": {
+    "prepack": "bun ../../scripts/sync-package-readme.ts"
+  },
   "bin": {
     "ci-perf-lint": "cli.mjs"
   },

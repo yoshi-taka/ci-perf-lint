@@ -3,7 +3,7 @@
 [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/yoshi-taka/ci-perf-lint?utm_source=badge)
 
 <a href="https://ci-perf-lint.veritycost.com/">
-  <img src="./docs/assets/home.png" alt="ci-perf-lint — Find CI waste. Know what to fix first." width="640">
+  <img src="https://raw.githubusercontent.com/yoshi-taka/ci-perf-lint/main/docs/assets/home.png" alt="ci-perf-lint — Find CI waste. Know what to fix first." width="640">
 </a>
 
 Find CI waste. Know what to fix first.
@@ -30,16 +30,27 @@ An abbreviated, illustrative report:
 Top findings
 
 1. missing-path-ignore-for-non-code
-   Context: a heavy workflow has no path filter for docs-only changes.
-   Why it matters: small documentation changes can still trigger expensive CI.
-   Suggested action: add safe path exclusions, or gate heavy jobs if checks are required.
-   Measurement hint: confirm docs-only changes skip heavy work without leaving required checks pending.
+   Context:
+     A heavy workflow has no path filter for docs-only changes.
+   Why it matters:
+     Small documentation changes can still trigger expensive CI.
+   Suggested action:
+     Add safe path exclusions, or gate heavy jobs if checks
+     are required.
+   Measurement hint:
+     Confirm docs-only changes skip heavy work without leaving
+     required checks pending.
 
 2. avoid-svg-component-imports
-   Context: SVG component imports found in source files.
-   Why it matters: component transforms add work when asset URLs suffice.
-   Suggested action: use asset URL imports where component behavior is unnecessary.
-   Measurement hint: compare transform time and bundle/module counts.
+   Context:
+     SVG component imports found in source files.
+   Why it matters:
+     Component transforms add work when asset URLs suffice.
+   Suggested action:
+     Use asset URL imports where component behavior
+     is unnecessary.
+   Measurement hint:
+     Compare transform time and bundle/module counts.
 ```
 
 CI YAML is only part of the picture. Slow builds and tests can come from source imports, package scripts, Dockerfiles, or tool configuration. CI Perf Lint checks those alongside your workflows.
@@ -53,7 +64,8 @@ CI Perf Lint encodes that specialized knowledge as repeatable static checks. It 
 Let the tool find the patterns. Let AI adapt the fixes to your repository.
 
 ```sh
-bunx ci-perf-lint | claude -p "Review these findings and propose fixes"
+bunx ci-perf-lint |
+  claude -p "Review these findings and propose fixes"
 ```
 
 The default output is an AI-ready handoff with prioritized findings, affected locations, suggested changes, and measurement hints.
@@ -107,4 +119,4 @@ bun run audit:static
 bun run test
 ```
 
-[Adding a rule](docs/adding-a-rule.md)
+[Adding a rule](https://github.com/yoshi-taka/ci-perf-lint/blob/main/docs/adding-a-rule.md)
