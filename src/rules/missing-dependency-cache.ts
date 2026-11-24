@@ -19,9 +19,9 @@ import {
   jobAllowsActionsCacheRestore,
   setupActionHasBuiltInCacheForFamily,
 } from "./shared/workflow-caches.ts";
-import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
+import { dependencyCacheJobIsReleaseLike } from "./shared/dependency-cache-release.ts";
 
-const FAMILY_CACHE_MATCHERS: Record<DependencyFamily, string[]> = {
+export const FAMILY_CACHE_MATCHERS: Record<DependencyFamily, string[]> = {
   npm: [".npm", "npm-cache"],
   pnpm: [".pnpm-store", "pnpm-store", "store/v3", "/pnpm/store"],
   yarn: [".yarn/cache", ".yarn/install-state", "yarn-cache"],
@@ -98,7 +98,10 @@ export const missingDependencyCacheRule = {
     const findings: Diagnostic[] = [];
 
     for (const job of workflow.jobs) {
-      if (!jobAllowsActionsCacheRestore(workflow, job) || workflowLooksReleaseLike(workflow, job)) {
+      if (
+        !jobAllowsActionsCacheRestore(workflow, job) ||
+        dependencyCacheJobIsReleaseLike(workflow, job)
+      ) {
         continue;
       }
 

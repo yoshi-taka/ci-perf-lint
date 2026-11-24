@@ -54,6 +54,24 @@
     "score": 80
   },
   {
+    "ruleId": "missing-dependency-cache-buildkite",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-dependency-cache-buildkite.md",
+    "workflow": ".buildkite/pipeline.yml",
+    "location": {
+      "path": ".buildkite/pipeline.yml",
+      "line": 3,
+      "column": 14
+    },
+    "message": "Step \":hammer: Tests\" installs dependencies without a cache.",
+    "why": "Every build starts from a clean checkout, so dependency directories are re-downloaded and re-installed on every run.",
+    "suggestion": "Add dependency caching: a pipeline `cache:` attribute on hosted agents, the official cache plugin, or `buildkite-agent cache save/restore` keyed on the lockfile.",
+    "measurementHint": "Compare the install command's duration across builds before and after adding the cache, and expect a cache miss after lockfile changes.",
+    "aiHandoff": "Review .buildkite/pipeline.yml step \":hammer: Tests\": add dependency caching or colocate the install with the step that consumes it.",
+    "score": 40
+  },
+  {
     "ruleId": "prefer-node-run-over-npm-run",
     "severity": "warning",
     "confidence": "medium",

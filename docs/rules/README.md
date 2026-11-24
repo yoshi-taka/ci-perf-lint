@@ -114,6 +114,7 @@ Current rule registry:
 - `missing-angular-cli-cache`
 - `missing-concurrency`
 - `missing-dependency-cache`
+- `missing-dependency-cache-buildkite`
 - `missing-dockerignore-for-build-context`
 - `missing-fail-fast-cancellation`
 - `missing-gradle-build-cache`

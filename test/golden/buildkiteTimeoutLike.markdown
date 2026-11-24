@@ -36,6 +36,18 @@
 - Suggested action: Add if_changed with glob patterns covering the files this step consumes (requires a pipeline uploaded with buildkite-agent pipeline upload and an agent that applies it by default, 3.103.0+). Keep deploy steps off if_changed: on the default branch the changed-file set only reflects the previous commit, so a multi-commit push can skip a needed deployment.
 - Measurement hint: Count the share of recent commits whose changed files fall outside the globs. That share is the fraction of builds this step can skip.
 
+## missing-dependency-cache-buildkite
+
+- Workflow: `.buildkite/pipeline.yml`
+- Location: `.buildkite/pipeline.yml:3:14`
+- Severity: `suggestion`
+- Confidence: `medium`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-dependency-cache-buildkite`
+- Message: Step ":hammer: Tests" installs dependencies without a cache.
+- Why it matters: Every build starts from a clean checkout, so dependency directories are re-downloaded and re-installed on every run.
+- Suggested action: Add dependency caching: a pipeline `cache:` attribute on hosted agents, the official cache plugin, or `buildkite-agent cache save/restore` keyed on the lockfile.
+- Measurement hint: Compare the install command's duration across builds before and after adding the cache, and expect a cache miss after lockfile changes.
+
 ## prefer-node-run-over-npm-run
 
 - Workflow: `.buildkite/pipeline.yml`

@@ -6,6 +6,7 @@
     "verify:source": "bun import-audit.ts",
     "verify:gate-parity": "bun ci-yaml-gate-parity.ts",
     "verify:if-changed-gates": "bun buildkite-if-changed-gates.ts",
+    "verify:depcache-gates": "bun buildkite-depcache-gates.ts",
     "verify:models": "bun source-models.ts",
     "verify:mutation": "bun mutation-models.ts",
     "verify:regex": "bun regex-models.ts",

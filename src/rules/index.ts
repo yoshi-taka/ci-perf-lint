@@ -47,6 +47,7 @@ import {
 } from "./go-test-efficiency.ts";
 import { missingConcurrencyRule } from "./missing-concurrency.ts";
 import { missingDependencyCacheRule } from "./missing-dependency-cache.ts";
+import { missingDependencyCacheBuildkiteRule } from "./missing-dependency-cache-buildkite.ts";
 import { missingIfChangedRule } from "./missing-if-changed.ts";
 import { missingFailFastCancellationRule } from "./missing-fail-fast-cancellation.ts";
 import { missingAngularCliCacheRule } from "./missing-angular-cli-cache.ts";
@@ -193,6 +194,7 @@ export const allRules = [
   missingIfChangedRule,
   missingPathsFilterRule,
   missingDependencyCacheRule,
+  missingDependencyCacheBuildkiteRule,
   missingFailFastCancellationRule,
   missingAngularCliCacheRule,
   missingGradleBuildCacheRule,
