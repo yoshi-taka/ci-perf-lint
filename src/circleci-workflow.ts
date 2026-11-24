@@ -155,6 +155,11 @@ function getScalarArray(node: Node | undefined): string[] | undefined {
 }
 
 function getBool(node: Node | undefined): boolean | undefined {
+  // CircleCI documents `background: true` and `docker_layer_caching: true`
+  // as YAML booleans, not strings.
+  if (node && isScalar(node) && typeof node.value === "boolean") {
+    return node.value;
+  }
   const str = getScalarString(node);
   if (str === undefined) {
     return undefined;
@@ -363,7 +368,10 @@ export function parseCircleCi(
       }
     }
 
-    const parallelismValue = getScalarString(parallelismNode);
+    const parallelismValue =
+      parallelismNode && isScalar(parallelismNode) && typeof parallelismNode.value === "number"
+        ? String(parallelismNode.value)
+        : getScalarString(parallelismNode);
     const parallelismNum = parallelismValue ? parseInt(parallelismValue, 10) : undefined;
     const steps = parseSteps(stepsNode);
     if (steps.length > MAX_CIRCLECI_STEPS_PER_JOB) {

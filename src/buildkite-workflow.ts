@@ -41,7 +41,7 @@ export interface PipelineStep {
   ifNode?: Node;
   timeoutNode?: Node;
   plugins?: Record<string, unknown>[];
-  pluginsNode?: YAMLMap<unknown, unknown>;
+  pluginsNode?: Node;
   env?: Record<string, unknown>;
   envNode?: YAMLMap<unknown, unknown>;
   agents?: Record<string, unknown>;
@@ -121,6 +121,18 @@ function getScalarString(value: unknown): string | undefined {
   return undefined;
 }
 
+/** Normalizes documented non-string scalars (bool, int) to their string form. */
+function getScalarText(node: Node | undefined): string | undefined {
+  if (
+    node &&
+    isScalar(node) &&
+    (typeof node.value === "boolean" || typeof node.value === "number")
+  ) {
+    return String(node.value);
+  }
+  return getScalarString(node);
+}
+
 function getMap(node: Node | undefined): YAMLMap<unknown, unknown> | undefined {
   if (node && isMap(node)) {
     return node;
@@ -143,20 +155,50 @@ function getScalarArray(node: Node | undefined): string[] | undefined {
   return values.length > 0 ? values : undefined;
 }
 
+function pluginRecord(key: unknown, value: unknown): Record<string, unknown> | undefined {
+  const name = getScalarString(key);
+  if (!name) {
+    return undefined;
+  }
+  return { [name]: isNode(value) ? value.toJSON() : value };
+}
+
+/**
+ * Buildkite accepts both plugin syntaxes:
+ *   plugins: [docker#v3.9.0: {...}]   (sequence)
+ *   plugins: {docker#v3.9.0: {...}}  (map)
+ */
 function parsePlugins(node: Node | undefined): Record<string, unknown>[] | undefined {
-  if (!node || !isSeq(node)) {
+  if (!node) {
     return undefined;
   }
 
   const plugins: Record<string, unknown>[] = [];
-  for (const item of node.items) {
-    if (!item) {
-      continue;
+  if (isSeq(node)) {
+    for (const item of node.items) {
+      if (!item) {
+        continue;
+      }
+      if (isMap(item)) {
+        for (const pair of item.items) {
+          const record = pluginRecord(pair.key, pair.value);
+          if (record) {
+            plugins.push(record);
+          }
+        }
+      } else if (isScalar(item)) {
+        const record = pluginRecord(item, undefined);
+        if (record) {
+          plugins.push(record);
+        }
+      }
     }
-    const value = isNode(item) ? item.toJSON() : item;
-    const record = nodeToRecord(value as Node);
-    if (record) {
-      plugins.push(record);
+  } else if (isMap(node)) {
+    for (const pair of node.items) {
+      const record = pluginRecord(pair.key, pair.value);
+      if (record) {
+        plugins.push(record);
+      }
     }
   }
   return plugins.length > 0 ? plugins : undefined;
@@ -179,7 +221,7 @@ function parseStep(item: unknown): PipelineStep {
   const keyNode = getNode(item, "key") ?? getNode(item, "id") ?? getNode(item, "identifier");
   const ifNode = getNode(item, "if");
   const timeoutNode = getNode(item, "timeout_in_minutes");
-  const pluginsNode = getMap(getNode(item, "plugins"));
+  const pluginsNode = getNode(item, "plugins");
   const envNode = getMap(getNode(item, "env"));
   const agentsNode = getMap(getNode(item, "agents"));
   const branchesNode = getNode(item, "branches");
@@ -194,10 +236,11 @@ function parseStep(item: unknown): PipelineStep {
   const triggerNode = getNode(item, "trigger");
   const groupNode = getNode(item, "group");
 
-  const parallelismValue = getScalarString(parallelismNode);
+  const parallelismValue = getScalarText(parallelismNode);
   const parallelismNum = parallelismValue ? parseInt(parallelismValue, 10) : undefined;
 
-  const skipValue = getScalarString(skipNode);
+  // Buildkite documents `skip: true|false` (bool) as well as a reason string.
+  const skipValue = getScalarText(skipNode);
   const skipResult =
     skipValue !== undefined
       ? skipValue === "" || skipValue.toLowerCase() === "false"
@@ -259,7 +302,12 @@ function parseSteps(node: Node | undefined): PipelineStep[] {
       continue;
     }
 
-    steps.push(parseStep(item));
+    const step = parseStep(item);
+    steps.push(step);
+    // Group steps are visual containers: their inner steps run on agents.
+    if (step.isGroup && isMap(step.node)) {
+      steps.push(...parseSteps(getNode(step.node, "steps")));
+    }
   }
 
   return steps;

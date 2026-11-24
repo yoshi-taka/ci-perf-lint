@@ -155,6 +155,10 @@ function getScalarOrStringArray(node: Node | undefined): string | string[] | und
 }
 
 function getBool(node: Node | undefined): boolean | undefined {
+  // GitLab documents `interruptible` and `allow_failure` as booleans.
+  if (node && isScalar(node) && typeof node.value === "boolean") {
+    return node.value;
+  }
   const str = getScalarString(node);
   if (str === undefined) {
     return undefined;
@@ -203,7 +207,10 @@ function parseJob(item: YAMLMap<unknown, unknown>, jobName: string): GitlabCiJob
   const extendsNode = getNode(item, "extends");
   const allowFailureNode = getNode(item, "allow_failure");
 
-  const parallelValue = getScalarString(parallelNode);
+  const parallelValue =
+    parallelNode && isScalar(parallelNode) && typeof parallelNode.value === "number"
+      ? String(parallelNode.value)
+      : getScalarString(parallelNode);
   const parallelNum = parallelValue ? parseInt(parallelValue, 10) : undefined;
   const commands = collectScriptCommands(scriptNode);
 
@@ -216,7 +223,10 @@ function parseJob(item: YAMLMap<unknown, unknown>, jobName: string): GitlabCiJob
     script: commands.length ? commands.map((command) => command.text) : undefined,
     scriptNode,
     scriptNodes: commands.length ? commands.map((command) => command.node) : undefined,
-    image: getScalarString(imageNode),
+    // GitLab allows `image: {name: "...", entrypoint: [...]}` as a map.
+    image:
+      getScalarString(imageNode) ??
+      (imageNode && isMap(imageNode) ? getScalarString(getNode(imageNode, "name")) : undefined),
     imageNode,
     timeout: getScalarString(timeoutNode),
     timeoutNode,

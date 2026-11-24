@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fixtures } from "./fixtures.ts";
 import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
+import { parseGitlabCi } from "../src/gitlab-ci-workflow.ts";
 
 const tempDirs = createTempDirTracker();
 
@@ -88,4 +89,56 @@ test("does not flag hidden GitLab CI templates", async () => {
   );
   expect(findings).toHaveLength(1);
   expect(findings[0]?.message).toContain('Job "tests"');
+});
+
+test("reads map-form image name for Node version detection", async () => {
+  const root = await tempDirs.create("apl-gitlab-image-map-");
+  await mkdir(path.join(root), { recursive: true });
+  await writeFile(
+    path.join(root, "package.json"),
+    JSON.stringify({ scripts: { build: "echo built" } }),
+  );
+  await writeFile(
+    path.join(root, ".gitlab-ci.yml"),
+    [
+      "build:",
+      "  image:",
+      "    name: node:24",
+      '    entrypoint: ["/bin/bash"]',
+      "  script: npm run build",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 10,
+    mode: "exploratory",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "prefer-node-run-over-npm-run",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain('Job "build"');
+});
+
+test("reads documented bool and int scalars on GitLab CI jobs", () => {
+  const doc = parseGitlabCi(
+    "/repo/.gitlab-ci.yml",
+    "/repo",
+    [
+      "build:",
+      "  script: echo hi",
+      "  interruptible: true",
+      "  allow_failure: true",
+      "  parallel: 3",
+      "deploy:",
+      "  script: echo hi",
+      "  interruptible: false",
+      "  allow_failure: false",
+    ].join("\n"),
+  );
+  expect(doc.jobs[0]?.interruptible).toBe(true);
+  expect(doc.jobs[0]?.allowFailure).toBe(true);
+  expect(doc.jobs[0]?.parallel).toBe(3);
+  expect(doc.jobs[1]?.interruptible).toBe(false);
+  expect(doc.jobs[1]?.allowFailure).toBe(false);
 });
