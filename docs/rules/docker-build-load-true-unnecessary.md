@@ -3,7 +3,6 @@
 Both `docker/build-push-action` and `useblacksmith/build-push-action` are supported.
 Image consumers such as local tests, saves and tag/push sequences prevent the
 finding; dynamic tags and opaque downstream actions are not assumed unused.
-See [Blacksmith workflows](../blacksmith.md).
 
 Later image usage is checked on parsed non-display invocations. Comments, `echo`/`printf`, and text-search assertions containing a tag, digest or Docker command do not establish a consumer; command substitutions still execute. Later scripts, task runners, unexpanded actions, unknown shell syntax and custom shells remain conservative guards. A script before the build does not prove later consumption. Dynamic build tags remain unresolved rather than declared unused.
 

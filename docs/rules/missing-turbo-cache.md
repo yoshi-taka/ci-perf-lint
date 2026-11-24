@@ -5,7 +5,7 @@ already cover Turbo without YAML wiring. The finding becomes an exploratory
 suggestion to verify organization settings and actual cache-hit logs before
 adding another cache. Containers are not assumed to reach that automatic cache;
 fork PRs do not receive it. Explicit remote providers and valid Sticky Disk mounts
-before the Turbo command are respected. See [Blacksmith workflows](../blacksmith.md).
+before the Turbo command are respected.
 
 Turbo dry-run/hash-inspection commands do not establish executed task work.
 Visible `rharkor/caching-for-turbo` setup before the first task is remote wiring
