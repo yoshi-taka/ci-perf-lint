@@ -8,6 +8,7 @@ import {
 import type { DockerBuildTarget } from "./docker-build-targets.ts";
 import { shellInvocations } from "../rules/shared/shell-invocations.ts";
 import { shellExecutionTexts } from "../rules/shared/shell-execution-text.ts";
+import { hasDockerManagingPlugin } from "../rules/shared/buildkite-plugins.ts";
 import { shellCommands } from "../rules/shared/command-patterns.ts";
 import { declaredShellEnvironmentNames } from "../rules/shared/shell-environment-evidence.ts";
 
@@ -339,7 +340,7 @@ export function collectPersistentCacheDockerTargets(
         const env = { ...doc.env, ...step.env };
         const localState =
           cachesDockerState(raw.cache ?? doc.parsed?.cache) &&
-          !step.plugins?.length &&
+          !hasDockerManagingPlugin(step) &&
           env.DOCKER_HOST === undefined &&
           env.DOCKER_CONTEXT === undefined &&
           env.DOCKER_BUILDKIT !== "0" &&

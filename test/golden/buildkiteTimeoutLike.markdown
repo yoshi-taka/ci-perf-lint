@@ -9,8 +9,8 @@
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-timeout-in-minutes-buildkite`
 - Message: Step ":hammer: Tests" does not define timeout_in_minutes.
 - Why it matters: Buildkite has no default timeout. Without timeout_in_minutes, a hung or degraded step can run indefinitely and consume agent capacity.
-- Suggested action: Add timeout_in_minutes to the step to prevent unbounded execution.
-- Measurement hint: Monitor the step's typical duration and set timeout_in_minutes to a value that allows for normal variance but catches hangs.
+- Suggested action: Add timeout_in_minutes to prevent unbounded execution; when the work runs inside a plugin, set the value above that plugin's own internal limit so a normal run is not cut short.
+- Measurement hint: Monitor the step's typical duration and allow for normal variance. Plugin steps need headroom above the plugin's own internal limit.
 
 ## prefer-node-run-over-npm-run
 

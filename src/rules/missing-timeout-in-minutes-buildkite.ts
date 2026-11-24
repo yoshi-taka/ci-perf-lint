@@ -7,6 +7,7 @@ import {
   invocationWorkName,
   invocationHasNativeOrOpaqueWork,
 } from "./shared/tooling-command-evidence.ts";
+import { buildkitePluginWeight } from "./shared/buildkite-plugins.ts";
 
 const meta = {
   id: "missing-timeout-in-minutes-buildkite",
@@ -24,6 +25,8 @@ function stepLooksHeavy(step: PipelineStep): boolean {
     ...shellNonDisplayInvocations(source),
     ...shellNonDisplayInvocations(source, true),
   ];
+  const pluginDriven = Boolean(step.plugins?.length);
+  const pluginWeight = pluginDriven ? buildkitePluginWeight(step) : "unknown";
   return (
     commands.some((words) => {
       const [tool, action, subcommand] = words;
@@ -39,7 +42,12 @@ function stepLooksHeavy(step: PipelineStep): boolean {
         (invocationHasNativeOrOpaqueWork(words) && heavyName.test(step.label ?? ""))
       );
     }) ||
-    (Boolean(step.plugins?.length) && heavyName.test(step.label ?? ""))
+    // Plugin steps are classified by plugin name: heavy plugins run real
+    // work, light plugins only annotate, and unknown plugins fall back
+    // to the step label as an auxiliary hint.
+    (pluginDriven &&
+      (pluginWeight === "heavy" ||
+        (pluginWeight === "unknown" && heavyName.test(step.label ?? ""))))
   );
 }
 
@@ -67,10 +75,11 @@ export const missingTimeoutInMinutesBuildkiteRule = {
           buildDiagnostic(pipeline, meta, node, {
             message: `Step "${step.label ?? step.key ?? "unnamed"}" does not define timeout_in_minutes.`,
             why: "Buildkite has no default timeout. Without timeout_in_minutes, a hung or degraded step can run indefinitely and consume agent capacity.",
-            suggestion: `Add timeout_in_minutes to the step to prevent unbounded execution.`,
+            suggestion:
+              "Add timeout_in_minutes to prevent unbounded execution; when the work runs inside a plugin, set the value above that plugin's own internal limit so a normal run is not cut short.",
             measurementHint:
-              "Monitor the step's typical duration and set timeout_in_minutes to a value that allows for normal variance but catches hangs.",
-            aiHandoff: `Review ${pipeline.relativePath} step "${step.label ?? step.key}" and add a sensible timeout_in_minutes value.`,
+              "Monitor the step's typical duration and allow for normal variance. Plugin steps need headroom above the plugin's own internal limit.",
+            aiHandoff: `Review ${pipeline.relativePath} step "${step.label ?? step.key}" and add a timeout_in_minutes value above any plugin-internal limit.`,
             score: 65,
           }),
         );

@@ -12,9 +12,9 @@
     },
     "message": "Step \":hammer: Tests\" does not define timeout_in_minutes.",
     "why": "Buildkite has no default timeout. Without timeout_in_minutes, a hung or degraded step can run indefinitely and consume agent capacity.",
-    "suggestion": "Add timeout_in_minutes to the step to prevent unbounded execution.",
-    "measurementHint": "Monitor the step's typical duration and set timeout_in_minutes to a value that allows for normal variance but catches hangs.",
-    "aiHandoff": "Review .buildkite/pipeline.yml step \":hammer: Tests\" and add a sensible timeout_in_minutes value.",
+    "suggestion": "Add timeout_in_minutes to prevent unbounded execution; when the work runs inside a plugin, set the value above that plugin's own internal limit so a normal run is not cut short.",
+    "measurementHint": "Monitor the step's typical duration and allow for normal variance. Plugin steps need headroom above the plugin's own internal limit.",
+    "aiHandoff": "Review .buildkite/pipeline.yml step \":hammer: Tests\" and add a timeout_in_minutes value above any plugin-internal limit.",
     "score": 95
   },
   {

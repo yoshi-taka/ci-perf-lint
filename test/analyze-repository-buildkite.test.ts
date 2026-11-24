@@ -200,9 +200,7 @@ test("parses plugins in sequence and map form", () => {
     { "docker#v5.13.0": { image: "node:18" } },
   ]);
   expect(doc.steps[1]?.plugins).toEqual([{ "test-summary#v1.2.3": undefined }]);
-  expect(doc.steps[2]?.plugins).toEqual([
-    { "acme-deploy#v2.0.0": { context: "production" } },
-  ]);
+  expect(doc.steps[2]?.plugins).toEqual([{ "acme-deploy#v2.0.0": { context: "production" } }]);
 });
 
 test("flags plugin-only heavy steps without timeout_in_minutes", async () => {
@@ -318,3 +316,86 @@ test("normalizes documented bool and int step scalars", () => {
   expect(doc.steps[1]?.skip).toBe(false);
 });
 
+test("does not flag light annotator plugins regardless of label", async () => {
+  const root = await tempDirs.create("apl-buildkite-plugin-light-");
+  const dir = path.join(root, ".buildkite");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "pipeline.yml"),
+    [
+      "steps:",
+      '  - label: "Annotate with test results"',
+      "    plugins:",
+      "      - test-summary#v1.0: {junit: a.xml}",
+      '  - label: "Annotate with test results"',
+      "    plugins:",
+      "      - junit-annotate#v2.9.0: {junit: a.xml}",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 10,
+    mode: "exploratory",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
+  );
+  expect(findings).toHaveLength(0);
+});
+
+test("flags heavy plugins regardless of step label", async () => {
+  const root = await tempDirs.create("apl-buildkite-plugin-heavy-name-");
+  const dir = path.join(root, ".buildkite");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "pipeline.yml"),
+    [
+      "steps:",
+      '  - label: "Security scan"',
+      "    plugins:",
+      "      - docker#v5.13.0: {}",
+      "  - label: Lint",
+      "    plugins:",
+      "      - docker-compose#v1.0: {}",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 10,
+    mode: "exploratory",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
+  );
+  expect(findings).toHaveLength(2);
+  expect(findings[0]?.message).toContain('Step "Security scan"');
+  expect(findings[1]?.message).toContain('Step "Lint"');
+});
+
+test("falls back to the label hint only for unknown plugins", async () => {
+  const root = await tempDirs.create("apl-buildkite-plugin-unknown-");
+  const dir = path.join(root, ".buildkite");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "pipeline.yml"),
+    [
+      "steps:",
+      "  - label: Notify",
+      "    plugins:",
+      "      - slack-notify#v3.0: {}",
+      "  - label: Build artifacts",
+      "    plugins:",
+      "      - custom-runner#v1.0: {}",
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 10,
+    mode: "exploratory",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain('Step "Build artifacts"');
+});
