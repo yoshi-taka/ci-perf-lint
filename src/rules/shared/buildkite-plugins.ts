@@ -10,7 +10,7 @@ function buildkitePluginBaseName(identifier: string): string {
 }
 
 /** Base names of every plugin on a step, in document order. */
-function buildkitePluginBaseNames(step: Pick<PipelineStep, "plugins">): string[] {
+export function buildkitePluginBaseNames(step: Pick<PipelineStep, "plugins">): string[] {
   const names: string[] = [];
   for (const plugin of step.plugins ?? []) {
     for (const identifier of Object.keys(plugin)) {

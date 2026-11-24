@@ -47,6 +47,7 @@ import {
 } from "./go-test-efficiency.ts";
 import { missingConcurrencyRule } from "./missing-concurrency.ts";
 import { missingDependencyCacheRule } from "./missing-dependency-cache.ts";
+import { missingIfChangedRule } from "./missing-if-changed.ts";
 import { missingFailFastCancellationRule } from "./missing-fail-fast-cancellation.ts";
 import { missingAngularCliCacheRule } from "./missing-angular-cli-cache.ts";
 import { noxWithoutUvBackendRule } from "./nox-without-uv-backend.ts";
@@ -148,6 +149,7 @@ import { repeatedBuildInSameWorkflowRule } from "./repeated-build-in-same-workfl
 import { repeatedInstallInSameJobRule } from "./repeated-install-in-same-job.ts";
 import { repeatedLintInSameWorkflowRule } from "./repeated-lint-in-same-workflow.ts";
 import { scheduledHeavyWorkflowWithoutThrottlingRule } from "./scheduled-heavy-workflow-without-throttling.ts";
+import { skipCheckoutOnAnnotationStepsRule } from "./skip-checkout-on-annotation-steps.ts";
 import { ungatedHeavyJobRule } from "./ungated-heavy-job.ts";
 import { ungatedPrCacheSaveRule } from "./ungated-pr-cache-save.ts";
 import { ungatedPrDockerGhaExportRule } from "./ungated-pr-docker-gha-export.ts";
@@ -188,6 +190,7 @@ export const allRules = [
   ineffectiveCacheSaveConditionRule,
   pushAndPullRequestDoubleRunRule,
   missingConcurrencyRule,
+  missingIfChangedRule,
   missingPathsFilterRule,
   missingDependencyCacheRule,
   missingFailFastCancellationRule,
@@ -294,6 +297,7 @@ export const allRules = [
   repeatedBootstrapSetupRule,
   repeatedBuildInSameWorkflowRule,
   scheduledHeavyWorkflowWithoutThrottlingRule,
+  skipCheckoutOnAnnotationStepsRule,
   duplicateCheckoutInSameWorkflowRule,
   duplicateInstallOrLintRule,
   elixirOtpVersionPerformanceRule,

@@ -117,6 +117,7 @@ Current rule registry:
 - `missing-dockerignore-for-build-context`
 - `missing-fail-fast-cancellation`
 - `missing-gradle-build-cache`
+- `missing-if-changed`
 - `missing-make-j-flag`
 - `missing-next-build-cache`
 - `missing-path-ignore-for-non-code`
@@ -277,6 +278,7 @@ Current rule registry:
 - `ruby-setup-ruby-missing-bundler-cache`
 - `scheduled-heavy-workflow-without-throttling`
 - `setup-node-cache-dependency-path-unset`
+- `skip-checkout-on-annotation-steps`
 - `tailwind-content-config`
 - `terraform-github-app-auth`
 - `terraform-github-parallel-requests`

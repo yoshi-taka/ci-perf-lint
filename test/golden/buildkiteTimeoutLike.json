@@ -18,6 +18,42 @@
     "score": 95
   },
   {
+    "ruleId": "missing-if-changed",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-if-changed.md",
+    "workflow": ".buildkite/pipeline.yml",
+    "location": {
+      "path": ".buildkite/pipeline.yml",
+      "line": 3,
+      "column": 14
+    },
+    "message": "Step \":hammer: Tests\" runs heavy work on every build and has no if_changed.",
+    "why": "Commits that only touch files the step ignores (for example documentation) still pay its full cost. if_changed omits a step when the build's changed files match none of its globs.",
+    "suggestion": "Add if_changed with glob patterns covering the files this step consumes (requires a pipeline uploaded with buildkite-agent pipeline upload and an agent that applies it by default, 3.103.0+). Keep deploy steps off if_changed: on the default branch the changed-file set only reflects the previous commit, so a multi-commit push can skip a needed deployment.",
+    "measurementHint": "Count the share of recent commits whose changed files fall outside the globs. That share is the fraction of builds this step can skip.",
+    "aiHandoff": "Review .buildkite/pipeline.yml step \":hammer: Tests\": add if_changed globs for its input files.",
+    "score": 80
+  },
+  {
+    "ruleId": "missing-if-changed",
+    "severity": "warning",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-if-changed.md",
+    "workflow": ".buildkite/pipeline.yml",
+    "location": {
+      "path": ".buildkite/pipeline.yml",
+      "line": 11,
+      "column": 14
+    },
+    "message": "Step \":package: Build\" runs heavy work on every build and has no if_changed.",
+    "why": "Commits that only touch files the step ignores (for example documentation) still pay its full cost. if_changed omits a step when the build's changed files match none of its globs.",
+    "suggestion": "Add if_changed with glob patterns covering the files this step consumes (requires a pipeline uploaded with buildkite-agent pipeline upload and an agent that applies it by default, 3.103.0+). Keep deploy steps off if_changed: on the default branch the changed-file set only reflects the previous commit, so a multi-commit push can skip a needed deployment.",
+    "measurementHint": "Count the share of recent commits whose changed files fall outside the globs. That share is the fraction of builds this step can skip.",
+    "aiHandoff": "Review .buildkite/pipeline.yml step \":package: Build\": add if_changed globs for its input files.",
+    "score": 80
+  },
+  {
     "ruleId": "prefer-node-run-over-npm-run",
     "severity": "warning",
     "confidence": "medium",
@@ -33,6 +69,6 @@
     "suggestion": "Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.",
     "measurementHint": "Compare the step duration before and after the change, and verify that the script still receives the same arguments and environment it needs.",
     "aiHandoff": "Review .buildkite/pipeline.yml step \":package: Build\" running `npm run build`. Only replace it with `node --run build` after checking the collected compatibility evidence: Repository scan found no visible .npmrc file, matching pre/post lifecycle script, or npm-specific environment reference.",
-    "score": 60
+    "score": 30
   }
 ]
