@@ -23,6 +23,8 @@ Current rule registry:
 - `avoid-prettier-eslint`
 - `avoid-svg-component-imports`
 - `avoid-xcode-install-on-hosted-macos`
+- `blacksmith-docker-builder-missing`
+- `blacksmith-docker-cache-export`
 - `bundler-external-subpath-leak`
 - `cache-terraform-providers`
 - `cargo-build-before-test`

@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { stepDisablesDockerBuildCache } from "./shared/docker.ts";
+import { blacksmithDockerBuilds } from "./shared/blacksmith-docker.ts";
 import {
   jobAllowsActionsCacheRestore,
   jobAllowsActionsCacheSave,
@@ -47,6 +48,11 @@ export const dockerBuildWithoutLayerCacheRule = {
   meta,
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const findings: Diagnostic[] = [];
+    const persistentBuilds = new Set(
+      blacksmithDockerBuilds(workflow)
+        .filter(({ persistent }) => persistent)
+        .map(({ step }) => step),
+    );
     for (const job of workflow.jobs) {
       if (job.usesReusableWorkflow || !jobAllowsActionsCacheRestore(workflow, job)) {
         continue;
@@ -55,6 +61,7 @@ export const dockerBuildWithoutLayerCacheRule = {
       const step = job.steps.find(
         (candidate) =>
           stepUsesDockerBuildPushAction(candidate) &&
+          !persistentBuilds.has(candidate) &&
           !stepDisablesDockerBuildCache(candidate) &&
           !stepHasLayerCache(candidate) &&
           // A read-only GHA backend can reuse layers without exporting them.

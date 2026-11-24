@@ -1,5 +1,12 @@
 # `missing-dependency-cache`
 
+Explicit Blacksmith Sticky Disk mounts of dependency-cache paths are recognized
+when placed before dependency installation on a static Blacksmith runner.
+Container mounts require visible privileged mounting and the documented forwarded
+environment. This is visible persistence wiring, not proof of a cache hit.
+Run-scoped disks may intentionally transfer state between jobs.
+See [Blacksmith workflows](../blacksmith.md).
+
 Actions cache policy is respected: job-level `cache-mode` overrides workflow-level policy. `read` permits restore; `none`, `write-only`, and dynamic/unknown modes suppress cache-enablement advice. Disabled restore is not counted as working cache coverage. Existing event defaults remain unchanged; this rule does not recommend loosening cache access.
 
 Detects setup steps that prepare a language runtime but do not visibly enable dependency caching.

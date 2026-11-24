@@ -12,6 +12,8 @@ import { effectiveStepEnvironment } from "./shared/workflow-env.ts";
 import { declaredShellEnvironmentNames } from "./shared/shell-environment-evidence.ts";
 import { shellExecutionTexts } from "./shared/shell-execution-text.ts";
 import { shellCommandSegments } from "./shared/command-patterns.ts";
+import { isBlacksmithStickyDiskCacheStep } from "./shared/blacksmith-caches.ts";
+import { jobRunsOnBlacksmithRunner } from "./shared/runs-on-facts.ts";
 
 const meta = {
   id: "missing-turbo-cache",
@@ -23,16 +25,29 @@ const meta = {
 function stepRunsTurboTasks(step: WorkflowStep): boolean {
   return toolInvocations(step.run ?? "").some((words) => {
     const [tool, action, task] = repositoryCommandHead(words);
+    const separator = words.indexOf("--");
+    const turboWords = separator < 0 ? words : words.slice(0, separator);
     return (
       tool === "turbo" &&
       action === "run" &&
-      ["build", "test", "lint", "typecheck", "check"].includes(task ?? "")
+      ["build", "test", "lint", "typecheck", "check"].includes(task ?? "") &&
+      !turboWords.some((word) => /^--dry(?:-run)?(?:=|$)/.test(word))
     );
   });
 }
 
 function jobRunsTurboTasks(job: WorkflowJob): boolean {
   return job.steps.some(stepRunsTurboTasks);
+}
+
+function jobHasBlacksmithTurboCache(job: WorkflowJob): boolean {
+  const firstTask = job.steps.findIndex(stepRunsTurboTasks);
+  return job.steps.some(
+    (step, index) =>
+      isBlacksmithStickyDiskCacheStep(job, step) &&
+      /\.turbo\b|node_modules\/\.cache\/turbo\b/i.test(turboCachePathText(step)) &&
+      index < firstTask,
+  );
 }
 
 function turboCachePathText(step: WorkflowStep): string {
@@ -75,15 +90,19 @@ function workflowHasTurboLocalCache(workflow: WorkflowDocument): boolean {
 function jobHasTurboRemoteCacheWiring(workflow: WorkflowDocument, job: WorkflowJob): boolean {
   const names = ["TURBO_TOKEN", "TURBO_TEAM", "TURBO_API", "TURBO_REMOTE_ONLY"];
   const persisted = new Set<string>();
+  const remoteActions: WorkflowStep[] = [];
   for (const step of job.steps) {
     const run = step.run ?? "";
     const environment = effectiveStepEnvironment(workflow, job, step);
     const declared = declaredShellEnvironmentNames(run);
-    if (
-      stepRunsTurboTasks(step) &&
-      names.some((name) => name in environment || declared.has(name) || persisted.has(name))
-    ) {
-      return true;
+    if (stepRunsTurboTasks(step)) {
+      return (
+        names.some((name) => name in environment || declared.has(name) || persisted.has(name)) ||
+        remoteActions.some((action) => !action.ifNode || (!!action.if && action.if === step.if))
+      );
+    }
+    if (/^rharkor\/caching-for-turbo@/i.test(step.uses ?? "")) {
+      remoteActions.push(step);
     }
     for (const segment of shellExecutionTexts(run).flatMap(shellCommandSegments)) {
       if (
@@ -117,10 +136,12 @@ export const missingTurboCacheRule = {
         (job) =>
           jobAllowsActionsCacheRestore(workflow, job) &&
           jobRunsTurboTasks(job) &&
+          !jobHasBlacksmithTurboCache(job) &&
           !jobHasTurboRemoteCacheWiring(workflow, job),
       )
-      .map((job) =>
-        buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
+      .map((job) => {
+        const automaticCachePossible = jobRunsOnBlacksmithRunner(job) && !job.raw.container;
+        return buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs Turbo tasks without visible local or remote cache wiring.`,
           why: "Turbo is most effective in CI when task cache reuse is visible, but this workflow does not show a `.turbo` cache path or remote-cache environment wiring.",
           suggestion:
@@ -129,7 +150,18 @@ export const missingTurboCacheRule = {
             "Compare cache restore time, Turbo task wall-clock time, cache hit rate, and cache save time before and after adding cache wiring.",
           aiHandoff: `Review ${workflow.relativePath} job "${job.id}" together with the repository's Turbo setup. If this CI path repeats the same Turbo tasks, test visible local or remote cache wiring and keep it only when total time improves.`,
           score: 52,
-        }),
-      );
+          ...(automaticCachePossible
+            ? {
+                severity: "suggestion" as const,
+                message: `Job "${job.id}" runs Turbo on Blacksmith; cache coverage cannot be resolved from the visible workflow.`,
+                why: "Blacksmith can provide Turborepo remote caching without YAML wiring, and local composite actions may also configure caching. Dashboard settings, hidden setup and fork-PR restrictions are not resolved by this scanner.",
+                suggestion:
+                  "Check Blacksmith's Turborepo cache setting and the job log for `Remote caching enabled` and cache hits before adding another cache. Preserve existing remote-cache providers; verify outputs declarations before enabling task caching.",
+                aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Verify Blacksmith's Turborepo cache setting and same-job logs before adding local or remote cache wiring. Do not assume the cache is enabled, and do not remove another provider or cache external-state tasks blindly.`,
+                score: 32,
+              }
+            : {}),
+        });
+      });
   },
 };

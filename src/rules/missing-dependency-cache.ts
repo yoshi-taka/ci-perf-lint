@@ -1,6 +1,7 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowDocument, WorkflowStep } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
+import { isBlacksmithStickyDiskCacheStep } from "./shared/blacksmith-caches.ts";
 import { type DependencyFamily, detectInstallCommand } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
@@ -22,7 +23,7 @@ import { workflowLooksReleaseLike } from "./shared/workflow-jobs.ts";
 
 const FAMILY_CACHE_MATCHERS: Record<DependencyFamily, string[]> = {
   npm: [".npm", "npm-cache"],
-  pnpm: [".pnpm-store", "pnpm-store", "store/v3"],
+  pnpm: [".pnpm-store", "pnpm-store", "store/v3", "/pnpm/store"],
   yarn: [".yarn/cache", ".yarn/install-state", "yarn-cache"],
   bun: [".bun", "bun/install/cache"],
   pip: [".cache/pip", "pip-cache"],
@@ -61,16 +62,21 @@ function manualCacheMatchesFamily(step: WorkflowStep, family: DependencyFamily):
 }
 
 function computeManualCacheCoverage(
-  steps: WorkflowStep[],
+  job: WorkflowJob,
   families: Set<DependencyFamily>,
 ): Set<DependencyFamily> {
   const covered = new Set<DependencyFamily>();
-  for (const step of steps) {
-    if (!isManualCacheStep(step)) {
+  for (const [index, step] of job.steps.entries()) {
+    const sticky = isBlacksmithStickyDiskCacheStep(job, step);
+    if (!isManualCacheStep(step) && !sticky) {
       continue;
     }
     for (const family of families) {
-      if (manualCacheMatchesFamily(step, family)) {
+      if (
+        manualCacheMatchesFamily(step, family) &&
+        (!sticky ||
+          index < job.steps.findIndex((candidate) => detectInstallCommand(candidate) === family))
+      ) {
         covered.add(family);
       }
     }
@@ -105,7 +111,7 @@ export const missingDependencyCacheRule = {
         continue;
       }
 
-      const cachedByManual = computeManualCacheCoverage(job.steps, installFamilies);
+      const cachedByManual = computeManualCacheCoverage(job, installFamilies);
 
       for (const step of job.steps) {
         const action = getSetupActionKind(step);

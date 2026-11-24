@@ -16,6 +16,8 @@ export const RULE_REGISTRY = {
   "avoid-eslint-plugin-prettier": { kind: "workflow" },
   "avoid-prettier-eslint": { kind: "workflow" },
   "avoid-xcode-install-on-hosted-macos": { kind: "workflow" },
+  "blacksmith-docker-builder-missing": { kind: "workflow" },
+  "blacksmith-docker-cache-export": { kind: "workflow" },
   "cache-terraform-providers": { kind: "workflow" },
   "cargo-build-before-test": { kind: "workflow" },
   "circleci-checkout-uses-full-clone": { kind: "workflow" },

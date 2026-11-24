@@ -24,6 +24,94 @@ const files = (source: string, extra: Record<string, string> = {}) => ({
 });
 
 const scenarios: ShellEvidenceScenario[] = [
+  ...["npx turbo run build", "npx turbo run build -- --dry=json"].map(
+    (command): ShellEvidenceScenario => ({
+      name: `Turbo task execution, not a printed example: ${command}`,
+      command,
+      build: (run) =>
+        files(workflow([{ run }]), {
+          "package.json": JSON.stringify({ devDependencies: { turbo: "2.5.0" } }),
+        }),
+      expectations: [{ id: "missing-turbo-cache", severity: "warning", count: 1, literalCount: 0 }],
+    }),
+  ),
+  {
+    name: "Turbo dry-run is metadata rather than cacheable task execution",
+    command: "npx turbo run build --dry=json",
+    build: (run) =>
+      files(workflow([{ uses: "actions/setup-node@v6" }, { run: "npm ci" }, { run }]), {
+        "package.json": JSON.stringify({ devDependencies: { turbo: "2.5.0" } }),
+      }),
+    expectations: [
+      { id: "missing-turbo-cache", severity: "warning", count: 0, literalCount: 0 },
+      { id: "missing-dependency-cache", severity: "suggestion", count: 1, literalCount: 1 },
+    ],
+  },
+  {
+    name: "Blacksmith local-image consumer is execution, not printed data",
+    command: "docker run --rm example/app:ci",
+    build: (run) =>
+      files(
+        workflow(
+          [
+            { uses: "docker/setup-qemu-action@v4" },
+            {
+              uses: "useblacksmith/build-push-action@v2",
+              with: {
+                platforms: "linux/arm64",
+                load: true,
+                push: true,
+                tags: "example/app:ci",
+              },
+            },
+            { run },
+          ],
+          { "runs-on": "blacksmith-4vcpu-ubuntu-2404" },
+        ),
+      ),
+    expectations: [
+      {
+        id: "prefer-native-arm-runner-over-qemu",
+        severity: "suggestion",
+        count: 1,
+        literalCount: 1,
+      },
+      { id: "docker-build-load-true-unnecessary", severity: "warning", count: 0, literalCount: 1 },
+    ],
+  },
+  ...["docker buildx use other", 'echo "DOCKER_HOST=tcp://other" >> "$GITHUB_ENV"'].map(
+    (command): ShellEvidenceScenario => ({
+      name: `Blacksmith builder override is execution, not printed data: ${command}`,
+      command,
+      build: (run) =>
+        files(
+          workflow(
+            [
+              { uses: "docker/setup-qemu-action@v4" },
+              {
+                uses: "useblacksmith/setup-docker-builder@v2",
+                with: { "cache-key": "Dockerfile" },
+              },
+              { run },
+              {
+                uses: "useblacksmith/build-push-action@v2",
+                with: { platforms: "linux/arm64", "cache-to": "type=gha,mode=max" },
+              },
+            ],
+            { "runs-on": "blacksmith-4vcpu-ubuntu-2404" },
+          ),
+        ),
+      expectations: [
+        {
+          id: "prefer-native-arm-runner-over-qemu",
+          severity: "suggestion",
+          count: 1,
+          literalCount: 1,
+        },
+        { id: "blacksmith-docker-cache-export", severity: "suggestion", count: 0, literalCount: 1 },
+      ],
+    }),
+  ),
   {
     name: "component scope uses execution paths, not labels or logs",
     command: "npm run build",

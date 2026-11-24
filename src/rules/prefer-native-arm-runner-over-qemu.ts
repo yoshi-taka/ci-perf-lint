@@ -19,7 +19,8 @@ function usesQemuSetup(step: WorkflowStep): boolean {
 
 function usesDockerBuildPushAction(step: WorkflowStep): boolean {
   return (
-    typeof step.uses === "string" && step.uses.toLowerCase().startsWith("docker/build-push-action@")
+    typeof step.uses === "string" &&
+    /^(?:docker|useblacksmith)\/build-push-action@/i.test(step.uses)
   );
 }
 

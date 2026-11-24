@@ -6,6 +6,7 @@ This rule looks for:
 
 - `docker/setup-qemu-action`
 - a visible Docker build step in the same job
+- both `docker/build-push-action` and `useblacksmith/build-push-action` are recognized
 - ARM targets such as `linux/arm64`
 
 Why it matters:

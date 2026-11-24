@@ -13,6 +13,8 @@ import { avoidEslintPluginPrettierRule } from "./avoid-eslint-plugin-prettier.ts
 import { avoidPrettierEslintRule } from "./avoid-prettier-eslint.ts";
 import { repeatedBootstrapSetupRule } from "./repeated-bootstrap-setup.ts";
 import { avoidXcodeInstallOnHostedMacosRule } from "./avoid-xcode-install-on-hosted-macos.ts";
+import { blacksmithDockerBuilderMissingRule } from "./blacksmith-docker-builder-missing.ts";
+import { blacksmithDockerCacheExportRule } from "./blacksmith-docker-cache-export.ts";
 import { cacheTerraformProvidersRule } from "./cache-terraform-providers.ts";
 import { cargoBuildBeforeTestRule } from "./cargo-build-before-test.ts";
 import { circleciCheckoutUsesFullCloneRule } from "./circleci-checkout-uses-full-clone.ts";
@@ -163,6 +165,8 @@ export const allRules = [
   avoidEslintPluginPrettierRule,
   avoidPrettierEslintRule,
   avoidXcodeInstallOnHostedMacosRule,
+  blacksmithDockerBuilderMissingRule,
+  blacksmithDockerCacheExportRule,
   cacheTerraformProvidersRule,
   cargoBuildBeforeTestRule,
   circleciCheckoutUsesFullCloneRule,

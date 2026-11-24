@@ -107,7 +107,7 @@ function computeStepFacts(step: WorkflowStep): StepFacts {
   let checkoutDepth: number | undefined;
   let checkoutSparseCheckout: string | undefined;
   let checkoutFilter: string | undefined;
-  if (uses.startsWith("actions/checkout@")) {
+  if (/^(?:actions|useblacksmith)\/checkout@/.test(uses)) {
     isCheckout = true;
     const fetchDepth = step.with?.["fetch-depth"];
     if (fetchDepth === 0 || fetchDepth === "0") {

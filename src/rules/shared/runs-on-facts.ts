@@ -68,19 +68,22 @@ function extractLabels(job: WorkflowJob): string[] {
 }
 
 function detectOs(labels: readonly string[]): RunsOnOs {
-  if (labels.some((l) => /^ubuntu-/i.test(l))) {
+  if (labels.some((l) => /^(?:blacksmith-\d+vcpu-)?ubuntu-/i.test(l))) {
     return "ubuntu";
   }
-  if (labels.some((l) => /^windows-/i.test(l))) {
+  if (labels.some((l) => /^(?:blacksmith-\d+vcpu-)?windows-/i.test(l))) {
     return "windows";
   }
-  if (labels.some((l) => /^macos-/i.test(l))) {
+  if (labels.some((l) => /^(?:blacksmith-\d+vcpu-)?macos-/i.test(l))) {
     return "macos";
   }
   return "unknown";
 }
 
 function detectArch(labels: readonly string[]): RunsOnArch {
+  if (labels.some((label) => /^blacksmith-\d+vcpu-macos-/.test(label))) {
+    return "arm";
+  }
   if (labels.some((l) => /\b(arm|arm64|aarch64)\b/i.test(l))) {
     return "arm";
   }
@@ -135,4 +138,11 @@ export function jobRunsOnStandardX64Ubuntu(job: WorkflowJob): boolean {
 
 export function jobRunsOnArmLikeRunner(job: WorkflowJob): boolean {
   return getRunsOnSpec(job).arch === "arm";
+}
+
+/** Static provider evidence only; an expression mentioning Blacksmith is not a resolved label. */
+export function jobRunsOnBlacksmithRunner(job: WorkflowJob): boolean {
+  return getRunsOnSpec(job).labels.some(
+    (label) => !label.includes("${{") && /^blacksmith(?:-|$|;)/.test(label),
+  );
 }

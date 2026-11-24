@@ -15,7 +15,7 @@ const meta = {
 
 function stepHasLoadTrue(step: WorkflowStep): boolean {
   const uses = step.uses?.toLowerCase() ?? "";
-  if (!uses.startsWith("docker/build-push-action@")) {
+  if (!/^(?:docker|useblacksmith)\/build-push-action@/.test(uses)) {
     return false;
   }
   const load = step.with?.load;
@@ -28,7 +28,7 @@ function getStaticTagsOrSkip(step: WorkflowStep): string[] | undefined {
     return undefined;
   }
   return tags
-    .split(",")
+    .split(/[,\r\n]+/)
     .map((t) => t.trim())
     .filter((t) => t.length > 0);
 }
@@ -116,16 +116,18 @@ export const dockerBuildLoadTrueUnnecessaryRule = {
         }
 
         const tagsHint = tags.length > 0 ? `tags: ${tags.join(", ")}` : "no tags set";
+        const action = step.uses?.toLowerCase().startsWith("useblacksmith/")
+          ? "useblacksmith/build-push-action"
+          : "docker/build-push-action";
 
         findings.push(
           buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {
-            message: `Job "${job.id}" sets load: true on docker/build-push-action (${tagsHint}) but the image is not used by any subsequent step.`,
+            message: `Job "${job.id}" sets load: true on ${action} (${tagsHint}) but the image is not used by any subsequent step.`,
             why: "`load: true` serializes the built image into the Docker daemon, adding overhead. If no later step runs the image via `docker run`, `docker compose`, `docker tag`, or `docker save`, the load step is unnecessary.",
-            suggestion:
-              "Remove `load: true` from the docker/build-push-action step unless a subsequent step in the same job needs the image in the local Docker daemon.",
+            suggestion: `Remove \`load: true\` from the ${action} step unless a subsequent step in the same job needs the image in the local Docker daemon.`,
             measurementHint:
               "Compare Docker build wall-clock time before and after removing `load: true`. The savings grow with image size.",
-            aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and remove \`load: true\` from the docker/build-push-action step since the loaded image is not used afterward.`,
+            aiHandoff: `Review job "${job.id}" in ${workflow.relativePath} and remove \`load: true\` from the ${action} step since the loaded image is not used afterward.`,
             score: 50,
           }),
         );

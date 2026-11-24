@@ -1,5 +1,17 @@
 # missing-turbo-cache
 
+On a statically identified Blacksmith host runner, automatic remote caching may
+already cover Turbo without YAML wiring. The finding becomes an exploratory
+suggestion to verify organization settings and actual cache-hit logs before
+adding another cache. Containers are not assumed to reach that automatic cache;
+fork PRs do not receive it. Explicit remote providers and valid Sticky Disk mounts
+before the Turbo command are respected. See [Blacksmith workflows](../blacksmith.md).
+
+Turbo dry-run/hash-inspection commands do not establish executed task work.
+Visible `rharkor/caching-for-turbo` setup before the first task is remote wiring
+when unconditional or guarded by the same condition as that task. A later setup
+does not retroactively cover an earlier task.
+
 Workload evidence comes from executed Turbo commands. Remote-cache intent comes from the consuming job's structured environment, actual shell declarations or recognized prior `$GITHUB_ENV` writes, not printed variable names or another job's environment. Existing local/artifact-cache gates are retained.
 
 Flags workflows that visibly run `turbo run ...` tasks while no local Turbo cache path or remote-cache wiring is visible.

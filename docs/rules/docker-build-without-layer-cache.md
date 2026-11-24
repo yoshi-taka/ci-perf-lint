@@ -1,5 +1,9 @@
 # docker-build-without-layer-cache
 
+An unconditionally configured Blacksmith v2 persistent builder with a nonempty
+cache key is an alternative to exported caching. Such builds are excluded when
+no intervening opaque setup, shell step or explicit builder override is visible.
+
 Detects `docker/build-push-action` steps that do not configure `cache-from` and `cache-to`.
 
 Depot actions are excluded: their normal builds automatically persist the project's layer cache, without GHA cache exports.
