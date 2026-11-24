@@ -316,6 +316,23 @@ test("normalizes documented bool and int step scalars", () => {
   expect(doc.steps[1]?.skip).toBe(false);
 });
 
+test("recognizes both documented wait step forms", () => {
+  const doc = parsePipeline(
+    "/repo/.buildkite/pipeline.yml",
+    "/repo",
+    [
+      "steps:",
+      "  - command: make build",
+      "  - wait",
+      "  - command: make test",
+      "  - wait: ~",
+      "  - command: make lint",
+    ].join("\n"),
+  );
+  expect(doc.steps[1]?.isWait).toBe(true);
+  expect(doc.steps[3]?.isWait).toBe(true);
+});
+
 test("does not flag light annotator plugins regardless of label", async () => {
   const root = await tempDirs.create("apl-buildkite-plugin-light-");
   const dir = path.join(root, ".buildkite");

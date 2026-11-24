@@ -206,9 +206,11 @@ function parsePlugins(node: Node | undefined): Record<string, unknown>[] | undef
 
 function parseStep(item: unknown): PipelineStep {
   if (!isMap(item)) {
+    // Scalar `- wait` (and `- wait: ~`) are the documented wait forms.
+    const scalarText = isScalar(item) ? getScalarString(item) : undefined;
     return {
       node: item as YAMLMap<unknown, unknown>,
-      isWait: false,
+      isWait: scalarText === "wait",
       isBlock: false,
       isTrigger: false,
       isGroup: false,
