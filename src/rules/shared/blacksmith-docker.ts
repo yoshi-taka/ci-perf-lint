@@ -4,6 +4,7 @@ import { effectiveStepEnvironment } from "./workflow-env.ts";
 import { jobRunsOnBlacksmithRunner } from "./runs-on-facts.ts";
 import { blacksmithShellPreservesBuilder } from "./blacksmith-docker-shell.ts";
 import { stepHasKnownRunnerShell } from "./runner-execution-context.ts";
+import { isBlacksmithV2Action } from "./blacksmith-action-refs.ts";
 
 const builderEnvironment = ["BUILDX_BUILDER", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_BUILDKIT"];
 
@@ -34,9 +35,10 @@ export function blacksmithDockerBuilds(workflow: WorkflowDocument) {
       if (uses.startsWith("useblacksmith/setup-docker-builder@")) {
         const key = step.with?.["cache-key"];
         state =
-          /^useblacksmith\/setup-docker-builder@v2(?:\.|$)/.test(uses) &&
+          isBlacksmithV2Action(uses, "setup-docker-builder") &&
           typeof key === "string" &&
           key.trim() !== "" &&
+          !key.includes("${{") &&
           !step.ifNode &&
           !override &&
           !runnerEnvironmentUnknown
@@ -49,7 +51,7 @@ export function blacksmithDockerBuilds(workflow: WorkflowDocument) {
           persistent: state === "persistent" && !override && step.with?.builder === undefined,
           missing:
             state === "missing" &&
-            /^useblacksmith\/build-push-action@v2(?:\.|$)/.test(uses) &&
+            isBlacksmithV2Action(uses, "build-push-action") &&
             !override &&
             step.with?.builder === undefined,
         });

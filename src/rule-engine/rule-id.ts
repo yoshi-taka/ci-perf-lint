@@ -18,6 +18,7 @@ export const RULE_REGISTRY = {
   "avoid-xcode-install-on-hosted-macos": { kind: "workflow" },
   "blacksmith-docker-builder-missing": { kind: "workflow" },
   "blacksmith-docker-cache-export": { kind: "workflow" },
+  "blacksmith-sticky-disk-cache-overlap": { kind: "workflow" },
   "cache-terraform-providers": { kind: "workflow" },
   "cargo-build-before-test": { kind: "workflow" },
   "circleci-checkout-uses-full-clone": { kind: "workflow" },

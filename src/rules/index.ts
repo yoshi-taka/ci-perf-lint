@@ -15,6 +15,7 @@ import { repeatedBootstrapSetupRule } from "./repeated-bootstrap-setup.ts";
 import { avoidXcodeInstallOnHostedMacosRule } from "./avoid-xcode-install-on-hosted-macos.ts";
 import { blacksmithDockerBuilderMissingRule } from "./blacksmith-docker-builder-missing.ts";
 import { blacksmithDockerCacheExportRule } from "./blacksmith-docker-cache-export.ts";
+import { blacksmithStickyDiskCacheOverlapRule } from "./blacksmith-sticky-disk-cache-overlap.ts";
 import { cacheTerraformProvidersRule } from "./cache-terraform-providers.ts";
 import { cargoBuildBeforeTestRule } from "./cargo-build-before-test.ts";
 import { circleciCheckoutUsesFullCloneRule } from "./circleci-checkout-uses-full-clone.ts";
@@ -167,6 +168,7 @@ export const allRules = [
   avoidXcodeInstallOnHostedMacosRule,
   blacksmithDockerBuilderMissingRule,
   blacksmithDockerCacheExportRule,
+  blacksmithStickyDiskCacheOverlapRule,
   cacheTerraformProvidersRule,
   cargoBuildBeforeTestRule,
   circleciCheckoutUsesFullCloneRule,

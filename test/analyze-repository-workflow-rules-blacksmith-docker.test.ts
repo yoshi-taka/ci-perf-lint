@@ -17,6 +17,65 @@ const metadata = {
   with: { images: "ghcr.io/example/app" },
 };
 
+test.each([
+  "33803e640bd9d674f2843a8c323aa2a7da478d23",
+  "1e75355f81cbb3f93cba1eb5dd5e5b05110ca8f9",
+  "a5256a73e30f09e37e3eceb8ca36043d17621d24",
+  "19215110ab936351210feebdfa5b440b4493e184",
+  "06dd9c83a5d541274d2e3ac67625560979275267",
+  "9657a6e02ca6445e6d6ce5ffaf370f4828dea50d",
+])("verified setup v2 pin preserves export review: %s", async (sha) => {
+  const pinned = { ...setup, uses: `useblacksmith/setup-docker-builder@${sha}` };
+  expect(await analyze([pinned, exporting], exportId)).toHaveLength(1);
+  expect(
+    await analyze([{ ...pinned, if: "github.ref == 'refs/heads/main'" }, exporting], exportId),
+  ).toHaveLength(0);
+  expect(
+    await analyze([{ ...pinned, with: { "cache-key": "" } }, exporting], exportId),
+  ).toHaveLength(0);
+  expect(
+    await analyze(
+      [
+        {
+          ...pinned,
+          with: { "cache-key": "${{ github.event_name == 'pull_request' && 'pr' || '' }}" },
+        },
+        exporting,
+      ],
+      exportId,
+    ),
+  ).toHaveLength(0);
+});
+
+test.each([
+  "cbd1f60d194a98cb3be5523b15134501eaf0fbf3",
+  "fb9e3e6a9299c78462bfadd0d93352c316adc9b8",
+  "9b0579bbec7a6cad2f171596c57e7ac1e7658850",
+])("verified build v2 pin preserves missing-builder review: %s", async (sha) => {
+  const pinned = { ...build, uses: `useblacksmith/build-push-action@${sha}` };
+  expect(await analyze([pinned], missingId)).toHaveLength(1);
+  expect(await analyze([setup, pinned], missingId)).toHaveLength(0);
+  expect(await analyze([pinned], missingId, { env: { DOCKER_HOST: "tcp://remote" } })).toHaveLength(
+    0,
+  );
+});
+
+test.each([
+  "0000000000000000000000000000000000000000",
+  "00b770997181b0ea829a64add3dbd306fe9cfa25",
+  "v2.custom",
+])("unknown and v1 pins remain unknown despite version comments: %s", async (ref) => {
+  expect(
+    await analyze(
+      [{ ...setup, uses: `useblacksmith/setup-docker-builder@${ref}` }, exporting],
+      exportId,
+    ),
+  ).toHaveLength(0);
+  expect(
+    await analyze([{ ...build, uses: `useblacksmith/build-push-action@${ref}` }], missingId),
+  ).toHaveLength(0);
+});
+
 async function analyze(
   steps: readonly Record<string, unknown>[],
   id: string,

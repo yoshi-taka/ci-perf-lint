@@ -1,5 +1,10 @@
 # blacksmith-docker-cache-export
 
+Recognizes v2 version tags and explicitly verified v2 release commit pins.
+Unknown pins and version comments alone do not establish persistent-builder semantics.
+Dynamic cache keys also remain unknown: they may deliberately resolve to an empty
+key to select a local fallback builder.
+
 ## Why it matters
 
 Blacksmith's persistent builder retains layers and cache mounts between jobs.

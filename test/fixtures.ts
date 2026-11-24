@@ -3,6 +3,8 @@ import path from "node:path";
 const fixturesDir = path.resolve(import.meta.dir, "fixtures");
 
 const fixtureNames = {
+  blacksmithCacheOverlapLike: "blacksmith-cache-overlap-like",
+  blacksmithCacheOverlapOk: "blacksmith-cache-overlap-ok",
   agenticWorkflowLike: "agentic-workflow-like",
   alpineCiLike: "alpine-ci-like",
   angularCacheLike: "angular-cache-like",

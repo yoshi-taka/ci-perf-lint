@@ -12,6 +12,11 @@ that every account feature is enabled or that every migration is beneficial.
 - Explicit Sticky Disk mounts can cover dependency caches and `.turbo` task
   outputs when mounted before the relevant work. They are not treated as
   `actions/cache` actions with interchangeable outputs or save behavior.
+- `blacksmith-sticky-disk-cache-overlap` offers an exploratory review when an
+  unconditional archive cache and Sticky Disk target the same known path.
+  Provider-specific fallback conditions and unknown preparation are not guessed.
+- Docker builder checks recognize verified v2 release pins as well as version
+  tags. Unknown pins and dynamic cache keys remain unresolved.
 - Docker build actions participate in native-ARM/QEMU and unused local-image
   loading checks. Local smoke tests, image saves and publishing consumers must
   remain intact.

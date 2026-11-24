@@ -24,6 +24,30 @@ const files = (source: string, extra: Record<string, string> = {}) => ({
 });
 
 const scenarios: ShellEvidenceScenario[] = [
+  {
+    name: "Blacksmith cache overlap is configuration evidence, not printed command text",
+    command: "npm ci",
+    build: (run) =>
+      files(
+        workflow(
+          [
+            { uses: "useblacksmith/checkout@v1" },
+            { uses: "actions/setup-node@v7", with: { cache: "npm" } },
+            { uses: "useblacksmith/stickydisk@v1", with: { key: "npm", path: "~/.npm" } },
+            { run },
+          ],
+          { "runs-on": "blacksmith-2vcpu-ubuntu-2404" },
+        ),
+      ),
+    expectations: [
+      {
+        id: "blacksmith-sticky-disk-cache-overlap",
+        severity: "suggestion",
+        count: 1,
+        literalCount: 1,
+      },
+    ],
+  },
   ...["npx turbo run build", "npx turbo run build -- --dry=json"].map(
     (command): ShellEvidenceScenario => ({
       name: `Turbo task execution, not a printed example: ${command}`,

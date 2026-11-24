@@ -25,6 +25,7 @@ Current rule registry:
 - `avoid-xcode-install-on-hosted-macos`
 - `blacksmith-docker-builder-missing`
 - `blacksmith-docker-cache-export`
+- `blacksmith-sticky-disk-cache-overlap`
 - `bundler-external-subpath-leak`
 - `cache-terraform-providers`
 - `cargo-build-before-test`

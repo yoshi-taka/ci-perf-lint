@@ -1,5 +1,8 @@
 # blacksmith-docker-builder-missing
 
+Recognizes v2 version tags and explicitly verified v2 build-action release commit pins.
+Unknown pins and version comments alone do not establish v2 semantics.
+
 ## Why it matters
 
 `useblacksmith/build-push-action@v2` alone uses the default builder. It does not
