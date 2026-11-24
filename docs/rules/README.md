@@ -112,6 +112,7 @@ Current rule registry:
 - `matrix-test-job-without-test-sharding`
 - `maven-parallel-not-enabled`
 - `missing-angular-cli-cache`
+- `missing-cancel-on-build-failing`
 - `missing-concurrency`
 - `missing-dependency-cache`
 - `missing-dependency-cache-buildkite`

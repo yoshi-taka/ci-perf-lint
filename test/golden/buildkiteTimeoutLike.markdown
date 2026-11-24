@@ -36,6 +36,18 @@
 - Suggested action: Add if_changed with glob patterns covering the files this step consumes (requires a pipeline uploaded with buildkite-agent pipeline upload and an agent that applies it by default, 3.103.0+). Keep deploy steps off if_changed: on the default branch the changed-file set only reflects the previous commit, so a multi-commit push can skip a needed deployment.
 - Measurement hint: Count the share of recent commits whose changed files fall outside the globs. That share is the fraction of builds this step can skip.
 
+## missing-cancel-on-build-failing
+
+- Workflow: `.buildkite/pipeline.yml`
+- Location: `.buildkite/pipeline.yml:3:14`
+- Severity: `suggestion`
+- Confidence: `medium`
+- Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-cancel-on-build-failing`
+- Message: Pipeline runs steps concurrently but no step sets cancel_on_build_failing.
+- Why it matters: Without the fast-fail attribute, a failing job leaves its concurrent siblings running to natural completion, occupying agents for results that cannot change the verdict.
+- Suggested action: Add cancel_on_build_failing: true to the steps whose results cannot change the verdict once the build is failing. Teams that fix all failures in one pass may deliberately keep lanes running; retries of canceled siblings are also subject to the same policy until the source failure is retried, so retry source failures first.
+- Measurement hint: Compare total agent time of failing builds before and after adding the attribute. Cancellation saves only the window between the first hard failure and natural completion of the siblings.
+
 ## missing-dependency-cache-buildkite
 
 - Workflow: `.buildkite/pipeline.yml`

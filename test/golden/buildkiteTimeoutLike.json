@@ -54,6 +54,24 @@
     "score": 80
   },
   {
+    "ruleId": "missing-cancel-on-build-failing",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-cancel-on-build-failing.md",
+    "workflow": ".buildkite/pipeline.yml",
+    "location": {
+      "path": ".buildkite/pipeline.yml",
+      "line": 3,
+      "column": 14
+    },
+    "message": "Pipeline runs steps concurrently but no step sets cancel_on_build_failing.",
+    "why": "Without the fast-fail attribute, a failing job leaves its concurrent siblings running to natural completion, occupying agents for results that cannot change the verdict.",
+    "suggestion": "Add cancel_on_build_failing: true to the steps whose results cannot change the verdict once the build is failing. Teams that fix all failures in one pass may deliberately keep lanes running; retries of canceled siblings are also subject to the same policy until the source failure is retried, so retry source failures first.",
+    "measurementHint": "Compare total agent time of failing builds before and after adding the attribute. Cancellation saves only the window between the first hard failure and natural completion of the siblings.",
+    "aiHandoff": "Review .buildkite/pipeline.yml: add cancel_on_build_failing to steps that cannot change the verdict, starting near step \":hammer: Tests\".",
+    "score": 40
+  },
+  {
     "ruleId": "missing-dependency-cache-buildkite",
     "severity": "suggestion",
     "confidence": "medium",

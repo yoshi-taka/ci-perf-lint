@@ -52,6 +52,7 @@ export const RULE_REGISTRY = {
   "missing-dependency-cache": { kind: "workflow" },
   "missing-dependency-cache-buildkite": { kind: "workflow" },
   "missing-fail-fast-cancellation": { kind: "workflow" },
+  "missing-cancel-on-build-failing": { kind: "workflow" },
   "missing-gradle-build-cache": { kind: "workflow" },
   "missing-if-changed": { kind: "workflow" },
   "missing-make-j-flag": { kind: "workflow" },

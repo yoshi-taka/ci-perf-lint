@@ -50,6 +50,7 @@ import { missingDependencyCacheRule } from "./missing-dependency-cache.ts";
 import { missingDependencyCacheBuildkiteRule } from "./missing-dependency-cache-buildkite.ts";
 import { missingIfChangedRule } from "./missing-if-changed.ts";
 import { missingFailFastCancellationRule } from "./missing-fail-fast-cancellation.ts";
+import { missingCancelOnBuildFailingRule } from "./missing-cancel-on-build-failing.ts";
 import { missingAngularCliCacheRule } from "./missing-angular-cli-cache.ts";
 import { noxWithoutUvBackendRule } from "./nox-without-uv-backend.ts";
 import { npmCiOverNpmInstallRule } from "./npm-ci-over-npm-install.ts";
@@ -196,6 +197,7 @@ export const allRules = [
   missingDependencyCacheRule,
   missingDependencyCacheBuildkiteRule,
   missingFailFastCancellationRule,
+  missingCancelOnBuildFailingRule,
   missingAngularCliCacheRule,
   missingGradleBuildCacheRule,
   missingMakeJFlagRule,

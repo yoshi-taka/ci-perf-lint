@@ -16,13 +16,19 @@
    Suggested action: Add if_changed with glob patterns covering the files this step consumes (requires a pipeline uploaded with buildkite-agent pipeline upload and an agent that applies it by default, 3.103.0+). Keep deploy steps off if_changed: on the default branch the changed-file set only reflects the previous commit, so a multi-commit push can skip a needed deployment.
    Measurement hint: Count the share of recent commits whose changed files fall outside the globs. That share is the fraction of builds this step can skip.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-if-changed
-4. missing-dependency-cache-buildkite (.buildkite/pipeline.yml:3:14)
+4. missing-cancel-on-build-failing (.buildkite/pipeline.yml:3:14)
+   Pipeline runs steps concurrently but no step sets cancel_on_build_failing.
+   Why it matters: Without the fast-fail attribute, a failing job leaves its concurrent siblings running to natural completion, occupying agents for results that cannot change the verdict.
+   Suggested action: Add cancel_on_build_failing: true to the steps whose results cannot change the verdict once the build is failing. Teams that fix all failures in one pass may deliberately keep lanes running; retries of canceled siblings are also subject to the same policy until the source failure is retried, so retry source failures first.
+   Measurement hint: Compare total agent time of failing builds before and after adding the attribute. Cancellation saves only the window between the first hard failure and natural completion of the siblings.
+   Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-cancel-on-build-failing
+5. missing-dependency-cache-buildkite (.buildkite/pipeline.yml:3:14)
    Step ":hammer: Tests" installs dependencies without a cache.
    Why it matters: Every build starts from a clean checkout, so dependency directories are re-downloaded and re-installed on every run.
    Suggested action: Add dependency caching: a pipeline `cache:` attribute on hosted agents, the official cache plugin, or `buildkite-agent cache save/restore` keyed on the lockfile.
    Measurement hint: Compare the install command's duration across builds before and after adding the cache, and expect a cache miss after lockfile changes.
    Rule docs: https://ci-perf-lint.veritycost.com/rules/missing-dependency-cache-buildkite
-5. prefer-node-run-over-npm-run (.buildkite/pipeline.yml:11:14)
+6. prefer-node-run-over-npm-run (.buildkite/pipeline.yml:11:14)
    Step ":package: Build" runs package script "build" through npm run.
    Why it matters: For simple package-script execution on recent Node.js, node --run can avoid npm startup overhead. It is not a drop-in replacement when npm-specific behavior is required.
    Suggested action: Replace npm run with node --run for simple package-script execution when no npm-specific behavior is needed.
