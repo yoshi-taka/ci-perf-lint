@@ -52,31 +52,9 @@ function stepLooksHeavy(step: PipelineStep): boolean {
 }
 
 function stepHasTimeout(step: PipelineStep): boolean {
-  if (step.timeoutNode !== undefined) {
-    return true;
-  }
-  // Recognize explicit positive plugin limits, not disabled, unresolved, or
-  // arbitrary nested timeout-shaped text. This is a conservative exemption:
-  // plugin limits need not cover the entire job lifecycle.
-  return (step.plugins ?? []).some((plugin) =>
-    Object.values(plugin).some((config) => {
-      if (!config || typeof config !== "object" || Array.isArray(config)) {
-        return false;
-      }
-      const record = config as Record<string, unknown>;
-      return ["timeout", "timeout_in_minutes", "timeout-in-minutes"].some((key) => {
-        const value = record[key];
-        if (typeof value === "number") {
-          return Number.isFinite(value) && value > 0;
-        }
-        if (typeof value !== "string") {
-          return false;
-        }
-        const match = /^(\d+(?:\.\d+)?)\s*(?:ms|s|m|h)?$/.exec(value.trim());
-        return match !== null && Number(match[1]) > 0;
-      });
-    }),
-  );
+  // Plugin options may bound only network requests or individual operations,
+  // not the step's other commands, hooks, and artifact uploads.
+  return step.timeoutNode !== undefined;
 }
 
 export const missingTimeoutInMinutesBuildkiteRule = {

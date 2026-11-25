@@ -9,13 +9,17 @@ import {
 const tempDirs = createTempDirTracker();
 afterEach(() => tempDirs.cleanup());
 
-async function findings(setting: string, mode: "strict" | "exploratory" = "exploratory") {
+async function findings(
+  setting: string,
+  mode: "strict" | "exploratory" = "exploratory",
+  stepLines: string[] = ["    command: make build"],
+) {
   const root = await tempDirs.create("apl-bk-timeout-policy-");
   await writeRepositoryFiles(root, {
     [path.join(".buildkite", "pipeline.yml")]: [
       "steps:",
       "  - label: Build",
-      "    command: make build",
+      ...stepLines,
       "    plugins:",
       "      - example/build#v1:",
       `          ${setting}`,
@@ -41,8 +45,24 @@ test.each([
   "timeout: 10m",
   "timeout_in_minutes: 15",
   "timeout-in-minutes: 15",
-])("exempts explicit positive plugin timeout (%s)", async (setting) => {
-  expect(await findings(setting)).toHaveLength(0);
+])("plugin operation timeout does not bound a separate command (%s)", async (setting) => {
+  const found = await findings(setting);
+  expect(found).toHaveLength(1);
+  expect(found[0]?.severity).toBe("suggestion");
+  expect(found[0]?.suggestion).toContain("not hooks or other commands");
+});
+
+test("plugin-only work still needs review of job-wide timeout coverage", async () => {
+  expect(await findings("timeout: 600", "exploratory", [])).toHaveLength(1);
+});
+
+test("explicit step timeout exempts the step independently of plugin settings", async () => {
+  expect(
+    await findings("timeout: 600", "exploratory", [
+      "    command: make build",
+      "    timeout_in_minutes: 15",
+    ]),
+  ).toHaveLength(0);
 });
 
 test.each([

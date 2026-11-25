@@ -10,7 +10,7 @@ Plugin-only steps are classified by plugin name, with the step label kept as an 
 - **Light plugins** (`test-summary`, `junit-annotate`) only annotate or report build results. Build/test-word labels must not flag them.
 - **Unknown plugins** fall back to the label hint, so a custom plugin labeled "Build" is still flagged while one labeled "Notify" is not.
 
-Steps with an explicit positive plugin `timeout`, `timeout_in_minutes`, or `timeout-in-minutes` are conservatively excluded. Numeric values, numeric strings, and simple durations such as `30s` or `10m` count; zero, negative, disabled, unresolved, and nested settings do not. This exemption reduces duplicate advice, but is not proof that hooks or other commands are bounded by the plugin.
+Plugin settings named `timeout`, `timeout_in_minutes`, or `timeout-in-minutes` do not exempt a step. Their meaning depends on the plugin: they may limit a network request or one operation rather than the whole job. This remains true for plugin-only steps, because hooks and artifact uploads can run outside that operation. A step-level `timeout_in_minutes` is a separate, job-wide setting.
 
 Check effective pipeline and organization timeout settings before adding a step override. When an additional step timeout is needed, allow headroom above a plugin's own internal limit.
 
