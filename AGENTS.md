@@ -202,7 +202,7 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 ## CodSpeed Benchmarks
 
 - Targets: `bench/analyze-repository.bench.ts` defines opencode TS, oxc Rust, and pytorch Python cases
-- Workflow: `.github/workflows/codspeed.yml` — runs on PRs, main pushes, version tags, and dispatch
+- Workflow: `.github/workflows/codspeed.yml` — runs on PRs, main pushes, and dispatch; release tags do not start another benchmark
 - Targets are shallow-cloned fresh each run; Node executes bundled Tinybench/CodSpeed API benchmarks
 - Change target clones in the workflow and benchmark cases together; any failed task makes the runner fail
 
