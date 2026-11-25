@@ -33,6 +33,15 @@ Built-in cache defaults considered by the rule:
 
 Conservative bias:
 
+- Tag filters alone do not exempt jobs that also run on branch pushes or pull
+  requests. This includes workflows with `tags-ignore`. Tag-only workflows,
+  release/publication names and visible publication operations retain the
+  exemption. Conditional jobs in a mixed release workflow remain unresolved
+  and exempt; their conditions may restrict them to release events.
+- This narrower exemption applies only to dependency-cache advice. Checkout and
+  release-safety rules keep their existing classification. Opaque publication
+  hidden in generically named scripts/actions may still be missed; suggestions
+  are not proof that a job is read-only or that caching is safe or faster.
 - the rule does not trust `package.json` metadata alone to prove that `setup-node` automatic cache behavior is actually in effect
 - for Node workflows, visible `cache: npm|yarn|pnpm` or a matching manual `actions/cache` step is preferred as proof
 - the rule treats missing cache as a suggestion, not a guaranteed fix, because cache restore and save overhead can outweigh the benefit on some CI paths

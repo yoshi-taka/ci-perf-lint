@@ -25,6 +25,27 @@ const files = (source: string, extra: Record<string, string> = {}) => ({
 
 const scenarios: ShellEvidenceScenario[] = [
   {
+    name: "actual publication retains the tagged cache exemption; printed examples do not",
+    command: "npm publish --access public",
+    build: (run) =>
+      files(
+        stringify({
+          name: "Checks",
+          on: { push: { branches: ["main"], tags: ["v*"] }, pull_request: null },
+          jobs: {
+            verify: {
+              "runs-on": "ubuntu-latest",
+              steps: [{ uses: "actions/setup-node@v4" }, { run: "npm ci" }, { run }],
+            },
+          },
+        }),
+      ),
+    expectations: [
+      { id: "missing-dependency-cache", severity: "suggestion", count: 0, literalCount: 1 },
+      { id: "missing-concurrency", severity: "warning", count: 1, literalCount: 1 },
+    ],
+  },
+  {
     name: "Blacksmith cache overlap is configuration evidence, not printed command text",
     command: "npm ci",
     build: (run) =>

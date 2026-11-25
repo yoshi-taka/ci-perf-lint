@@ -59,16 +59,53 @@ describe("benchmark and documentation guards", () => {
     ).toBe(false);
   });
 
-  test("CodSpeed retains version-tag and manual benchmark triggers", async () => {
+  test("CodSpeed benchmarks PRs and main, not duplicate release-tag pushes", async () => {
     const text = await readFile(
       path.join(import.meta.dir, "../.github/workflows/codspeed.yml"),
       "utf8",
     );
     const doc = parseDocument(text).toJS() as {
-      on: { push: { tags: string[] }; workflow_dispatch?: unknown };
+      on: {
+        push: { branches: string[]; tags?: string[]; "tags-ignore"?: string[] };
+        pull_request?: unknown;
+        workflow_dispatch?: unknown;
+      };
     };
-    expect(doc.on.push.tags).toContain("v*");
+    expect(doc.on.push.branches).toEqual(["main"]);
+    expect(doc.on.push.tags).toBeUndefined();
+    expect(doc.on.push["tags-ignore"]).toBeUndefined();
+    expect(Object.hasOwn(doc.on, "pull_request")).toBe(true);
     expect(Object.hasOwn(doc.on, "workflow_dispatch")).toBe(true);
+  });
+
+  test("CodSpeed caches dependency downloads before an unconditional frozen install", async () => {
+    const text = await readFile(
+      path.join(import.meta.dir, "../.github/workflows/codspeed.yml"),
+      "utf8",
+    );
+    const doc = parseDocument(text).toJS() as {
+      jobs: {
+        benchmarks: {
+          steps: {
+            uses?: string;
+            run?: string;
+            if?: unknown;
+            with?: { path?: string; key?: string };
+          }[];
+        };
+      };
+    };
+    const steps = doc.jobs.benchmarks.steps;
+    const cacheIndex = steps.findIndex(
+      (step) => step.uses === "actions/cache@v5" && step.with?.path === "~/.bun/install/cache",
+    );
+    const installIndex = steps.findIndex((step) =>
+      step.run?.startsWith("bun install --frozen-lockfile"),
+    );
+    expect(cacheIndex).toBeGreaterThanOrEqual(0);
+    expect(installIndex).toBeGreaterThan(cacheIndex);
+    expect(steps[cacheIndex]?.with?.key).toContain("hashFiles('bun.lock')");
+    expect(steps[installIndex]?.if).toBeUndefined();
   });
 
   test("detects task failures even when Tinybench.run resolves", async () => {
