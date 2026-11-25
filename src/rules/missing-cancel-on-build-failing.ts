@@ -2,6 +2,7 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { PipelineDocument, PipelineStep } from "../buildkite-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { buildkiteStepDeploys } from "./shared/buildkite-deployment.ts";
 
 const meta = {
   id: "missing-cancel-on-build-failing",
@@ -23,29 +24,36 @@ function runnableCommandStep(step: PipelineStep): boolean {
   );
 }
 
-/** Branch-filtered steps may be mutually exclusive with their segment
- * neighbors (verified on real pipelines), so only unfiltered steps count
- * toward segment concurrency. A parallel step's shards run together on
- * every matching branch regardless. */
+/** Branch-filtered steps may be mutually exclusive, and explicit dependencies
+ * may serialize segment neighbors. Only unfiltered, dependency-free steps
+ * count toward segment concurrency. A runnable parallel step's own shards
+ * still run together after its dependencies complete. */
 function hasConcurrentWork(pipeline: PipelineDocument): PipelineStep | undefined {
   let run = 0;
-  let first: PipelineStep | undefined;
+  let safeCandidate: PipelineStep | undefined;
   for (const step of pipeline.steps) {
     if (step.isWait || step.isBlock) {
       run = 0;
+      safeCandidate = undefined;
       continue;
     }
     if (step.isTrigger || step.isGroup) {
       continue;
     }
-    if ((step.parallelism ?? 0) >= 2) {
+    if (!runnableCommandStep(step)) {
+      continue;
+    }
+    const deploys = buildkiteStepDeploys(step);
+    if ((step.parallelism ?? 0) >= 2 && !deploys) {
       return step;
     }
-    if (runnableCommandStep(step) && !step.branches) {
+    if (!step.branches && step.dependsOnNode === undefined) {
       run += 1;
-      first ??= step;
-      if (run >= 2) {
-        return first;
+      if (!deploys) {
+        safeCandidate ??= step;
+      }
+      if (run >= 2 && safeCandidate) {
+        return safeCandidate;
       }
     }
   }
@@ -79,10 +87,10 @@ export const missingCancelOnBuildFailingRule = {
           message: `Pipeline runs steps concurrently but no step sets cancel_on_build_failing.`,
           why: "Without the fast-fail attribute, a failing job leaves its concurrent siblings running to natural completion, occupying agents for results that cannot change the verdict.",
           suggestion:
-            "Add cancel_on_build_failing: true to the steps whose results cannot change the verdict once the build is failing. Teams that fix all failures in one pass may deliberately keep lanes running; retries of canceled siblings are also subject to the same policy until the source failure is retried, so retry source failures first.",
+            "Consider cancel_on_build_failing: true only for non-deployment steps whose results cannot change the verdict once the build is failing. Never apply it to deployment steps: interruption can leave environments partially updated. Teams may deliberately keep test lanes running to collect all failures; retry source failures before canceled siblings.",
           measurementHint:
-            "Compare total agent time of failing builds before and after adding the attribute. Cancellation saves only the window between the first hard failure and natural completion of the siblings.",
-          aiHandoff: `Review ${pipeline.relativePath}: add cancel_on_build_failing to steps that cannot change the verdict, starting near step "${label}".`,
+            "Compare total agent time and failure frequency before and after the change. Only failing builds can save time, between the first hard failure and sibling completion; successful builds do not get faster.",
+          aiHandoff: `Review ${pipeline.relativePath}: consider cancel_on_build_failing only for non-deployment work near step "${label}". Never cancel deployments through this advice.`,
           score: 40,
         },
       ),

@@ -25,11 +25,14 @@ A step is flagged when its commands install dependencies (npm, pnpm, yarn, bun, 
 
 - a pipeline-level `cache:` attribute (hosted-agent cache volumes),
 - the official cache plugin (base name `cache`, any owning path),
+- plugin `path`/`paths` settings pointing at installed dependency directories such as `node_modules`, including workspace-relative paths; the plugin name need not be `cache`,
 - `buildkite-agent cache save/restore/exec` invocations,
 - `artifact_paths` on the installing step (an explicit handoff),
 - dependency-directory path text in the step's commands or plugin configuration (family-specific markers such as `.npm`, `vendor/bundle`, `go/pkg/mod` — custom storage or volume mounts count as cached).
 
 The firing condition is deliberately narrow: pipelines with custom caching the rule cannot name are false negatives rather than false positives.
+
+A recognized cache is not proof of a speedup. In particular, `npm ci` removes existing `node_modules`; measure whether restoring that directory is useful, or cache npm's download store instead.
 
 For a step whose every invocation is an install (no build/test work of its own), the message points at the layout instead: later steps run on other agents with clean checkouts, so the recommended fix is to install in the same step that consumes the dependencies, or hand them off explicitly.
 

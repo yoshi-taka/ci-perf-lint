@@ -28,6 +28,14 @@ for (const directory of [".buildkite", "buildkite"]) {
       [`${directory}/resource-definitions/pr.yml`]:
         "kind: Resource\nspec:\n  implementation:\n    steps:\n      - command: npm test\n",
       [`${directory}/scripts/generator.sh`]: "exit 1\n",
+      [`${directory}/test_areas/unit.yaml`]:
+        "steps:\n  - command: npm test\n    source_file_dependencies: ['src/**']\n",
+      [`${directory}/test_areas/area.rayci.yml`]: pipeline,
+      [`${directory}/test_areas/generated/pipeline.yml`]:
+        "source_file_dependencies: ['src/**']\nsteps:\n  - command: npm test\n",
+      [`${directory}/test_areas/generated/input.json`]: JSON.stringify({
+        steps: [{ command: "npm test", source_file_dependencies: ["src/**"] }],
+      }),
       [`${directory}/node_modules/example/pipeline.yml`]: pipeline,
       ".github/workflows/check.yml": "on: push\njobs: {}\n",
     });
@@ -118,4 +126,14 @@ test("malformed static pipelines still reach parser diagnostics", async () => {
     topCount: 100,
   });
   expect(report.analysisWarnings.some((w) => w.kind === "parser-error")).toBe(true);
+});
+
+test("generator-key text in a command does not exclude a real pipeline", async () => {
+  const root = await tempDirs.create("apl-bk-generator-key-text-");
+  await writeRepositoryFiles(root, {
+    ".buildkite/pipeline.yml":
+      "steps:\n  - command: |\n      cat <<'EOF'\n      source_file_dependencies: []\n      EOF\n      npm test\n",
+  });
+  const files = await collectWorkflowFiles(await resolveWorkflowTarget(root));
+  expect(files).toEqual([path.join(root, ".buildkite/pipeline.yml")]);
 });

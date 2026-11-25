@@ -215,6 +215,7 @@ test("flags plugin-only heavy steps without timeout_in_minutes", async () => {
       "    plugins:",
       "      - acme-deploy#v1.0.0:",
       "          context: production",
+      "          timeout: 120",
       "  - label: ':rocket: Deploy!'",
       "    plugins:",
       "      acme-deploy#v1.0.0:",
@@ -232,6 +233,11 @@ test("flags plugin-only heavy steps without timeout_in_minutes", async () => {
   );
   expect(findings).toHaveLength(1);
   expect(findings[0]?.message).toContain('Step ":rocket: Deploy!"');
+  expect(findings[0]?.why).toContain("Pipeline or organization defaults");
+  expect(findings[0]?.suggestion).toContain(
+    "Check pipeline and organization timeout settings first",
+  );
+  expect(findings[0]?.suggestion).toContain("not hooks or other commands");
 });
 
 test("flattens group steps so inner steps are visible to rules", async () => {

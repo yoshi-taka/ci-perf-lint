@@ -57,6 +57,28 @@ function validFailures(inputs: Iterable<string>): unknown[] {
 }
 
 describe("plain scalar continuation lines", () => {
+  test.each([" \t", "  \t"])(
+    "tab-separated empty-key value keeps valid continuations (%j)",
+    (indent) => {
+      const source = `value: a\n  :\n${indent}a\n  a\n`;
+      const candidate = parseDocument(source);
+      const reference = referenceParse(source);
+      expect(reference.errors).toEqual([]);
+      expect(candidate.errors).toEqual([]);
+      expect(candidate.toJS()).toEqual(reference.toJS());
+      expect(candidate.toJS()).toEqual({ value: "a", "": "a a" });
+    },
+  );
+
+  test.each(["  ", "   ", "   \t", "\t"])(
+    "misindented empty-key values remain invalid (%j)",
+    (indent) => {
+      const source = `value: a\n  :\n${indent}a\n  a\n`;
+      expect(referenceParse(source).errors.length).toBeGreaterThan(0);
+      expect(parseDocument(source).errors.length).toBeGreaterThan(0);
+    },
+  );
+
   test.each(chunked([...sources], 250).map((chunk, index) => ({ index, chunk })))(
     "valid continuation chunk %# does not become a diagnostic",
     ({ chunk }) => {

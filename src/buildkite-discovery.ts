@@ -1,7 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { readTextFile } from "./read-text-file.ts";
-import { isMap, isScalar, isSeq } from "./yaml.ts";
+import { isMap, isScalar, isSeq, type Node } from "./yaml.ts";
 import { parseCiYaml } from "./ci-yaml.ts";
 
 export function buildkiteDirectoryForPath(filePath: string): string | undefined {
@@ -18,17 +18,41 @@ export function buildkiteDirectoryForPath(filePath: string): string | undefined 
   }
 }
 
-async function looksLikePipeline(filePath: string): Promise<boolean> {
-  // Keep canonical names (including malformed documents) visible to parser diagnostics.
-  if (/^pipeline\.(?:ya?ml|json)$/i.test(path.basename(filePath))) {
-    return true;
+function hasGeneratorDependencies(node: Node | null, depth = 0): boolean {
+  if (!node || depth > 100) {
+    return false;
   }
+  if (isMap(node)) {
+    return (
+      node.get("source_file_dependencies", true) !== undefined ||
+      hasGeneratorDependencies(node.get("steps", true) as Node | null, depth + 1)
+    );
+  }
+  if (isSeq(node)) {
+    return node.items.some((item) => hasGeneratorDependencies(item as Node | null, depth + 1));
+  }
+  return false;
+}
+
+async function looksLikePipeline(filePath: string): Promise<boolean> {
+  // These files are generator inputs, not directly uploadable pipelines.
+  if (/\.rayci\.ya?ml$/i.test(filePath)) {
+    return false;
+  }
+  const canonical = /^pipeline\.(?:ya?ml|json)$/i.test(path.basename(filePath));
   const info = await stat(filePath);
   if (info.size > 5_000_000) {
-    return false;
+    return canonical;
   }
   const source = await readTextFile(filePath);
   const doc = parseCiYaml(source, "buildkite");
+  if (hasGeneratorDependencies(doc.contents)) {
+    return false;
+  }
+  // Keep canonical names (including malformed documents) visible to parser diagnostics.
+  if (canonical) {
+    return true;
+  }
   if (isMap(doc.contents) && isSeq(doc.contents.get("steps", true))) {
     return true;
   }

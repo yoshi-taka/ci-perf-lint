@@ -10,13 +10,13 @@ Plugin-only steps are classified by plugin name, with the step label kept as an 
 - **Light plugins** (`test-summary`, `junit-annotate`) only annotate or report build results. Build/test-word labels must not flag them.
 - **Unknown plugins** fall back to the label hint, so a custom plugin labeled "Build" is still flagged while one labeled "Notify" is not.
 
-When the work runs inside a plugin, set `timeout_in_minutes` **above the plugin's own internal limit**. Deploy plugins often bound their own internal wait (for example a bounded wait on an external rollout); a step timeout shorter than that limit cuts short a normal run, not a hung one. Check the plugin's documentation for its internal limit and set the step timeout above it.
+Check effective pipeline and organization timeout settings before adding a step override. When an additional step timeout is needed, allow headroom above a plugin's own internal limit. A plugin may bound only one operation, not other commands, hooks, or artifact uploads; the presence of an arbitrary `timeout` plugin option does not prove that the whole job is bounded.
 
-Buildkite pipeline steps do not have a default timeout. Without `timeout_in_minutes`, a hung or degraded step can run indefinitely and consume agent capacity.
+Buildkite supports default and maximum command-step timeouts at the pipeline and organization levels. These external settings are not visible in workflow YAML. This rule reports a missing explicit step value, not proof that the job can run indefinitely.
 
 ## Why this matters
 
-- **No default timeout**: Buildkite agents run steps forever unless `timeout_in_minutes` is set
+- **Unknown effective limit**: A job without a suitable step, pipeline, or organization limit can occupy an agent indefinitely
 - **Resource waste**: Hung steps consume agent capacity that could be used for other jobs
 - **Deployment blocking**: Long-running steps can block concurrency groups or deployment pipelines
 
@@ -44,7 +44,7 @@ steps:
 
 ## Recommended fix
 
-Add `timeout_in_minutes` to steps that run heavy operations. For plugin steps, set it above the plugin's own internal limit:
+First check the [effective timeout settings](https://buildkite.com/docs/pipelines/configure/build-timeouts). Add `timeout_in_minutes` only if the existing limit is missing or unsuitable. For plugin steps, allow headroom above internal limits:
 
 ```yaml
 steps:

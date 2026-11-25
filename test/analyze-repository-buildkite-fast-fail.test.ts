@@ -32,6 +32,45 @@ async function findings(root: string) {
 }
 
 describe("missing-cancel-on-build-failing", () => {
+  test("does not suggest canceling concurrent deployments", async () => {
+    const root = await tempDirs.create("apl-bk-fastfail-deployments-");
+    await writePipeline(root, [
+      "  - label: Deploy region one",
+      "    command: ./rollout.sh",
+      "  - label: Deploy region two",
+      "    command: ./rollout.sh",
+      "    parallelism: 2",
+    ]);
+    expect(await findings(root)).toHaveLength(0);
+  });
+
+  test("targets tests rather than their concurrent deployment", async () => {
+    const root = await tempDirs.create("apl-bk-fastfail-mixed-deployment-");
+    await writePipeline(root, [
+      "  - label: Deploy",
+      "    command: ./rollout.sh",
+      "  - label: Tests",
+      "    command: npm test",
+    ]);
+    const found = await findings(root);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.aiHandoff).toContain('step "Tests"');
+    expect(found[0]?.suggestion).toContain("Never apply it to deployment steps");
+    expect(found[0]?.measurementHint).toContain("successful builds do not get faster");
+  });
+
+  test("does not carry a cancellation candidate across wait barriers", async () => {
+    const root = await tempDirs.create("apl-bk-fastfail-deploy-barrier-");
+    await writePipeline(root, [
+      "  - command: npm test",
+      "  - wait",
+      "  - label: Deploy one",
+      "    command: ./rollout.sh",
+      "  - label: Deploy two",
+      "    command: ./rollout.sh",
+    ]);
+    expect(await findings(root)).toHaveLength(0);
+  });
   test("fires for parallel test shards without the attribute", async () => {
     const root = await tempDirs.create("apl-bk-fastfail-parallelism-");
     await writePipeline(root, [
@@ -116,5 +155,50 @@ describe("missing-cancel-on-build-failing", () => {
       "    skip: true",
     ]);
     expect(await findings(root)).toHaveLength(0);
+  });
+
+  test("ignores skipped parallel shards", async () => {
+    const root = await tempDirs.create("apl-bk-fastfail-skipped-shards-");
+    await writePipeline(root, ["  - command: npm test", "    parallelism: 5", "    skip: true"]);
+    expect(await findings(root)).toHaveLength(0);
+  });
+
+  test.each([
+    "    depends_on: build",
+    "    depends_on: [build]",
+    "    depends_on:\n      - step: build\n        allow_failure: true",
+  ])("does not count serialized neighbors (%s)", async (dependency) => {
+    const root = await tempDirs.create("apl-bk-fastfail-dependencies-");
+    await writePipeline(root, [
+      "  - key: build",
+      "    command: make build",
+      "  - command: npm test",
+      dependency,
+    ]);
+    expect(await findings(root)).toHaveLength(0);
+  });
+
+  test("still detects parallel shards after dependencies", async () => {
+    const root = await tempDirs.create("apl-bk-fastfail-dependent-shards-");
+    await writePipeline(root, [
+      "  - key: build",
+      "    command: make build",
+      "  - command: npm test",
+      "    depends_on: build",
+      "    parallelism: 5",
+    ]);
+    expect(await findings(root)).toHaveLength(1);
+  });
+
+  test("still detects independent work beside a dependency chain", async () => {
+    const root = await tempDirs.create("apl-bk-fastfail-independent-");
+    await writePipeline(root, [
+      "  - key: build",
+      "    command: make build",
+      "  - command: npm test",
+      "    depends_on: build",
+      "  - command: make lint",
+    ]);
+    expect(await findings(root)).toHaveLength(1);
   });
 });

@@ -32,6 +32,33 @@ async function findings(root: string) {
 }
 
 describe("missing-if-changed", () => {
+  test.each(
+    [
+      ["  - label: Deploy", "    command: ./rollout.sh"],
+      ["  - command: aws s3 sync public s3://site"],
+      ["  - command: aws cloudfront create-invalidation --distribution-id example --paths '/*'"],
+      ["  - command: ./rollout.sh", "    plugins:", "      - example-deploy#v1: {}"],
+      ["  - command: ./rollout.sh", "    metadata:", "      type: deploy"],
+      ["  - command: npm publish"],
+      ["  - command: make deploy"],
+      ["  - label: Upload to S3 and Purge Cloudfront", "    command: ./distribute.sh"],
+    ].map((lines) => ({ lines })),
+  )("excludes tests in a deployment pipeline (%j)", async ({ lines }) => {
+    const root = await tempDirs.create("apl-bk-ifchanged-deployment-pipeline-");
+    await writePipeline(root, ["  - command: npm test", ...lines]);
+    expect(await findings(root)).toHaveLength(0);
+  });
+
+  test("does not confuse printed deployments or cache downloads with deployment", async () => {
+    const root = await tempDirs.create("apl-bk-ifchanged-deploy-text-");
+    await writePipeline(root, [
+      "  - command: |",
+      "      echo 'kubectl apply -f app.yml'",
+      "      aws s3 sync s3://cache inputs",
+      "      npm test",
+    ]);
+    expect(await findings(root)).toHaveLength(1);
+  });
   test("flags a heavy test step without if_changed", async () => {
     const root = await tempDirs.create("apl-bk-ifchanged-heavy-");
     await writePipeline(root, ["  - label: ':golang: Tests'", "    command: go test ./..."]);

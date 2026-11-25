@@ -41,6 +41,26 @@ describe("publish idempotency", () => {
 });
 
 describe("benchmark and documentation guards", () => {
+  test("elan download retries transient failures with bounded time and verifies its checksum", async () => {
+    const text = await readFile(path.join(import.meta.dir, "../.github/workflows/ci.yml"), "utf8");
+    const doc = parseDocument(text).toJS() as {
+      jobs: { formal: { steps: { name?: string; run?: string }[] } };
+    };
+    const script = doc.jobs.formal.steps.find((step) => step.name === "Install pinned elan")?.run;
+    expect(script).toBeDefined();
+    expect(script).toContain("curl --fail --location --silent --show-error");
+    expect(script).toContain("--retry 4 --retry-delay 2 --retry-max-time 120");
+    expect(script).toContain("--connect-timeout 15 --max-time 60");
+    expect(script).not.toContain("--retry-all-errors");
+    expect(script).toContain(
+      "https://github.com/leanprover/elan/releases/download/v4.2.4/elan-aarch64-unknown-linux-gnu.tar.gz",
+    );
+    expect(script).toContain(
+      'echo "05febd124d84ebf994b2e7479922a5650b1e950c17ae3bd1ddd776b65bb72bf9  $dir/elan.tar.gz" | sha256sum --check',
+    );
+    expect(script!.indexOf("sha256sum --check")).toBeLessThan(script!.indexOf("tar -xzf"));
+  });
+
   test("repository workflows pass strict self-audit", async () => {
     const root = path.resolve(import.meta.dir, "..");
     const report = await analyzeRepository({

@@ -40,6 +40,34 @@ function familyCachePathMentioned(step: PipelineStep, family: string): boolean {
 }
 
 function hasKnownCacheSurface(step: PipelineStep, family: string): boolean {
+  const dependencyDirectories: Record<string, string[]> = {
+    npm: ["node_modules"],
+    pnpm: ["node_modules", ".pnpm-store"],
+    yarn: ["node_modules", ".yarn"],
+    bun: ["node_modules", ".bun"],
+  };
+  const paths = (step.plugins ?? []).flatMap((plugin) =>
+    Object.values(plugin).flatMap((config) => {
+      if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return [];
+      }
+      const { path, paths: configuredPaths } = config as Record<string, unknown>;
+      return [path, configuredPaths].flatMap((value) =>
+        typeof value === "string"
+          ? [value]
+          : Array.isArray(value)
+            ? value.filter((item): item is string => typeof item === "string")
+            : [],
+      );
+    }),
+  );
+  if (
+    paths.some((value) =>
+      value.split(/[\\/]/).some((part) => dependencyDirectories[family]?.includes(part)),
+    )
+  ) {
+    return true;
+  }
   if (familyCachePathMentioned(step, family)) {
     return true;
   }

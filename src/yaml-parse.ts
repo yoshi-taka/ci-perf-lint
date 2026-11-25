@@ -2245,7 +2245,12 @@ class Parser {
             const firstLine = this.src
               .slice(value.range[0], firstLineEnd === -1 ? value.range[1] : firstLineEnd)
               .trim();
-            return firstLine.length === 1;
+            // A tab after sufficient spaces is separation, not an extra
+            // indentation column. Do not treat that value as a deeper map.
+            const prefix = this.src.slice(this.lineStartIndex(value.range[0]), value.range[0]);
+            const separatedByTab =
+              prefix.includes("\t") && this.lineIndentOf(value.range[0]) <= colonLeadingSpaces;
+            return firstLine.length === 1 && !separatedByTab;
           })()
         ) {
           const newline = this.src.indexOf("\n", value.range[0]);

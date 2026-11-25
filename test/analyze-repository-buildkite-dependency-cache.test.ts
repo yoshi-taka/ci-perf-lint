@@ -34,6 +34,33 @@ async function findings(root: string) {
 }
 
 describe("missing-dependency-cache-buildkite", () => {
+  test.each(["path: node_modules", "paths: [packages/app/node_modules]"])(
+    "recognizes dependency paths on custom cache plugins (%s)",
+    async (setting) => {
+      const root = await tempDirs.create("apl-bk-depcache-custom-path-");
+      await writePipeline(root, [
+        "  - command: npm ci && npm test",
+        "    plugins:",
+        "      - example/cacher#v1:",
+        `          ${setting}`,
+      ]);
+      expect(await findings(root)).toHaveLength(0);
+    },
+  );
+
+  test.each(["path: build", "description: node_modules", "path: not_node_modules"])(
+    "does not infer dependency caching from unrelated configuration (%s)",
+    async (setting) => {
+      const root = await tempDirs.create("apl-bk-depcache-unrelated-path-");
+      await writePipeline(root, [
+        "  - command: npm ci && npm test",
+        "    plugins:",
+        "      - example/cacher#v1:",
+        `          ${setting}`,
+      ]);
+      expect(await findings(root)).toHaveLength(1);
+    },
+  );
   test("flags a colocated install without any cache", async () => {
     const root = await tempDirs.create("apl-bk-depcache-colocated-");
     await writePipeline(root, ["  - label: Tests", "    command: npm ci && npm test"]);

@@ -8,6 +8,7 @@ import {
   invocationHasNativeOrOpaqueWork,
 } from "./shared/tooling-command-evidence.ts";
 import { buildkitePluginBaseNames } from "./shared/buildkite-plugins.ts";
+import { buildkitePipelineDeploys } from "./shared/buildkite-deployment.ts";
 
 const meta = {
   id: "missing-if-changed",
@@ -21,12 +22,6 @@ const meta = {
  * the tool name for the Go test toolchain (`go test`). */
 const heavyName =
   /\b(build|publish|upload|npm|pnpm|yarn|bun|cargo|gradle|maven|pytest|jest|vitest|tauri|electron|docker|go|test|lint)\b/i;
-
-/** Deploy-shaped work: on the default branch, changed-file detection only
- * compares with the previous commit, and a multi-commit push can produce
- * an incomplete diff. Skipping needed release or deploy work on that
- * basis is a correctness risk, not a performance saving. */
-const deployName = /\b(deploy|kubectl|helm|argocd|publish|release)\b/i;
 
 /** These plugins already provide their own changed-file detection. */
 const OWN_DETECTION_PLUGINS = ["monorepo-diff"];
@@ -54,11 +49,6 @@ function stepCommandsHeavy(step: PipelineStep): boolean {
       (invocationHasNativeOrOpaqueWork(words) && heavyName.test(step.label ?? ""))
     );
   });
-}
-
-function stepLooksDeploy(step: PipelineStep): boolean {
-  const source = [step.command ?? "", ...(step.commands ?? [])].join("\n");
-  return deployName.test(source) || deployName.test(step.label ?? "");
 }
 
 /** A step pinned to specific bare branch names (main, master, or any
@@ -92,6 +82,11 @@ function hasOwnDetection(step: PipelineStep): boolean {
 export const missingIfChangedRule = {
   meta,
   check(pipeline: PipelineDocument, _context: RuleContext): Diagnostic[] {
+    // Tests are deployment prerequisites too: never suggest skipping them
+    // based on an incomplete default-branch changed-file set.
+    if (buildkitePipelineDeploys(pipeline)) {
+      return [];
+    }
     const findings: Diagnostic[] = [];
 
     for (const step of pipeline.steps) {
@@ -104,7 +99,7 @@ export const missingIfChangedRule = {
       if (step.ifChanged !== undefined || step.ifChangedNode !== undefined) {
         continue;
       }
-      if (!stepCommandsHeavy(step) || stepLooksDeploy(step)) {
+      if (!stepCommandsHeavy(step)) {
         continue;
       }
       if (stepPinnedToBranches(step) || hasOwnDetection(step)) {

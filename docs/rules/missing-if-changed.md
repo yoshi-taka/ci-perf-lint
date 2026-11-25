@@ -20,7 +20,7 @@ A step is flagged when all of these hold:
 1. Its commands contain heavy build/test work (npm, cargo, pytest, docker build, and similar).
 2. It has no `if_changed`.
 3. It is not pinned to specific bare branch names. The default branch is a repository setting that a pipeline file never states, so `branches: "main"` and `branches: "master"` (or any other bare names) both count as pinned; negated restrictions (`branches: "!main"`, `if: build.branch != "…"`) and glob filters (`feature/*`) do not. On the default branch, changed-file detection compares only with the previous commit, and a multi-commit push can produce an incomplete diff.
-4. It is not deploy-shaped (commands or label matching deploy, kubectl, helm, argocd, publish, release). Skipping needed release or deploy work on an incomplete diff is a correctness risk, not a performance saving.
+4. Its pipeline has no deployment evidence: deployment commands or labels, deploy plugins, metadata declaring `type: deploy`, uploads to S3, or CloudFront invalidations. Tests in a deployment pipeline are excluded too: skipping a deployment prerequisite on an incomplete diff is a correctness risk, not a performance saving.
 5. It does not use a plugin with its own changed-file detection (`monorepo-diff`).
 
 Skipped steps and container steps are ignored; group inner steps are checked after flattening.
@@ -33,7 +33,8 @@ Skipped steps and container steps are ignored; group inner steps are checked aft
 ## Scope and limits
 
 - Static analysis cannot see repository-specific detection built into dynamic pipeline generators. Repositories generating steps dynamically are false negatives.
-- A pipeline file named `deploy.yml` is not excluded by filename; the deploy exclusion is per step (command and label shape).
+- A pipeline file named `deploy.yml` is not excluded by filename alone; deployment evidence excludes the entire pipeline. Opaque scripts can hide deployment work.
+- Known generator inputs (`*.rayci.yml`/`*.rayci.yaml` and documents with `source_file_dependencies` at the root or on steps) are excluded from automatic pipeline discovery rather than audited as directly uploadable pipelines.
 - Agent versions older than 3.103.0 do not apply `if_changed` without the `--apply-if-changed` flag.
 
 This rule only applies to Buildkite pipeline files (`.buildkite/pipeline.yml`).
