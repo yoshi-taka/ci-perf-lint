@@ -125,7 +125,6 @@ export class RepositoryScanContext {
   #rgFileDirectories: readonly string[] | null = null;
   #filePathSet: Set<string> | null | undefined;
   #hasGitDir: boolean | undefined;
-  static #rgPath: string | null | undefined;
 
   constructor(repoRoot: string, warnings: AnalysisWarning[]) {
     this.repoRoot = repoRoot;
@@ -481,49 +480,6 @@ export class RepositoryScanContext {
     return this.#rgFileListPromise;
   }
 
-  static async #resolveRgPath(): Promise<string | null> {
-    if (this.#rgPath !== undefined) {
-      return this.#rgPath;
-    }
-
-    try {
-      if (hasBun) {
-        const proc = Bun.spawn(["which", "rg"], { stdio: ["ignore", "pipe", "pipe"] });
-        const [exitCode, stdout] = await Promise.all([
-          proc.exited,
-          new Response(proc.stdout).text(),
-        ]);
-        if (exitCode !== 0) {
-          this.#rgPath = null;
-          return null;
-        }
-        const resolved = stdout.trim();
-        this.#rgPath = resolved.length > 0 ? resolved : null;
-        return this.#rgPath;
-      } else {
-        const proc = spawn("which", ["rg"], { stdio: ["ignore", "pipe", "pipe"] });
-        const chunks: string[] = [];
-        for await (const chunk of proc.stdout) {
-          chunks.push(chunk.toString());
-        }
-        const stdout = chunks.join("");
-        const exitCode = await new Promise<number>((resolve) => {
-          proc.on("close", resolve);
-        });
-        if (exitCode !== 0) {
-          this.#rgPath = null;
-          return null;
-        }
-        const resolved = stdout.trim();
-        this.#rgPath = resolved.length > 0 ? resolved : null;
-        return this.#rgPath;
-      }
-    } catch {
-      this.#rgPath = null;
-      return null;
-    }
-  }
-
   /**
    * Small trees are cheaper to list in-process: starting the scanner costs about 5 ms
    * regardless of size, while a walk costs about 0.07 ms per directory. Trees that
@@ -580,16 +536,15 @@ export class RepositoryScanContext {
 
   async #listFilesWithRg(): Promise<string[] | null> {
     try {
-      const rgPath = await RepositoryScanContext.#resolveRgPath();
-      if (rgPath === null) {
-        return null;
-      }
-
       const repoRoot = this.repoRoot;
       const relativePath = createRgRelativePath(repoRoot);
 
+      // Spawn rg directly: Bun.spawn throws (and node:child_process emits an
+      // "error" event) when the binary is missing, which the catch below and
+      // the "error" handler turn into null. That skips the former `which rg`
+      // probe — one fewer process per run — with identical fallback behavior.
       if (hasBun) {
-        const proc = Bun.spawn([rgPath, "--files", "--hidden", repoRoot], {
+        const proc = Bun.spawn(["rg", "--files", "--hidden", repoRoot], {
           stdio: ["ignore", "pipe", "pipe"],
         });
         const [exitCode, stdout] = await Promise.all([
@@ -607,7 +562,7 @@ export class RepositoryScanContext {
       const exitPromise = new Promise<number>((resolve) => {
         resolveExit = resolve;
       });
-      const proc = spawn(rgPath, ["--files", "--hidden", repoRoot], {
+      const proc = spawn("rg", ["--files", "--hidden", repoRoot], {
         stdio: ["ignore", "pipe", "pipe"],
       });
       proc.on("error", () => resolveExit!(1));

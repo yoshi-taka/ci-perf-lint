@@ -6,6 +6,13 @@ import { createTempDirTracker } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 
+async function git(repoRoot: string, ...args: string[]): Promise<void> {
+  const proc = Bun.spawn(["git", "-C", repoRoot, ...args], { stdio: ["ignore", "ignore", "pipe"] });
+  if ((await proc.exited) !== 0) {
+    throw new Error(`git ${args.join(" ")} failed`);
+  }
+}
+
 function hasRipgrep(): boolean {
   return Bun.spawnSync(["which", "rg"]).exitCode === 0;
 }
@@ -253,16 +260,48 @@ describe("RepositoryScanContext", () => {
     try {
       const count = await context.estimatedFileCount();
       const ranGitLsFiles = spawns.some((cmd) => cmd.includes("ls-files"));
+      const ranWhichProbe = spawns.some((cmd) => cmd.includes("which"));
 
+      // The rg spawn answers the count directly; the `which rg` probe is gone.
+      expect(ranWhichProbe).toBe(false);
       if (hasRipgrep()) {
-        // The warmed rg index answers the count; git ls-files must not run.
         expect(count).toBe(2);
         expect(ranGitLsFiles).toBe(false);
       } else {
-        // Without the file index, git ls-files is attempted as the fallback.
         expect(count).toBe(null);
         expect(ranGitLsFiles).toBe(true);
       }
+    } finally {
+      Bun.spawn = originalBunSpawn;
+    }
+  });
+
+  test("estimatedFileCount falls back to git ls-files when rg is unavailable", async () => {
+    const repoRoot = await tempDirs.create("actions-perf-context-count-fallback-");
+    await writeFile(path.join(repoRoot, "a.txt"), "a\n");
+    await writeFile(path.join(repoRoot, "b.txt"), "b\n");
+    await git(repoRoot, "init");
+    await git(repoRoot, "add", "a.txt");
+
+    const context = new RepositoryScanContext(repoRoot, []);
+    const spawns: string[] = [];
+    const originalBunSpawn = Bun.spawn;
+    Bun.spawn = ((cmd: string[], options: Parameters<typeof Bun.spawn>[1]) => {
+      spawns.push(cmd.join(" "));
+      // Simulate Bun's ENOENT behavior when rg is missing.
+      if (cmd[0] === "rg") {
+        throw new Error('Executable not found in $PATH: "rg"');
+      }
+      return originalBunSpawn(cmd, options);
+    }) as typeof Bun.spawn;
+    try {
+      const count = await context.estimatedFileCount();
+
+      // git ls-files answers with the staged-only count; the untracked b.txt is
+      // invisible to the fallback, which is why the warmed rg index is preferred.
+      expect(count).toBe(1);
+      expect(spawns.some((cmd) => cmd.startsWith("rg --files"))).toBe(true);
+      expect(spawns.some((cmd) => cmd.includes("ls-files"))).toBe(true);
     } finally {
       Bun.spawn = originalBunSpawn;
     }
