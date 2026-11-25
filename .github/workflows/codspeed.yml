@@ -25,11 +25,29 @@ permissions:
 
 jobs:
   benchmarks:
-    name: Run benchmarks
+    name: Run benchmarks (${{ matrix.shard }})
     # CodSpeed's runner installer rejects ubuntu-latest once it resolves to
     # 26.04 ("Unsupported system"); stay on the supported LTS image.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: micro
+            repository: ""
+            target: ""
+          - shard: opencode
+            repository: anomalyco/opencode
+            target: /tmp/ts-target
+          - shard: oxc
+            repository: oxc-project/oxc
+            target: /tmp/rs-target
+          - shard: pytorch
+            repository: pytorch/pytorch
+            target: /tmp/py-target
+    env:
+      BENCH_SHARD: ${{ matrix.shard }}
 
     steps:
       - name: Checkout
@@ -51,11 +69,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --minimum-release-age 0
 
-      - name: Clone real-world targets
+      - name: Record benchmark environment
         run: |
-          git clone --depth 1 https://github.com/anomalyco/opencode.git /tmp/ts-target
-          git clone --depth 1 https://github.com/oxc-project/oxc.git /tmp/rs-target
-          git clone --depth 1 https://github.com/pytorch/pytorch.git /tmp/py-target
+          git rev-parse HEAD
+          node -e 'console.log(JSON.stringify({node:process.version,cpu:require("node:os").cpus()[0]?.model}))'
+
+      - name: Clone real-world target
+        if: matrix.repository != ''
+        env:
+          TARGET_REPOSITORY: ${{ matrix.repository }}
+          TARGET_DIRECTORY: ${{ matrix.target }}
+        run: |
+          git clone --depth 1 "https://github.com/$TARGET_REPOSITORY.git" "$TARGET_DIRECTORY"
+          sha=$(git -C "$TARGET_DIRECTORY" rev-parse HEAD)
+          echo "Benchmark target: $TARGET_REPOSITORY@$sha"
+          echo "Benchmark target: \`$TARGET_REPOSITORY@$sha\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build benchmark runner
         run: bun build ./bench/run.ts --outdir ./dist --target node --external tinybench --external @codspeed/tinybench-plugin

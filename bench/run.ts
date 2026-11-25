@@ -1,24 +1,32 @@
 import { failedBenchmarkTasks } from "./benchmark-results.ts";
-import { bench as parseWorkflowBench } from "./parse-workflow.bench.ts";
-import { bench as ruleEngineBench } from "./rule-engine.bench.ts";
-import { bench as analyzeRepositoryBench } from "./analyze-repository.bench.ts";
-import { bench as reportersBench } from "./reporters.bench.ts";
-import { bench as toolPresenceBench } from "./tool-presence.bench.ts";
-import { bench as stepProximityBench } from "./step-proximity.bench.ts";
-import { bench as dockerfileParserBench } from "./dockerfile-parser.bench.ts";
+import type { Bench } from "tinybench";
+import { benchmarkShard, includesBenchmarkShard } from "./shards.ts";
 
 async function main() {
-  const benches = [
-    parseWorkflowBench,
-    ruleEngineBench,
-    analyzeRepositoryBench,
-    reportersBench,
-    toolPresenceBench,
-    stepProximityBench,
-    dockerfileParserBench,
-  ];
+  const benches: Bench[] = [];
+  if (includesBenchmarkShard("micro")) {
+    benches.push(
+      (await import("./parse-workflow.bench.ts")).bench,
+      (await import("./rule-engine.bench.ts")).bench,
+    );
+  }
+  benches.push((await import("./analyze-repository.bench.ts")).bench);
+  if (includesBenchmarkShard("micro")) {
+    benches.push(
+      (await import("./reporters.bench.ts")).bench,
+      (await import("./tool-presence.bench.ts")).bench,
+      (await import("./step-proximity.bench.ts")).bench,
+      (await import("./dockerfile-parser.bench.ts")).bench,
+    );
+  }
 
   for (const bench of benches) {
+    if (bench.tasks.length === 0) {
+      throw new Error(`No benchmarks registered for shard ${benchmarkShard}`);
+    }
+    const names = bench.tasks.map((task) => task.name).join(", ");
+    console.log(`[bench] Start shard=${benchmarkShard}: ${names}`);
+    const startedAt = performance.now();
     try {
       await bench.run();
       const analysisCompleted =
@@ -26,7 +34,9 @@ async function main() {
         ["simulation", "instrumentation", "memory"].includes(
           process.env.CODSPEED_RUNNER_MODE ?? "",
         );
-      if (!analysisCompleted) {console.table(bench.table());}
+      if (!analysisCompleted) {
+        console.table(bench.table());
+      }
       const failed = failedBenchmarkTasks(bench, analysisCompleted);
       if (failed.length > 0) {
         console.error(`[bench] Failed tasks: ${failed.join(", ")}`);
@@ -35,8 +45,12 @@ async function main() {
     } catch (error) {
       console.error(`[bench] Skipping failed benchmark: ${error}`);
       process.exitCode = 1;
+    } finally {
+      console.log(
+        `[bench] End shard=${benchmarkShard} elapsed_ms=${Math.round(performance.now() - startedAt)}: ${names}`,
+      );
     }
   }
 }
 
-main();
+await main();

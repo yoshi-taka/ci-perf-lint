@@ -128,6 +128,62 @@ describe("benchmark and documentation guards", () => {
     expect(steps[installIndex]?.if).toBeUndefined();
   });
 
+  test("CodSpeed shards stay in one workflow with distinct targets and stable runner identity", async () => {
+    const text = await readFile(
+      path.join(import.meta.dir, "../.github/workflows/codspeed.yml"),
+      "utf8",
+    );
+    const doc = parseDocument(text).toJS() as {
+      jobs: Record<
+        string,
+        {
+          strategy: {
+            "fail-fast": boolean;
+            matrix: { include: { shard: string; repository: string; target: string }[] };
+          };
+          env: Record<string, string>;
+          steps: {
+            name?: string;
+            uses?: string;
+            run?: string;
+            if?: string;
+            with?: { run?: string; mode?: string; "allow-empty"?: boolean };
+          }[];
+        }
+      >;
+    };
+    expect(Object.keys(doc.jobs)).toEqual(["benchmarks"]);
+    const job = doc.jobs.benchmarks!;
+    expect(job.strategy["fail-fast"]).toBe(false);
+    expect(job.strategy.matrix.include.map((item) => item.shard)).toEqual([
+      "micro",
+      "opencode",
+      "oxc",
+      "pytorch",
+    ]);
+    expect(job.strategy.matrix.include.map((item) => item.target)).toEqual([
+      "",
+      "/tmp/ts-target",
+      "/tmp/rs-target",
+      "/tmp/py-target",
+    ]);
+    expect(job.strategy.matrix.include.map((item) => item.repository)).toEqual([
+      "",
+      "anomalyco/opencode",
+      "oxc-project/oxc",
+      "pytorch/pytorch",
+    ]);
+    expect(job.env.BENCH_SHARD).toBe("${{ matrix.shard }}");
+    const clone = job.steps.find((step) => step.name === "Clone real-world target");
+    expect(clone?.if).toBe("matrix.repository != ''");
+    expect(clone?.run).toContain('git -C "$TARGET_DIRECTORY" rev-parse HEAD');
+    expect(clone?.run).toContain("$GITHUB_STEP_SUMMARY");
+    const run = job.steps.find((step) => step.uses === "CodSpeedHQ/action@v4");
+    expect(run?.with?.run).toBe("node ./dist/run.js");
+    expect(run?.with?.mode).toBe("simulation");
+    expect(run?.with?.["allow-empty"]).not.toBe(true);
+  });
+
   test("detects task failures even when Tinybench.run resolves", async () => {
     const bench = new Bench({ iterations: 1, time: 0, warmup: false });
     bench

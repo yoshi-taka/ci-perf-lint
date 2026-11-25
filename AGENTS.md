@@ -204,6 +204,7 @@ For narrow test iteration, prefer a specific Bun test file before the full suite
 - Targets: `bench/analyze-repository.bench.ts` defines opencode TS, oxc Rust, and pytorch Python cases
 - Workflow: `.github/workflows/codspeed.yml` — runs on PRs, main pushes, and dispatch; release tags do not start another benchmark
 - Targets are shallow-cloned fresh each run; Node executes bundled Tinybench/CodSpeed API benchmarks
+- Same-workflow matrix shards: micro, opencode, oxc, pytorch. `BENCH_SHARD` selects disjoint cases; unset runs all locally. Target SHAs and suite elapsed times are logged.
 - Change target clones in the workflow and benchmark cases together; any failed task makes the runner fail
 
 ### Known Issues
