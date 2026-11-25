@@ -11,7 +11,8 @@
     "verify:mutation": "bun mutation-models.ts",
     "verify:regex": "bun regex-models.ts",
     "verify:fuzz": "bun fuzz-models.ts",
-    "verify:fuzz-json": "bun fuzz-json-models.ts"
+    "verify:fuzz-json": "bun fuzz-json-models.ts",
+    "verify:file-count": "bun file-count-models.ts"
   },
   "devDependencies": {
     "z3-solver": "5.4.1"
