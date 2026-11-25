@@ -3,9 +3,11 @@ import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import type { PipelineDocument, PipelineStep } from "../../buildkite-workflow.ts";
 import { buildkiteStepDeploys, buildkiteTextDeploys } from "./buildkite-deployment.ts";
-import { hasShellInputDocument, shellCommands } from "./command-patterns.ts";
-import { shellNonDisplayInvocations } from "./shell-invocations.ts";
+import { hasShellInputDocument } from "./command-patterns.ts";
+import { shellInvocations } from "./shell-invocations.ts";
 import { invocationOptions } from "./tool-command-evidence.ts";
+import { unwrapBuildkiteCommand } from "./buildkite-command-wrappers.ts";
+import { buildkiteAllowsCheckoutScripts } from "./buildkite-plugin-script-context.ts";
 
 export type BuildkiteDeploymentEvidence = "publication" | "no-evidence" | "unknown";
 
@@ -32,7 +34,7 @@ function shellReference(words: string[]): string | undefined {
     }
     return words[index] ?? "";
   }
-  if (["zsh", "fish", "dash", "timeout", "nice", "xargs", "parallel"].includes(tool)) {
+  if (["zsh", "fish", "dash", "parallel"].includes(tool)) {
     return "";
   }
   // Literal non-shell tools are not recursively inspected. Their existence
@@ -52,7 +54,7 @@ interface ScriptEffects {
   dynamicWrite: boolean;
 }
 
-function collectWrites(source: string, effects: ScriptEffects): void {
+function collectWrites(original: string[], effects: ScriptEffects): void {
   const record = (target: string | undefined) => {
     if (/^&\d+$/.test(target ?? "")) {
       return;
@@ -68,27 +70,26 @@ function collectWrites(source: string, effects: ScriptEffects): void {
       effects.writes.add(path.normalize(target));
     }
   };
-  for (const words of shellCommands(source)) {
-    for (let index = 0; index < words.length; index++) {
-      if (words[index] === ">") {
-        while (words[index + 1] === ">") {
-          index++;
-        }
-        record(words[index + 1]);
+  const words = unwrapBuildkiteCommand(original) ?? original;
+  for (let index = 0; index < words.length; index++) {
+    if (words[index] === ">") {
+      while (words[index + 1] === ">") {
+        index++;
       }
+      record(words[index + 1]);
     }
-    if (["curl", "wget"].includes(words[0] ?? "")) {
-      for (const option of invocationOptions(
-        words,
-        words[0] === "wget" ? ["-O", "--output-document"] : [],
-      )) {
-        if (words[0] === "curl" && option.name === "-O") {
-          effects.dynamicWrite = true;
-          continue;
-        }
-        if (["--output", "-o", "-O", "--output-document"].includes(option.name)) {
-          record(option.value);
-        }
+  }
+  if (["curl", "wget"].includes(words[0] ?? "")) {
+    for (const option of invocationOptions(
+      words,
+      words[0] === "wget" ? ["-O", "--output-document"] : [],
+    )) {
+      if (words[0] === "curl" && option.name === "-O") {
+        effects.dynamicWrite = true;
+        continue;
+      }
+      if (["--output", "-o", "-O", "--output-document"].includes(option.name)) {
+        record(option.value);
       }
     }
   }
@@ -99,6 +100,7 @@ function fixedRelativePath(reference: string): boolean {
     reference.length > 0 &&
     !path.isAbsolute(reference) &&
     !reference.split("/").includes("..") &&
+    !reference.includes("__shell_substitution__") &&
     !/[$`*?{}~\\\0]/.test(reference) &&
     reference.includes("/")
   );
@@ -196,20 +198,33 @@ class ScriptDeploymentScan {
     if (hasShellInputDocument(source)) {
       return "unknown";
     }
-    const invocations = shellNonDisplayInvocations(source);
-    const hasReferences = invocations.some((words) => shellReference(words) !== undefined);
-    collectWrites(source, effects);
+    const invocations = shellInvocations(source, false).map((original) => ({
+      original,
+      words: unwrapBuildkiteCommand(original),
+    }));
+    const hasReferences = invocations.some(
+      ({ words }) => words === undefined || shellReference(words) !== undefined,
+    );
     // Only writes that may replace a referenced/executing script invalidate
     // static contents; ordinary test output does not make the pipeline unknown.
-    let unknown =
-      (hasReferences && !referencesAllowed) ||
-      [...active].some((reference) => effects.dynamicWrite || effects.writes.has(reference));
-    for (const words of invocations) {
+    let unknown = hasReferences && !referencesAllowed;
+    for (const { original, words } of invocations) {
       if (++this.#commands > MAX_COMMANDS) {
         return "unknown";
       }
+      collectWrites(original, effects);
+      unknown ||= [...active].some((reference) => effects.writes.has(reference));
+      if (!words) {
+        unknown = true;
+        continue;
+      }
       const tool = words[0] ?? "";
-      if (tool === "eval" || tool.startsWith("-") || /[$`]/.test(tool)) {
+      if (
+        tool === "eval" ||
+        tool.startsWith("-") ||
+        /[$`]/.test(tool) ||
+        tool.includes("__shell_substitution__")
+      ) {
         unknown = true;
       }
       if (["cd", "pushd", "popd"].includes(tool)) {
@@ -269,19 +284,11 @@ export function buildkiteScriptDeploymentEvidence(
       const result = new Map<PipelineStep, BuildkiteDeploymentEvidence>();
       for (const step of pipeline.steps) {
         const source = [step.command ?? "", ...(step.commands ?? [])].join("\n");
-        const overridesExecution = (step.plugins ?? []).some((plugin) =>
-          Object.values(plugin).some(
-            (config) =>
-              config !== null &&
-              typeof config === "object" &&
-              ["workdir", "command", "entrypoint"].some((key) => Object.hasOwn(config, key)),
-          ),
-        );
         result.set(
           step,
           buildkiteStepDeploys(step)
             ? "publication"
-            : await scan.text(source, new Set(), !overridesExecution),
+            : await scan.text(source, new Set(), buildkiteAllowsCheckoutScripts(step)),
         );
       }
       return result;

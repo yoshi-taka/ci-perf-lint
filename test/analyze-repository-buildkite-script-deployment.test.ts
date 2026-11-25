@@ -9,12 +9,17 @@ import { createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
 const tempDirs = createTempDirTracker();
 afterEach(() => tempDirs.cleanup());
 
-async function fixture(command: string, files: Record<string, string> = {}) {
+async function fixture(
+  command: string,
+  files: Record<string, string> = {},
+  pluginLines: string[] = [],
+) {
   const root = await tempDirs.create("apl-bk-script-deployment-");
   const source = [
     "steps:",
     "  - label: Build",
     `    command: ${JSON.stringify(command)}`,
+    ...pluginLines,
     "  - label: Tests",
     "    command: npm test",
   ].join("\n");
@@ -46,6 +51,9 @@ test.each([
   "bash scripts/build.sh",
   "sh -eu scripts/build.sh",
   "env bash scripts/build.sh",
+  "timeout 30 sh scripts/build.sh",
+  "nice -n 5 sh scripts/build.sh",
+  "xargs -n1 sh scripts/build.sh",
 ])("follows a fixed shell reference without executing it (%s)", async (command) => {
   const f = await fixture(command, {
     "scripts/build.sh": "touch should-not-exist\ndocker push registry.example/app:latest\n",
@@ -91,6 +99,11 @@ test.each(
     ["$SCRIPT", {}],
     ["env -i bash scripts/build.sh", {}],
     ["timeout 30 sh scripts/build.sh", {}],
+    ["xargs -I{} {} --flag", {}],
+    ["xargs -n1 $COMMAND", {}],
+    ['xargs -I"$TOKEN" command-from-input', {}],
+    ["xargs --unknown-option pytest", {}],
+    ['xargs sh -c "$COMMAND"', {}],
     ["./scripts/*.sh", {}],
     ["cd subdir && ./scripts/build.sh", {}],
     ["./scripts/build.sh", { "scripts/build.sh": "source scripts/build.sh\n" }],
@@ -176,8 +189,16 @@ test.each([
   "bundle exec fastlane package",
   "buildkite-agent artifact upload results.xml",
   "pytest > report.txt",
+  'pytest > "$REPORT"',
+  'pytest 2> "$LOG"',
   "pytest < input.txt",
   "cd tests && pytest",
+  "xargs -0 -n1 pytest",
+  "xargs --max-procs=4 pytest",
+  "xargs -I{} pytest '{}'",
+  "xargs -- echo 'docker push image'",
+  "timeout 30 pytest",
+  "nice -n5 npm test",
 ])("literal script tools do not make publication analysis unknown (%s)", async (command) => {
   const f = await fixture("./scripts/build.sh", {
     "scripts/build.sh": `#!/bin/sh\n${command}\n`,
@@ -222,22 +243,67 @@ test("sourced file generation invalidates subsequent static script references", 
   expect(await f.evidence()).toBe("unknown");
 });
 
-test("plugin execution-directory overrides keep script resolution unknown", async () => {
-  const f = await fixture("sh scripts/build.sh", { "scripts/build.sh": "echo harmless\n" });
-  await writeRepositoryFiles(f.root, {
-    ".buildkite/pipeline.yml": [
-      "steps:",
-      "  - label: Build",
-      "    command: sh scripts/build.sh",
+test.each(["docker#v5.13.0", "buildkite-plugins/docker#v5.13.0"])(
+  "Docker workdir preserves the checkout-relative script mapping (%s)",
+  async (plugin) => {
+    const f = await fixture("sh scripts/build.sh", { "scripts/build.sh": "pytest\n" }, [
       "    plugins:",
-      "      - docker#v5:",
+      `      - ${plugin}:`,
       "          image: builder",
-      "          workdir: /other",
-    ].join("\n"),
-  });
+      "          workdir: /app",
+    ]);
+    expect(await f.evidence()).toBe("no-evidence");
+    expect(
+      (await f.report()).filter((finding) => finding.ruleId === "missing-if-changed"),
+    ).toHaveLength(2);
+  },
+);
+
+test.each([
+  "mount-checkout: false",
+  "mount-checkout: '${MOUNT}'",
+  "volumes: ['./other:/app']",
+  "volumes: ['./other:/app/scripts']",
+  "volumes: ['./other:/app/../app/scripts']",
+  "command: ['./other.sh']",
+  "entrypoint: /other.sh",
+])("keeps genuinely changed container execution contexts unresolved (%s)", async (setting) => {
+  const f = await fixture("sh scripts/build.sh", { "scripts/build.sh": "pytest\n" }, [
+    "    plugins:",
+    "      - docker#v5.13.0:",
+    "          image: builder",
+    "          workdir: /app",
+    `          ${setting}`,
+  ]);
+  expect(await f.evidence()).toBe("unknown");
   expect((await f.report()).filter((finding) => finding.ruleId === "missing-if-changed")).toEqual(
     [],
   );
+});
+
+test("Docker workdir inspection still finds publication and accepts unrelated volumes", async () => {
+  const f = await fixture("sh scripts/build.sh", { "scripts/build.sh": "docker push image\n" }, [
+    "    plugins:",
+    "      - docker#v5.13.0:",
+    "          image: builder",
+    "          workdir: /app",
+    "          volumes: ['/var/run/docker.sock:/var/run/docker.sock']",
+  ]);
+  expect(await f.evidence()).toBe("publication");
+});
+
+test("variable output after the last script call does not invalidate prior analysis", async () => {
+  const f = await fixture('sh scripts/build.sh; pytest > "$REPORT"', {
+    "scripts/build.sh": "pytest\n",
+  });
+  expect(await f.evidence()).toBe("no-evidence");
+});
+
+test("a variable output before a later script call remains an unresolved alias", async () => {
+  const f = await fixture("printf 'docker push image' > \"$OUTPUT\"; sh scripts/build.sh", {
+    "scripts/build.sh": "pytest\n",
+  });
+  expect(await f.evidence()).toBe("unknown");
 });
 
 test("bounds distinct files, aggregate content, and command traversal", async () => {
