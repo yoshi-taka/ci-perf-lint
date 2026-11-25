@@ -13,10 +13,20 @@ afterEach(async () => {
 async function isolatedContext(rgPath: string | null, useBun: boolean) {
   const filename = fileURLToPath(new URL("../src/repository-scan-context.ts", import.meta.url));
   const source = await Bun.file(filename).text();
-  const changed = source.replace(
-    "static #rgPath: string | null | undefined;",
-    `static #rgPath: string | null | undefined = ${JSON.stringify(rgPath)};`,
-  );
+  // rg spawns directly after the which-probe removal, so inject the fake binary
+  // at both call sites. A null rgPath injects a nonexistent path: Bun.spawn
+  // throws and the node branch emits an "error" event, exercising the ENOENT
+  // fallback instead of the former probe-absence short circuit.
+  const injected = rgPath ?? path.join(path.sep, "apl-definitely-missing", "rg");
+  const changed = source
+    .replace(
+      'Bun.spawn(["rg", "--files", "--hidden", repoRoot]',
+      `Bun.spawn([${JSON.stringify(injected)}, "--files", "--hidden", repoRoot]`,
+    )
+    .replace(
+      'spawn("rg", ["--files", "--hidden", repoRoot]',
+      `spawn(${JSON.stringify(injected)}, ["--files", "--hidden", repoRoot]`,
+    );
   expect(changed).not.toBe(source);
   const build = await Bun.build({
     entrypoints: [filename],
@@ -81,7 +91,7 @@ test.each([false, true])(
 );
 
 test.each([false, true])(
-  "rg error and absence retain readdir fallback (Bun spawn: %s)",
+  "rg error and ENOENT retain readdir fallback (Bun spawn: %s)",
   async (useBun) => {
     const repoRoot = await tempDirs.create("relative-rg-fallback-");
     // Otherwise the small-tree walker succeeds without exercising rg failure.
@@ -92,6 +102,7 @@ test.each([false, true])(
     await writeFile(path.join(repoRoot, "node_modules", "hidden.ts"), "");
     const rgPath = path.join(repoRoot, "fake-rg");
     await writeFile(rgPath, "#!/bin/sh\nexit 2\n", { mode: 0o755 });
+    // rgPath exits nonzero; null resolves to a nonexistent path (ENOENT).
     for (const executable of [rgPath, null]) {
       const Context = await isolatedContext(executable, useBun);
       const context = new Context(repoRoot, []);
