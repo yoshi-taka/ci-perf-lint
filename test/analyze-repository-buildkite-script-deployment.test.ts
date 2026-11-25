@@ -91,12 +91,13 @@ test.each(
     ["$SCRIPT", {}],
     ["env -i bash scripts/build.sh", {}],
     ["timeout 30 sh scripts/build.sh", {}],
-    ["node scripts/build.js", {}],
     ["./scripts/*.sh", {}],
     ["cd subdir && ./scripts/build.sh", {}],
     ["./scripts/build.sh", { "scripts/build.sh": "source scripts/build.sh\n" }],
     ["./scripts/build.sh", { "scripts/build.sh": "#!/usr/bin/python3\nprint('hello')\n" }],
-    ["./scripts/build.sh", { "scripts/build.sh": "bundle exec fastlane package\n" }],
+    ["${nix} build", {}],
+    ["./scripts/build.sh", { "scripts/build.sh": "pytest\n$BUILDX push image\n" }],
+    ["./scripts/build.sh", { "scripts/build.sh": 'pytest\neval "$COMMAND"\n' }],
     ["./scripts/build.sh", { "scripts/build.sh": 'bash "$(dirname "$0")/nested.sh"\n' }],
   ].map(([command, files]) => ({
     command: command as string,
@@ -161,11 +162,48 @@ test("does not read a checkout-relative lookalike after a directory change", asy
 test.each([
   "printf 'docker push image' > scripts/build.sh; sh scripts/build.sh",
   "curl -o scripts/build.sh https://example.com/build.sh; sh scripts/build.sh",
-  "python generate.py; sh scripts/build.sh",
 ])("does not treat generated script contents as the checked-out file (%s)", async (command) => {
   const f = await fixture(command, { "scripts/build.sh": "echo harmless\n" });
   expect(await f.evidence()).toBe("unknown");
 });
+
+test.each([
+  "pytest",
+  "npm test",
+  "python -m pytest",
+  "/usr/bin/pytest",
+  "node scripts/check.js",
+  "bundle exec fastlane package",
+  "buildkite-agent artifact upload results.xml",
+  "pytest > report.txt",
+  "pytest < input.txt",
+  "cd tests && pytest",
+])("literal script tools do not make publication analysis unknown (%s)", async (command) => {
+  const f = await fixture("./scripts/build.sh", {
+    "scripts/build.sh": `#!/bin/sh\n${command}\n`,
+  });
+  expect(await f.evidence()).toBe("no-evidence");
+  const found = await f.report();
+  expect(found.filter((finding) => finding.ruleId === "missing-if-changed")).toHaveLength(2);
+  expect(
+    found.filter((finding) => finding.ruleId === "missing-cancel-on-build-failing"),
+  ).toHaveLength(1);
+});
+
+test.each([
+  "cd tests && pytest",
+  "pytest > report.txt; sh scripts/build.sh",
+  "python generate.py; sh scripts/build.sh",
+])(
+  "literal inline tools do not by themselves imply unresolved publication (%s)",
+  async (command) => {
+    const f = await fixture(command, { "scripts/build.sh": "pytest\n" });
+    expect(await f.evidence()).toBe("no-evidence");
+    expect((await f.report()).some((finding) => finding.ruleId === "missing-if-changed")).toBe(
+      true,
+    );
+  },
+);
 
 test("rejects parent traversal before normalization can erase a symlink", async () => {
   const outside = await tempDirs.create("apl-bk-script-parent-");
