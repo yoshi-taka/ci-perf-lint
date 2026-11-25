@@ -28,6 +28,8 @@ Dependency graphs are not evaluated. This conservative exclusion can miss concur
 
 Deployment-only concurrency is excluded. In mixed segments the suggestion targets non-deployment work only. Never apply this advice to deployment steps: cancellation can leave environments partially updated. Deployment detection uses commands, labels, plugins, and explicit deployment metadata; opaque scripts can hide deployments and still require human review.
 
+Fixed checkout-relative shell scripts are inspected without execution, using the same bounded inspection as [missing-if-changed](missing-if-changed.md#scope-and-limits). A step with publication evidence or an unresolved shell call is never selected as the cancellation target. It may still run alongside an eligible test step; the suggestion then targets only that test step. Unknown script behavior is not proof that cancellation is safe.
+
 ## Real-pipeline validation
 
 Scanned 98 publicly indexed `.buildkite/pipeline.yml` files (GitHub code search, non-random sample): 50 have concurrent work by the definition above, and none use `cancel_on_build_failing` — the attribute appears in 152 GitHub files overall, almost entirely documentation and DSL schemas. Two refinements came out of that scan: branch-exclusive segment neighbors do not actually run in the same build (a `!main` gate step next to a `main` build step), and the scalar `- wait` step form was not previously recognized as a barrier, which made sequential pipelines look concurrent.

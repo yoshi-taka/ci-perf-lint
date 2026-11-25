@@ -33,7 +33,11 @@ Skipped steps and container steps are ignored; group inner steps are checked aft
 ## Scope and limits
 
 - Static analysis cannot see repository-specific detection built into dynamic pipeline generators. Repositories generating steps dynamically are false negatives.
-- A pipeline file named `deploy.yml` is not excluded by filename alone; deployment evidence excludes the entire pipeline. Opaque scripts can hide deployment work.
+- A pipeline file named `deploy.yml` is not excluded by filename alone; deployment evidence excludes the entire pipeline.
+- Fixed checkout-relative shell calls (`./scripts/build.sh`, `bash scripts/build.sh`, `sh scripts/build.sh`, and fixed `source` calls) are inspected without execution. Nested paths resolve against the inherited checkout directory, not the caller's script directory. Publication found in a script excludes the pipeline.
+- Missing, dynamic, unsupported, or bounded-out shell references suppress this advice too; they are **unknown**, not proof of publication or its absence. Directory changes, shell `-c`, cycles, parent traversal, non-shell scripts, plugin execution overrides, and potentially generated/overwritten scripts remain unknown.
+- Script inspection rejects outside paths and symlinks. Limits per pipeline: depth 4, 16 distinct files, 64 KiB per file, 256 KiB total script content, and 512 command visits for reference traversal. The scan assumes repository files are not being maliciously replaced concurrently.
+- This is not general program analysis: package.json scripts, Makefiles, language-specific tasks, generated commands, plugin internals, and agent hooks are not recursively inspected. Existing inline command detection is unchanged; “no evidence” means only within the inspected scope.
 - S3 upload detection accounts for common AWS global and transfer options, including options before source/destination. Downloads, dry runs, and unknown options do not establish publication.
 - Known generator inputs (`*.rayci.yml`/`*.rayci.yaml` and documents with `source_file_dependencies` at the root or on steps) are excluded from automatic pipeline discovery rather than audited as directly uploadable pipelines.
 - Agent versions older than 3.103.0 do not apply `if_changed` without the `--apply-if-changed` flag.

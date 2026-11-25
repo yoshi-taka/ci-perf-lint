@@ -2,7 +2,10 @@ import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
 import type { PipelineDocument, PipelineStep } from "../buildkite-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
-import { buildkiteStepDeploys } from "./shared/buildkite-deployment.ts";
+import {
+  buildkiteScriptDeploymentEvidence,
+  type BuildkiteDeploymentEvidence,
+} from "./shared/buildkite-script-deployment.ts";
 
 const meta = {
   id: "missing-cancel-on-build-failing",
@@ -28,7 +31,10 @@ function runnableCommandStep(step: PipelineStep): boolean {
  * may serialize segment neighbors. Only unfiltered, dependency-free steps
  * count toward segment concurrency. A runnable parallel step's own shards
  * still run together after its dependencies complete. */
-function hasConcurrentWork(pipeline: PipelineDocument): PipelineStep | undefined {
+function hasConcurrentWork(
+  pipeline: PipelineDocument,
+  evidence: ReadonlyMap<PipelineStep, BuildkiteDeploymentEvidence>,
+): PipelineStep | undefined {
   let run = 0;
   let safeCandidate: PipelineStep | undefined;
   for (const step of pipeline.steps) {
@@ -43,7 +49,7 @@ function hasConcurrentWork(pipeline: PipelineDocument): PipelineStep | undefined
     if (!runnableCommandStep(step)) {
       continue;
     }
-    const deploys = buildkiteStepDeploys(step);
+    const deploys = evidence.get(step) !== "no-evidence";
     if ((step.parallelism ?? 0) >= 2 && !deploys) {
       return step;
     }
@@ -71,8 +77,12 @@ function pipelineSetsCancelFlag(pipeline: PipelineDocument): boolean {
 
 export const missingCancelOnBuildFailingRule = {
   meta,
-  check(pipeline: PipelineDocument, _context: RuleContext): Diagnostic[] {
-    const concurrentStep = hasConcurrentWork(pipeline);
+  async check(pipeline: PipelineDocument, context: RuleContext): Promise<Diagnostic[]> {
+    const evidence = await buildkiteScriptDeploymentEvidence(
+      pipeline,
+      context.scanContext?.repoRoot ?? context.fileIndex?.repoRoot,
+    );
+    const concurrentStep = hasConcurrentWork(pipeline, evidence);
     if (!concurrentStep || pipelineSetsCancelFlag(pipeline)) {
       return [];
     }

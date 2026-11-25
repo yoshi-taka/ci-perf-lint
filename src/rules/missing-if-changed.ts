@@ -9,6 +9,7 @@ import {
 } from "./shared/tooling-command-evidence.ts";
 import { buildkitePluginBaseNames } from "./shared/buildkite-plugins.ts";
 import { buildkitePipelineDeploys } from "./shared/buildkite-deployment.ts";
+import { buildkiteScriptDeploymentEvidence } from "./shared/buildkite-script-deployment.ts";
 
 const meta = {
   id: "missing-if-changed",
@@ -81,10 +82,17 @@ function hasOwnDetection(step: PipelineStep): boolean {
 
 export const missingIfChangedRule = {
   meta,
-  check(pipeline: PipelineDocument, _context: RuleContext): Diagnostic[] {
+  async check(pipeline: PipelineDocument, context: RuleContext): Promise<Diagnostic[]> {
     // Tests are deployment prerequisites too: never suggest skipping them
     // based on an incomplete default-branch changed-file set.
     if (buildkitePipelineDeploys(pipeline)) {
+      return [];
+    }
+    const evidence = await buildkiteScriptDeploymentEvidence(
+      pipeline,
+      context.scanContext?.repoRoot ?? context.fileIndex?.repoRoot,
+    );
+    if ([...evidence.values()].some((value) => value !== "no-evidence")) {
       return [];
     }
     const findings: Diagnostic[] = [];

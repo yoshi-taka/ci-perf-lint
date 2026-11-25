@@ -122,6 +122,10 @@ export function buildkiteStepDeploys(step: PipelineStep): boolean {
     return true;
   }
   const source = [step.command ?? "", ...(step.commands ?? [])].join("\n");
+  return buildkiteTextDeploys(source);
+}
+
+export function buildkiteTextDeploys(source: string): boolean {
   return [...shellNonDisplayInvocations(source), ...shellNonDisplayInvocations(source, true)].some(
     (words) => {
       if (

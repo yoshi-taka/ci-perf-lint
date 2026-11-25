@@ -134,6 +134,9 @@ describe("missing-cancel-on-build-failing", () => {
 
   test("counts group inner steps for segment concurrency", async () => {
     const root = await tempDirs.create("apl-bk-fastfail-group-");
+    await mkdir(path.join(root, "scripts"), { recursive: true });
+    await writeFile(path.join(root, "scripts/package-x86.sh"), "echo packaging\n");
+    await writeFile(path.join(root, "scripts/package-arm.sh"), "echo packaging\n");
     await writePipeline(root, [
       "  - group: ':package: Package'",
       "    steps:",
