@@ -156,6 +156,16 @@ export class RepositoryScanContext {
   }
 
   async estimatedFileCount(): Promise<number | null> {
+    // Reuse the warmed file index instead of enumerating the tree a second time
+    // via `git ls-files`: the scan phase fetches this index regardless, so the
+    // git spawn was purely additive process work. The index also counts
+    // untracked files, matching the scan workload this threshold guards.
+    // `git ls-files` remains the fallback when the index is unavailable
+    // (rg missing on a tree the in-process walk cannot cover).
+    const files = await this.#getRgFileList();
+    if (files !== null) {
+      return files.length;
+    }
     if (await this.#hasGitDirectory()) {
       try {
         if (hasBun) {
@@ -189,8 +199,7 @@ export class RepositoryScanContext {
         // git not available
       }
     }
-    const files = await this.#getRgFileList();
-    return files !== null ? files.length : null;
+    return null;
   }
 
   warn(source: string, message: string): void {

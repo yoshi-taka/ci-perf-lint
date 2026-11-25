@@ -6,6 +6,10 @@ import { createTempDirTracker } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 
+function hasRipgrep(): boolean {
+  return Bun.spawnSync(["which", "rg"]).exitCode === 0;
+}
+
 afterEach(async () => {
   await tempDirs.cleanup();
 });
@@ -205,5 +209,62 @@ describe("RepositoryScanContext", () => {
         message: "Expected a JSON object while collecting repository signals.",
       },
     ]);
+  });
+
+  test("estimatedFileCount counts the warmed file list without spawning for non-git trees", async () => {
+    const repoRoot = await tempDirs.create("actions-perf-context-count-");
+    await writeFile(path.join(repoRoot, "a.txt"), "a\n");
+    await writeFile(path.join(repoRoot, "b.txt"), "b\n");
+
+    const context = new RepositoryScanContext(repoRoot, []);
+    const spawns: string[] = [];
+    const originalBunSpawn = Bun.spawn;
+    Bun.spawn = ((cmd: string[], options: Parameters<typeof Bun.spawn>[1]) => {
+      spawns.push(cmd.join(" "));
+      return originalBunSpawn(cmd, options);
+    }) as typeof Bun.spawn;
+    try {
+      const count = await context.estimatedFileCount();
+
+      // The in-process walk covers small trees, so neither git nor rg runs.
+      expect(count).toBe(2);
+      expect(spawns).toEqual([]);
+    } finally {
+      Bun.spawn = originalBunSpawn;
+    }
+  });
+
+  test("estimatedFileCount reuses the warmed file list instead of git ls-files", async () => {
+    const repoRoot = await tempDirs.create("actions-perf-context-count-git-");
+    // An empty .git marks the tree as a git repo without real git internals,
+    // keeping the warmed file list (rg --files --hidden also lists .git) and
+    // the git fallback (git ls-files fails outside a real repo) deterministic.
+    await mkdir(path.join(repoRoot, ".git"), { recursive: true });
+    await writeFile(path.join(repoRoot, "a.txt"), "a\n");
+    await writeFile(path.join(repoRoot, "b.txt"), "b\n");
+
+    const context = new RepositoryScanContext(repoRoot, []);
+    const spawns: string[] = [];
+    const originalBunSpawn = Bun.spawn;
+    Bun.spawn = ((cmd: string[], options: Parameters<typeof Bun.spawn>[1]) => {
+      spawns.push(cmd.join(" "));
+      return originalBunSpawn(cmd, options);
+    }) as typeof Bun.spawn;
+    try {
+      const count = await context.estimatedFileCount();
+      const ranGitLsFiles = spawns.some((cmd) => cmd.includes("ls-files"));
+
+      if (hasRipgrep()) {
+        // The warmed rg index answers the count; git ls-files must not run.
+        expect(count).toBe(2);
+        expect(ranGitLsFiles).toBe(false);
+      } else {
+        // Without the file index, git ls-files is attempted as the fallback.
+        expect(count).toBe(null);
+        expect(ranGitLsFiles).toBe(true);
+      }
+    } finally {
+      Bun.spawn = originalBunSpawn;
+    }
   });
 });
