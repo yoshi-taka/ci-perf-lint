@@ -32,6 +32,44 @@ async function findings(root: string) {
 }
 
 describe("missing-if-changed", () => {
+  test.each([
+    "docker push registry.example/app:latest",
+    "docker image push registry.example/app:latest",
+    "docker buildx build --push -t registry.example/app:latest .",
+    "docker buildx build --push=true -t registry.example/app:latest .",
+    "aws --region us-east-1 s3 sync --delete public s3://site",
+    "aws s3 cp --recursive --profile release public s3://site",
+    "aws --profile=release s3 sync --exclude '*.map' public s3://site",
+    "aws s3 cp public/index.html --content-type text/html s3://site/index.html",
+    "aws --region us-east-1 cloudfront create-invalidation --distribution-id example --paths '/*'",
+  ])("excludes pipelines publishing images or files (%s)", async (command) => {
+    const root = await tempDirs.create("apl-bk-ifchanged-publishing-");
+    await writePipeline(root, ["  - command: npm test", `  - command: ${command}`]);
+    expect(await findings(root)).toHaveLength(0);
+  });
+
+  test.each([
+    "echo 'docker push registry.example/app:latest'",
+    "docker buildx build --push=false .",
+    "docker buildx build --label --push .",
+    "docker push --help",
+    "aws --region us-east-1 s3 sync --delete s3://cache inputs",
+    "aws s3 cp --recursive s3://cache inputs",
+    "aws s3 sync --include s3://not-a-destination s3://cache inputs",
+    "aws s3 sync --dryrun public s3://site",
+    "aws s3 sync --unknown-option public s3://site",
+  ])("does not mistake non-publication for publication (%s)", async (command) => {
+    const root = await tempDirs.create("apl-bk-ifchanged-not-publishing-");
+    await writePipeline(root, [
+      "  - label: Tests",
+      "    command: npm test",
+      `  - command: ${command}`,
+    ]);
+    expect((await findings(root)).some((finding) => finding.message.includes('Step "Tests"'))).toBe(
+      true,
+    );
+  });
+
   test.each(
     [
       ["  - label: Deploy", "    command: ./rollout.sh"],

@@ -4,7 +4,7 @@
 
 - Workflow: `.buildkite/pipeline.yml`
 - Location: `.buildkite/pipeline.yml:2:12`
-- Severity: `warning`
+- Severity: `suggestion`
 - Confidence: `medium`
 - Rule docs: `https://ci-perf-lint.veritycost.com/rules/missing-timeout-in-minutes-buildkite`
 - Message: Step ":hammer: Tests" does not define timeout_in_minutes.

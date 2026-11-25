@@ -1,6 +1,6 @@
 # missing-timeout-in-minutes-buildkite
 
-Reported as a warning in default strict mode.
+Reported as a suggestion in exploratory mode, not default strict mode.
 
 Heavy-work and pipeline-upload evidence use shared shell extraction. Printed commands and text-search arguments are not heavy work or upload exemptions. An actual `buildkite-agent pipeline upload` exempts only that invocation, not a build/test elsewhere in the same step. Existing timeout/skip/control-step guards are retained.
 
@@ -10,7 +10,9 @@ Plugin-only steps are classified by plugin name, with the step label kept as an 
 - **Light plugins** (`test-summary`, `junit-annotate`) only annotate or report build results. Build/test-word labels must not flag them.
 - **Unknown plugins** fall back to the label hint, so a custom plugin labeled "Build" is still flagged while one labeled "Notify" is not.
 
-Check effective pipeline and organization timeout settings before adding a step override. When an additional step timeout is needed, allow headroom above a plugin's own internal limit. A plugin may bound only one operation, not other commands, hooks, or artifact uploads; the presence of an arbitrary `timeout` plugin option does not prove that the whole job is bounded.
+Steps with an explicit positive plugin `timeout`, `timeout_in_minutes`, or `timeout-in-minutes` are conservatively excluded. Numeric values, numeric strings, and simple durations such as `30s` or `10m` count; zero, negative, disabled, unresolved, and nested settings do not. This exemption reduces duplicate advice, but is not proof that hooks or other commands are bounded by the plugin.
+
+Check effective pipeline and organization timeout settings before adding a step override. When an additional step timeout is needed, allow headroom above a plugin's own internal limit.
 
 Buildkite supports default and maximum command-step timeouts at the pipeline and organization levels. These external settings are not visible in workflow YAML. This rule reports a missing explicit step value, not proof that the job can run indefinitely.
 

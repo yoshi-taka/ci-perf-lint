@@ -1,7 +1,7 @@
 [
   {
     "ruleId": "missing-timeout-in-minutes-buildkite",
-    "severity": "warning",
+    "severity": "suggestion",
     "confidence": "medium",
     "docsPath": "docs/rules/missing-timeout-in-minutes-buildkite.md",
     "workflow": ".buildkite/pipeline.yml",

@@ -23,7 +23,7 @@ describe("analyzeRepository Buildkite pipeline rules", () => {
     const report = await getFixtureReport(fixtures.buildkiteTimeoutLike, {
       targetPath: ".",
       topCount: 10,
-      mode: "strict",
+      mode: "exploratory",
     });
 
     const ruleIds = report.findings.map((finding) => finding.ruleId);
@@ -35,7 +35,7 @@ describe("analyzeRepository Buildkite pipeline rules", () => {
       (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
     );
     expect(timeoutFinding).toBeDefined();
-    expect(timeoutFinding?.severity).toBe("warning");
+    expect(timeoutFinding?.severity).toBe("suggestion");
     expect(timeoutFinding?.message).toContain("timeout_in_minutes");
   });
 
@@ -215,7 +215,6 @@ test("flags plugin-only heavy steps without timeout_in_minutes", async () => {
       "    plugins:",
       "      - acme-deploy#v1.0.0:",
       "          context: production",
-      "          timeout: 120",
       "  - label: ':rocket: Deploy!'",
       "    plugins:",
       "      acme-deploy#v1.0.0:",
