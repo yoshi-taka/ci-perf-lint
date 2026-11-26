@@ -69,4 +69,18 @@ describe("eslint config evidence", () => {
       true,
     );
   });
+
+  test.each([
+    'import recommended from "eslint-plugin-prettier/recommended";\nexport default [recommended];',
+    'const recommended = require("eslint-plugin-prettier/recommended");\nmodule.exports = [recommended];',
+  ])("recognizes a used flat-config recommended import", (text) => {
+    expect(codeMentionsPrettierRecommendedConfig(text)).toBe(true);
+  });
+
+  test.each([
+    'import recommended from "eslint-plugin-prettier/recommended";\nexport default [];',
+    '// import recommended from "eslint-plugin-prettier/recommended";\nexport default [recommended];',
+  ])("ignores an unused or commented flat-config import", (text) => {
+    expect(codeMentionsPrettierRecommendedConfig(text)).toBe(false);
+  });
 });

@@ -26,7 +26,12 @@ Typical repo evidence includes:
 
 ## Current heuristic
 
-The rule fires only when `prettier/prettier` is enabled, either directly or through `plugin:prettier/recommended` in `extends`. A rule set to `off` / `0` does not count.
+The rule fires only when `prettier/prettier` is enabled, either directly or through the recommended preset. The preset is recognized in both forms:
+
+- legacy config: `plugin:prettier/recommended` in `extends`
+- flat config: `import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended"` used in the config array
+
+A rule set to `off` / `0` does not count, and an imported preset that is never used in the config does not count either.
 
 Merely loading a plugin or having `eslint-plugin-prettier` in package metadata does not run Prettier, so it is not enough to trigger this rule. Unused dependencies are an `knip`-style concern, not a performance finding.
 

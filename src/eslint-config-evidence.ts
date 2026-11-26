@@ -87,9 +87,30 @@ export function blankOutCodeComments(text: string): string {
   return result;
 }
 
+const flatPrettierRecommendedImportPattern =
+  /(?:import\s+([A-Za-z_$][\w$]*)\s+from\s*|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*)['"`]eslint-plugin-prettier\/recommended['"`]\s*\)?/gi;
+
+/** Flat config activates the recommended setup by importing it into the config array. */
+function codeUsesFlatPrettierRecommendedConfig(text: string): boolean {
+  const code = blankOutCodeComments(text);
+  for (const match of code.matchAll(flatPrettierRecommendedImportPattern)) {
+    const binding = match[1] ?? match[2];
+    if (!binding) {
+      continue;
+    }
+    const remaining = `${code.slice(0, match.index)} ${code.slice(match.index + match[0].length)}`;
+    if (new RegExp(`\\b${binding}\\b`).test(remaining)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function codeMentionsPrettierRecommendedConfig(text: string): boolean {
-  return /plugin:prettier\/recommended|['"`]prettier\/recommended['"`]/i.test(
-    blankOutCodeComments(text),
+  const code = blankOutCodeComments(text);
+  return (
+    /plugin:prettier\/recommended|['"`]prettier\/recommended['"`]/i.test(code) ||
+    codeUsesFlatPrettierRecommendedConfig(code)
   );
 }
 

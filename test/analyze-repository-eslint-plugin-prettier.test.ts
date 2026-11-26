@@ -64,6 +64,10 @@ describe("avoid-eslint-plugin-prettier repository evidence", () => {
       "rule explicitly off",
       'export default [{ extends: ["plugin:prettier/recommended"], rules: { "prettier/prettier": "off" } }];',
     ],
+    [
+      "unused flat-config recommended import",
+      'import recommended from "eslint-plugin-prettier/recommended";\nexport default [];',
+    ],
   ])("does not flag %s", async (_name, config) => {
     expect(await findings(config)).toHaveLength(0);
   });
@@ -88,6 +92,15 @@ describe("avoid-eslint-plugin-prettier repository evidence", () => {
     expect(
       await findings('export default [{ extends: ["plugin:prettier/recommended"] }];'),
     ).toHaveLength(1);
+  });
+
+  test("flags a used flat-config recommended import", async () => {
+    const result = await findings(
+      'import recommended from "eslint-plugin-prettier/recommended";\nexport default [recommended];',
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]?.why).toContain("plugin:prettier/recommended");
+    expect(result[0]?.location.line).toBe(1);
   });
 
   test("points evidence at the live rule, not a commented one", async () => {

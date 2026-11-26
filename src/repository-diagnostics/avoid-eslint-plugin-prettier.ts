@@ -78,6 +78,7 @@ export async function collectAvoidEslintPluginPrettierDiagnostics(
   const configPatterns: RegExp[] = [];
   if (usesPrettierRecommendedConfig) {
     configPatterns.push(/plugin:prettier\/recommended/gi);
+    configPatterns.push(/eslint-plugin-prettier\/recommended/gi);
   }
   if (usesPrettierRule) {
     configPatterns.push(
