@@ -4,6 +4,8 @@ Task evidence uses the shared Gradle argument parser. Comments, displayed comman
 
 Flags workflows that visibly run Gradle tasks while no repository-level Gradle build cache configuration is visible. When a CircleCI orb whose alias or name identifies Gradle is used, `settings.gradle`/`build.gradle` present, and no Gradle command is visible, the orb invocation is used as medium-confidence Gradle evidence.
 
+Inferred findings from one orb reference are grouped into a single diagnostic. The orb may already pass `--build-cache` or write `~/.gradle/gradle.properties`; confirm the orb implementation before changing repository settings.
+
 ## Why it matters
 
 Gradle build cache reuses task outputs instead of recomputing them. That is different from dependency caching: the goal here is to avoid repeating build and test work itself.

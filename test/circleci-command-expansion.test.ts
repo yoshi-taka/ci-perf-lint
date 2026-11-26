@@ -79,9 +79,14 @@ test("a Gradle orb plus Gradle build files is medium-confidence Gradle evidence"
       "    steps:",
       "      - checkout",
       "      - gradle/test",
+      "  test:",
+      "    docker: [{image: cimg/openjdk:21}]",
+      "    steps:",
+      "      - checkout",
+      "      - gradle/test",
       "workflows:",
       "  ci:",
-      "    jobs: [build]",
+      "    jobs: [build, test]",
     ].join("\n"),
     "settings.gradle": 'rootProject.name = "sample"\ninclude("lib")\n',
     "build.gradle": 'plugins { id("java") }\n',
@@ -95,11 +100,14 @@ test("a Gradle orb plus Gradle build files is medium-confidence Gradle evidence"
     topCount: 100,
   });
 
-  const gradleCache = report.findings.find(
+  const gradleCacheFindings = report.findings.filter(
     (finding) => finding.ruleId === "missing-gradle-build-cache",
   );
-  expect(gradleCache?.location.path).toBe(".circleci/config.yml");
-  expect(gradleCache?.message).toContain("CircleCI Gradle orb");
+  expect(gradleCacheFindings).toHaveLength(1);
+  expect(gradleCacheFindings[0]?.location.path).toBe(".circleci/config.yml");
+  expect(gradleCacheFindings[0]?.message).toContain("CircleCI Gradle orb");
+  expect(gradleCacheFindings[0]?.message).toContain("and 1 more");
+  expect(gradleCacheFindings[0]?.why).toContain("may already pass `--build-cache`");
   const parallel = report.findings.find(
     (finding) => finding.ruleId === "gradle-parallel-not-enabled",
   );

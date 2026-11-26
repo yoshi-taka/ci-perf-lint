@@ -47,7 +47,6 @@ export const missingGradleBuildCacheRule = {
     }
 
     const jobs = new Map<string, Parameters<typeof buildDiagnostic>[2]>();
-    const inferredJobs = new Set<string>();
     for (const entry of collectCommandEntries(doc)) {
       if (jobs.has(entry.jobName)) {
         continue;
@@ -56,26 +55,54 @@ export const missingGradleBuildCacheRule = {
         jobs.set(entry.jobName, entry.node);
       }
     }
-    if (jobs.size === 0 && doc.kind === "circleci" && (await hasGradleBuildFile(context))) {
-      for (const invocation of collectCircleCiGradleOrbInvocations(doc)) {
-        inferredJobs.add(invocation.jobName);
-        jobs.set(invocation.jobName, invocation.node);
-      }
+
+    if (jobs.size > 0) {
+      return [...jobs].map(([jobName, node]) =>
+        buildDiagnostic(doc, meta, node, {
+          message: `Job "${jobName}" runs Gradle tasks without visible build cache configuration in the repository.`,
+          why: "Gradle build cache can reuse task outputs across builds, but no visible `buildCache` configuration was found in `settings.gradle` or `settings.gradle.kts`.",
+          suggestion:
+            "If this repository repeats the same Gradle tasks in CI, configure Gradle build cache in the repository and keep it only if total job time improves.",
+          measurementHint:
+            "Compare Gradle task duration, reported build-cache hits, and total job time before and after enabling Gradle build cache.",
+          aiHandoff: `Review ${doc.relativePath} job "${jobName}" together with the repository's Gradle settings. If this CI path repeats the same Gradle tasks, test repository-level build cache configuration and keep it only when total time improves.`,
+          score: 51,
+        }),
+      );
     }
 
-    return [...jobs].map(([jobName, node]) =>
-      buildDiagnostic(doc, meta, node, {
-        message: inferredJobs.has(jobName)
-          ? `Job "${jobName}" uses a CircleCI Gradle orb without visible build cache configuration in the repository.`
-          : `Job "${jobName}" runs Gradle tasks without visible build cache configuration in the repository.`,
-        why: "Gradle build cache can reuse task outputs across builds, but no visible `buildCache` configuration was found in `settings.gradle` or `settings.gradle.kts`.",
+    if (doc.kind !== "circleci" || !(await hasGradleBuildFile(context))) {
+      return [];
+    }
+
+    const inferred = new Map<
+      string,
+      { jobs: string[]; node: Parameters<typeof buildDiagnostic>[2] }
+    >();
+    for (const invocation of collectCircleCiGradleOrbInvocations(doc)) {
+      const group = inferred.get(invocation.reference) ?? {
+        jobs: [],
+        node: invocation.node,
+      };
+      group.jobs.push(invocation.jobName);
+      inferred.set(invocation.reference, group);
+    }
+
+    return [...inferred].map(([reference, group]) => {
+      const jobLabel =
+        group.jobs.length === 1
+          ? `Job "${group.jobs[0]}" uses`
+          : `Jobs "${group.jobs[0]}" and ${group.jobs.length - 1} more use`;
+      return buildDiagnostic(doc, meta, group.node, {
+        message: `${jobLabel} CircleCI Gradle orb ${reference} without visible build cache configuration in the repository.`,
+        why: "Gradle build cache can reuse task outputs across builds, but no visible `buildCache` configuration was found in `settings.gradle` or `settings.gradle.kts`. The orb may already pass `--build-cache` or write `~/.gradle/gradle.properties`; confirm its implementation before changing repository settings.",
         suggestion:
-          "If this repository repeats the same Gradle tasks in CI, configure Gradle build cache in the repository and keep it only if total job time improves.",
+          "Check the orb source or documentation first. If the orb does not enable build cache, configure Gradle build cache in the repository and keep it only if total job time improves.",
         measurementHint:
           "Compare Gradle task duration, reported build-cache hits, and total job time before and after enabling Gradle build cache.",
-        aiHandoff: `Review ${doc.relativePath} job "${jobName}" together with the repository's Gradle settings. If this CI path repeats the same Gradle tasks, test repository-level build cache configuration and keep it only when total time improves.`,
+        aiHandoff: `Review ${doc.relativePath} jobs (${group.jobs.join(", ")}) and the CircleCI Gradle orb ${reference}. The orb may already set \`--build-cache\` or write \`~/.gradle/gradle.properties\`; verify that before adding repository-level build cache configuration.`,
         score: 51,
-      }),
-    );
+      });
+    });
   },
 };
