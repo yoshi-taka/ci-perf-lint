@@ -1,6 +1,6 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
+import type { WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { isBlacksmithStickyDiskCacheStep } from "./shared/blacksmith-caches.ts";
 import { type DependencyFamily, detectInstallCommand } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
@@ -20,6 +20,9 @@ import {
   setupActionHasBuiltInCacheForFamily,
 } from "./shared/workflow-caches.ts";
 import { dependencyCacheJobIsReleaseLike } from "./shared/dependency-cache-release.ts";
+import { collectCommandEntries, type CIDocument } from "./shared/any-step.ts";
+import { detectInstallCommandFromText } from "./shared/tools-text.ts";
+import { isMap } from "../yaml.ts";
 
 export const FAMILY_CACHE_MATCHERS: Record<DependencyFamily, string[]> = {
   npm: [".npm", "npm-cache"],
@@ -90,12 +93,85 @@ const meta = {
   confidence: "medium",
   docsPath: "docs/rules/missing-dependency-cache.md",
   impliedChecks: ["setup-node-cache-dependency-path-unset"] as const,
+  scope: "all",
 } satisfies RuleMeta;
+
+function circleCiCacheCovered(
+  doc: Extract<CIDocument, { kind: "circleci" }>,
+  jobName: string,
+): boolean {
+  const job = doc.jobs.find((candidate) => candidate.name === jobName);
+  return Boolean(
+    job?.steps.some((step) => step.type === "save_cache" || step.type === "restore_cache"),
+  );
+}
+
+function gitlabCacheCovered(
+  doc: Extract<CIDocument, { kind: "gitlab-ci" }>,
+  jobName: string,
+): boolean {
+  const job = doc.jobs.find((candidate) => candidate.name === jobName);
+  const defaultNode = doc.root?.get("default", true);
+  return Boolean(
+    job?.node.get("cache", true) !== undefined ||
+    doc.root?.get("cache", true) !== undefined ||
+    (isMap(defaultNode) && defaultNode.get("cache", true) !== undefined),
+  );
+}
+
+function checkNonGitHubDependencies(doc: CIDocument, findings: Diagnostic[]): void {
+  if (doc.kind === "buildkite" || doc.kind === "github-actions") {
+    return;
+  }
+  const familiesByJob = new Map<string, Set<string>>();
+  const firstNodeByJob = new Map<string, Parameters<typeof buildDiagnostic>[2]>();
+  for (const entry of collectCommandEntries(doc)) {
+    const family = detectInstallCommandFromText(entry.text);
+    if (!family) {
+      continue;
+    }
+    const families = familiesByJob.get(entry.jobName) ?? new Set<string>();
+    families.add(family);
+    familiesByJob.set(entry.jobName, families);
+    if (!firstNodeByJob.has(entry.jobName)) {
+      firstNodeByJob.set(entry.jobName, entry.node);
+    }
+  }
+
+  for (const [jobName, families] of familiesByJob) {
+    const covered =
+      doc.kind === "circleci"
+        ? circleCiCacheCovered(doc, jobName)
+        : gitlabCacheCovered(doc, jobName);
+    if (covered) {
+      continue;
+    }
+    findings.push(
+      buildDiagnostic(doc, meta, firstNodeByJob.get(jobName), {
+        message: `Job "${jobName}" installs dependencies (${[...families].join(", ")}) without a visible dependency cache.`,
+        why: "Clean CI runners re-download and re-install dependencies on every run when the provider cache is not configured. The relative benefit depends on install duration and cache restore/save overhead.",
+        suggestion:
+          doc.kind === "circleci"
+            ? "If this install path is expensive, add `save_cache`/`restore_cache` steps keyed on the lockfile and verify total job time improves."
+            : "If this install path is expensive, configure GitLab CI `cache:` keyed on the lockfile and verify total job time improves.",
+        measurementHint:
+          "Compare total job duration, not just install duration, before and after enabling dependency caching.",
+        aiHandoff: `Review ${doc.relativePath} job "${jobName}" and test whether the CI provider cache improves total job time before keeping it.`,
+        score: 38,
+      }),
+    );
+  }
+}
 
 export const missingDependencyCacheRule = {
   meta,
-  check(workflow: WorkflowDocument, _context: RuleContext) {
+  check(doc: CIDocument, _context: RuleContext) {
     const findings: Diagnostic[] = [];
+    if (doc.kind !== "github-actions") {
+      checkNonGitHubDependencies(doc, findings);
+      return findings;
+    }
+    const workflow = doc;
 
     for (const job of workflow.jobs) {
       if (

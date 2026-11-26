@@ -16,5 +16,23 @@
     "measurementHint": "Monitor the job's typical duration and set timeout to a value that allows for normal variance but catches hangs.",
     "aiHandoff": "Review .gitlab-ci.yml job \"build-app\" and add a sensible timeout value.",
     "score": 95
+  },
+  {
+    "ruleId": "missing-dependency-cache",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-dependency-cache.md",
+    "workflow": ".gitlab-ci.yml",
+    "location": {
+      "path": ".gitlab-ci.yml",
+      "line": 13,
+      "column": 7
+    },
+    "message": "Job \"build-app\" installs dependencies (npm) without a visible dependency cache.",
+    "why": "Clean CI runners re-download and re-install dependencies on every run when the provider cache is not configured. The relative benefit depends on install duration and cache restore/save overhead.",
+    "suggestion": "If this install path is expensive, configure GitLab CI `cache:` keyed on the lockfile and verify total job time improves.",
+    "measurementHint": "Compare total job duration, not just install duration, before and after enabling dependency caching.",
+    "aiHandoff": "Review .gitlab-ci.yml job \"build-app\" and test whether the CI provider cache improves total job time before keeping it.",
+    "score": 68
   }
 ]

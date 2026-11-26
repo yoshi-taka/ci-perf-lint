@@ -10,6 +10,8 @@ Depot actions are excluded: their normal builds automatically persist the projec
 
 The GHA-cache recommendation respects effective job/workflow `cache-mode`. Restore-disabled or unknown policies suppress this advice. Under `read`, a visible `cache-from: type=gha` is sufficient without requiring a prohibited cache export.
 
+On Buildkite, CircleCI, and GitLab CI, visible `docker build`/`docker buildx build` commands without `--cache-from` or `--cache-to` are reported with medium confidence. The suggestion uses a provider-neutral registry cache instead of the GitHub Actions cache backend. Builds with `--no-cache` are excluded.
+
 Without layer caching, every CI run rebuilds all Docker layers from scratch, even when the Dockerfile and source files are unchanged. This adds minutes per build for no benefit.
 
 The simplest and most effective cache backend for GitHub Actions is the built-in `type=gha`, which stores cache in the action's own cache storage:

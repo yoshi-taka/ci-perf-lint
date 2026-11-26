@@ -12,7 +12,7 @@ import {
 const meta = {
   id: "dockerfile-unused-build-stage",
   severity: "warning",
-  confidence: "high",
+  confidence: "medium",
   docsPath: "docs/rules/dockerfile-unused-build-stage.md",
 } satisfies RuleMeta;
 
@@ -102,7 +102,6 @@ export async function collectDockerfileUnusedBuildStageDiagnostics(
           aiHandoff: `Review ${relativePath}:${instruction.startLine}. The Dockerfile stage ${
             stage.alias ?? `#${stage.index + 1}`
           } is not reachable from the final image or any CI build target. Remove it, or add a COPY/FROM reference if the stage is intended to run.`,
-          confidence: dockerfileTargets[0]?.confidence,
           score: 35,
         }),
       );

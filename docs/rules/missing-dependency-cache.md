@@ -25,6 +25,8 @@ Current MVP heuristic:
 All eligible setup steps are reported; output `--top` limits presentation, not collection.
 Only visible workflow install commands are considered. Installs hidden in Makefiles or scripts can be missed.
 
+On CircleCI and GitLab CI, visible dependency install commands are reported as medium-confidence suggestions when no CircleCI `save_cache`/`restore_cache` step or GitLab `cache:` configuration is visible. Buildkite uses the separate `missing-dependency-cache-buildkite` rule.
+
 Built-in cache defaults considered by the rule:
 
 - `setup-go` is treated as cache-enabled by default

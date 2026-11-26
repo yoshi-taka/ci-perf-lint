@@ -16,5 +16,23 @@
     "measurementHint": "Compare checkout transfer size, lazy blob fetches, and total job time with the same commit history and checkout contents.",
     "aiHandoff": "Review .circleci/config.yml job \"build\" and test whether method: blobless avoids eager historical blob transfer. Preserve the checkout step and verify all repository-file and history operations.",
     "score": 90
+  },
+  {
+    "ruleId": "missing-dependency-cache",
+    "severity": "suggestion",
+    "confidence": "medium",
+    "docsPath": "docs/rules/missing-dependency-cache.md",
+    "workflow": ".circleci/config.yml",
+    "location": {
+      "path": ".circleci/config.yml",
+      "line": 10,
+      "column": 14
+    },
+    "message": "Job \"build\" installs dependencies (npm) without a visible dependency cache.",
+    "why": "Clean CI runners re-download and re-install dependencies on every run when the provider cache is not configured. The relative benefit depends on install duration and cache restore/save overhead.",
+    "suggestion": "If this install path is expensive, add `save_cache`/`restore_cache` steps keyed on the lockfile and verify total job time improves.",
+    "measurementHint": "Compare total job duration, not just install duration, before and after enabling dependency caching.",
+    "aiHandoff": "Review .circleci/config.yml job \"build\" and test whether the CI provider cache improves total job time before keeping it.",
+    "score": 68
   }
 ]
