@@ -18,6 +18,10 @@ import {
 import { meetsMinimum } from "../rules/shared/evidence.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
+import {
+  circleCiHasOpaqueOrbSignal,
+  collectCircleCiDockerEvidence,
+} from "../circleci-docker-evidence.ts";
 
 import { pruneGateDescendants } from "./gate-pruning.ts";
 
@@ -218,8 +222,17 @@ async function repositoryHasCdkManifest(scanContext: RepositoryScanContext): Pro
 }
 
 async function circleCiWithDockerfile(context: RepositoryDiagnosticContext): Promise<boolean> {
-  const hasCircleCi = (context.documents ?? []).some((document) => document.kind === "circleci");
-  if (!hasCircleCi) {
+  const circleciDocuments = (context.documents ?? []).filter(
+    (document) => document.kind === "circleci",
+  );
+  if (circleciDocuments.length === 0) {
+    return false;
+  }
+  const hasDockerEvidence = circleciDocuments.some(
+    (document) =>
+      collectCircleCiDockerEvidence(document).length > 0 || circleCiHasOpaqueOrbSignal(document),
+  );
+  if (!hasDockerEvidence) {
     return false;
   }
   const dockerfiles = await context.scanContext.walkFiles(".", {

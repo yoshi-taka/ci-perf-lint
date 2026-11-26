@@ -54,11 +54,9 @@ export async function collectDockerfileImageSizeDiagnostics(
     const dockerfileRelativePath = normalizeRelativePath(repoRoot, target.dockerfilePath);
     const { instructions, fromInstructionIndexes, finalFromInstructionIndex } = dockerfileData;
 
-    const packageCacheSettings = await collectPackageCacheSettings(
-      context,
-      target.contextPath,
-      instructions,
-    );
+    const packageCacheSettings = target.buildContextInferred
+      ? {}
+      : await collectPackageCacheSettings(context, target.contextPath, instructions);
     diagnostics.push(
       ...collectWorkdirDiagnostics(
         repository,
@@ -132,7 +130,7 @@ export async function collectNodeDockerfileInstallDiagnostics(
     ...targets.filter((target) => !target.cacheMountPersistence),
   ];
   for (const target of orderedTargets) {
-    if (seenDockerfiles.has(target.dockerfilePath)) {
+    if (target.buildContextInferred || seenDockerfiles.has(target.dockerfilePath)) {
       continue;
     }
     seenDockerfiles.add(target.dockerfilePath);

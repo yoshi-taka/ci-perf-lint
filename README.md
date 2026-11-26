@@ -80,7 +80,7 @@ Depot workflows use GitHub Actions support. Individual rule coverage varies by p
 
 Pointing the tool at a directory that is not a git repository but contains sibling repositories audits each repository separately, so root-level Gradle, Docker, and package signals stay scoped to the repository that owns them.
 
-CircleCI orb implementations are not fetched. When orb commands stay opaque, `setup_remote_docker`, an orb `dockerfile:` parameter, or a repository Dockerfile is treated as medium-confidence Docker build evidence. A Gradle-named orb plus `settings.gradle`/`build.gradle` is treated as medium-confidence Gradle evidence. The CLI reports how many orb references could not be expanded.
+CircleCI orb implementations are not fetched. When orb commands stay opaque, `setup_remote_docker` or an orb `dockerfile:` parameter is treated as medium-confidence Docker build evidence. Repository Dockerfiles are inferred only when one of those signals exists and no explicit `dockerfile:` target is found; test/example paths are skipped, inferred build contexts are not used for context-sensitive rules, and truncation is reported. A Gradle-named orb plus `settings.gradle`/`build.gradle` is treated as medium-confidence Gradle evidence. The CLI reports how many orb references could not be expanded.
 
 [Browse the rules →](https://ci-perf-lint.veritycost.com/rules/)
 

@@ -22,6 +22,9 @@ export async function collectDockerRuntimeCopiesBuilderRootfsDiagnostics(
   const targets = await featureIndex.getDockerBuildTargets(repoRoot, scanContext, warnings);
   const findings = new Map<string, Diagnostic>();
   for (const target of targets) {
+    if (target.buildContextInferred) {
+      continue;
+    }
     const file = normalizeRelativePath(repoRoot, target.dockerfilePath);
     if (findings.has(file) || nonRuntimePathPattern.test(file)) {
       continue;

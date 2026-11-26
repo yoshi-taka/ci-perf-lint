@@ -173,6 +173,7 @@ test("an orb dockerfile parameter is medium-confidence Docker evidence without f
       "      - checkout",
       "      - acme/build:",
       "          dockerfile: docker/Dockerfile",
+      "          path: .",
       "workflows:",
       "  ci:",
       "    jobs: [build]",
@@ -219,12 +220,7 @@ test("an opaque orb plus a repository Dockerfile is medium-confidence evidence",
       "  ci:",
       "    jobs: [build]",
     ].join("\n"),
-    Dockerfile: [
-      "FROM eclipse-temurin:21",
-      "COPY build.gradle.kts .",
-      "RUN ./gradlew dependencies",
-    ].join("\n"),
-    "build.gradle": 'plugins { id("java") }\n',
+    Dockerfile: ["FROM ubuntu:latest", "RUN echo build"].join("\n"),
   });
 
   const report = await analyzeRepository({
@@ -234,14 +230,25 @@ test("an opaque orb plus a repository Dockerfile is medium-confidence evidence",
     topCount: 100,
   });
 
-  const mismatch = report.findings.find(
-    (finding) => finding.ruleId === "docker-cache-copy-path-mismatch",
-  );
-  expect(mismatch?.location.path).toBe("Dockerfile");
-  expect(mismatch?.confidence).toBe("medium");
+  expect(
+    report.findings.some(
+      (finding) =>
+        finding.ruleId === "docker-cache-copy-path-mismatch" ||
+        finding.ruleId === "dockerignore-misses-noisy-build-context-paths" ||
+        finding.ruleId === "missing-dockerignore-for-build-context",
+    ),
+  ).toBe(false);
+  expect(
+    report.findings.some(
+      (finding) =>
+        finding.ruleId === "dockerfile-base-image-uses-floating-tag" &&
+        finding.location.path === "Dockerfile" &&
+        finding.confidence === "medium",
+    ),
+  ).toBe(true);
 });
 
-test("setup_remote_docker falls back to repository Dockerfiles", async () => {
+test("setup_remote_docker falls back to repository Dockerfiles without context guesses", async () => {
   blockNetwork();
   const cwd = await tempDirs.create("apl-circleci-remote-docker-");
   await writeRepositoryFiles(cwd, {
@@ -258,12 +265,7 @@ test("setup_remote_docker falls back to repository Dockerfiles", async () => {
       "  ci:",
       "    jobs: [build]",
     ].join("\n"),
-    Dockerfile: [
-      "FROM eclipse-temurin:21",
-      "COPY build.gradle.kts .",
-      "RUN ./gradlew dependencies",
-    ].join("\n"),
-    "build.gradle": 'plugins { id("java") }\n',
+    Dockerfile: ["FROM ubuntu:latest", "RUN echo build"].join("\n"),
   });
 
   const report = await analyzeRepository({
@@ -273,11 +275,98 @@ test("setup_remote_docker falls back to repository Dockerfiles", async () => {
     topCount: 100,
   });
 
-  const mismatch = report.findings.find(
-    (finding) => finding.ruleId === "docker-cache-copy-path-mismatch",
+  expect(
+    report.findings.some(
+      (finding) =>
+        finding.ruleId === "docker-cache-copy-path-mismatch" ||
+        finding.ruleId === "dockerignore-misses-noisy-build-context-paths" ||
+        finding.ruleId === "missing-dockerignore-for-build-context",
+    ),
+  ).toBe(false);
+  expect(
+    report.findings.some(
+      (finding) =>
+        finding.ruleId === "dockerfile-base-image-uses-floating-tag" &&
+        finding.location.path === "Dockerfile" &&
+        finding.confidence === "medium",
+    ),
+  ).toBe(true);
+});
+
+test("inferred Docker targets skip test and example Dockerfiles", async () => {
+  blockNetwork();
+  const cwd = await tempDirs.create("apl-circleci-inferred-paths-");
+  await writeRepositoryFiles(cwd, {
+    ".circleci/config.yml": [
+      "version: 2.1",
+      "orbs:",
+      "  acme: acme/private-orb@1",
+      "jobs:",
+      "  build:",
+      "    docker: [{image: cimg/base:stable}]",
+      "    steps:",
+      "      - acme/build",
+      "workflows:",
+      "  ci:",
+      "    jobs: [build]",
+    ].join("\n"),
+    Dockerfile: "FROM ubuntu:latest\n",
+    "functional-test/src/test/resources/docker/Dockerfile": "FROM ubuntu:latest\n",
+    "examples/Dockerfile": "FROM ubuntu:latest\n",
+  });
+
+  const report = await analyzeRepository({
+    cwd,
+    targetPath: ".",
+    mode: "strict",
+    topCount: 100,
+  });
+
+  const floatingTagPaths = report.findings
+    .filter((finding) => finding.ruleId === "dockerfile-base-image-uses-floating-tag")
+    .map((finding) => finding.location.path)
+    .sort();
+  expect(floatingTagPaths).toEqual(["Dockerfile"]);
+});
+
+test("inferred Docker target truncation is reported", async () => {
+  blockNetwork();
+  const cwd = await tempDirs.create("apl-circleci-inferred-limit-");
+  const dockerfiles = Object.fromEntries(
+    Array.from({ length: 22 }, (_, index) => [`svc${index}/Dockerfile`, "FROM alpine:3.20\n"]),
   );
-  expect(mismatch?.location.path).toBe("Dockerfile");
-  expect(mismatch?.confidence).toBe("medium");
+  await writeRepositoryFiles(cwd, {
+    ".circleci/config.yml": [
+      "version: 2.1",
+      "orbs:",
+      "  acme: acme/private-orb@1",
+      "jobs:",
+      "  build:",
+      "    docker: [{image: cimg/base:stable}]",
+      "    steps:",
+      "      - acme/build",
+      "workflows:",
+      "  ci:",
+      "    jobs: [build]",
+    ].join("\n"),
+    ...dockerfiles,
+  });
+
+  const report = await analyzeRepository({
+    cwd,
+    targetPath: ".",
+    mode: "strict",
+    topCount: 100,
+  });
+
+  expect(
+    report.analysisWarnings.some(
+      (warning) =>
+        warning.kind === "scan-warning" &&
+        warning.message.includes("limited to 20 files") &&
+        warning.message.includes("2 additional Dockerfile candidates"),
+    ),
+  ).toBe(true);
 });
 
 test("CLI prints unresolved orb coverage as a warning", async () => {

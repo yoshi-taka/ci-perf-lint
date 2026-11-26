@@ -23,7 +23,7 @@ Reports when:
 - That file does not exist at the expected path in the build context
 - An alternative file with the correct extension does exist in the same directory
 
-When CircleCI orb commands are opaque, `setup_remote_docker`, an orb `dockerfile:` parameter, or a repository Dockerfile is used as medium-confidence build evidence. Findings from inferred targets are marked with `confidence: medium`.
+When CircleCI orb commands are opaque, `setup_remote_docker` or an orb `dockerfile:` parameter is used as medium-confidence build evidence. Repository Dockerfiles are inferred only when no explicit `dockerfile:` target is found. This rule needs a trustworthy build context, so targets whose context was inferred are skipped. Findings from explicit targets with medium-confidence evidence are marked with `confidence: medium`.
 
 ## Supported file pairs
 

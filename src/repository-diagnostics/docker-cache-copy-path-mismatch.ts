@@ -57,7 +57,7 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
   const seen = new Set<string>();
 
   for (const target of targets) {
-    if (seen.has(target.dockerfilePath)) {
+    if (target.buildContextInferred || seen.has(target.dockerfilePath)) {
       continue;
     }
     seen.add(target.dockerfilePath);

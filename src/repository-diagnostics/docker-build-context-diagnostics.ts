@@ -80,7 +80,10 @@ export async function collectDockerignoreDiagnostics(
   const diagnostics: Diagnostic[] = [];
 
   for (const target of targets) {
-    if (!(await looksLikeRelevantBuildContext(context, repoRoot, target))) {
+    if (
+      target.buildContextInferred ||
+      !(await looksLikeRelevantBuildContext(context, repoRoot, target))
+    ) {
       continue;
     }
 
