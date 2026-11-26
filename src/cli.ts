@@ -3,8 +3,8 @@ const { runCli } = await import("./main.ts");
 
 try {
   const exitCode = await runCli(process.argv.slice(2), process.cwd(), console);
-  process.exit(exitCode);
+  process.exitCode = exitCode;
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(2);
+  process.exitCode = 2;
 }

@@ -56,6 +56,7 @@ function cloneStepAt(step: CircleCiStep, invocationNode: Node | undefined): Circ
   return {
     ...step,
     node: isMap(invocationNode) ? invocationNode : step.node,
+    invocationNode,
     nameNode: invocationNode,
     commandNode: invocationNode,
   };
@@ -134,7 +135,8 @@ function unresolvedOrbReferences(document: CircleCiDocument): string[] {
     if (!alias || !reference || !aliasIsUsed(alias, document.source)) {
       continue;
     }
-    const fullName = reference.slice(0, reference.lastIndexOf("@"));
+    const at = reference.lastIndexOf("@");
+    const fullName = at > 0 ? reference.slice(0, at) : reference;
     if (SPECIAL_ORBS.has(fullName)) {
       continue;
     }

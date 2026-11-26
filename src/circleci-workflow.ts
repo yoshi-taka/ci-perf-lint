@@ -29,6 +29,7 @@ export interface CircleCiStep {
   type: string;
   expandedFromOrb?: boolean;
   orbUnresolved?: boolean;
+  invocationNode?: Node;
   name?: string;
   nameNode?: Node;
   command?: string;
@@ -236,6 +237,7 @@ function parseSteps(seq: Node | undefined): CircleCiStep[] {
         steps.push({
           node: emptyMap,
           type: name,
+          invocationNode: item,
         });
       }
       continue;
@@ -264,6 +266,7 @@ function parseSteps(seq: Node | undefined): CircleCiStep[] {
         steps.push({
           node: item,
           type: "run",
+          invocationNode: item,
           command: str,
           commandNode: isNode(first.value) ? first.value : undefined,
         });
@@ -273,14 +276,18 @@ function parseSteps(seq: Node | undefined): CircleCiStep[] {
         steps.push({
           node: item,
           type: stepType,
+          invocationNode: item,
         });
       }
     } else if (isMap(first.value)) {
-      steps.push(parseStepArgs(first.value, stepType));
+      const step = parseStepArgs(first.value, stepType);
+      step.invocationNode = item;
+      steps.push(step);
     } else {
       steps.push({
         node: item,
         type: stepType,
+        invocationNode: item,
       });
     }
   }

@@ -13,6 +13,7 @@ import {
   workflowWorkingDirectory,
 } from "../rules/shared/workflow-command-context.ts";
 import { collectCommandEntries } from "../rules/shared/any-step.ts";
+import { circleCiHasGradleOrbEvidence } from "../circleci-gradle-evidence.ts";
 
 const meta = {
   id: "gradle-parallel-not-enabled",
@@ -150,17 +151,22 @@ export async function collectGradleParallelNotEnabledDiagnostics(
   }
 
   const untunedRoots = new Set<string>();
+  const visibleLifecycleRoots = new Set<string>();
   const considerCommand = async (
     text: string,
     environment: Record<string, unknown>,
     directory: string | undefined,
   ): Promise<void> => {
     for (const command of collectGradleCommands(text, environment, directory)) {
-      if (!command.lifecycle || command.parallelConfigured || command.userHome === null) {
+      if (!command.lifecycle) {
         continue;
       }
       const root = await findGradleBuildRoot(context.scanContext, command.directory);
       if (root === undefined) {
+        continue;
+      }
+      visibleLifecycleRoots.add(root);
+      if (command.parallelConfigured || command.userHome === null) {
         continue;
       }
       if (
@@ -190,8 +196,25 @@ export async function collectGradleParallelNotEnabledDiagnostics(
       await considerCommand(entry.text, {}, entry.workingDirectory);
     }
   }
+  const inferredRoots = new Set<string>();
+  if (
+    untunedRoots.size === 0 &&
+    visibleLifecycleRoots.size === 0 &&
+    (context.documents ?? []).some(
+      (document) => document.kind === "circleci" && circleCiHasGradleOrbEvidence(document),
+    )
+  ) {
+    const root = await findGradleBuildRoot(context.scanContext, ".");
+    if (
+      root !== undefined &&
+      (await hasParallelInProperties(context.scanContext, root)) === "absent"
+    ) {
+      inferredRoots.add(root);
+    }
+  }
+
   const diagnostics: Diagnostic[] = [];
-  for (const root of [...untunedRoots].sort()) {
+  for (const root of [...new Set([...untunedRoots, ...inferredRoots])].sort()) {
     if ((await countGradleModules(context.scanContext, root)) < 2) {
       continue;
     }
@@ -202,13 +225,16 @@ export async function collectGradleParallelNotEnabledDiagnostics(
           line: 1,
           column: 1,
         },
-        message: "Gradle parallel build is not enabled for a likely multi-project build.",
+        message: inferredRoots.has(root)
+          ? "Gradle parallel build is not enabled for a likely multi-project build inferred from CircleCI Gradle orb usage."
+          : "Gradle parallel build is not enabled for a likely multi-project build.",
         why: "Gradle can execute independent modules in parallel, reducing CI wall-clock time. This repository has multiple build.gradle files but org.gradle.parallel is not configured.",
         suggestion:
           "Add org.gradle.parallel=true to gradle.properties. If any modules share mutable state, verify parallel safety before enabling.",
         measurementHint:
           "Compare total CI build duration before and after enabling parallel. The speedup depends on module count and task independence.",
         aiHandoff: `Add org.gradle.parallel=true to ${path.posix.join(root, "gradle.properties")}. This allows Gradle to execute independent modules concurrently. If the project uses shared mutable state across modules, test thoroughly before rolling out.`,
+        confidence: inferredRoots.has(root) ? "medium" : undefined,
         score: 55,
       }),
     );

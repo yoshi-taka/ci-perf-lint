@@ -44,7 +44,8 @@ function orbAliases(doc: CircleCiDocument): Set<string> {
     if (!alias || !reference) {
       continue;
     }
-    const fullName = reference.slice(0, reference.lastIndexOf("@"));
+    const at = reference.lastIndexOf("@");
+    const fullName = at > 0 ? reference.slice(0, at) : reference;
     if (!SPECIAL_ORBS.has(fullName)) {
       aliases.add(alias);
     }

@@ -65,6 +65,50 @@ test("local CircleCI commands are expanded for Docker and Gradle rules", async (
   ).toBe(true);
 });
 
+test("a Gradle orb plus Gradle build files is medium-confidence Gradle evidence", async () => {
+  blockNetwork();
+  const cwd = await tempDirs.create("apl-circleci-gradle-orb-");
+  await writeRepositoryFiles(cwd, {
+    ".circleci/config.yml": [
+      "version: 2.1",
+      "orbs:",
+      "  gradle: circleci/gradle@3.0.0",
+      "jobs:",
+      "  build:",
+      "    docker: [{image: cimg/openjdk:21}]",
+      "    steps:",
+      "      - checkout",
+      "      - gradle/test",
+      "workflows:",
+      "  ci:",
+      "    jobs: [build]",
+    ].join("\n"),
+    "settings.gradle": 'rootProject.name = "sample"\ninclude("lib")\n',
+    "build.gradle": 'plugins { id("java") }\n',
+    "lib/build.gradle": 'plugins { id("java") }\n',
+  });
+
+  const report = await analyzeRepository({
+    cwd,
+    targetPath: ".",
+    mode: "strict",
+    topCount: 100,
+  });
+
+  const gradleCache = report.findings.find(
+    (finding) => finding.ruleId === "missing-gradle-build-cache",
+  );
+  expect(gradleCache?.location.path).toBe(".circleci/config.yml");
+  expect(gradleCache?.message).toContain("CircleCI Gradle orb");
+  const parallel = report.findings.find(
+    (finding) => finding.ruleId === "gradle-parallel-not-enabled",
+  );
+  expect(parallel?.location.path).toBe("gradle.properties");
+  expect(parallel?.confidence).toBe("medium");
+  expect(parallel?.message).toContain("inferred from CircleCI Gradle orb usage");
+  expect(report.analysisWarnings.some((warning) => warning.kind === "orb-unresolved")).toBe(true);
+});
+
 test("an orb dockerfile parameter is medium-confidence Docker evidence without fetching", async () => {
   blockNetwork();
   const cwd = await tempDirs.create("apl-circleci-orb-dockerfile-");
