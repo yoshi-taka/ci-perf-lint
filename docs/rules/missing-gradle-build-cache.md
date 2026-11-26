@@ -6,6 +6,9 @@ Flags workflows that visibly run Gradle tasks while no repository-level Gradle b
 
 Inferred findings from one orb reference are grouped into a single diagnostic. The orb may already pass `--build-cache` or write `~/.gradle/gradle.properties`; confirm the orb implementation before changing repository settings.
 
+A repository-wide fallback also covers Gradle invoked inside a referenced shell script. It requires a CI command that references an existing script containing `gradle`/`gradlew`, no visible Gradle lifecycle command or Gradle orb, and no `org.gradle.caching=true`.
+
+
 ## Why it matters
 
 Gradle build cache reuses task outputs instead of recomputing them. That is different from dependency caching: the goal here is to avoid repeating build and test work itself.

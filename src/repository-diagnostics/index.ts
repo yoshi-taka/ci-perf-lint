@@ -6,7 +6,10 @@ import {
   SharedGenerationCancelled,
 } from "./source-shared-records.ts";
 import { collectBundlerExternalSubpathLeakDiagnostics } from "./bundler-external-subpath-leak.ts";
+import { collectGradleBuildCacheNotConfiguredDiagnostics } from "./gradle-build-cache-not-configured.ts";
+import { collectGradleFormatterApplyInCompileDiagnostics } from "./gradle-formatter-apply-in-compile.ts";
 import { collectGradleParallelNotEnabledDiagnostics } from "./gradle-parallel-not-enabled.ts";
+import { collectGradleRepositoriesWithoutContentFilterDiagnostics } from "./gradle-repositories-without-content-filter.ts";
 import { collectJvmCdsOpportunityDiagnostics } from "./jvm-cds-opportunity.ts";
 import { collectMavenParallelNotEnabledDiagnostics } from "./maven-parallel-not-enabled.ts";
 import { collectPreferInnerLoopChecksDiagnostics } from "./prefer-inner-loop-checks.ts";
@@ -71,10 +74,28 @@ export const repositoryDiagnosticCollectors = [
     collect: collectTestcontainersSharedLifecycleDiagnostics,
   } as const,
   {
+    id: "gradle-build-cache-not-configured",
+    gate: gateKeys.gradle,
+    collect: (context: GatedContext<"hasGradle">) =>
+      collectGradleBuildCacheNotConfiguredDiagnostics(context),
+  } as const,
+  {
+    id: "gradle-formatter-apply-in-compile",
+    gate: gateKeys.gradle,
+    collect: (context: GatedContext<"hasGradle">) =>
+      collectGradleFormatterApplyInCompileDiagnostics(context),
+  } as const,
+  {
     id: "gradle-parallel-not-enabled",
     gate: gateKeys.gradle,
     collect: (context: GatedContext<"hasGradle">) =>
       collectGradleParallelNotEnabledDiagnostics(context),
+  } as const,
+  {
+    id: "gradle-repositories-without-content-filter",
+    gate: gateKeys.gradle,
+    collect: (context: GatedContext<"hasGradle">) =>
+      collectGradleRepositoriesWithoutContentFilterDiagnostics(context),
   } as const,
   {
     id: "jvm-cds-opportunity-for-repeated-startup",

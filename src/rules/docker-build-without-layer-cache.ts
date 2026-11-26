@@ -105,9 +105,26 @@ function checkGitHubWorkflow(workflow: WorkflowDocument, findings: Diagnostic[])
 }
 
 function checkCommandText(doc: CIDocument, findings: Diagnostic[]): void {
+  const remoteDockerByJob = new Map<string, boolean>();
+  if (doc.kind === "circleci") {
+    for (const job of doc.jobs) {
+      const remoteDockerSteps = job.steps.filter((step) => step.type === "setup_remote_docker");
+      if (remoteDockerSteps.length > 0) {
+        remoteDockerByJob.set(
+          job.name,
+          remoteDockerSteps.some((step) => step.dockerLayerCaching === true),
+        );
+      }
+    }
+  }
+
   const jobs = new Set<string>();
   for (const entry of collectCommandEntries(doc)) {
     if (jobs.has(entry.jobName)) {
+      continue;
+    }
+    const remoteDockerLayerCache = remoteDockerByJob.get(entry.jobName);
+    if (remoteDockerLayerCache === true) {
       continue;
     }
     for (const args of dockerBuildArguments(entry.text)) {
@@ -115,15 +132,21 @@ function checkCommandText(doc: CIDocument, findings: Diagnostic[]): void {
         continue;
       }
       jobs.add(entry.jobName);
+      const missingRemoteDockerCache = remoteDockerLayerCache === false;
       findings.push(
         buildDiagnostic(doc, meta, entry.node, {
-          message: `Job "${entry.jobName}" runs a Docker build without visible layer cache configuration.`,
-          why: "Docker layer caches avoid repeating unchanged COPY and RUN work. Without an explicit cache backend, CI runners that start clean rebuild all layers on every run.",
-          suggestion:
-            "Add a cache backend appropriate for this runner: `docker buildx build --cache-from type=registry,ref=<cache-image>` (add `--cache-to type=registry,ref=<cache-image>,mode=max` when exporting), or a CI-provider cache volume/mount. Keep authentication and registry support in mind.",
+          message: missingRemoteDockerCache
+            ? `Job "${entry.jobName}" uses setup_remote_docker without docker_layer_caching while running a Docker build.`
+            : `Job "${entry.jobName}" runs a Docker build without visible layer cache configuration.`,
+          why: missingRemoteDockerCache
+            ? "CircleCI's remote Docker environment starts without layer caching unless `docker_layer_caching: true` is set. The build then repeats unchanged COPY and RUN work on every run."
+            : "Docker layer caches avoid repeating unchanged COPY and RUN work. Without an explicit cache backend, CI runners that start clean rebuild all layers on every run.",
+          suggestion: missingRemoteDockerCache
+            ? "Set `docker_layer_caching: true` on the setup_remote_docker step if the plan and Docker version support it, or add an explicit `--cache-from`/`--cache-to` backend."
+            : "Add a cache backend appropriate for this runner: `docker buildx build --cache-from type=registry,ref=<cache-image>` (add `--cache-to type=registry,ref=<cache-image>,mode=max` when exporting), or a CI-provider cache volume/mount. Keep authentication and registry support in mind.",
           measurementHint:
             "Compare Docker build wall-clock time and cache-hit output before and after enabling a remote or persistent cache backend.",
-          aiHandoff: `Review ${doc.relativePath} job "${entry.jobName}" and add an explicit Docker layer cache backend if the runner starts clean. Verify the registry or cache volume is available to this CI provider.`,
+          aiHandoff: `Review ${doc.relativePath} job "${entry.jobName}" and add an explicit Docker layer cache backend if the runner starts clean. Verify the registry, remote Docker caching, or cache volume is available to this CI provider.`,
           confidence: "medium",
           score: 72,
         }),

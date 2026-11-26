@@ -103,7 +103,9 @@ Current rule registry:
 - `go-build-before-race-test`
 - `go-test-broad-package-serial-p-one`
 - `go-test-repeats-vet-after-go-vet`
+- `gradle-formatter-apply-in-compile`
 - `gradle-parallel-not-enabled`
+- `gradle-repositories-without-content-filter`
 - `hatch-without-uv-installer`
 - `ineffective-cache-save-condition`
 - `ineffective-concurrency-group`

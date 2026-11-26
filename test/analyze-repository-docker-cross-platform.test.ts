@@ -38,6 +38,41 @@ test("CircleCI Docker builds without cache flags are reported", async () => {
   expect(findings[0]?.confidence).toBe("medium");
 });
 
+test("CircleCI remote Docker without docker_layer_caching is reported", async () => {
+  const findings = await findingsFor({
+    ".circleci/config.yml": [
+      "version: 2.1",
+      "jobs:",
+      "  build:",
+      "    docker: [{image: cimg/base:stable}]",
+      "    steps:",
+      "      - setup_remote_docker",
+      "      - run: docker build -t app .",
+      "workflows:",
+      "  ci:",
+      "    jobs: [build]",
+    ].join("\n"),
+  });
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain("docker_layer_caching");
+
+  const withCaching = await findingsFor({
+    ".circleci/config.yml": [
+      "version: 2.1",
+      "jobs:",
+      "  build:",
+      "    docker: [{image: cimg/base:stable}]",
+      "    steps:",
+      "      - setup_remote_docker: {docker_layer_caching: true}",
+      "      - run: docker build -t app .",
+      "workflows:",
+      "  ci:",
+      "    jobs: [build]",
+    ].join("\n"),
+  });
+  expect(withCaching).toHaveLength(0);
+});
+
 test("Buildkite Docker builds without cache flags are reported", async () => {
   const findings = await findingsFor({
     ".buildkite/pipeline.yml": [
