@@ -218,6 +218,7 @@ export async function collectGradleParallelNotEnabledDiagnostics(
     if ((await countGradleModules(context.scanContext, root)) < 2) {
       continue;
     }
+    const inferred = inferredRoots.has(root);
     diagnostics.push(
       buildRepositoryDiagnostic(context.repository, meta, {
         location: {
@@ -225,16 +226,21 @@ export async function collectGradleParallelNotEnabledDiagnostics(
           line: 1,
           column: 1,
         },
-        message: inferredRoots.has(root)
+        message: inferred
           ? "Gradle parallel build is not enabled for a likely multi-project build inferred from CircleCI Gradle orb usage."
           : "Gradle parallel build is not enabled for a likely multi-project build.",
-        why: "Gradle can execute independent modules in parallel, reducing CI wall-clock time. This repository has multiple build.gradle files but org.gradle.parallel is not configured.",
-        suggestion:
-          "Add org.gradle.parallel=true to gradle.properties. If any modules share mutable state, verify parallel safety before enabling.",
+        why: inferred
+          ? "Gradle can execute independent modules in parallel, reducing CI wall-clock time. This repository has multiple build.gradle files but org.gradle.parallel is not configured. The CircleCI Gradle orb may already pass `--parallel` or configure a Gradle user home; verify the orb implementation before changing repository settings."
+          : "Gradle can execute independent modules in parallel, reducing CI wall-clock time. This repository has multiple build.gradle files but org.gradle.parallel is not configured.",
+        suggestion: inferred
+          ? "Check the orb source or documentation first. If it does not enable parallel execution, add org.gradle.parallel=true to gradle.properties and verify parallel safety before enabling."
+          : "Add org.gradle.parallel=true to gradle.properties. If any modules share mutable state, verify parallel safety before enabling.",
         measurementHint:
           "Compare total CI build duration before and after enabling parallel. The speedup depends on module count and task independence.",
-        aiHandoff: `Add org.gradle.parallel=true to ${path.posix.join(root, "gradle.properties")}. This allows Gradle to execute independent modules concurrently. If the project uses shared mutable state across modules, test thoroughly before rolling out.`,
-        confidence: inferredRoots.has(root) ? "medium" : undefined,
+        aiHandoff: inferred
+          ? `Review the CircleCI Gradle orb configuration and ${path.posix.join(root, "gradle.properties")}. The orb may already pass \`--parallel\` or configure a Gradle user home; verify that before adding org.gradle.parallel=true. If it does not, add the property and test shared mutable state across modules.`
+          : `Add org.gradle.parallel=true to ${path.posix.join(root, "gradle.properties")}. This allows Gradle to execute independent modules concurrently. If the project uses shared mutable state across modules, test thoroughly before rolling out.`,
+        confidence: inferred ? "medium" : undefined,
         score: 55,
       }),
     );

@@ -18,7 +18,7 @@ Reports when:
 
 Visible Gradle roots under workflow working directories or inline `cd` are included. Each root's own `gradle.properties` and module build files are checked, so a nested project's parallel setting is not mistaken for an absent root-level setting.
 
-When a CircleCI orb whose alias or name identifies Gradle is used and no Gradle lifecycle command is visible, the repository root is treated as medium-confidence Gradle evidence. This fallback is suppressed by any visible Gradle lifecycle command, including one with `--parallel`.
+When a CircleCI orb whose alias or name identifies Gradle is used and no Gradle lifecycle command is visible, the repository root is treated as medium-confidence Gradle evidence. This fallback is suppressed by any visible Gradle lifecycle command, including one with `--parallel`. The orb may already pass `--parallel` or configure a Gradle user home, so verify the orb implementation before changing repository settings.
 
 Command arguments are parsed separately from comments, echoed text, option values and other commands. Literal cwd, workflow/job/step working directories, `cd`, and `-p`/`--project-dir` determine the project start directory. The nearest ancestor settings file determines the actual build root; wrapper location alone does not select a project.
 

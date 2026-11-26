@@ -60,7 +60,7 @@ export const missingGradleBuildCacheRule = {
       return [...jobs].map(([jobName, node]) =>
         buildDiagnostic(doc, meta, node, {
           message: `Job "${jobName}" runs Gradle tasks without visible build cache configuration in the repository.`,
-          why: "Gradle build cache can reuse task outputs across builds, but no visible `buildCache` configuration was found in `settings.gradle` or `settings.gradle.kts`.",
+          why: "Gradle build cache can reuse task outputs across builds, but no visible `buildCache` configuration was found in `settings.gradle`/`settings.gradle.kts`, and `org.gradle.caching=true` was not found in `gradle.properties`.",
           suggestion:
             "If this repository repeats the same Gradle tasks in CI, configure Gradle build cache in the repository and keep it only if total job time improves.",
           measurementHint:
@@ -95,7 +95,7 @@ export const missingGradleBuildCacheRule = {
           : `Jobs "${group.jobs[0]}" and ${group.jobs.length - 1} more use`;
       return buildDiagnostic(doc, meta, group.node, {
         message: `${jobLabel} CircleCI Gradle orb ${reference} without visible build cache configuration in the repository.`,
-        why: "Gradle build cache can reuse task outputs across builds, but no visible `buildCache` configuration was found in `settings.gradle` or `settings.gradle.kts`. The orb may already pass `--build-cache` or write `~/.gradle/gradle.properties`; confirm its implementation before changing repository settings.",
+        why: "Gradle build cache can reuse task outputs across builds, but no visible `buildCache` configuration was found in `settings.gradle`/`settings.gradle.kts`, and `org.gradle.caching=true` was not found in `gradle.properties`. The orb may already pass `--build-cache` or write `~/.gradle/gradle.properties`; confirm its implementation before changing repository settings.",
         suggestion:
           "Check the orb source or documentation first. If the orb does not enable build cache, configure Gradle build cache in the repository and keep it only if total job time improves.",
         measurementHint:

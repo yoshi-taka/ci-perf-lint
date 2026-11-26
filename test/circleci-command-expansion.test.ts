@@ -108,13 +108,54 @@ test("a Gradle orb plus Gradle build files is medium-confidence Gradle evidence"
   expect(gradleCacheFindings[0]?.message).toContain("CircleCI Gradle orb");
   expect(gradleCacheFindings[0]?.message).toContain("and 1 more");
   expect(gradleCacheFindings[0]?.why).toContain("may already pass `--build-cache`");
+  expect(gradleCacheFindings[0]?.why).toContain("gradle.properties");
   const parallel = report.findings.find(
     (finding) => finding.ruleId === "gradle-parallel-not-enabled",
   );
   expect(parallel?.location.path).toBe("gradle.properties");
   expect(parallel?.confidence).toBe("medium");
   expect(parallel?.message).toContain("inferred from CircleCI Gradle orb usage");
+  expect(parallel?.why).toContain("may already pass `--parallel`");
   expect(report.analysisWarnings.some((warning) => warning.kind === "orb-unresolved")).toBe(true);
+});
+
+test("Gradle orb evidence reads org.gradle.caching and org.gradle.parallel", async () => {
+  blockNetwork();
+  const cwd = await tempDirs.create("apl-circleci-gradle-orb-properties-");
+  await writeRepositoryFiles(cwd, {
+    ".circleci/config.yml": [
+      "version: 2.1",
+      "orbs:",
+      "  gradle: circleci/gradle@3.0.0",
+      "jobs:",
+      "  build:",
+      "    docker: [{image: cimg/openjdk:21}]",
+      "    steps:",
+      "      - checkout",
+      "      - gradle/build_and_test_with_cache",
+      "workflows:",
+      "  ci:",
+      "    jobs: [build]",
+    ].join("\n"),
+    "settings.gradle": 'rootProject.name = "sample"\ninclude("lib")\n',
+    "build.gradle": 'plugins { id("java") }\n',
+    "lib/build.gradle": 'plugins { id("java") }\n',
+    "gradle.properties": "org.gradle.caching=true\norg.gradle.parallel=true\n",
+  });
+
+  const report = await analyzeRepository({
+    cwd,
+    targetPath: ".",
+    mode: "strict",
+    topCount: 100,
+  });
+
+  expect(report.findings.some((finding) => finding.ruleId === "missing-gradle-build-cache")).toBe(
+    false,
+  );
+  expect(report.findings.some((finding) => finding.ruleId === "gradle-parallel-not-enabled")).toBe(
+    false,
+  );
 });
 
 test("an orb dockerfile parameter is medium-confidence Docker evidence without fetching", async () => {

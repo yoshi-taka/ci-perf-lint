@@ -268,6 +268,20 @@ async function hasFrameworkSignalEvidence(
     return true;
   }
 
+  if (
+    await anyPathExists(context, [
+      "build.gradle",
+      "build.gradle.kts",
+      "settings.gradle",
+      "settings.gradle.kts",
+      "gradle.properties",
+      "gradlew",
+      "gradlew.bat",
+    ] as const)
+  ) {
+    return true;
+  }
+
   return context.pathExists(context.resolve("package.json"));
 }
 
