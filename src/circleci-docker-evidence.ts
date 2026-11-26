@@ -96,20 +96,104 @@ function workflowJobEntries(
   return entries;
 }
 
+function workflowJobArguments(
+  doc: CircleCiDocument,
+): Map<string, YAMLMap<unknown, unknown> | undefined> {
+  const argumentsByJob = new Map<string, YAMLMap<unknown, unknown> | undefined>();
+  const workflows = mapAt(doc.root, "workflows");
+  if (!workflows) {
+    return argumentsByJob;
+  }
+  for (const workflowPair of workflows.items) {
+    if (workflowPair.key && scalarValue(workflowPair.key) === "version") {
+      continue;
+    }
+    const jobs = nodeAt(workflowPair.value as YAMLMap<unknown, unknown> | undefined, "jobs");
+    if (!jobs || !isSeq(jobs)) {
+      continue;
+    }
+    for (const item of jobs.items) {
+      if (isScalar(item)) {
+        const name = scalarValue(item);
+        if (name) {
+          argumentsByJob.set(name, undefined);
+        }
+        continue;
+      }
+      if (!isMap(item)) {
+        continue;
+      }
+      const pair = item.items[0];
+      const name = scalarValue(pair?.key);
+      if (name) {
+        argumentsByJob.set(name, isMap(pair?.value) ? pair.value : undefined);
+      }
+    }
+  }
+  return argumentsByJob;
+}
+
+function stringValues(map: YAMLMap<unknown, unknown> | undefined): Record<string, string> {
+  const values: Record<string, string> = {};
+  if (!map) {
+    return values;
+  }
+  for (const pair of map.items) {
+    const key = scalarValue(pair.key);
+    const value = scalarValue(pair.value);
+    if (key && value !== undefined) {
+      values[key] = value;
+    }
+  }
+  return values;
+}
+
+function jobParameterDefaults(job: { node: YAMLMap<unknown, unknown> }): Record<string, string> {
+  const parameters = mapAt(job.node, "parameters");
+  const values: Record<string, string> = {};
+  if (!parameters) {
+    return values;
+  }
+  for (const pair of parameters.items) {
+    const name = scalarValue(pair.key);
+    const definition = isMap(pair.value) ? pair.value : undefined;
+    const defaultValue = definition ? scalarValue(definition.get("default", true)) : undefined;
+    if (name && defaultValue !== undefined) {
+      values[name] = defaultValue;
+    }
+  }
+  return values;
+}
+
+function resolveTemplate(value: string, parameters: Record<string, string>): string {
+  return value.replace(
+    /<<\s*parameters\.([A-Za-z0-9_-]+)\s*>>/g,
+    (match, name: string) => parameters[name] ?? match,
+  );
+}
+
 function evidenceFromArgs(
   args: YAMLMap<unknown, unknown> | undefined,
+  parameters: Record<string, string> = {},
 ): CircleCiDockerEvidence | undefined {
   if (!args) {
     return undefined;
   }
-  const dockerfile = scalarValue(args.get("dockerfile", true));
-  if (!dockerfile) {
+  const rawDockerfile = scalarValue(args.get("dockerfile", true));
+  if (!rawDockerfile) {
     return undefined;
   }
+  const dockerfile = resolveTemplate(rawDockerfile, parameters);
+  if (/<<\s*parameters\./.test(dockerfile)) {
+    return undefined;
+  }
+  const rawContext =
+    scalarValue(args.get("path", true)) ?? scalarValue(args.get("docker_context", true));
+  const context = rawContext === undefined ? undefined : resolveTemplate(rawContext, parameters);
   return {
     reason: "orb-dockerfile-parameter",
     dockerfile,
-    context: scalarValue(args.get("path", true)) ?? scalarValue(args.get("docker_context", true)),
+    context: context && /<<\s*parameters\./.test(context) ? undefined : context,
   };
 }
 
@@ -126,7 +210,12 @@ export function collectCircleCiDockerEvidence(doc: CircleCiDocument): CircleCiDo
     evidence.push(entry);
   };
 
+  const workflowArguments = workflowJobArguments(doc);
   for (const job of doc.jobs) {
+    const parameters = {
+      ...jobParameterDefaults(job),
+      ...stringValues(workflowArguments.get(job.name)),
+    };
     for (const step of job.steps) {
       if (step.type === "setup_remote_docker") {
         add({ reason: "setup_remote_docker" });
@@ -135,14 +224,14 @@ export function collectCircleCiDockerEvidence(doc: CircleCiDocument): CircleCiDo
       if (!step.type.includes("/")) {
         continue;
       }
-      const fromArgs = evidenceFromArgs(step.node);
+      const fromArgs = evidenceFromArgs(step.node, parameters);
       if (fromArgs) {
         add(fromArgs);
       }
     }
   }
   for (const entry of workflowJobEntries(doc)) {
-    const fromArgs = evidenceFromArgs(entry.args);
+    const fromArgs = evidenceFromArgs(entry.args, stringValues(entry.args));
     if (fromArgs) {
       add(fromArgs);
     }

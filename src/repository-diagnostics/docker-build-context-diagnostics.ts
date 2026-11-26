@@ -127,7 +127,7 @@ export async function collectDockerignoreDiagnostics(
       diagnostics.push({
         ruleId: "dockerignore-misses-noisy-build-context-paths",
         severity: "warning",
-        confidence: "medium",
+        confidence: target.confidence ?? "medium",
         scope: "repository",
         docsPath: weakDockerignoreDocsPath,
         workflow: repository.primaryWorkflowPath ?? target.workflow,
@@ -165,7 +165,7 @@ export async function collectDockerignoreDiagnostics(
     diagnostics.push({
       ruleId: "missing-dockerignore-for-build-context",
       severity: "warning",
-      confidence: "medium",
+      confidence: target.confidence ?? "medium",
       scope: "repository",
       docsPath: missingDockerignoreDocsPath,
       workflow: repository.primaryWorkflowPath ?? target.workflow,

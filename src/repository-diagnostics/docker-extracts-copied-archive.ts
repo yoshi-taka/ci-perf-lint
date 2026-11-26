@@ -56,6 +56,7 @@ export async function collectDockerExtractsCopiedArchiveDiagnostics(
     findings.set(
       file,
       buildRepositoryDiagnostic({ ...repository, primaryWorkflowPath: target.workflow }, meta, {
+        confidence: target.confidence,
         location: { path: file, line: first.copyLine, column: 1 },
         message: `Dockerfile ${file} persists temporary extraction archives: ${evidence.map((item) => `${item.source}: COPY line ${item.copyLine}, extract line ${item.extractLine}, ${item.cleanupLine ? `cleanup line ${item.cleanupLine}` : "artifact-only consumers"}`).join("; ")}.`,
         why: "COPY creates a snapshot/layer containing the archive. Deleting it after extraction does not reclaim that earlier layer. A temporary input can reduce intermediate snapshot/cache export work; output image bytes only decrease when the archive COPY layer belongs to the output rootfs ancestry.",

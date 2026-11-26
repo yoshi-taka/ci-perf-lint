@@ -401,6 +401,13 @@ function insideRepository(repoRoot: string, targetPath: string): boolean {
   return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
+function isRepositoryRootDockerfile(repoRoot: string, dockerfilePath: string): boolean {
+  return (
+    path.dirname(path.resolve(dockerfilePath)) === path.resolve(repoRoot) &&
+    path.basename(dockerfilePath).toLowerCase() === "dockerfile"
+  );
+}
+
 function isTestOrExamplePath(relativePath: string): boolean {
   return relativePath
     .split("/")
@@ -476,13 +483,15 @@ async function collectCircleCiFallbackTargets(
         continue;
       }
       seenDockerfiles.add(dockerfilePath);
+      const contextUnknown = entry.context === undefined;
+      const rootDockerfile = contextUnknown && isRepositoryRootDockerfile(repoRoot, dockerfilePath);
       explicitTargets.push({
         workflow: document.relativePath,
         jobId: "(orb dockerfile parameter)",
-        contextPath,
+        contextPath: rootDockerfile ? repoRoot : contextPath,
         dockerfilePath,
-        confidence: "medium",
-        buildContextInferred: entry.context === undefined,
+        confidence: rootDockerfile ? "low" : "medium",
+        buildContextInferred: contextUnknown && !rootDockerfile,
       });
     }
   }
@@ -505,13 +514,14 @@ async function collectCircleCiFallbackTargets(
       continue;
     }
     seenDockerfiles.add(dockerfilePath);
+    const rootDockerfile = isRepositoryRootDockerfile(repoRoot, dockerfilePath);
     targets.push({
       workflow: circleciDocuments[0]!.relativePath,
       jobId: "(inferred from Dockerfile)",
-      contextPath: path.dirname(dockerfilePath),
+      contextPath: rootDockerfile ? repoRoot : path.dirname(dockerfilePath),
       dockerfilePath,
-      confidence: "medium",
-      buildContextInferred: true,
+      confidence: rootDockerfile ? "low" : "medium",
+      buildContextInferred: !rootDockerfile,
     });
   }
 

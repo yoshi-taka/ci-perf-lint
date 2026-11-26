@@ -84,6 +84,7 @@ export async function collectDockerRuntimeCopiesBuilderRootfsDiagnostics(
     findings.set(
       file,
       buildRepositoryDiagnostic({ ...repository, primaryWorkflowPath: target.workflow }, meta, {
+        confidence: target.confidence,
         location: { path: file, line: first.copy.startLine, column: 1 },
         message: `The output image in ${file} copies the entire ${first.compiler} builder filesystem from stage ${first.source} at line ${first.copy.startLine}, then executes ${first.artifact.path}, compiled at line ${first.artifact.line}.`,
         why: "Copying a compiler builder's entire merged filesystem carries compiler binaries, source and other surviving build-only files into the output image. Targeted artifact copies can reduce snapshot, export, push, pull and extraction work.",

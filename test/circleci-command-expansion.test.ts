@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { analyzeRepository } from "../src/repo.ts";
 import { runCli } from "../src/main.ts";
+import { parseCircleCi } from "../src/circleci-workflow.ts";
+import { collectCircleCiDockerEvidence } from "../src/circleci-docker-evidence.ts";
 import { createLogger, createTempDirTracker, writeRepositoryFiles } from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
@@ -230,22 +232,79 @@ test("an opaque orb plus a repository Dockerfile is medium-confidence evidence",
     topCount: 100,
   });
 
-  expect(
-    report.findings.some(
-      (finding) =>
-        finding.ruleId === "docker-cache-copy-path-mismatch" ||
-        finding.ruleId === "dockerignore-misses-noisy-build-context-paths" ||
-        finding.ruleId === "missing-dockerignore-for-build-context",
-    ),
-  ).toBe(false);
+  const contextFinding = report.findings.find(
+    (finding) => finding.ruleId === "missing-dockerignore-for-build-context",
+  );
+  expect(contextFinding?.location.path).toBe("Dockerfile");
+  expect(contextFinding?.confidence).toBe("low");
   expect(
     report.findings.some(
       (finding) =>
         finding.ruleId === "dockerfile-base-image-uses-floating-tag" &&
-        finding.location.path === "Dockerfile" &&
-        finding.confidence === "medium",
+        finding.location.path === "Dockerfile",
     ),
   ).toBe(true);
+});
+
+test("an explicit root Dockerfile restores low-confidence context rules", async () => {
+  blockNetwork();
+  const cwd = await tempDirs.create("apl-circleci-root-dockerfile-");
+  await writeRepositoryFiles(cwd, {
+    ".circleci/config.yml": [
+      "version: 2.1",
+      "orbs:",
+      "  acme: acme/private-orb@1",
+      "jobs:",
+      "  build:",
+      "    docker: [{image: cimg/base:stable}]",
+      "    steps:",
+      "      - acme/build:",
+      "          dockerfile: Dockerfile",
+      "workflows:",
+      "  ci:",
+      "    jobs: [build]",
+    ].join("\n"),
+    Dockerfile: "FROM ubuntu:latest\n",
+  });
+
+  const report = await analyzeRepository({
+    cwd,
+    targetPath: ".",
+    mode: "strict",
+    topCount: 100,
+  });
+
+  const contextFinding = report.findings.find(
+    (finding) => finding.ruleId === "missing-dockerignore-for-build-context",
+  );
+  expect(contextFinding?.location.path).toBe("Dockerfile");
+  expect(contextFinding?.confidence).toBe("low");
+});
+
+test("workflow job parameters are expanded in orb dockerfile arguments", () => {
+  const source = [
+    "version: 2.1",
+    "orbs:",
+    "  acme: acme/private-orb@1",
+    "jobs:",
+    "  build:",
+    "    parameters:",
+    "      path:",
+    "        type: string",
+    '        default: "."',
+    "    docker: [{image: cimg/base:stable}]",
+    "    steps:",
+    "      - acme/build:",
+    "          dockerfile: <<parameters.path>>/Dockerfile",
+    "workflows:",
+    "  ci:",
+    "    jobs:",
+    "      - build:",
+    '          path: "."',
+  ].join("\n");
+  const doc = parseCircleCi("/tmp/repo/.circleci/config.yml", "/tmp/repo", source);
+  const evidence = collectCircleCiDockerEvidence(doc);
+  expect(evidence.some((entry) => entry.dockerfile === "./Dockerfile")).toBe(true);
 });
 
 test("setup_remote_docker falls back to repository Dockerfiles without context guesses", async () => {
@@ -275,20 +334,16 @@ test("setup_remote_docker falls back to repository Dockerfiles without context g
     topCount: 100,
   });
 
-  expect(
-    report.findings.some(
-      (finding) =>
-        finding.ruleId === "docker-cache-copy-path-mismatch" ||
-        finding.ruleId === "dockerignore-misses-noisy-build-context-paths" ||
-        finding.ruleId === "missing-dockerignore-for-build-context",
-    ),
-  ).toBe(false);
+  const contextFinding = report.findings.find(
+    (finding) => finding.ruleId === "missing-dockerignore-for-build-context",
+  );
+  expect(contextFinding?.location.path).toBe("Dockerfile");
+  expect(contextFinding?.confidence).toBe("low");
   expect(
     report.findings.some(
       (finding) =>
         finding.ruleId === "dockerfile-base-image-uses-floating-tag" &&
-        finding.location.path === "Dockerfile" &&
-        finding.confidence === "medium",
+        finding.location.path === "Dockerfile",
     ),
   ).toBe(true);
 });

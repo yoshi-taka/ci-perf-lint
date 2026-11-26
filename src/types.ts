@@ -2,7 +2,7 @@ import type { RepairOp } from "./reification.ts";
 import type { DiagnosticSource, DiagnosticSourceKind } from "./diagnostic-source.ts";
 
 export type Severity = "error" | "warning" | "suggestion";
-export type Confidence = "high" | "medium";
+export type Confidence = "high" | "medium" | "low";
 export type OutputFormat = "handoff" | "text" | "json" | "markdown";
 export type AuditMode = "strict" | "exploratory";
 
