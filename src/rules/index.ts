@@ -9,6 +9,7 @@ import { avoidBroadUploadArtifactRule } from "./avoid-broad-upload-artifact.ts";
 import { avoidBrewUpdateOnHostedMacosRule } from "./avoid-brew-update-on-hosted-macos.ts";
 import { avoidCDriveOnWindowsRunnerRule } from "./avoid-c-drive-on-windows-runner.ts";
 import { avoidDockerImageViaUsesRule } from "./avoid-docker-image-via-uses.ts";
+import { avoidDuplicatePrettierCheckRule } from "./avoid-duplicate-prettier-check.ts";
 import { avoidEslintPluginPrettierRule } from "./avoid-eslint-plugin-prettier.ts";
 import { avoidPrettierEslintRule } from "./avoid-prettier-eslint.ts";
 import { repeatedBootstrapSetupRule } from "./repeated-bootstrap-setup.ts";
@@ -168,6 +169,7 @@ export const allRules = [
   avoidBrewUpdateOnHostedMacosRule,
   avoidCDriveOnWindowsRunnerRule,
   avoidDockerImageViaUsesRule,
+  avoidDuplicatePrettierCheckRule,
   avoidEslintPluginPrettierRule,
   avoidPrettierEslintRule,
   avoidXcodeInstallOnHostedMacosRule,

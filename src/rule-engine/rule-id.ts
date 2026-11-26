@@ -13,6 +13,7 @@ export const RULE_REGISTRY = {
   "avoid-brew-update-on-hosted-macos": { kind: "workflow" },
   "avoid-c-drive-on-windows-runner": { kind: "workflow" },
   "avoid-docker-image-via-uses": { kind: "workflow" },
+  "avoid-duplicate-prettier-check": { kind: "workflow" },
   "avoid-eslint-plugin-prettier": { kind: "workflow" },
   "avoid-prettier-eslint": { kind: "workflow" },
   "avoid-xcode-install-on-hosted-macos": { kind: "workflow" },

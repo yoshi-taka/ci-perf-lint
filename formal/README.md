@@ -67,6 +67,14 @@ bun run --cwd formal verify:models
   and fresh facts across contexts. Rejection is abstracted as settlement; hanging
   I/O, cancellation, multiple worker threads and reentrant callbacks are excluded.
 
+### npm script expansion / duplicate Prettier check (local, optional)
+
+`bun run verify:npm-scripts` runs `NpmScriptExpansion.lean` and compares its
+8 bounded expansion cases with the real TypeScript helper. Lean checks depth-bounded
+termination (including cycles) and the exact duplicate criterion; the bridge also
+confirms a scope-insensitive mutant disagrees. It is model evidence plus differential
+testing, not an implementation proof.
+
 Run Z3 separately with `bun run verify:source-audit`. The four tools answer
 different questions; their results do not combine into a whole-program proof.
 

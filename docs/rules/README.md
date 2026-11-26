@@ -15,6 +15,7 @@ Current rule registry:
 - `avoid-broad-upload-artifact`
 - `avoid-c-drive-on-windows-runner`
 - `avoid-docker-image-via-uses`
+- `avoid-duplicate-prettier-check`
 - `avoid-eslint-plugin-prettier`
 - `avoid-lucide-angular-icons-registry`
 - `avoid-lucide-dynamic-icon`
