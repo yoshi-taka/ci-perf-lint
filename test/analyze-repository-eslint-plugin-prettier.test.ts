@@ -52,36 +52,41 @@ describe("avoid-eslint-plugin-prettier repository evidence", () => {
       "eslint-config-prettier in extends",
       'export default [{ extends: ["prettier"], rules: { "no-debugger": "error" } }];',
     ],
+    [
+      "plugins entry without an enabled rule",
+      'export default [{ plugins: ["prettier"], rules: { "no-debugger": "error" } }];',
+    ],
+    [
+      "flat-config plugin object without an enabled rule",
+      'import prettier from "eslint-plugin-prettier";\nexport default [{ plugins: { prettier } }];',
+    ],
+    [
+      "rule explicitly off",
+      'export default [{ extends: ["plugin:prettier/recommended"], rules: { "prettier/prettier": "off" } }];',
+    ],
   ])("does not flag %s", async (_name, config) => {
     expect(await findings(config)).toHaveLength(0);
   });
 
-  test("flags a real plugins entry", async () => {
+  test("does not flag an unused eslint-plugin-prettier dependency", async () => {
+    expect(
+      await findings('export default [{ rules: { "no-debugger": "error" } }];', {
+        "eslint-plugin-prettier": "^5.0.0",
+      }),
+    ).toHaveLength(0);
+  });
+
+  test("flags an enabled prettier/prettier rule", async () => {
     const result = await findings(
-      'export default [{ plugins: ["prettier"], rules: { "no-debugger": "error" } }];',
+      'export default [{ plugins: ["prettier"], rules: { "prettier/prettier": "error" } }];',
     );
     expect(result).toHaveLength(1);
     expect(result[0]?.location.path).toMatch(/eslint\.config/);
   });
 
-  test("flags a flat-config prettier plugin object", async () => {
-    const result = await findings(
-      'import prettier from "eslint-plugin-prettier";\nexport default [{ plugins: { prettier } }];',
-    );
-    expect(result).toHaveLength(1);
-  });
-
-  test("flags plugin:prettier/recommended without comments", async () => {
+  test("flags plugin:prettier/recommended", async () => {
     expect(
       await findings('export default [{ extends: ["plugin:prettier/recommended"] }];'),
-    ).toHaveLength(1);
-  });
-
-  test("flags eslint-plugin-prettier in package metadata", async () => {
-    expect(
-      await findings('export default [{ rules: { "no-debugger": "error" } }];', {
-        "eslint-plugin-prettier": "^5.0.0",
-      }),
     ).toHaveLength(1);
   });
 

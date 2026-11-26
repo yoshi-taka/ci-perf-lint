@@ -26,12 +26,9 @@ Typical repo evidence includes:
 
 ## Current heuristic
 
-The rule looks for visible repo-level evidence that Prettier is wired into ESLint:
+The rule fires only when `prettier/prettier` is enabled, either directly or through `plugin:prettier/recommended` in `extends`. A rule set to `off` / `0` does not count.
 
-- a `prettier` entry in ESLint `plugins` (legacy array, flat-config object, or YAML list)
-- an enabled `prettier/prettier` rule
-- `plugin:prettier/recommended` in `extends`
-- `eslint-plugin-prettier` in package metadata
+Merely loading a plugin or having `eslint-plugin-prettier` in package metadata does not run Prettier, so it is not enough to trigger this rule. Unused dependencies are an `knip`-style concern, not a performance finding.
 
 Comments are ignored. `extends: ["prettier"]` only means `eslint-config-prettier`, which disables ESLint formatting rules and does not run Prettier through ESLint, so it is not evidence.
 

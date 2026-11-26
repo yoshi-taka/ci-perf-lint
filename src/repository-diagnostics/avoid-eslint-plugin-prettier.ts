@@ -62,13 +62,12 @@ export async function collectAvoidEslintPluginPrettierDiagnostics(
   warnings?: AnalysisWarning[],
   scanContext?: RepositoryScanContext,
 ): Promise<Diagnostic[]> {
-  const { usesPrettierPlugin, usesPrettierRecommendedConfig, usesPrettierRule } = repository.eslint;
-  if (!usesPrettierPlugin && !usesPrettierRecommendedConfig && !usesPrettierRule) {
+  const { usesPrettierRecommendedConfig, usesPrettierRule } = repository.eslint;
+  if (!usesPrettierRecommendedConfig && !usesPrettierRule) {
     return [];
   }
 
   const evidence = [
-    usesPrettierPlugin ? "eslint-plugin-prettier" : undefined,
     usesPrettierRecommendedConfig ? "plugin:prettier/recommended" : undefined,
     usesPrettierRule ? "prettier/prettier rule" : undefined,
   ].filter((value): value is string => Boolean(value));
@@ -81,12 +80,9 @@ export async function collectAvoidEslintPluginPrettierDiagnostics(
     configPatterns.push(/plugin:prettier\/recommended/gi);
   }
   if (usesPrettierRule) {
-    configPatterns.push(/['"`]prettier\/prettier['"`]\s*:/g);
-  }
-  if (usesPrettierPlugin) {
-    configPatterns.push(/eslint-plugin-prettier/gi);
-    configPatterns.push(/\bplugins\s*:\s*\[[^\]]*['"`]prettier['"`]/gi);
-    configPatterns.push(/\bplugins\s*:\s*\{[^}]*\bprettier\b/gi);
+    configPatterns.push(
+      /['"`]prettier\/prettier['"`]\s*:\s*(?!(?:\[\s*)?(?:0\b|["'`]?off["'`]?(?:\s|,|\]|$)))/g,
+    );
   }
 
   // Find the first existing config file with a

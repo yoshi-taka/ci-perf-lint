@@ -1,8 +1,9 @@
 import type { RepositorySignals } from "./repository-signals-types.ts";
 import {
+  codeDisablesPrettierRule,
+  codeMentionsEnabledPrettierRule,
   codeMentionsPrettierPlugin,
   codeMentionsPrettierRecommendedConfig,
-  codeMentionsPrettierRule,
 } from "./eslint-config-evidence.ts";
 import { effectiveDependencyVersionSpec } from "./repository-dependency-versions.ts";
 import {
@@ -327,8 +328,10 @@ export async function collectEslintSignals(
     if (Array.isArray(eslintConfigPlugins)) {
       usesPrettierPlugin ||= eslintConfigPlugins.some((plugin) => plugin === "prettier");
     }
-    usesPrettierRecommendedConfig ||= codeMentionsPrettierRecommendedConfig(packageJsonText);
-    usesPrettierRule ||= codeMentionsPrettierRule(packageJsonText);
+    usesPrettierRecommendedConfig ||=
+      codeMentionsPrettierRecommendedConfig(packageJsonText) &&
+      !codeDisablesPrettierRule(packageJsonText);
+    usesPrettierRule ||= codeMentionsEnabledPrettierRule(packageJsonText);
     usesImportPlugin ||= packageJsonHasDependency(packageJson, "eslint-plugin-import");
     usesImportXPlugin ||= packageJsonHasDependency(packageJson, "eslint-plugin-import-x");
     usesNoBarrelFilesPlugin ||= packageJsonHasDependency(
@@ -350,8 +353,9 @@ export async function collectEslintSignals(
     usesEslint = true;
     collectPluginNamesFromConfigText(configText, pluginNames);
     usesPrettierPlugin ||= codeMentionsPrettierPlugin(configText);
-    usesPrettierRecommendedConfig ||= codeMentionsPrettierRecommendedConfig(configText);
-    usesPrettierRule ||= codeMentionsPrettierRule(configText);
+    usesPrettierRecommendedConfig ||=
+      codeMentionsPrettierRecommendedConfig(configText) && !codeDisablesPrettierRule(configText);
+    usesPrettierRule ||= codeMentionsEnabledPrettierRule(configText);
     usesImportPlugin ||= textMentionsImportPlugin(configText);
     usesImportXPlugin ||= textMentionsImportXPlugin(configText);
     usesNoBarrelFilesPlugin ||= textMentionsNoBarrelFilesPlugin(configText);

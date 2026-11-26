@@ -19,10 +19,7 @@ export const avoidEslintPluginPrettierRule = {
   check(workflow: WorkflowDocument, _context: RuleContext) {
     const hasWorkflowEvidence =
       workflowUsesLintTool(workflow, "eslint") &&
-      workflowStepTextMatches(
-        workflow,
-        /eslint-plugin-prettier|plugin:prettier\/recommended|prettier\/prettier/i,
-      );
+      workflowStepTextMatches(workflow, /plugin:prettier\/recommended|prettier\/prettier/i);
     if (!hasWorkflowEvidence) {
       return [];
     }

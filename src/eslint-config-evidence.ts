@@ -93,8 +93,26 @@ export function codeMentionsPrettierRecommendedConfig(text: string): boolean {
   );
 }
 
-export function codeMentionsPrettierRule(text: string): boolean {
-  return /['"`]prettier\/prettier['"`]\s*:/.test(blankOutCodeComments(text));
+const prettierRuleSettingPattern = /['"`]prettier\/prettier['"`]\s*:\s*(\[[^\]]*\]|[^,}\n]+)/gi;
+
+function isDisabledPrettierRuleSetting(setting: string): boolean {
+  const normalized = setting.trim().replace(/^\[\s*/, "");
+  return /^(?:0|["'`]?off["'`]?)(?:\s|,|\]|$)/i.test(normalized);
+}
+
+function prettierRuleSettings(text: string): string[] {
+  return [...blankOutCodeComments(text).matchAll(prettierRuleSettingPattern)].map(
+    (match) => match[1] ?? "",
+  );
+}
+
+export function codeMentionsEnabledPrettierRule(text: string): boolean {
+  const settings = prettierRuleSettings(text);
+  return settings.length > 0 && settings.some((setting) => !isDisabledPrettierRuleSetting(setting));
+}
+
+export function codeDisablesPrettierRule(text: string): boolean {
+  return prettierRuleSettings(text).some(isDisabledPrettierRuleSetting);
 }
 
 /** Only a real `plugins` entry counts; `extends: ["prettier"]` means eslint-config-prettier. */
