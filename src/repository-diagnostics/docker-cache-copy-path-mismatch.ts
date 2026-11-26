@@ -124,6 +124,7 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
           aiHandoff: `Review the COPY instruction at ${target.dockerfilePath}:${instruction.startLine}. The file ${source} does not exist in the repository${
             matches.length > 0 ? `; found ${matches.join(" or ")} instead` : ""
           }. Update the COPY path to match the actual filename, or adjust the repository layout if the file is expected to be generated earlier in the build.`,
+          confidence: target.confidence,
           score: 65,
         }),
       );

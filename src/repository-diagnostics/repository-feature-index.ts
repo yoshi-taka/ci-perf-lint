@@ -1,6 +1,7 @@
 import type { AnalysisWarning } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import type { AnyWorkflowDocument } from "../ci-types.ts";
+import { circleCiHasDockerBuildEvidence } from "../circleci-docker-evidence.ts";
 import { getWorkflowFacts } from "../rules/shared/workflow-analysis.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { DockerBuildTarget, CollectedDockerfileData } from "./docker-build-targets.ts";
@@ -138,6 +139,10 @@ export function buildRepositoryFeatureIndex(
   for (const doc of additionalDocuments) {
     if (doc.kind === "github-actions") {
       continue;
+    }
+    if (doc.kind === "circleci" && circleCiHasDockerBuildEvidence(doc)) {
+      toolPresence.set("hasDockerBuild", true);
+      ecosystems.add("docker");
     }
     const presence = getWorkflowFacts(doc).toolPresence;
     for (const [key, present] of presence) {

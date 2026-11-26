@@ -297,7 +297,7 @@ export async function runCli(args: string[], cwd: string, logger: LoggerLike): P
     });
 
     for (const warning of report.analysisWarnings) {
-      if (warning.kind === "parser-error") {
+      if (warning.kind === "parser-error" || warning.kind === "orb-unresolved") {
         logger.error(`Warning: ${warning.message}`);
       }
     }

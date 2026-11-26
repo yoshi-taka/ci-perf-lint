@@ -115,6 +115,7 @@ export interface AnalysisWarning {
     | "max-findings-hit"
     | "empty-result"
     | "parser-error"
+    | "orb-unresolved"
     | "remediation-drift"
     | "scan-warning"
     | "refiner-effect";

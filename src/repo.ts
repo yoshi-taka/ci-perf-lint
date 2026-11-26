@@ -6,7 +6,7 @@ import { parseGitlabCi } from "./gitlab-ci-workflow.ts";
 import { prepareGitlabIncludeDocuments } from "./gitlab-ci-include-context.ts";
 import { prepareDiscoveredCircleciConfig } from "./circleci-config-discovery.ts";
 import { parseCircleCi } from "./circleci-workflow.ts";
-import { expandCircleCiOrbs } from "./circleci-orb-expansion.ts";
+import { expandCircleCiCommands } from "./circleci-command-expansion.ts";
 import { toastifySource } from "./toastify.ts";
 import {
   collectWorkflowInputs,
@@ -268,17 +268,15 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     }
   }
 
-  const expandedWorkflows = await Promise.all(
-    parsedWorkflows.map(async (doc) => {
-      if (doc.kind !== "circleci") {
-        return doc;
-      }
-      const expanded = await expandCircleCiOrbs(doc, analysisWarnings);
-      return discoveredCircleciPaths.has(doc.path)
-        ? prepareDiscoveredCircleciConfig(expanded, analysisWarnings)
-        : expanded;
-    }),
-  );
+  const expandedWorkflows = parsedWorkflows.map((doc) => {
+    if (doc.kind !== "circleci") {
+      return doc;
+    }
+    const expanded = expandCircleCiCommands(doc, analysisWarnings);
+    return discoveredCircleciPaths.has(doc.path)
+      ? prepareDiscoveredCircleciConfig(expanded, analysisWarnings)
+      : expanded;
+  });
   const preparedWorkflows = prepareGitlabIncludeDocuments(expandedWorkflows, analysisWarnings);
   const githubWorkflows = preparedWorkflows.filter(
     (w): w is WorkflowDocument => w.kind === "github-actions",

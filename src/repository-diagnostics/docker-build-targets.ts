@@ -1,11 +1,15 @@
 import path from "node:path";
 import { parseDocument } from "../yaml.ts";
-import type { AnalysisWarning } from "../types.ts";
+import type { AnalysisWarning, Confidence } from "../types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
 import { shellInvocations } from "../rules/shared/shell-invocations.ts";
 import { invocationOperands, invocationOptions } from "../rules/shared/tool-command-evidence.ts";
 import { workflowWorkingDirectory } from "../rules/shared/workflow-command-context.ts";
 import { collectCommandEntries } from "../rules/shared/any-step.ts";
+import {
+  circleCiHasOpaqueOrbSignal,
+  collectCircleCiDockerEvidence,
+} from "../circleci-docker-evidence.ts";
 import type { AnyWorkflowDocument } from "../ci-types.ts";
 import {
   collectPersistentCacheDockerTargets,
@@ -24,6 +28,8 @@ export interface DockerBuildTarget {
   dockerfilePath: string;
   targetStage?: string;
   cacheMountPersistence?: "depot" | "blacksmith" | "buildkite-docker-state";
+  /** Inferred from opaque CircleCI evidence rather than a visible build command. */
+  confidence?: Confidence;
 }
 
 export interface CollectedDockerfileData {
@@ -388,6 +394,95 @@ async function loadComposeServices(
   return composeServicesLoad;
 }
 
+function insideRepository(repoRoot: string, targetPath: string): boolean {
+  const relative = path.relative(repoRoot, targetPath);
+  return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
+async function discoverDockerfiles(context: RepositoryScanContext): Promise<string[]> {
+  const files = await context.walkFiles(".", {
+    cacheKey: "circleci-fallback-dockerfiles",
+    include: (relativePath) => /(^|\/)(?:Dockerfile|[^/]+\.Dockerfile)$/i.test(relativePath),
+  });
+  return files.sort().slice(0, 20);
+}
+
+async function collectCircleCiFallbackTargets(
+  context: RepositoryScanContext,
+  repoRoot: string,
+  documents: readonly AnyWorkflowDocument[],
+): Promise<DockerBuildTarget[]> {
+  const circleciDocuments = documents.filter(
+    (document): document is Extract<AnyWorkflowDocument, { kind: "circleci" }> =>
+      document.kind === "circleci",
+  );
+  if (circleciDocuments.length === 0) {
+    return [];
+  }
+
+  const targets: DockerBuildTarget[] = [];
+  const seenDockerfiles = new Set<string>();
+  let hasOpaqueSignal = false;
+
+  for (const document of circleciDocuments) {
+    const evidence = collectCircleCiDockerEvidence(document);
+    hasOpaqueSignal ||= circleCiHasOpaqueOrbSignal(document);
+
+    for (const entry of evidence) {
+      if (!entry.dockerfile || /[$`]/.test(entry.dockerfile)) {
+        continue;
+      }
+      const contextValue = entry.context ?? ".";
+      if (/[$`]/.test(contextValue)) {
+        continue;
+      }
+      const contextPath = path.resolve(repoRoot, contextValue);
+      const dockerfilePath = path.isAbsolute(entry.dockerfile)
+        ? entry.dockerfile
+        : path.resolve(contextPath, entry.dockerfile);
+      if (
+        !insideRepository(repoRoot, contextPath) ||
+        !insideRepository(repoRoot, dockerfilePath) ||
+        !(await context.pathExists(dockerfilePath)) ||
+        seenDockerfiles.has(dockerfilePath)
+      ) {
+        continue;
+      }
+      seenDockerfiles.add(dockerfilePath);
+      targets.push({
+        workflow: document.relativePath,
+        jobId: "(orb dockerfile parameter)",
+        contextPath,
+        dockerfilePath,
+        confidence: "medium",
+      });
+    }
+  }
+
+  for (const relativePath of await discoverDockerfiles(context)) {
+    const dockerfilePath = path.resolve(repoRoot, relativePath);
+    if (seenDockerfiles.has(dockerfilePath)) {
+      continue;
+    }
+    seenDockerfiles.add(dockerfilePath);
+    targets.push({
+      workflow: circleciDocuments[0]!.relativePath,
+      jobId: "(inferred from Dockerfile)",
+      contextPath: path.dirname(dockerfilePath),
+      dockerfilePath,
+      confidence: "medium",
+    });
+  }
+
+  if (hasOpaqueSignal && targets.length === 0) {
+    context.warn(
+      circleciDocuments[0]!.relativePath,
+      "CircleCI orb commands were not visible and no Dockerfile could be used as fallback Docker build evidence.",
+    );
+  }
+  return targets;
+}
+
 export async function collectDockerBuildTargets(
   repoRoot: string,
   workflows: WorkflowDocument[],
@@ -420,6 +515,9 @@ export async function collectDockerBuildTargets(
     const nonGithubDocuments = additionalDocuments.filter((doc) => doc.kind !== "github-actions");
     allTargets.push(
       ...nonGithubDocuments.flatMap((document) => extractFromAnyDocument(repoRoot, document)),
+    );
+    allTargets.push(
+      ...(await collectCircleCiFallbackTargets(context, repoRoot, nonGithubDocuments)),
     );
     allTargets.push(
       ...collectPersistentCacheDockerTargets(repoRoot, [...workflows, ...nonGithubDocuments]),

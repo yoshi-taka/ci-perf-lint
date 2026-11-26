@@ -18,6 +18,7 @@ import {
 import { meetsMinimum } from "../rules/shared/evidence.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
+
 import { pruneGateDescendants } from "./gate-pruning.ts";
 
 interface AdjacencyList {
@@ -214,6 +215,18 @@ function collectSignalGateState(
 
 async function repositoryHasCdkManifest(scanContext: RepositoryScanContext): Promise<boolean> {
   return scanContext.pathExists(scanContext.resolve("cdk.out", "manifest.json"));
+}
+
+async function circleCiWithDockerfile(context: RepositoryDiagnosticContext): Promise<boolean> {
+  const hasCircleCi = (context.documents ?? []).some((document) => document.kind === "circleci");
+  if (!hasCircleCi) {
+    return false;
+  }
+  const dockerfiles = await context.scanContext.walkFiles(".", {
+    cacheKey: "circleci-dockerfile-evidence",
+    include: (relativePath) => /(^|\/)(?:Dockerfile|[^/]+\.Dockerfile)$/i.test(relativePath),
+  });
+  return dockerfiles.length > 0;
 }
 
 async function repositoryHasJavaScriptBuildConfigEvidence(
@@ -434,6 +447,15 @@ export async function collectRepositoryDiagnosticGateState(
   Object.assign(state, signalGates);
   for (const [key, value] of Object.entries(signalGates) as [GateKey, boolean][]) {
     markResolved(results, key, value);
+  }
+
+  if (
+    !state.hasDockerHeavyWorkflow &&
+    (await timedGate("circleci-docker-evidence", () => circleCiWithDockerfile(context)))
+  ) {
+    state.hasDockerHeavyWorkflow = true;
+    markResolved(results, "hasDockerHeavyWorkflow", true);
+    observability.observed.push("hasDockerHeavyWorkflow");
   }
 
   const [largeFilesEvidence, pytestEvidence, hasRenovateConfig, hasCdkManifest] = await Promise.all(
