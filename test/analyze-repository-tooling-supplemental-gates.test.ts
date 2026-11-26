@@ -177,7 +177,10 @@ describe("analyzeRepository repo-aware and tooling rules: supplemental gates", (
 
     await mkdir(workflowDir, { recursive: true });
     await writeFile(path.join(fixtureRoot, "gradlew"), "");
-    await writeFile(path.join(fixtureRoot, "settings.gradle"), 'rootProject.name = "test"');
+    await writeFile(
+      path.join(fixtureRoot, "settings.gradle"),
+      'rootProject.name = "test"\ninclude("sub-a", "sub-b")\n',
+    );
     await writeFile(path.join(fixtureRoot, "build.gradle"), 'plugins { id("java") }');
     await mkdir(path.join(fixtureRoot, "sub-a"), { recursive: true });
     await writeFile(path.join(fixtureRoot, "sub-a", "build.gradle"), "");

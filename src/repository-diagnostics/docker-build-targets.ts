@@ -5,6 +5,7 @@ import type { WorkflowDocument } from "../workflow.ts";
 import { shellInvocations } from "../rules/shared/shell-invocations.ts";
 import { invocationOperands, invocationOptions } from "../rules/shared/tool-command-evidence.ts";
 import { workflowWorkingDirectory } from "../rules/shared/workflow-command-context.ts";
+import { collectCommandEntries } from "../rules/shared/any-step.ts";
 import type { AnyWorkflowDocument } from "../ci-types.ts";
 import {
   collectPersistentCacheDockerTargets,
@@ -129,6 +130,43 @@ function extractFromBuildPushStep(
         contextPath,
         dockerfilePath,
         targetStage: typeof step.with?.target === "string" ? step.with.target : undefined,
+      });
+    }
+  }
+
+  return targets;
+}
+
+function extractFromAnyDocument(
+  repoRoot: string,
+  document: AnyWorkflowDocument,
+): DockerBuildTarget[] {
+  const targets: DockerBuildTarget[] = [];
+
+  for (const entry of collectCommandEntries(document)) {
+    for (const words of shellInvocations(entry.text)) {
+      const build = parseDockerBuildCommand(words);
+      if (
+        !build ||
+        build.depot ||
+        /[$`]|__shell_substitution__/.test(`${build.context} ${build.file ?? ""}`)
+      ) {
+        continue;
+      }
+      const directory = entry.workingDirectory ?? ".";
+      if (/[$`]/.test(directory)) {
+        continue;
+      }
+      const contextPath = path.resolve(repoRoot, directory, build.context);
+      const dockerfilePath = build.file
+        ? path.resolve(repoRoot, directory, build.file)
+        : path.join(contextPath, "Dockerfile");
+      targets.push({
+        workflow: document.relativePath,
+        jobId: entry.jobName,
+        contextPath,
+        dockerfilePath,
+        targetStage: build.targetStage,
       });
     }
   }
@@ -379,11 +417,12 @@ export async function collectDockerBuildTargets(
       .filter((result) => result.status === "fulfilled")
       .map((result) => result.value)
       .flat();
+    const nonGithubDocuments = additionalDocuments.filter((doc) => doc.kind !== "github-actions");
     allTargets.push(
-      ...collectPersistentCacheDockerTargets(repoRoot, [
-        ...workflows,
-        ...additionalDocuments.filter((doc) => doc.kind !== "github-actions"),
-      ]),
+      ...nonGithubDocuments.flatMap((document) => extractFromAnyDocument(repoRoot, document)),
+    );
+    allTargets.push(
+      ...collectPersistentCacheDockerTargets(repoRoot, [...workflows, ...nonGithubDocuments]),
     );
 
     const uniqueTargets = new Map<string, DockerBuildTarget>();

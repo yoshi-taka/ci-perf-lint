@@ -67,6 +67,59 @@ async function findCiDirs(baseDir: string): Promise<string[]> {
   return dirs;
 }
 
+async function hasGitEntry(directory: string): Promise<boolean> {
+  const gitPath = path.join(directory, ".git");
+  return (await isDirectory(gitPath)) || (await isFile(gitPath));
+}
+
+async function isInsideGitRepository(inputPath: string): Promise<boolean> {
+  let directory = inputPath;
+  for (;;) {
+    if (await hasGitEntry(directory)) {
+      return true;
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) {
+      return false;
+    }
+    directory = parent;
+  }
+}
+
+/**
+ * A directory that is not itself inside a git repository but contains git
+ * repositories is a workspace, not one monorepo. Callers should analyse each
+ * child repository separately so root package/build signals stay scoped.
+ */
+export async function discoverWorkspaceRepositories(
+  inputPath: string,
+): Promise<string[] | undefined> {
+  const normalizedPath = path.resolve(inputPath);
+  if (!(await isDirectory(normalizedPath))) {
+    return undefined;
+  }
+  if (await isInsideGitRepository(normalizedPath)) {
+    return undefined;
+  }
+  let entries;
+  try {
+    entries = await readdir(normalizedPath, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+  const repositories: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) {
+      continue;
+    }
+    const candidate = path.join(normalizedPath, entry.name);
+    if (await hasGitEntry(candidate)) {
+      repositories.push(candidate);
+    }
+  }
+  return repositories.length > 0 ? repositories.sort((a, b) => a.localeCompare(b)) : undefined;
+}
+
 export async function resolveWorkflowTarget(inputPath: string): Promise<WorkflowTarget> {
   const normalizedPath = path.resolve(inputPath);
   const baseName = path.basename(normalizedPath);

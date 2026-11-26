@@ -89,6 +89,7 @@ Current rule registry:
 - `dockerfile-runtime-copies-builder-rootfs`
 - `dockerfile-runtime-image-uses-heavy-base`
 - `dockerfile-runtime-inherits-build-environment`
+- `dockerfile-unused-build-stage`
 - `dockerfile-useradd-high-uid-without-no-log-init`
 - `dockerfile-uses-npm-install-with-lockfile`
 - `dockerfile-uv-install-without-no-cache-or-cache-mount`

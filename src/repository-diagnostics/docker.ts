@@ -5,6 +5,7 @@ import type { WorkflowDocument } from "../workflow.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import { collectDockerBuildTargets } from "./docker-build-targets.ts";
 import { collectDockerCacheCopyPathMismatchDiagnostics } from "./docker-cache-copy-path-mismatch.ts";
+import { collectDockerfileUnusedBuildStageDiagnostics } from "./dockerfile-unused-build-stage.ts";
 import {
   collectDockerfileCopyLinkDiagnostics,
   collectDockerfileCopyOrderDiagnostics,
@@ -68,6 +69,14 @@ export async function collectDockerBuildDiagnostics(
       featureIndex,
     ),
     collectDockerCacheCopyPathMismatchDiagnostics(
+      repoRoot,
+      repository,
+      targets,
+      warnings,
+      scanContext,
+      featureIndex,
+    ),
+    collectDockerfileUnusedBuildStageDiagnostics(
       repoRoot,
       repository,
       targets,

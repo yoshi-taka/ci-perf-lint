@@ -350,7 +350,6 @@ function buildJavaScriptGateObservations(
       frameworks.usesTurbo ||
       frameworks.usesNx ||
       frameworks.usesLerna ||
-      frameworks.usesGradle ||
       frameworks.usesAngularCli ||
       babel.usesBabel ||
       typescript.versionSpec !== undefined ||
@@ -372,7 +371,6 @@ function buildJavaScriptGateObservations(
       frameworks.usesTurbo ||
       frameworks.usesNx ||
       frameworks.usesLerna ||
-      frameworks.usesGradle ||
       frameworks.usesAngularCli ||
       babel.usesBabel ||
       typescript.versionSpec !== undefined ||

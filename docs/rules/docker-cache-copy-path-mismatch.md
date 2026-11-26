@@ -40,6 +40,7 @@ Does not report when:
 - The COPY uses `--from=` (multi-stage build reference)
 - The file actually exists in the build context
 - No alternative extension file exists in the build context
+- The instruction is in a stage that no reachable stage or CI build target references; `dockerfile-unused-build-stage` reports that separately
 
 ## Severity
 

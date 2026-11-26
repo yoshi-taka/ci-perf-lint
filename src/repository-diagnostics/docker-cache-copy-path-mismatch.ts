@@ -5,6 +5,7 @@ import { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
 import { normalizeRelativePath, type DockerBuildTarget } from "./docker-build-targets.ts";
+import { collectReachableDockerfileInstructionIndexes } from "./dockerfile-instructions.ts";
 
 const meta = {
   id: "docker-cache-copy-path-mismatch",
@@ -68,7 +69,15 @@ export async function collectDockerCacheCopyPathMismatchDiagnostics(
       continue;
     }
 
-    for (const instruction of data.instructions) {
+    const reachable = collectReachableDockerfileInstructionIndexes(
+      data.instructions,
+      target.targetStage,
+    );
+
+    for (const [index, instruction] of data.instructions.entries()) {
+      if (reachable && !reachable.has(index)) {
+        continue;
+      }
       if (!/^copy\b/i.test(instruction.text)) {
         continue;
       }

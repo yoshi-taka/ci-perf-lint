@@ -70,6 +70,17 @@ bun run --cwd formal verify:models
 Run Z3 separately with `bun run verify:source-audit`. The four tools answer
 different questions; their results do not combine into a whole-program proof.
 
+### Workspace / orb / Docker stage changes (local, optional)
+
+`bun run --cwd formal verify:new-changes` checks the workspace split, Gradle
+module count, JavaScript gate, and Docker stage reachability changes with
+Lean, Alloy, TLA+, and Z3. It also compares the real Docker reachability helper
+against an independent closure oracle for all 64 four-stage graphs × 4 target
+aliases. Set `LEAN_BIN`, `JAVA_BIN`, `ALLOY_JAR`, and `TLA_JAR` as in the
+source-audit models. This is bounded model evidence plus differential tests, not
+a proof of TypeScript or YAML-parser equivalence. See
+`docs/internal/formal-verification-workspace-orb-docker-2026-11-27.md`.
+
 ### Mutation runner models (local, optional)
 
 The Stryker-replacement runner has its own bounded models; they are not part of

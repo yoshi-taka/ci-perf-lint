@@ -6,8 +6,13 @@ import { parseGitlabCi } from "./gitlab-ci-workflow.ts";
 import { prepareGitlabIncludeDocuments } from "./gitlab-ci-include-context.ts";
 import { prepareDiscoveredCircleciConfig } from "./circleci-config-discovery.ts";
 import { parseCircleCi } from "./circleci-workflow.ts";
+import { expandCircleCiOrbs } from "./circleci-orb-expansion.ts";
 import { toastifySource } from "./toastify.ts";
-import { collectWorkflowInputs, resolveWorkflowTarget } from "./fs.ts";
+import {
+  collectWorkflowInputs,
+  discoverWorkspaceRepositories,
+  resolveWorkflowTarget,
+} from "./fs.ts";
 import { aggregateFindingsWithMembers } from "./reporters.ts";
 import { RepositoryScanContext, LruMap } from "./repository-scan-context.ts";
 import type {
@@ -23,6 +28,7 @@ import type {
 } from "./types.ts";
 import { parseWorkflow, type WorkflowDocument } from "./workflow.ts";
 import type { AnyWorkflowDocument, CiKind } from "./ci-types.ts";
+import type { DiagnosticSource } from "./diagnostic-source.ts";
 import { collectRepositorySignals } from "./repository-signals.ts";
 import { collectJobSummaries } from "./repository-similar-workflows-job-summaries.ts";
 import type { JobSummary } from "./repository-similar-workflows-job-summaries.ts";
@@ -245,14 +251,12 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
   timer.mark("parse-workflows");
 
   const parsedWorkflows: ParsedWorkflowDocument[] = [];
+  const discoveredCircleciPaths = new Set(
+    workflowInputs.filter((input) => input.circleciDiscovered).map((input) => input.path),
+  );
   for (const [index, result] of parsedWorkflowResults.entries()) {
     if (result.status === "fulfilled") {
-      const doc = result.value;
-      parsedWorkflows.push(
-        doc.kind === "circleci" && workflowInputs[index]?.circleciDiscovered
-          ? prepareDiscoveredCircleciConfig(doc, analysisWarnings)
-          : doc,
-      );
+      parsedWorkflows.push(result.value);
     } else {
       const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
       analysisWarnings.push({
@@ -264,7 +268,18 @@ async function scanRepo(options: AnalyzeOptions): Promise<ScannedRepo> {
     }
   }
 
-  const preparedWorkflows = prepareGitlabIncludeDocuments(parsedWorkflows, analysisWarnings);
+  const expandedWorkflows = await Promise.all(
+    parsedWorkflows.map(async (doc) => {
+      if (doc.kind !== "circleci") {
+        return doc;
+      }
+      const expanded = await expandCircleCiOrbs(doc, analysisWarnings);
+      return discoveredCircleciPaths.has(doc.path)
+        ? prepareDiscoveredCircleciConfig(expanded, analysisWarnings)
+        : expanded;
+    }),
+  );
+  const preparedWorkflows = prepareGitlabIncludeDocuments(expandedWorkflows, analysisWarnings);
   const githubWorkflows = preparedWorkflows.filter(
     (w): w is WorkflowDocument => w.kind === "github-actions",
   );
@@ -413,6 +428,7 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
           repoRoot,
           repository: ruleContext.repository,
           workflows: githubWorkflows as WorkflowDocument[],
+          documents: parsedWorkflows,
           workflowSemantics: semanticsByWorkflow as ReadonlyMap<
             WorkflowDocument,
             WorkflowSemantics
@@ -645,7 +661,215 @@ async function lintRepo(scanned: ScannedRepo): Promise<ReportData> {
   };
 }
 
+function prefixedPath(value: string, repoRoot: string, prefix: string): string {
+  if (!value) {
+    return value;
+  }
+  const relative = path.isAbsolute(value) ? path.relative(repoRoot, value) : value;
+  const normalized = relative.replace(/\\/g, "/");
+  return normalized ? `${prefix}/${normalized}` : prefix;
+}
+
+function prefixedSource(
+  source: DiagnosticSource,
+  repoRoot: string,
+  prefix: string,
+): DiagnosticSource {
+  if (source.kind === "composite") {
+    return {
+      ...source,
+      sources: source.sources.map((entry) => prefixedSource(entry, repoRoot, prefix)),
+    };
+  }
+  return {
+    ...source,
+    workflowPath: prefixedPath(source.workflowPath, repoRoot, prefix),
+    location: {
+      ...source.location,
+      path: prefixedPath(source.location.path, repoRoot, prefix),
+    },
+  };
+}
+
+function prefixWorkspaceDiagnostic(
+  finding: Diagnostic,
+  repoRoot: string,
+  prefix: string,
+): Diagnostic {
+  return {
+    ...finding,
+    workflow: prefixedPath(finding.workflow, repoRoot, prefix),
+    location: {
+      ...finding.location,
+      path: prefixedPath(finding.location.path, repoRoot, prefix),
+    },
+    source: finding.source ? prefixedSource(finding.source, repoRoot, prefix) : undefined,
+  };
+}
+
+function mergeMeasureCompleteness(reports: readonly ReportData[]): MeasureCompleteness | undefined {
+  const present = reports
+    .map((report) => report.measureCompleteness)
+    .filter((entry): entry is MeasureCompleteness => entry !== undefined);
+  if (present.length === 0) {
+    return undefined;
+  }
+  const abstentions = present.flatMap((entry) => entry.abstentions ?? []);
+  return {
+    totalWorkflows: present.reduce((total, entry) => total + entry.totalWorkflows, 0),
+    evaluatedWorkflows: present.reduce((total, entry) => total + entry.evaluatedWorkflows, 0),
+    skippedRepositoryDiagnostics: present.some((entry) => entry.skippedRepositoryDiagnostics),
+    skippedGates: [...new Set(present.flatMap((entry) => entry.skippedGates))].sort(),
+    maxFindingsHitRules: [...new Set(present.flatMap((entry) => entry.maxFindingsHitRules))].sort(),
+    parserFailures: (() => {
+      const values = [...new Set(present.flatMap((entry) => entry.parserFailures ?? []))].sort();
+      return values.length > 0 ? values : undefined;
+    })(),
+    workflowOnlyRules: (() => {
+      const values = [...new Set(present.flatMap((entry) => entry.workflowOnlyRules ?? []))].sort();
+      return values.length > 0 ? values : undefined;
+    })(),
+    abstentions: abstentions.length > 0 ? abstentions : undefined,
+  };
+}
+
+function mergeWorkspaceReports(
+  parentRoot: string,
+  entries: readonly { repoRoot: string; report: ReportData }[],
+  failures: readonly { repoRoot: string; message: string }[],
+  topCount: number,
+): ReportData {
+  const prefixedReports = entries.map(({ report, repoRoot }) => ({
+    report,
+    repoRoot,
+    prefix: path.relative(parentRoot, repoRoot).replace(/\\/g, "/"),
+  }));
+
+  const compareFindings = (left: Diagnostic, right: Diagnostic) =>
+    findingSorter().compare(left, right);
+  const findings = prefixedReports
+    .flatMap(({ report, repoRoot, prefix }) =>
+      report.findings.map((finding) => prefixWorkspaceDiagnostic(finding, repoRoot, prefix)),
+    )
+    .sort(compareFindings);
+
+  const workflows = prefixedReports.flatMap(({ report, repoRoot, prefix }) =>
+    report.workflows.map((workflow) => ({
+      ...workflow,
+      path: prefixedPath(workflow.path, repoRoot, prefix),
+      findings: workflow.findings.map((finding) =>
+        prefixWorkspaceDiagnostic(finding, repoRoot, prefix),
+      ),
+    })),
+  );
+
+  const aggregatedFindings = aggregateFindingsWithMembers(findings).aggregatedFindings;
+  const topAggregatedFindings = aggregatedFindings.slice(0, topCount);
+  const propagationClusters = prefixedReports.flatMap(({ report, repoRoot, prefix }) =>
+    report.propagationClusters.map((cluster) => ({
+      ...cluster,
+      sourceWorkflow: prefixedPath(cluster.sourceWorkflow, repoRoot, prefix),
+      memberWorkflows: cluster.memberWorkflows.map((workflow) =>
+        prefixedPath(workflow, repoRoot, prefix),
+      ),
+      similarityEdges: cluster.similarityEdges.map((edge) => ({
+        ...edge,
+        source: prefixedPath(edge.source, repoRoot, prefix),
+        target: prefixedPath(edge.target, repoRoot, prefix),
+      })),
+    })),
+  );
+  const sharedDiagnostics = prefixedReports.flatMap(({ report, repoRoot, prefix }) =>
+    (report.sharedDiagnostics ?? []).map((finding) => ({
+      ...finding,
+      memberWorkflows: finding.memberWorkflows.map((workflow) =>
+        prefixedPath(workflow, repoRoot, prefix),
+      ),
+      representativeWorkflow: prefixedPath(finding.representativeWorkflow, repoRoot, prefix),
+      representativeLocation: {
+        ...finding.representativeLocation,
+        path: prefixedPath(finding.representativeLocation.path, repoRoot, prefix),
+      },
+    })),
+  );
+  const remediationChecks = [
+    ...new Map(
+      prefixedReports
+        .flatMap(({ report }) => report.remediationChecks)
+        .map((check) => [`${check.sourceRuleId}\0${check.impliedRuleId}`, check] as const),
+    ).values(),
+  ];
+
+  const analysisWarnings: AnalysisWarning[] = [
+    {
+      kind: "scan-warning",
+      source: parentRoot,
+      message: `Detected ${entries.length} nested repositories; analysed each repository separately.`,
+    },
+    ...prefixedReports.flatMap(({ report }) => report.analysisWarnings),
+    ...failures.map(({ repoRoot, message }) => ({
+      kind: "scan-warning" as const,
+      source: repoRoot,
+      message: `Repository analysis failed: ${message}`,
+    })),
+  ];
+
+  return {
+    targetPath: parentRoot,
+    workflowCount: entries.reduce((total, { report }) => total + report.workflowCount, 0),
+    scannedAt: new Date().toISOString(),
+    topFindings: findings.slice(0, topCount),
+    topAggregatedFindings,
+    findings,
+    workflows,
+    fixFirst: uniqueStrings(topAggregatedFindings.map((finding) => finding.suggestion)).slice(
+      0,
+      topCount,
+    ),
+    aiHandoff: buildAiHandoff(topAggregatedFindings),
+    analysisWarnings,
+    measureCompleteness: mergeMeasureCompleteness(entries.map(({ report }) => report)),
+    propagationClusters,
+    sharedDiagnostics: sharedDiagnostics.length > 0 ? sharedDiagnostics : undefined,
+    remediationChecks,
+  };
+}
+
+async function analyzeWorkspace(
+  options: AnalyzeOptions,
+  parentRoot: string,
+  repositoryRoots: readonly string[],
+): Promise<ReportData> {
+  const reports: { repoRoot: string; report: ReportData }[] = [];
+  const failures: { repoRoot: string; message: string }[] = [];
+  for (let index = 0; index < repositoryRoots.length; index += 4) {
+    const chunk = repositoryRoots.slice(index, index + 4);
+    const results = await Promise.allSettled(
+      chunk.map((repoRoot) =>
+        analyzeRepository({ ...options, cwd: parentRoot, targetPath: repoRoot }),
+      ),
+    );
+    for (const [offset, result] of results.entries()) {
+      const repoRoot = chunk[offset]!;
+      if (result.status === "fulfilled") {
+        reports.push({ repoRoot, report: result.value });
+      } else {
+        failures.push({
+          repoRoot,
+          message: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+      }
+    }
+  }
+  return mergeWorkspaceReports(parentRoot, reports, failures, options.topCount);
+}
+
 export async function analyzeRepository(options: AnalyzeOptions): Promise<ReportData> {
+  const inputPath = path.resolve(options.cwd, options.targetPath);
+  const workspaceRepositories = await discoverWorkspaceRepositories(inputPath);
+  if (workspaceRepositories) {
+    return analyzeWorkspace(options, inputPath, workspaceRepositories);
+  }
   const scanned = await scanRepo(options);
   return lintRepo(scanned);
 }

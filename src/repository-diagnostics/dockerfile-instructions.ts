@@ -336,6 +336,176 @@ export function collectDockerfileStageAliases(
   return aliases;
 }
 
+export interface DockerfileStage {
+  readonly index: number;
+  readonly alias?: string;
+  readonly fromInstructionIndex: number;
+  readonly startInstructionIndex: number;
+  readonly endInstructionIndex: number;
+  readonly parentStageIndex?: number;
+  readonly referencedStageIndexes: readonly number[];
+}
+
+const fromAliasPattern = /\sas\s+(["']?)([A-Za-z0-9_.-]+)\1\s*$/i;
+const copyFromPattern = /\bcopy\b[^\n]*--from=(["']?)([^\s"']+)\1/i;
+const runMountFromPattern = /--mount=[^\n]*\bfrom=(["']?)([^,\s"']+)\1/i;
+
+function fromAlias(instruction: CollectedDockerfileInstruction): string | undefined {
+  return fromAliasPattern.exec(instruction.text)?.[2]?.toLowerCase();
+}
+
+function stageReference(
+  instruction: CollectedDockerfileInstruction,
+  aliases: ReadonlyMap<string, number>,
+): number | undefined {
+  const flagValue = instruction.flags?.find((flag) => flag.name.toLowerCase() === "from")?.value;
+  const value =
+    flagValue ??
+    copyFromPattern.exec(instruction.text)?.[2] ??
+    runMountFromPattern.exec(instruction.text)?.[2];
+  if (!value || value.includes("$")) {
+    return undefined;
+  }
+  return aliases.get(value.toLowerCase()) ?? (/^\d+$/.test(value) ? Number(value) : undefined);
+}
+
+/** Stage boundaries only; Dockerfile semantics beyond FROM/COPY --from are not modelled. */
+export function collectDockerfileStages(
+  instructions: CollectedDockerfileInstruction[],
+): DockerfileStage[] | undefined {
+  const stages: {
+    index: number;
+    alias?: string;
+    fromInstructionIndex: number;
+    startInstructionIndex: number;
+    endInstructionIndex: number;
+    parentStageIndex?: number;
+  }[] = [];
+  const aliases = new Map<string, number>();
+
+  for (let index = 0; index < instructions.length; index++) {
+    const instruction = instructions[index]!;
+    const from = parseDockerfileFromInstruction(instruction);
+    if (!from) {
+      continue;
+    }
+    if (from.image.includes("$")) {
+      return undefined;
+    }
+    const previous = stages.at(-1);
+    if (previous) {
+      previous.endInstructionIndex = index - 1;
+    }
+    const alias = fromAlias(instruction);
+    if (alias !== undefined && aliases.has(alias)) {
+      return undefined;
+    }
+    const parentStageIndex =
+      aliases.get(from.image.toLowerCase()) ??
+      (/^\d+$/.test(from.image) ? Number(from.image) : undefined);
+    if (parentStageIndex !== undefined && parentStageIndex >= stages.length) {
+      return undefined;
+    }
+    stages.push({
+      index: stages.length,
+      alias,
+      fromInstructionIndex: index,
+      startInstructionIndex: index,
+      endInstructionIndex: instructions.length - 1,
+      parentStageIndex,
+    });
+    if (alias !== undefined) {
+      aliases.set(alias, stages.length - 1);
+    }
+  }
+  if (stages.length === 0) {
+    return undefined;
+  }
+
+  const references = new Map<number, Set<number>>();
+  let currentStage = -1;
+  for (let index = 0; index < instructions.length; index++) {
+    const instruction = instructions[index]!;
+    const stage = stages.find((candidate) => candidate.fromInstructionIndex === index);
+    if (stage) {
+      currentStage = stage.index;
+      continue;
+    }
+    if (currentStage < 0) {
+      continue;
+    }
+    const referenced = stageReference(instruction, aliases);
+    if (referenced === undefined || referenced >= stages.length) {
+      continue;
+    }
+    const refs = references.get(currentStage) ?? new Set<number>();
+    refs.add(referenced);
+    references.set(currentStage, refs);
+  }
+
+  return stages.map((stage) => ({
+    ...stage,
+    referencedStageIndexes: [...(references.get(stage.index) ?? [])].sort((a, b) => a - b),
+  }));
+}
+
+/**
+ * Instruction indexes that a build of `targetStage` can execute. Returns undefined
+ * when stage relationships cannot be resolved, so callers can fail open.
+ */
+export function collectReachableDockerfileInstructionIndexes(
+  instructions: CollectedDockerfileInstruction[],
+  targetStage?: string,
+): Set<number> | undefined {
+  const stages = collectDockerfileStages(instructions);
+  if (!stages) {
+    return undefined;
+  }
+  const aliases = new Map<string, number>();
+  for (const stage of stages) {
+    if (stage.alias !== undefined) {
+      aliases.set(stage.alias, stage.index);
+    }
+  }
+  let outputStage = stages.length - 1;
+  if (targetStage !== undefined && targetStage !== "") {
+    const resolved =
+      aliases.get(targetStage.toLowerCase()) ??
+      (/^\d+$/.test(targetStage) ? Number(targetStage) : undefined);
+    if (resolved === undefined || resolved >= stages.length) {
+      return undefined;
+    }
+    outputStage = resolved;
+  }
+
+  const reached = new Set<number>();
+  const visit = (stageIndex: number): void => {
+    if (reached.has(stageIndex)) {
+      return;
+    }
+    reached.add(stageIndex);
+    const stage = stages[stageIndex]!;
+    if (stage.parentStageIndex !== undefined) {
+      visit(stage.parentStageIndex);
+    }
+    for (const reference of stage.referencedStageIndexes) {
+      visit(reference);
+    }
+  };
+  visit(outputStage);
+
+  const reachableInstructions = new Set<number>();
+  for (const stage of stages) {
+    if (!reached.has(stage.index)) {
+      continue;
+    }
+    for (let index = stage.startInstructionIndex; index <= stage.endInstructionIndex; index++) {
+      reachableInstructions.add(index);
+    }
+  }
+  return reachableInstructions;
+}
+
 export function dockerfileFromUsesFloatingTag(image: string): boolean {
   if (
     image.toLowerCase() === "scratch" ||

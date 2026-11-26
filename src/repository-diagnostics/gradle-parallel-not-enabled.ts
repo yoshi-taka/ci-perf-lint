@@ -12,6 +12,7 @@ import {
   workflowStepEnv,
   workflowWorkingDirectory,
 } from "../rules/shared/workflow-command-context.ts";
+import { collectCommandEntries } from "../rules/shared/any-step.ts";
 
 const meta = {
   id: "gradle-parallel-not-enabled",
@@ -21,6 +22,111 @@ const meta = {
 } satisfies RuleMeta;
 
 const GRADLE_BUILD_FILE = /^build\.gradle(?:\.kts)?$/;
+const GRADLE_SETTINGS_FILES = ["settings.gradle", "settings.gradle.kts"] as const;
+const GRADLE_INCLUDE_DECLARATION = /\binclude\s*(?:\(([\s\S]*?)\)|([^\n;]+))/g;
+const GRADLE_QUOTED_VALUE = /["']([^"']+)["']/g;
+const SKIPPED_MODULE_DIRS = new Set([
+  "build",
+  "buildSrc",
+  "build-logic",
+  "node_modules",
+  ".git",
+  ".gradle",
+]);
+const MAX_MODULE_DIRECTORIES = 2_000;
+
+function stripGradleComments(text: string): string {
+  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+}
+
+function includedModuleNames(settingsText: string): string[] {
+  const modules = new Set<string>();
+  const text = stripGradleComments(settingsText);
+  for (const declaration of text.matchAll(GRADLE_INCLUDE_DECLARATION)) {
+    for (const match of (declaration[1] ?? declaration[2] ?? "").matchAll(GRADLE_QUOTED_VALUE)) {
+      const module = match[1]!.replace(/^:/, "").replace(/:/g, "/");
+      if (!module || module === "buildSrc" || module.startsWith("buildSrc/")) {
+        continue;
+      }
+      if (module === "build-logic" || module.startsWith("build-logic/")) {
+        continue;
+      }
+      modules.add(module);
+    }
+  }
+  return [...modules];
+}
+
+async function countModulesFromSettings(
+  scanContext: RepositoryScanContext,
+  root: string,
+): Promise<number | undefined> {
+  for (const fileName of GRADLE_SETTINGS_FILES) {
+    const filePath = scanContext.resolve(root, fileName);
+    if (!(await scanContext.pathExists(filePath))) {
+      continue;
+    }
+    const text = await scanContext.readTextFileOrWarn(filePath);
+    if (text === undefined) {
+      continue;
+    }
+    // The root project participates in a Gradle build even when it has no
+    // include entry of its own.
+    return includedModuleNames(text).length + 1;
+  }
+  return undefined;
+}
+
+async function countBuildFilesRecursive(
+  scanContext: RepositoryScanContext,
+  root: string,
+  directoryBudget = { remaining: MAX_MODULE_DIRECTORIES },
+): Promise<number> {
+  if (directoryBudget.remaining <= 0) {
+    return 0;
+  }
+  directoryBudget.remaining--;
+  let entries;
+  try {
+    entries = await scanContext.readDirectoryEntries(scanContext.resolve(root));
+  } catch {
+    return 0;
+  }
+
+  let count = 0;
+  const subdirs: string[] = [];
+  for (const entry of entries) {
+    if (GRADLE_BUILD_FILE.test(entry.name)) {
+      count++;
+    }
+    if (
+      entry.isDirectory() &&
+      !entry.name.startsWith(".") &&
+      !SKIPPED_MODULE_DIRS.has(entry.name)
+    ) {
+      subdirs.push(entry.name);
+    }
+  }
+  for (const dir of subdirs) {
+    count += await countBuildFilesRecursive(
+      scanContext,
+      path.posix.join(root, dir),
+      directoryBudget,
+    );
+  }
+  return count;
+}
+
+async function countGradleModules(
+  scanContext: RepositoryScanContext,
+  root: string,
+): Promise<number> {
+  const settingsCount = await countModulesFromSettings(scanContext, root);
+  if (settingsCount !== undefined) {
+    return settingsCount;
+  }
+  return countBuildFilesRecursive(scanContext, root);
+}
 
 async function hasParallelInProperties(
   scanContext: RepositoryScanContext,
@@ -36,42 +142,6 @@ async function hasParallelInProperties(
   return gradleParallelProperty(text);
 }
 
-async function countBuildFiles(scanContext: RepositoryScanContext, root = "."): Promise<number> {
-  try {
-    const entries = await scanContext.readDirectoryEntries(scanContext.resolve(root));
-    let count = 0;
-    const subdirs: string[] = [];
-    for (const e of entries) {
-      if (GRADLE_BUILD_FILE.test(e.name)) {
-        count++;
-      }
-      if (
-        e.isDirectory() &&
-        !e.name.startsWith(".") &&
-        e.name !== "build" &&
-        e.name !== "node_modules"
-      ) {
-        subdirs.push(e.name);
-      }
-    }
-    for (const dir of subdirs) {
-      const subEntries = await scanContext
-        .readDirectoryEntries(scanContext.resolve(root, dir))
-        .catch(() => undefined);
-      if (subEntries) {
-        for (const e of subEntries) {
-          if (GRADLE_BUILD_FILE.test(e.name)) {
-            count++;
-          }
-        }
-      }
-    }
-    return count;
-  } catch {
-    return 0;
-  }
-}
-
 export async function collectGradleParallelNotEnabledDiagnostics(
   context: RepositoryDiagnosticContext,
 ): Promise<Diagnostic[]> {
@@ -80,12 +150,12 @@ export async function collectGradleParallelNotEnabledDiagnostics(
   }
 
   const untunedRoots = new Set<string>();
-  for (const { workflow, job, step } of context.predicateIndex.allSteps) {
-    for (const command of collectGradleCommands(
-      step.run ?? "",
-      workflowStepEnv(workflow, job, step),
-      workflowWorkingDirectory(workflow, job, step),
-    )) {
+  const considerCommand = async (
+    text: string,
+    environment: Record<string, unknown>,
+    directory: string | undefined,
+  ): Promise<void> => {
+    for (const command of collectGradleCommands(text, environment, directory)) {
       if (!command.lifecycle || command.parallelConfigured || command.userHome === null) {
         continue;
       }
@@ -103,10 +173,26 @@ export async function collectGradleParallelNotEnabledDiagnostics(
         untunedRoots.add(root);
       }
     }
+  };
+
+  for (const { workflow, job, step } of context.predicateIndex.allSteps) {
+    await considerCommand(
+      step.run ?? "",
+      workflowStepEnv(workflow, job, step),
+      workflowWorkingDirectory(workflow, job, step),
+    );
+  }
+  for (const document of context.documents ?? []) {
+    if (document.kind === "github-actions") {
+      continue;
+    }
+    for (const entry of collectCommandEntries(document)) {
+      await considerCommand(entry.text, {}, entry.workingDirectory);
+    }
   }
   const diagnostics: Diagnostic[] = [];
   for (const root of [...untunedRoots].sort()) {
-    if ((await countBuildFiles(context.scanContext, root)) < 2) {
+    if ((await countGradleModules(context.scanContext, root)) < 2) {
       continue;
     }
     diagnostics.push(

@@ -24,24 +24,11 @@ const MAX_CIRCLECI_SOURCE_BYTES = 5_000_000;
 const MAX_CIRCLECI_JOBS = 500;
 const MAX_CIRCLECI_STEPS_PER_JOB = 2_000;
 
-const KNOWN_STEP_TYPES = new Set([
-  "checkout",
-  "run",
-  "save_cache",
-  "restore_cache",
-  "store_artifacts",
-  "store_test_results",
-  "persist_to_workspace",
-  "attach_workspace",
-  "add_ssh_keys",
-  "setup_remote_docker",
-  "when",
-  "unless",
-]);
-
-interface CircleCiStep {
+export interface CircleCiStep {
   node: YAMLMap<unknown, unknown>;
   type: string;
+  expandedFromOrb?: boolean;
+  orbUnresolved?: boolean;
   name?: string;
   nameNode?: Node;
   command?: string;
@@ -77,6 +64,7 @@ interface CircleCiStep {
 export interface CircleCiJob {
   node: YAMLMap<unknown, unknown>;
   name: string;
+  expandedFromOrb?: boolean;
   nameNode?: Node;
   dockerImages?: string[];
   resourceClass?: string;
@@ -226,6 +214,10 @@ function parseStepArgs(item: YAMLMap<unknown, unknown>, stepType: string): Circl
   return step;
 }
 
+export function parseCircleCiSteps(seq: Node | undefined): CircleCiStep[] {
+  return parseSteps(seq);
+}
+
 function parseSteps(seq: Node | undefined): CircleCiStep[] {
   if (!seq || !isSeq(seq)) {
     return [];
@@ -238,7 +230,7 @@ function parseSteps(seq: Node | undefined): CircleCiStep[] {
 
     if (isScalar(item)) {
       const name = getScalarString(item);
-      if (name && KNOWN_STEP_TYPES.has(name)) {
+      if (name) {
         const emptyMap = new YAMLMap<unknown, unknown>();
         emptyMap.range = [0, 0, 0];
         steps.push({

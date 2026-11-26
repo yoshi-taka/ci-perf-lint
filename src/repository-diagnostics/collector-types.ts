@@ -1,6 +1,7 @@
 import type { AnalysisWarning, Diagnostic, MeasureCompletenessTracker } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import type { WorkflowDocument } from "../workflow.ts";
+import type { AnyWorkflowDocument } from "../ci-types.ts";
 import type { RepositoryScanContext } from "../repository-scan-context.ts";
 import type { WorkflowSemantics } from "../rules/shared/workflow-semantics.ts";
 import type { RepositoryFileIndex } from "../rules/shared/repository-file-index.ts";
@@ -109,6 +110,8 @@ export interface RepositoryDiagnosticContext {
   repoRoot: string;
   repository: RepositorySignals;
   workflows: WorkflowDocument[];
+  /** Every parsed CI document, including non-GitHub providers. */
+  documents?: readonly AnyWorkflowDocument[];
   workflowSemantics: ReadonlyMap<WorkflowDocument, WorkflowSemantics>;
   warnings: AnalysisWarning[];
   measureCompleteness?: MeasureCompletenessTracker;

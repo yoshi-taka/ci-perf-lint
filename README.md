@@ -78,6 +78,10 @@ Checks cover triggers, concurrency, dependency caching, checkout and artifact ov
 
 Depot workflows use GitHub Actions support. Individual rule coverage varies by platform.
 
+Pointing the tool at a directory that is not a git repository but contains sibling repositories audits each repository separately, so root-level Gradle, Docker, and package signals stay scoped to the repository that owns them.
+
+CircleCI orb sources are loaded from the public CircleCI registry so Docker and Gradle commands inside orb jobs and commands are visible.
+
 [Browse the rules →](https://ci-perf-lint.veritycost.com/rules/)
 
 ## Usage

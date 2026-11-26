@@ -12,7 +12,7 @@ Reports when:
 
 - The repository uses Gradle
 - CI directly executes Gradle lifecycle tasks (`build`, `check`, `test`, `assemble`, `publish`, including qualified task paths and camel-case variants)
-- Multiple `build.gradle` or `build.gradle.kts` files are detected (indicating a multi-project build)
+- The root project plus `include` statements in `settings.gradle`/`settings.gradle.kts` declare at least two projects (or, without a settings file, multiple `build.gradle`/`build.gradle.kts` files are detected)
 - `org.gradle.parallel=true` is not set in `gradle.properties`
 - at least one invocation for that root has no visible parallel setting; a tuned command cannot suppress another invocation or another root
 
@@ -30,7 +30,8 @@ Does not report when:
 - `org.gradle.parallel=false` is set
 - `--parallel` flag is present in CI commands
 - `--no-parallel` flag is present
-- Only a single `build.gradle(.kts)` is found (single-module project)
+- Fewer than two projects are found (single-module project); `buildSrc` and `build-logic` are not counted
+- A settings file exists but declares no static `include` entries (dynamic module discovery is not inferred)
 - the command is help/version/dry-run or does not execute a lifecycle task
 - explicit parallel settings exist in the applicable CLI, JVM options or properties, including intentional disabling or unknown property values
 

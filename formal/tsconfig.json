@@ -1,4 +1,12 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["import-audit.ts", "source-models.ts", "mutation-models.ts", "ci-yaml-gate-parity.ts", "buildkite-if-changed-gates.ts", "buildkite-depcache-gates.ts"]
+  "include": [
+    "import-audit.ts",
+    "source-models.ts",
+    "mutation-models.ts",
+    "ci-yaml-gate-parity.ts",
+    "buildkite-if-changed-gates.ts",
+    "buildkite-depcache-gates.ts",
+    "new-changes-models.ts"
+  ]
 }

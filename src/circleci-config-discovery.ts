@@ -238,15 +238,24 @@ export function prepareDiscoveredCircleciConfig(
   ]);
   const skipped: string[] = [];
   const jobs = doc.jobs.filter((job) => {
+    if (job.steps.some((step) => step.orbUnresolved)) {
+      skipped.push(job.name);
+      return false;
+    }
+    if (job.expandedFromOrb) {
+      return true;
+    }
     const rawSteps = job.node.get("steps", true);
     const unresolved =
       !isSeq(rawSteps) ||
       rawSteps.items.some((step) => {
         if (isScalar(step)) {
-          return !simpleSteps.has(String(step.value));
+          const name = String(step.value);
+          return !simpleSteps.has(name) && !name.includes("/");
         }
         if (isMap(step) && isScalar(step.items[0]?.key)) {
-          return !simpleSteps.has(String(step.items[0].key.value));
+          const name = String(step.items[0].key.value);
+          return !simpleSteps.has(name) && !name.includes("/");
         }
         return true;
       });
