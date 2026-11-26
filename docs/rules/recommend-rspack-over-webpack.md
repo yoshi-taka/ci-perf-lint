@@ -4,6 +4,8 @@
 
 This rule detects repositories using webpack 5.x that could benefit from migrating to rspack.
 
+It also detects Create React App projects: `react-scripts`, `@rescripts/cli`, or `@craco/craco` in `package.json` implies webpack is used internally. CRA gets separate guidance because its webpack config is hidden, so the custom-plugin / hook skip checks below do not apply.
+
 ## Why It Matters
 
 rspack is a high-performance JavaScript bundler built with Rust that provides:
@@ -22,6 +24,15 @@ Consider migrating from webpack to rspack. The migration typically involves:
 2. Update your build scripts to use `rspack` instead of `webpack`
 3. Adjust configuration syntax where needed (rspack config is very similar to webpack)
 
+## Create React App guidance
+
+For `react-scripts`, `@rescripts/cli`, or `@craco/craco`, the suggested destination is Vite or Rsbuild, not an rspack drop-in swap. The React team deprecated Create React App for new apps on **2025-02-14** and pointed existing apps to Vite, Parcel, or Rsbuild: https://react.dev/blog/2025/02/14/sunsetting-create-react-app
+
+Migration guides linked from that announcement:
+
+- Vite: https://www.robinwieruch.de/vite-create-react-app/
+- Rsbuild: https://rsbuild.dev/guide/migration/cra
+
 ## When This Rule Is Skipped
 
 This rule will NOT recommend rspack if any of the following are detected in your webpack config:
@@ -30,7 +41,7 @@ This rule will NOT recommend rspack if any of the following are detected in your
 - **Compiler/compilation hooks**: Deep integration with webpack's compiler or compilation hooks
 - **Deep devServer/resolver customization**: Custom devServer middleware or resolver plugins
 
-These patterns indicate a higher migration risk that requires manual assessment.
+These patterns indicate a higher migration risk that requires manual assessment. The Create React App branch is evaluated separately and is not suppressed by these checks, since CRA does not expose a webpack config file.
 
 ## Measurement
 

@@ -16,6 +16,7 @@ import {
   repositoryLooksPytestHeavy,
 } from "./imports-shared.ts";
 import { meetsMinimum } from "../rules/shared/evidence.ts";
+import { packageJsonHasCraDependency } from "../repository-package-helpers.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
 import {
@@ -279,7 +280,10 @@ async function repositoryHasJavaScriptBuildConfigEvidence(
   }
 
   const packageJsonEntry = await scanContext.loadPackageJson();
-  return /"workspaces"\s*:/.test(packageJsonEntry.text ?? "");
+  return (
+    /"workspaces"\s*:/.test(packageJsonEntry.text ?? "") ||
+    Boolean(packageJsonEntry.value && packageJsonHasCraDependency(packageJsonEntry.value))
+  );
 }
 
 async function repositoryHasJavaScriptPackageScriptEvidence(

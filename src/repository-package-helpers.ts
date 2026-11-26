@@ -61,6 +61,12 @@ export function packageJsonHasDependency(
   return false;
 }
 
+export const craDependencyNames = ["react-scripts", "@rescripts/cli", "@craco/craco"] as const;
+
+export function packageJsonHasCraDependency(packageJson: Record<string, unknown>): boolean {
+  return craDependencyNames.some((name) => packageJsonHasDependency(packageJson, name));
+}
+
 export function packageJsonDependencyVersionSpec(
   packageJson: Record<string, unknown>,
   dependencyName: string,

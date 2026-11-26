@@ -2,7 +2,9 @@ import type { AnalysisWarning, Diagnostic, RuleMeta } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
 import {
+  craDependencyNames,
   packageJsonDependencyVersionSpec,
+  packageJsonHasDependency,
   parseSemverLikeVersionSpec,
 } from "../repository-package-helpers.ts";
 import { buildRepositoryDiagnostic } from "./diagnostics.ts";
@@ -13,6 +15,15 @@ const recommendRspackOverWebpackMeta = {
   confidence: "medium",
   docsPath: "docs/rules/recommend-rspack-over-webpack.md",
 } satisfies RuleMeta;
+
+function findCraDependency(packageJson: Record<string, unknown>): string | undefined {
+  return craDependencyNames.find((name) => packageJsonHasDependency(packageJson, name));
+}
+
+function dependencyLine(packageJsonText: string, dependency: string): number {
+  const index = packageJsonText.split("\n").findIndex((line) => line.includes(`"${dependency}"`));
+  return index >= 0 ? index + 1 : 1;
+}
 
 const webpackConfigPatterns = [
   "webpack.config.js",
@@ -85,6 +96,32 @@ export async function collectRecommendRspackOverWebpackDiagnostics(
     return [];
   }
 
+  const relativePath = packageJsonEntry.path.startsWith(repoRoot)
+    ? packageJsonEntry.path.slice(repoRoot.length + 1)
+    : packageJsonEntry.path;
+
+  // CRA hides its webpack config, so the custom-plugin checks below cannot see
+  // it. Give CRA repos their own guidance instead of a drop-in rspack suggestion.
+  const craDependency = findCraDependency(packageJson);
+  if (craDependency) {
+    return [
+      buildRepositoryDiagnostic(repository, recommendRspackOverWebpackMeta, {
+        location: {
+          path: relativePath,
+          line: dependencyLine(packageJsonEntry.text ?? "", craDependency),
+          column: 1,
+        },
+        message: `${craDependency} is used; consider migrating off Create React App to Vite or Rsbuild.`,
+        why: `Create React App relies on an internal webpack build that cannot be swapped for rspack through a normal webpack config. The React team deprecated Create React App for new apps on 2025-02-14 (https://react.dev/blog/2025/02/14/sunsetting-create-react-app). The React blog links a Vite Create React App migration guide (https://www.robinwieruch.de/vite-create-react-app/) and Rsbuild publishes one too (https://rsbuild.dev/guide/migration/cra). Visible evidence: ${craDependency} in package.json.`,
+        suggestion: `Migrate from ${craDependency} to Vite or Rsbuild using their Create React App migration guides. Keep eslint-config-prettier style formatting separate, and verify environment variables, public assets, aliases, and polyfills after the switch.`,
+        measurementHint:
+          "Compare dev server startup time, hot update latency, production build time, and bundle size before and after migrating off Create React App.",
+        aiHandoff: `Review the ${craDependency} setup (including CRACO or rescripts overrides) and migrate to Vite or Rsbuild with the published Create React App guide. Preserve build output behavior and required checks.`,
+        score: 44,
+      }),
+    ];
+  }
+
   const webpackVersionSpec = packageJsonDependencyVersionSpec(packageJson, "webpack");
   if (!webpackVersionSpec) {
     return [];
@@ -124,10 +161,6 @@ export async function collectRecommendRspackOverWebpackDiagnostics(
   if (skipReasons.length > 0) {
     return [];
   }
-
-  const relativePath = packageJsonEntry.path.startsWith(repoRoot)
-    ? packageJsonEntry.path.slice(repoRoot.length + 1)
-    : packageJsonEntry.path;
 
   return [
     buildRepositoryDiagnostic(repository, recommendRspackOverWebpackMeta, {
