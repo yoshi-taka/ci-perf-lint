@@ -24,6 +24,8 @@ If this install path is slow enough to matter, measure both options:
 
 For repeated APT package sets on hosted Ubuntu, `awalsh128/cache-apt-pkgs-action@v1` is one concrete package-cache option. Prefer a custom or prebuilt image when the same heavy package set is required on most runs or package installation scripts make cache restore brittle.
 
+On CircleCI, the rule scans visible job commands and treats apt cache steps (`save_cache`/`restore_cache` with apt paths or keys) as coverage. A dedicated internal image is usually preferable when the same package set repeats across jobs.
+
 Keep the change only if total job time improves.
 
 ## Measurement hint

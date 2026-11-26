@@ -19,6 +19,7 @@ import { blacksmithStickyDiskCacheOverlapRule } from "./blacksmith-sticky-disk-c
 import { cacheTerraformProvidersRule } from "./cache-terraform-providers.ts";
 import { cargoBuildBeforeTestRule } from "./cargo-build-before-test.ts";
 import { circleciCheckoutUsesFullCloneRule } from "./circleci-checkout-uses-full-clone.ts";
+import { circleciUnnecessarySetupRemoteDockerRule } from "./circleci-unnecessary-setup-remote-docker.ts";
 import { collapseMultipleGoBuildsInJobRule } from "./collapse-multiple-go-builds-in-job.ts";
 import { considerCachingOsPackagesOrUsingACustomImageRule } from "./consider-caching-os-packages-or-using-a-custom-image.ts";
 import { considerFilterBlobNoneForReleaseMetadataRule } from "./consider-filter-blob-none-for-release-metadata.ts";
@@ -176,6 +177,7 @@ export const allRules = [
   cacheTerraformProvidersRule,
   cargoBuildBeforeTestRule,
   circleciCheckoutUsesFullCloneRule,
+  circleciUnnecessarySetupRemoteDockerRule,
   collapseMultipleGoBuildsInJobRule,
   considerCachingOsPackagesOrUsingACustomImageRule,
   considerDynamodbLocalInMemoryRule,
