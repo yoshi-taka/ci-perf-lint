@@ -1,4 +1,5 @@
 import path from "node:path";
+import { blankOutCodeComments } from "../eslint-config-evidence.ts";
 import type { AnalysisWarning, Diagnostic, RuleMeta, SourceLocation } from "../types.ts";
 import type { RepositorySignals } from "../repository-signals-types.ts";
 import { RepositoryScanContext } from "../repository-scan-context.ts";
@@ -84,6 +85,8 @@ export async function collectAvoidEslintPluginPrettierDiagnostics(
   }
   if (usesPrettierPlugin) {
     configPatterns.push(/eslint-plugin-prettier/gi);
+    configPatterns.push(/\bplugins\s*:\s*\[[^\]]*['"`]prettier['"`]/gi);
+    configPatterns.push(/\bplugins\s*:\s*\{[^}]*\bprettier\b/gi);
   }
 
   // Find the first existing config file with a
@@ -94,7 +97,7 @@ export async function collectAvoidEslintPluginPrettierDiagnostics(
   if (foundConfig) {
     const configText = await context.readTextFileOrWarn(context.resolve(foundConfig));
     if (configText) {
-      const found = findEvidenceLocation(configText, configPatterns);
+      const found = findEvidenceLocation(blankOutCodeComments(configText), configPatterns);
       if (found) {
         location = { path: foundConfig, line: found.line, column: found.column };
       }
@@ -104,7 +107,10 @@ export async function collectAvoidEslintPluginPrettierDiagnostics(
   if (!location) {
     const packageJsonEntry = await context.loadPackageJson();
     if (packageJsonEntry.text) {
-      const found = findEvidenceLocation(packageJsonEntry.text, configPatterns);
+      const found = findEvidenceLocation(
+        blankOutCodeComments(packageJsonEntry.text),
+        configPatterns,
+      );
       if (found) {
         location = {
           path: normalizeRelativePath(repoRoot, packageJsonEntry.path),

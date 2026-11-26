@@ -26,7 +26,14 @@ Typical repo evidence includes:
 
 ## Current heuristic
 
-The rule looks for visible repo-level evidence that Prettier is wired into ESLint.
+The rule looks for visible repo-level evidence that Prettier is wired into ESLint:
+
+- a `prettier` entry in ESLint `plugins` (legacy array, flat-config object, or YAML list)
+- an enabled `prettier/prettier` rule
+- `plugin:prettier/recommended` in `extends`
+- `eslint-plugin-prettier` in package metadata
+
+Comments are ignored. `extends: ["prettier"]` only means `eslint-config-prettier`, which disables ESLint formatting rules and does not run Prettier through ESLint, so it is not evidence.
 
 ## When to ignore it
 
