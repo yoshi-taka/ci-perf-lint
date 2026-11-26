@@ -57,6 +57,24 @@ describe("CI YAML reference normalization", () => {
     });
   }
 
+  test("reference flags ignore indicator text that is plain data", () => {
+    for (const source of [
+      'value: "a*b!c<<d"\n',
+      "run: |\n  echo src/**/*.ts !important\n  cat <<EOF\n",
+      "# * ! <<\nvalue: text\n",
+      "glob: '**/*.yml'\n",
+    ]) {
+      expect(parseDocument(source).hasReferences).toBe(false);
+      expect(parseCiYaml(source, "github-actions").toJS()).toEqual(referenceParse(source).toJS());
+      expect(parseCiYaml(source, "gitlab-ci").toJS()).toEqual(
+        referenceParse(source, { merge: true }).toJS(),
+      );
+    }
+    for (const source of ["a: &a {x: 1}\nb: *a\n", "a: &a {x: 1}\nout: {<<: *a}\n"]) {
+      expect(parseDocument(source, { merge: true }).hasReferences).toBe(true);
+    }
+  });
+
   test("GitHub accepts aliases but rejects merges; quoted << is still data", () => {
     expect(parseCiYaml("a: &a {x: 1}\nout: *a", "github-actions").errors).toEqual([]);
     const merged = parseCiYaml("a: &a {x: 1}\nout: {<<: *a}", "github-actions");

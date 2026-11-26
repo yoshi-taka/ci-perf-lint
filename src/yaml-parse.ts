@@ -86,6 +86,8 @@ export interface ParseDocumentResult {
   tags: Record<string, string>;
   version: string | null;
   explicitVersion: boolean;
+  /** True when aliases or merge directives need a referenced-AST pass. */
+  references: boolean;
 }
 
 interface Trivia {
@@ -661,6 +663,7 @@ class Parser {
       tags: this.tags,
       version: this.version,
       explicitVersion: this.explicitVersion,
+      references: false,
     };
   }
 
@@ -1657,6 +1660,7 @@ class Parser {
       tags: this.tags,
       version: this.version,
       explicitVersion: this.explicitVersion,
+      references: false,
     };
   }
 
@@ -3385,6 +3389,14 @@ class Parser {
     }
   }
 
+  private isFirstNonSpaceOnLine(pos: number): boolean {
+    let probe = this.lineStartIndex(pos);
+    while (probe < this.n && (this.src[probe] === " " || this.src[probe] === "\t")) {
+      probe += 1;
+    }
+    return probe === pos;
+  }
+
   private lineIndentOf(pos: number): number {
     const lineStart = this.lineStartIndex(pos);
     let index = lineStart;
@@ -3972,12 +3984,6 @@ class Parser {
     const node = makeScalar("");
     const start = this.i;
     const context = this.plainContext;
-    const firstLineStart = this.lineStartIndex(start);
-    let firstProbe = firstLineStart;
-    while (firstProbe < this.n && (this.src[firstProbe] === " " || this.src[firstProbe] === "\t")) {
-      firstProbe += 1;
-    }
-    const startAtFirst = firstProbe === start;
     this.reportBadScalarStart(start);
     if (start < this.n && this.src[start] === "%") {
       recover = true;
@@ -4142,7 +4148,7 @@ class Parser {
         this.src[contentPos] !== "#" &&
         this.src[contentPos] !== '"' &&
         this.src[contentPos] !== "'" &&
-        (startAtFirst
+        (this.isFirstNonSpaceOnLine(start)
           ? this.lineIndentOf(contentPos) >= this.lineIndentOf(start)
           : this.lineIndentOf(contentPos) >
             (parentIndent >= 0 ? parentIndent : this.lineIndentOf(start))) &&
@@ -5139,20 +5145,56 @@ function resolveFloatCandidates(
   return candidates;
 }
 
+const coreImplicitCandidates: { tag: string; format?: string; variant?: number }[] = [
+  { tag: "null" },
+  { tag: "bool" },
+  ...resolveIntCandidates("core"),
+  ...resolveFloatCandidates("core"),
+];
+
+const legacyImplicitCandidates: { tag: string; format?: string; variant?: number }[] = [
+  { tag: "null" },
+  { tag: "bool", variant: 0 },
+  { tag: "bool", variant: 1 },
+  ...resolveIntCandidates("yaml-1.1"),
+  ...resolveFloatCandidates("yaml-1.1"),
+  { tag: "timestamp" },
+];
+
 function implicitCandidates(
   schema: "core" | "yaml-1.1",
 ): { tag: string; format?: string; variant?: number }[] {
-  const candidates: { tag: string; format?: string; variant?: number }[] = [{ tag: "null" }];
-  if (schema === "yaml-1.1") {
-    candidates.push({ tag: "bool", variant: 0 }, { tag: "bool", variant: 1 });
-  } else {
-    candidates.push({ tag: "bool" });
+  return schema === "yaml-1.1" ? legacyImplicitCandidates : coreImplicitCandidates;
+}
+
+/** Every implicit core/1.1 candidate starts with one of these characters (or is empty). */
+function canResolveImplicit(source: string): boolean {
+  const first = source.charCodeAt(0);
+  if (Number.isNaN(first)) {
+    return true;
   }
-  candidates.push(...resolveIntCandidates(schema), ...resolveFloatCandidates(schema));
-  if (schema === "yaml-1.1") {
-    candidates.push({ tag: "timestamp" });
+  if (first >= 48 && first <= 57) {
+    return true;
   }
-  return candidates;
+  switch (first) {
+    case 43: // +
+    case 45: // -
+    case 46: // .
+    case 126: // ~
+    case 70: // F
+    case 78: // N
+    case 79: // O
+    case 84: // T
+    case 89: // Y
+    case 102: // f
+    case 110: // n
+    case 111: // o
+    case 116: // t
+    case 121: // y
+      return true;
+    default:
+      return false;
+  }
 }
 
 function resolveWithCandidates(
@@ -5196,6 +5238,7 @@ interface ResolveContext {
   warn(code: string, message: string, range: Range | [number, number]): void;
   error(code: string, message: string, range: Range | [number, number]): void;
   duplicate(start: number, end: number): void;
+  reference(): void;
 }
 
 const PREFIX = "tag:yaml.org,2002:";
@@ -5322,23 +5365,32 @@ function resolveScalar(
     node.mergeKey = true;
     return;
   }
-  if (resolveWithCandidates(node, implicitCandidates(schema), schema)) {
+  if (
+    canResolveImplicit(node.source) &&
+    resolveWithCandidates(node, implicitCandidates(schema), schema)
+  ) {
     return;
   }
   node.value = node.source;
 }
 
 function resolveDuplicates(items: ParsePairNode[], ctx: ResolveContext): void {
-  const seen: unknown[] = [];
+  // Resolved values are compared by identity. A Set matches that for every
+  // primitive and object except NaN, which the historical `===` scan never
+  // reported as a duplicate; keep that boundary explicit.
+  const seen = new Set<unknown>();
   for (const pair of items) {
     if (pair.key?.kind !== "scalar" || pair.key.mergeKey) {
       continue;
     }
     const value = pair.key.value;
-    if (seen.some((entry) => entry === value)) {
+    if (typeof value === "number" && Number.isNaN(value)) {
+      continue;
+    }
+    if (seen.has(value)) {
       ctx.duplicate(pair.key.range[0], pair.key.range[0] + 1);
     } else {
-      seen.push(value);
+      seen.add(value);
     }
   }
 }
@@ -5354,12 +5406,25 @@ function resolveNode(
     return;
   }
   if (node.kind === "alias") {
+    ctx.reference();
     return;
   }
   if (node.kind === "map") {
     for (const pair of node.items) {
       if (pair.key) {
         resolveNode(pair.key, schema, ctx, true);
+        // Matches resolveYamlAst's merge-directive detection so the referenced
+        // pass can be skipped only when no alias or merge can exist.
+        if (
+          pair.key.kind === "scalar" &&
+          (pair.key.mergeKey === true ||
+            (pair.key.mergeKey !== false &&
+              pair.key.type === "PLAIN" &&
+              pair.key.source === "<<" &&
+              pair.key.tag === undefined))
+        ) {
+          ctx.reference();
+        }
       }
       if (pair.value) {
         resolveNode(pair.value, schema, ctx, false);
@@ -5475,6 +5540,7 @@ function resolveCollections(
 export function parseYaml(source: string): ParseDocumentResult {
   const parser = new Parser(source);
   const result = parser.parse();
+  let references = false;
   if (result.contents) {
     resolveNode(result.contents, result.schema, {
       warn(code, message, range) {
@@ -5486,7 +5552,11 @@ export function parseYaml(source: string): ParseDocumentResult {
       duplicate(start, end) {
         parser.recordErrorSorted("DUPLICATE_KEY", "Map keys must be unique", start, end);
       },
+      reference() {
+        references = true;
+      },
     });
+    result.references = references;
   }
   const isSoft = (diagnostic: ParseDiagnostic): boolean => {
     return (diagnostic as unknown as { soft?: boolean }).soft === true;

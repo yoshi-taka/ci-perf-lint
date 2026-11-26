@@ -187,6 +187,39 @@ describe("YAML compatibility boundary", () => {
     ).toContain("MULTIPLE_DOCS");
   });
 
+  test("resolved-value duplicate detection stays exact in large mappings", () => {
+    const unique = ["root:", "  1: integer"];
+    for (let index = 0; index < 2000; index += 1) {
+      unique.push(`  key${index}: value${index}`);
+    }
+    expect(parseDocument(`${unique.join("\n")}\n`).errors).toEqual([]);
+
+    const duplicated = [...unique, "  1.0: converted"];
+    const errors = parseDocument(`${duplicated.join("\n")}\n`).errors;
+    expect(errors.map((error) => error.code)).toEqual(["DUPLICATE_KEY"]);
+    expect(errors[0]?.pos[0]).toBe(duplicated.join("\n").indexOf("1.0"));
+
+    // Spelled NaNs share a syntax signature; differently spelled NaNs never
+    // compared identity-equal and must stay distinct after resolution.
+    expect(parseDocument("a: {.nan: one, .nan: two}\n").errors.map((error) => error.code)).toEqual([
+      "DUPLICATE_KEY",
+    ]);
+    expect(parseDocument("a: {.nan: one, .NaN: two}\n").errors).toEqual([]);
+  });
+
+  test("large single-line flow mappings keep order, values and duplicates", () => {
+    const count = 1000;
+    const entries = Array.from({ length: count }, (_, index) => `k${index}: ${index}`);
+    const source = `m: {0: zero, ${entries.join(", ")}, 0.0: converted}\n`;
+    const document = parseDocument(source);
+    expect(document.errors.map((error) => error.code)).toEqual(["DUPLICATE_KEY"]);
+    const value = document.toJS() as { m: Record<string, unknown> };
+    expect(Object.keys(value.m)).toHaveLength(count + 1);
+    expect(value.m.k0).toBe(0);
+    expect(value.m.k999).toBe(999);
+    expect(value.m["0"]).toBe("converted");
+  });
+
   test("prototype-looking YAML keys stay own data properties", () => {
     const document = parseDocument("__proto__: {marker: data}\nconstructor: preserved\n");
     const value = document.toJS() as Record<string, unknown>;

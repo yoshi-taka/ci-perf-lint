@@ -236,6 +236,8 @@ export interface ParsedDocument {
   readonly errors: YamlIssue[];
   readonly warnings: YamlIssue[];
   readonly range?: Range;
+  /** Absent on synthetic documents; false means no alias or merge directive exists. */
+  readonly hasReferences?: boolean;
   get(key: unknown, keepScalar?: boolean): unknown;
   toJS(options?: { maxAliasCount?: number; mapAsMap?: boolean }): unknown;
   toJSON(arg?: string | null): unknown;

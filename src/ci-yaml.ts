@@ -24,9 +24,13 @@ export function parseCiYaml(
   if (document.errors.length || !document.contents) {
     return document;
   }
-  // No references means the syntax tree is already resolved. Aliases require '*';
-  // merge directives require '<<' or an explicit tag ('!'). Avoid cloning normal CI.
-  if (!source.includes("*") && !source.includes("<<") && !source.includes("!")) {
+  // No references means the syntax tree is already resolved. Aliases and merge
+  // directives are recorded by the parser; a '*' in a glob, '!' in an expression,
+  // or '<<' in a heredoc must not trigger a full referenced-AST clone.
+  const references =
+    document.hasReferences ??
+    (source.includes("*") || source.includes("<<") || source.includes("!"));
+  if (!references) {
     return document;
   }
   try {

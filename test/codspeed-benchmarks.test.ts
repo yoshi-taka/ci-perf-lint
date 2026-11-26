@@ -135,7 +135,7 @@ test("CodSpeed shards partition the original benchmark identities exactly once",
     expect(new Set(data.executed).size).toBe(data.executed.length);
     if (shard === undefined) {
       all = data.executed;
-      expect(all).toHaveLength(33);
+      expect(all).toHaveLength(36);
     } else {
       names.push(...data.executed);
       expect(result.stdout).toContain(`[bench] End shard=${shard} elapsed_ms=`);
@@ -147,7 +147,7 @@ test("CodSpeed shards partition the original benchmark identities exactly once",
       };
       const expected = targetsByShard[shard] ?? [];
       expect([...new Set(data.targets)]).toEqual(expected);
-      expect(data.executed).toHaveLength(shard === "micro" ? 30 : 1);
+      expect(data.executed).toHaveLength(shard === "micro" ? 33 : 1);
     }
   }
   expect(names.toSorted()).toEqual(all.toSorted());

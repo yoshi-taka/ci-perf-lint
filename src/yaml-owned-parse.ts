@@ -209,6 +209,7 @@ export function buildOwnedDocument(result: ParseDocumentResult): ParsedDocument 
     errors: result.errors.map((diagnostic) => toIssue(diagnostic, "YAMLParseError")),
     warnings: result.warnings.map((diagnostic) => toIssue(diagnostic, "YAMLWarning")),
     range: [result.range[0], result.range[1], result.range[2]],
+    hasReferences: result.references,
     get: (key, keepScalar) =>
       contents instanceof YAMLMap || contents instanceof YAMLSeq
         ? contents.get(key, keepScalar)

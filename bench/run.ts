@@ -8,6 +8,7 @@ async function main() {
     benches.push(
       (await import("./parse-workflow.bench.ts")).bench,
       (await import("./rule-engine.bench.ts")).bench,
+      (await import("./yaml-shapes.bench.ts")).bench,
     );
   }
   benches.push((await import("./analyze-repository.bench.ts")).bench);

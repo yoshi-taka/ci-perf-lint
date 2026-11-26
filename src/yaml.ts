@@ -60,6 +60,7 @@ function fatalDocument(source: string, error: unknown): ParsedDocument {
     errors: [issue],
     warnings: [],
     range: [0, source.length, source.length],
+    hasReferences: false,
     get: () => undefined,
     toJS: () => null,
     toJSON: () => null,
