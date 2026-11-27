@@ -2,7 +2,9 @@
 
 ## What it flags
 
-Flags workflows that run the same `prettier --check <scope>` twice across steps. The check may be hidden inside a package script, for example `prettier --check . && eslint .` expanded from `npm run check`, while a separate step runs `npm run prettier-check`.
+Flags CI pipelines that run the same `prettier --check <scope>` twice across steps. The check may be hidden inside a package script, for example `prettier --check . && eslint .` expanded from `npm run check`, while a separate step runs `npm run prettier-check`.
+
+All four CI platforms are supported: GitHub Actions, Buildkite, CircleCI, and GitLab CI.
 
 Package scripts are expanded before comparison, including script-to-script delegation. Confidence is high only when the target file scope matches exactly (for example both runs use `.`).
 
