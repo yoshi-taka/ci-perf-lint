@@ -1,0 +1,25 @@
+# Source: zer0-os/zAuction-SDK (.circleci/config.yml)
+version: 2.1
+jobs:
+  checks:
+    parameters:
+      task:
+        type: string
+    docker:
+      - image: cimg/openjdk:21.0
+    steps:
+      - checkout
+      - run: ./gradlew << parameters.task >>
+job-groups:
+  checks-group:
+    jobs:
+      - checks:
+          name: unit
+          task: test
+      - checks:
+          name: integration
+          task: integrationTest
+workflows:
+  ci:
+    jobs:
+      - checks-group:

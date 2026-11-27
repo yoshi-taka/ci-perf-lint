@@ -177,6 +177,40 @@ test("17 branch/tag filter combinations match the documented co-run rules", () =
   }
 });
 
+test("job groups map outer requires to entry jobs and downstream requires to exit jobs", () => {
+  const result = invocations(
+    [
+      "version: 2.1",
+      "jobs:",
+      "  a: {}",
+      "  b: {}",
+      "  downstream: {}",
+      "job-groups:",
+      "  group:",
+      "    jobs:",
+      "      - a:",
+      "          name: first",
+      "      - b:",
+      "          name: last",
+      "          requires: [first]",
+      "workflows:",
+      "  ci:",
+      "    jobs:",
+      "      - group:",
+      "          name: checks",
+      "          requires: [upstream]",
+      "      - downstream:",
+      "          requires: [checks]",
+    ].join("\n"),
+  );
+  const first = result.find((item) => item.alias === "checks/first");
+  const last = result.find((item) => item.alias === "checks/last");
+  const downstream = result.find((item) => item.alias === "downstream");
+  expect(first?.requires).toEqual(["upstream"]);
+  expect(last?.requires).toEqual(["checks/first"]);
+  expect(downstream?.requires).toEqual(["checks/last"]);
+});
+
 test("scalar, array and regex only filters are compared correctly", () => {
   const [
     scalarDevelop,

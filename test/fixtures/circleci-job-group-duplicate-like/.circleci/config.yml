@@ -1,0 +1,25 @@
+# Source: zer0-os/zAuction-SDK (.circleci/config.yml)
+version: 2.1
+jobs:
+  checks:
+    parameters:
+      version:
+        type: string
+    docker:
+      - image: cimg/openjdk:21.0
+    steps:
+      - checkout
+      - run: ./gradlew test
+job-groups:
+  checks-group:
+    jobs:
+      - checks:
+          name: a
+          version: "21"
+      - checks:
+          name: b
+          version: "21"
+workflows:
+  ci:
+    jobs:
+      - checks-group:
