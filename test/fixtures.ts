@@ -60,6 +60,7 @@ const fixtureNames = {
   circleciRemoteDockerMakeMissingOk: "circleci-remote-docker-make-missing-ok",
   circleciRemoteDockerMakeNoDockerLike: "circleci-remote-docker-make-nodocker-like",
   circleciRemoteDockerInlineLike: "circleci-remote-docker-inline-like",
+  circleciAnchorCommentOk: "circleci-anchor-comment-ok",
   circleciDuplicateTestGradleLike: "circleci-duplicate-test-gradle-like",
   circleciDuplicateTestWorkdirOk: "circleci-duplicate-test-workdir-ok",
   circleciDuplicateTestMicroserviceOk: "circleci-duplicate-test-microservice-ok",

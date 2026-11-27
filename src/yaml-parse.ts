@@ -3526,6 +3526,21 @@ class Parser {
       }
       break;
     }
+    // A property on its own line may be followed by a comment before the
+    // block node it applies to. Keep the cursor at the line break so
+    // parseInlineNode can attach the anchor/tag to the following mapping.
+    this.skipInlineSpaces();
+    if (
+      this.flowDepth === 0 &&
+      (props.anchor !== undefined || props.tag !== undefined) &&
+      this.i < this.n &&
+      this.src[this.i] === "#"
+    ) {
+      while (this.i < this.n && !this.isLineBreak(this.i)) {
+        this.i += 1;
+      }
+      this.skipInlineSpaces();
+    }
     return props;
   }
 
