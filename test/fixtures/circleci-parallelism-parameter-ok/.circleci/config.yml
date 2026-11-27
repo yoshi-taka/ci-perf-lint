@@ -1,0 +1,15 @@
+version: 2.1
+parameters:
+  n:
+    type: integer
+    default: 2
+jobs:
+  test:
+    docker: [{image: cimg/base:stable}]
+    parallelism: << parameters.n >>
+    steps:
+      - checkout
+      - run: pytest
+workflows:
+  ci:
+    jobs: [test]

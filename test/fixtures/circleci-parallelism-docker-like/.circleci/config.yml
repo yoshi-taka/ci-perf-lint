@@ -1,0 +1,13 @@
+version: 2.1
+jobs:
+  build:
+    docker: [{image: cimg/base:stable}]
+    resource_class: xlarge
+    parallelism: 3
+    steps:
+      - checkout
+      - run: docker build -t app .
+      - run: docker push app:latest
+workflows:
+  ci:
+    jobs: [build]

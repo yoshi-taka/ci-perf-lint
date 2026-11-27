@@ -35,6 +35,7 @@ Current rule registry:
 - `cdk-bucket-deployment-memory-unconfigured`
 - `cdk-duplicate-asset-hash`
 - `circleci-checkout-uses-full-clone`
+- `circleci-parallelism-without-test-splitting`
 - `circleci-unnecessary-setup-remote-docker`
 - `collapse-multiple-go-builds-in-job`
 - `consider-caching-os-packages-or-using-a-custom-image`

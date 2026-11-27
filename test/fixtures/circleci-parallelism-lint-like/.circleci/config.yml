@@ -1,0 +1,14 @@
+version: 2.1
+jobs:
+  lint:
+    docker: [{image: cimg/base:stable}]
+    resource_class: large
+    parallelism: 4
+    steps:
+      - checkout
+      - run: isort --check-only .
+      - run: black --check .
+      - run: mypy .
+workflows:
+  ci:
+    jobs: [lint]

@@ -1,0 +1,11 @@
+version: 2.1
+jobs:
+  test:
+    docker: [{image: cimg/base:stable}]
+    parallelism: 3
+    steps:
+      - checkout
+      - run: circleci tests glob "test/**/*_test.rb" | circleci tests run --command "bundle exec rspec"
+workflows:
+  ci:
+    jobs: [test]

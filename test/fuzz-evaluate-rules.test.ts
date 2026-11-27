@@ -185,7 +185,7 @@ function validDiagnosticShape(d: unknown): boolean {
   return (
     typeof diag.ruleId === "string" &&
     ["error", "warning", "suggestion"].includes(diag.severity as string) &&
-    ["high", "medium"].includes(diag.confidence as string) &&
+    ["high", "medium", "low"].includes(diag.confidence as string) &&
     typeof diag.message === "string" &&
     typeof diag.workflow === "string" &&
     typeof diag.docsPath === "string" &&

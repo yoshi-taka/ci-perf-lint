@@ -24,6 +24,7 @@ export const RULE_REGISTRY = {
   "cache-terraform-providers": { kind: "workflow" },
   "cargo-build-before-test": { kind: "workflow" },
   "circleci-checkout-uses-full-clone": { kind: "workflow" },
+  "circleci-parallelism-without-test-splitting": { kind: "workflow" },
   "circleci-unnecessary-setup-remote-docker": { kind: "workflow" },
   "collapse-multiple-go-builds-in-job": { kind: "workflow" },
   "consider-caching-os-packages-or-using-a-custom-image": { kind: "workflow" },

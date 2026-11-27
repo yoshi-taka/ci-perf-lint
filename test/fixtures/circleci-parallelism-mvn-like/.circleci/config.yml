@@ -1,0 +1,11 @@
+version: 2.1
+jobs:
+  test:
+    docker: [{image: cimg/base:stable}]
+    parallelism: 3
+    steps:
+      - checkout
+      - run: ./mvnw clean install
+workflows:
+  ci:
+    jobs: [test]

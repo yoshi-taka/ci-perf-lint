@@ -1,0 +1,11 @@
+version: 2.1
+jobs:
+  test:
+    docker: [{image: cimg/base:stable}]
+    parallelism: 3
+    steps:
+      - checkout
+      - run: echo "node $CIRCLE_NODE_INDEX of $CIRCLE_NODE_TOTAL"
+workflows:
+  ci:
+    jobs: [test]
