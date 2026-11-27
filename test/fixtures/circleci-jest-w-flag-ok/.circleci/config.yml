@@ -1,0 +1,20 @@
+# Adapted from snyk/cloud-config-parser (.circleci/config.yml)
+version: 2.1
+defaults: &defaults
+  resource_class: small
+  docker:
+    - image: cimg/node:24.16
+  working_directory: ~/app
+jobs:
+  test:
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: Run tests
+          command: jest --ci -w 2
+workflows:
+  ci:
+    jobs:
+      - test
+

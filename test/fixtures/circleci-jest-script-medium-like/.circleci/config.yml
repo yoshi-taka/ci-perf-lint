@@ -1,0 +1,19 @@
+# Source: snyk/cloud-config-parser (.circleci/config.yml)
+version: 2.1
+defaults: &defaults
+  docker:
+    - image: cimg/node:24.16
+  working_directory: ~/app
+jobs:
+  test:
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: Run tests
+          command: npm test
+workflows:
+  ci:
+    jobs:
+      - test
+

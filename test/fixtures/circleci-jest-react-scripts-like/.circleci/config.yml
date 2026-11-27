@@ -1,0 +1,20 @@
+# Synthetic (created for this test)
+version: 2.1
+defaults: &defaults
+  resource_class: small
+  docker:
+    - image: cimg/node:24.16
+  working_directory: ~/app
+jobs:
+  test:
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: Run tests
+          command: react-scripts test --watchAll=false
+workflows:
+  ci:
+    jobs:
+      - test
+

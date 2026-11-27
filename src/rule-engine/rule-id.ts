@@ -26,6 +26,7 @@ export const RULE_REGISTRY = {
   "circleci-checkout-uses-full-clone": { kind: "workflow" },
   "circleci-checkout-with-full-workspace": { kind: "workflow" },
   "circleci-duplicate-test-across-jobs": { kind: "workflow" },
+  "circleci-jest-without-max-workers": { kind: "workflow" },
   "circleci-legacy-convenience-image": { kind: "workflow" },
   "circleci-node-modules-cache-with-npm-ci": { kind: "workflow" },
   "circleci-parallelism-without-test-splitting": { kind: "workflow" },

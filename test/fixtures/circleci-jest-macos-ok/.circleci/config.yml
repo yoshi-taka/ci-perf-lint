@@ -1,0 +1,18 @@
+# Adapted from intercom/intercom-react-native (.circleci/config.yml)
+version: 2.1
+executors:
+  macos:
+    macos:
+      xcode: 16.0.0
+    resource_class: m4pro.medium
+jobs:
+  test:
+    executor: macos
+    steps:
+      - checkout
+      - run: npx jest --ci
+workflows:
+  ci:
+    jobs:
+      - test
+

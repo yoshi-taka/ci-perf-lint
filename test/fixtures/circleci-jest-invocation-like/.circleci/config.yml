@@ -1,0 +1,21 @@
+# Adapted from snyk/cloud-config-parser (.circleci/config.yml)
+version: 2.1
+defaults: &defaults
+  docker:
+    - image: cimg/node:24.16
+  resource_class: large
+jobs:
+  test:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: npx jest --ci
+workflows:
+  ci:
+    jobs:
+      - test:
+          name: tuned
+          pre-steps:
+            - run: npx jest --ci --maxWorkers=4
+      - test:
+          name: untuned

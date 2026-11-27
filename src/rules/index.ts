@@ -22,6 +22,7 @@ import { cargoBuildBeforeTestRule } from "./cargo-build-before-test.ts";
 import { circleciCheckoutUsesFullCloneRule } from "./circleci-checkout-uses-full-clone.ts";
 import { circleciCheckoutWithFullWorkspaceRule } from "./circleci-checkout-with-full-workspace.ts";
 import { circleciDuplicateTestAcrossJobsRule } from "./circleci-duplicate-test-across-jobs.ts";
+import { circleciJestWithoutMaxWorkersRule } from "./circleci-jest-without-max-workers.ts";
 import { circleciLegacyConvenienceImageRule } from "./circleci-legacy-convenience-image.ts";
 import { circleciNodeModulesCacheWithNpmCiRule } from "./circleci-node-modules-cache-with-npm-ci.ts";
 import { circleciParallelismWithoutTestSplittingRule } from "./circleci-parallelism-without-test-splitting.ts";
@@ -186,6 +187,7 @@ export const allRules = [
   circleciCheckoutUsesFullCloneRule,
   circleciCheckoutWithFullWorkspaceRule,
   circleciDuplicateTestAcrossJobsRule,
+  circleciJestWithoutMaxWorkersRule,
   circleciLegacyConvenienceImageRule,
   circleciNodeModulesCacheWithNpmCiRule,
   circleciParallelismWithoutTestSplittingRule,

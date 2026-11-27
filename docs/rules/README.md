@@ -37,6 +37,7 @@ Current rule registry:
 - `circleci-checkout-uses-full-clone`
 - `circleci-checkout-with-full-workspace`
 - `circleci-duplicate-test-across-jobs`
+- `circleci-jest-without-max-workers`
 - `circleci-legacy-convenience-image`
 - `circleci-node-modules-cache-with-npm-ci`
 - `circleci-parallelism-without-test-splitting`
