@@ -14,6 +14,7 @@ Current rule registry:
 - `avoid-brew-update-on-hosted-macos`
 - `avoid-broad-upload-artifact`
 - `avoid-c-drive-on-windows-runner`
+- `avoid-chown-after-copy-add`
 - `avoid-docker-image-via-uses`
 - `avoid-duplicate-prettier-check`
 - `avoid-eslint-plugin-prettier`

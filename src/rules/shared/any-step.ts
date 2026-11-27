@@ -1,5 +1,6 @@
 /* oxlint-disable typescript/prefer-for-of */
 import type { Node } from "../../yaml.ts";
+import { isSeq } from "../../yaml.ts";
 import type { WorkflowDocument, WorkflowStep } from "../../workflow.ts";
 import type { PipelineDocument, PipelineStep } from "../../buildkite-workflow.ts";
 import type { CircleCiDocument } from "../../circleci-workflow.ts";
@@ -108,10 +109,14 @@ const commandEntryCollectors: Record<string, CIDocumentNormalizer<CIDocument>> =
         continue;
       }
       const commands = step.commands ?? (step.command ? [step.command] : []);
-      for (const cmd of commands) {
+      const commandsSeq = isSeq(step.commandsNode) ? step.commandsNode : undefined;
+      for (let index = 0; index < commands.length; index++) {
+        const node = commandsSeq
+          ? ((commandsSeq.items[index] as Node | undefined) ?? step.commandsNode)
+          : step.commandNode;
         entries.push({
-          text: cmd,
-          node: step.commandNode,
+          text: commands[index]!,
+          node,
           jobName: step.label ?? step.key ?? "(unnamed)",
           stepName: step.label ?? step.key ?? "(unnamed)",
           workingDirectory: undefined,

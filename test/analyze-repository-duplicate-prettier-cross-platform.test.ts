@@ -44,6 +44,7 @@ test("Buildkite commands detect the duplicate check", async () => {
   });
   expect(findings).toHaveLength(1);
   expect(findings[0]?.location.path).toBe(".buildkite/pipeline.yml");
+  expect(findings[0]?.location.line).toBe(4);
   expect(findings[0]?.message).toContain("lint, prettier-check");
 });
 

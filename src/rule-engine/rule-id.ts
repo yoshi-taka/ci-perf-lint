@@ -12,6 +12,7 @@ export const RULE_REGISTRY = {
   "avoid-broad-upload-artifact": { kind: "workflow" },
   "avoid-brew-update-on-hosted-macos": { kind: "workflow" },
   "avoid-c-drive-on-windows-runner": { kind: "workflow" },
+  "avoid-chown-after-copy-add": { kind: "repository" },
   "avoid-docker-image-via-uses": { kind: "workflow" },
   "avoid-duplicate-prettier-check": { kind: "workflow" },
   "avoid-eslint-plugin-prettier": { kind: "workflow" },

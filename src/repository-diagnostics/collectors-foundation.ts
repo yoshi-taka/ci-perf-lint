@@ -8,9 +8,11 @@ import { collectDockerBuildDiagnostics } from "./docker.ts";
 import { collectDockerImageMetadataDiagnostics } from "./docker-image-metadata-diagnostics.ts";
 import { collectDockerBuildRuntimeSeparationDiagnostics } from "./docker-build-runtime-separation.ts";
 import { collectDockerRuntimeBaseImageDiagnostics } from "./docker-runtime-base-image.ts";
+import { collectDockerfileChownAfterCopyDiagnostics } from "./dockerfile-chown-after-copy.ts";
 import { collectDockerExtractsCopiedArchiveDiagnostics } from "./docker-extracts-copied-archive.ts";
 import { collectDockerRuntimeCopiesBuilderRootfsDiagnostics } from "./docker-runtime-copies-builder-rootfs.ts";
 import { collectElixirOtpVersionDiagnostics } from "./elixir-otp-versions.ts";
+import { collectElixirParallelDepsCompileDiagnostics } from "./elixir-parallel-deps-compile.ts";
 import { collectLargeFileDiagnostics } from "./large-files.ts";
 import { collectPreferMiseOverAsdfDiagnostics } from "./prefer-mise-over-asdf.ts";
 
@@ -29,6 +31,11 @@ export const dockerDiagnosticCollectors = [
     id: "docker-image-metadata-diagnostics",
     gate: gateKeys.dockerHeavy,
     collect: collectDockerImageMetadataDiagnostics,
+  },
+  {
+    id: "avoid-chown-after-copy-add",
+    gate: gateKeys.dockerHeavy,
+    collect: collectDockerfileChownAfterCopyDiagnostics,
   },
   {
     id: "dockerfile-extracts-copied-archive",
@@ -82,6 +89,11 @@ export const elixirDiagnosticCollectors = [
     gate: gateKeys.elixirHeavy,
     collect: ({ repoRoot, repository, workflows, warnings, scanContext }) =>
       collectElixirOtpVersionDiagnostics(repoRoot, repository, workflows, warnings, scanContext),
+  },
+  {
+    id: "prefer-elixir-parallel-deps-compile",
+    gate: gateKeys.elixirHeavy,
+    collect: collectElixirParallelDepsCompileDiagnostics,
   },
 ] satisfies readonly RepositoryDiagnosticCollector[];
 

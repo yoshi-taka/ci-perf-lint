@@ -1,6 +1,8 @@
 # prefer-elixir-parallel-deps-compile
 
-Detects GitHub Actions jobs that use Elixir 1.19+ and run `mix` without enabling parallel dependency compilation.
+Detects CI pipelines that use Elixir 1.19+ and run `mix` without enabling parallel dependency compilation.
+
+GitHub Actions gets a workflow-level finding from `erlef/setup-beam` or an `elixir:` container. A repository-level finding covers CircleCI: the Elixir version comes from `.tool-versions`, and a CircleCI Elixir/beam orb invocation plus a `mix` compile command is the evidence. That repository finding has medium confidence because the orb may already set the variable internally.
 
 ## What it detects
 
