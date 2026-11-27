@@ -1,0 +1,22 @@
+# Source: zer0-os/zAuction-SDK (.circleci/config.yml)
+version: 2.1
+jobs:
+  test:
+    docker:
+      - image: cimg/node:20.20
+    steps:
+      - checkout
+      - run: npm ci
+workflows:
+  ci:
+    jobs:
+      - test:
+          pre-steps:
+            - restore_cache:
+                keys:
+                  - v1-npm-{{ checksum "package.json" }}
+          post-steps:
+            - save_cache:
+                key: v1-npm-{{ checksum "package.json" }}
+                paths:
+                  - ./node_modules
