@@ -29,6 +29,8 @@ export interface CircleCiStep {
   type: string;
   expandedFromOrb?: boolean;
   orbUnresolved?: boolean;
+  /** Step came from a when/unless block whose condition was not statically decidable. */
+  conditional?: boolean;
   invocationNode?: Node;
   name?: string;
   nameNode?: Node;

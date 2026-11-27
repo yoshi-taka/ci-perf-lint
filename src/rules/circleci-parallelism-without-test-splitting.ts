@@ -3,6 +3,8 @@ import type { RuleMeta } from "../types.ts";
 import type { CircleCiDocument } from "../circleci-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { traceCommandReferences } from "./shared/command-reference-tracing.ts";
+import { jobIsFullyOverridden } from "./shared/circleci-effective-steps.ts";
+import { collectCircleCiWorkflowInvocations } from "../circleci-workflow-graph.ts";
 
 const meta = {
   id: "circleci-parallelism-without-test-splitting",
@@ -49,6 +51,9 @@ export const circleciParallelismWithoutTestSplittingRule = {
       if (typeof job.parallelism !== "number" || job.parallelism < 2) {
         continue;
       }
+      if (jobIsFullyOverridden(doc, job.name)) {
+        continue;
+      }
       const nodes = job.parallelism;
       const visibleText = job.steps.map((step) => `${step.type} ${step.command ?? ""}`).join("\n");
       if (SPLIT_SIGNAL.test(visibleText)) {
@@ -78,11 +83,15 @@ export const circleciParallelismWithoutTestSplittingRule = {
       }
 
       const resource = job.resourceClass ? ` on ${job.resourceClass}` : "";
+      const label =
+        collectCircleCiWorkflowInvocations(doc).find(
+          (invocation) => invocation.jobName === job.name && !invocation.overrideWith,
+        )?.alias ?? job.name;
       findings.push(
         buildDiagnostic(doc, meta, job.parallelismNode ?? job.node, {
           severity: lowConfidence ? "suggestion" : undefined,
           confidence: lowConfidence ? "low" : undefined,
-          message: `Job "${job.name}" uses parallelism: ${nodes}${resource}. Each of the ${nodes} nodes repeats the same work.`,
+          message: `Job "${label}" uses parallelism: ${nodes}${resource}. Each of the ${nodes} nodes repeats the same work.`,
           why: `CircleCI starts ${nodes} identical nodes for this job. ${repeatedWorkDetail(tracedText)} Without a split signal in the step text, the nodes cannot divide the work and the runner cost multiplies by ${nodes}.`,
           suggestion:
             "Remove parallelism for this job, or split the work with `circleci tests run` / `circleci testsuite` so each node handles a distinct shard.",

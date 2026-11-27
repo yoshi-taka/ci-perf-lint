@@ -15,7 +15,8 @@
     "verify:file-count": "bun file-count-models.ts",
     "verify:new-changes": "bun new-changes-models.ts",
     "verify:npm-scripts": "bun npm-script-models.ts",
-    "verify:circleci-filters": "bun circleci-filter-models.ts"
+    "verify:circleci-filters": "bun circleci-filter-models.ts",
+    "verify:circleci-syntax": "bun circleci-syntax-models.ts"
   },
   "devDependencies": {
     "z3-solver": "5.4.1"

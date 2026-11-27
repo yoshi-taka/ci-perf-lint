@@ -67,6 +67,13 @@ bun run --cwd formal verify:models
   and fresh facts across contexts. Rejection is abstracted as settlement; hanging
   I/O, cancellation, multiple worker threads and reentrant callbacks are excluded.
 
+### CircleCI when/unless step expansion (local, optional)
+
+`bun run verify:circleci-syntax` runs `CircleCiSyntax.lean` and compares nine
+when/unless conditions with the real condition evaluator. Lean proves the
+when/unless inclusion rules and Boolean operator laws. It is model evidence,
+not a proof of the YAML parser or full CircleCI condition language.
+
 ### CircleCI branch/tag trigger overlap (local, optional)
 
 `bun run verify:circleci-filters` runs `CircleCiFilters.lean` and compares 17

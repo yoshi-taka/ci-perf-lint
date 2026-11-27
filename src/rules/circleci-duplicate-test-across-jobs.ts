@@ -1,6 +1,6 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
-import type { CircleCiDocument, CircleCiJob } from "../circleci-workflow.ts";
+import type { CircleCiDocument, CircleCiJob, CircleCiStep } from "../circleci-workflow.ts";
 import {
   circleCiInvocationsCanCoRun,
   collectCircleCiWorkflowInvocations,
@@ -9,6 +9,7 @@ import {
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { shellCommandSegments, shellCommands } from "./shared/command-patterns.ts";
 import { traceCommandReferences } from "./shared/command-reference-tracing.ts";
+import { effectiveInvocationSteps } from "./shared/circleci-effective-steps.ts";
 import {
   commandFlagDirectory,
   commandWorkingDirectory,
@@ -38,6 +39,7 @@ const NOISE_FLAG = new Set([
 interface TestSignature {
   key: string;
   implied: boolean;
+  conditional?: boolean;
   hasClean: boolean;
 }
 
@@ -87,6 +89,7 @@ function signatureFromTokens(tokens: string[]): TestSignature | undefined {
     return {
       key: `gradle:${task}:${selectionOf(args).join(" ")}`,
       implied,
+      conditional: false,
       hasClean,
     };
   }
@@ -104,6 +107,7 @@ function signatureFromTokens(tokens: string[]): TestSignature | undefined {
     return {
       key: `maven:${explicit ? "test" : "lifecycle"}:${selectionOf(args).join(" ")}`,
       implied,
+      conditional: false,
       hasClean,
     };
   }
@@ -179,6 +183,7 @@ function runtimeIdentity(
 }
 
 async function jobSignatures(
+  steps: readonly CircleCiStep[],
   job: CircleCiJob,
   doc: CircleCiDocument,
   parameters: ReadonlyMap<string, string>,
@@ -192,7 +197,7 @@ async function jobSignatures(
   const runtime = runtimeIdentity(job, doc, parameters);
   const signatures = new Map<string, TestSignature>();
 
-  for (const step of job.steps) {
+  for (const step of steps) {
     if (step.type !== "run") {
       continue;
     }
@@ -216,19 +221,14 @@ async function jobSignatures(
         directory ??
         `unresolved:${JSON.stringify([...parameters.entries()].sort(([a], [b]) => a.localeCompare(b)))}`;
       const key = `${signature.key}|dir=${scope}|runtime=${runtime}`;
-      signatures.set(key, { ...signature, key });
+      signatures.set(key, {
+        ...signature,
+        key,
+        conditional: step.conditional === true || signature.conditional === true,
+      });
     }
   }
   return [...signatures.values()];
-}
-
-function jobHasOpaqueOrb(job: CircleCiJob): boolean {
-  return job.steps.some((step) => {
-    if (step.orbUnresolved) {
-      return true;
-    }
-    return step.type.includes("/") && !["checkout", "run"].includes(step.type);
-  });
 }
 
 function sameParameters(a: CircleCiWorkflowInvocation, b: CircleCiWorkflowInvocation): boolean {
@@ -248,7 +248,7 @@ export const circleciDuplicateTestAcrossJobsRule = {
   async check(doc: CircleCiDocument, context: RuleContext) {
     const jobs = new Map(doc.jobs.map((job) => [job.name, job]));
     const invocations = collectCircleCiWorkflowInvocations(doc).filter(
-      (invocation) => !invocation.matrix,
+      (invocation) => !invocation.matrix && !invocation.overrideWith,
     );
     const signaturesByJob = new Map<string, TestSignature[]>();
     const skipped = new Set<string>();
@@ -257,19 +257,28 @@ export const circleciDuplicateTestAcrossJobsRule = {
       if (!job || skipped.has(job.name)) {
         continue;
       }
-      const allText = job.steps.map((step) => `${step.type} ${step.command ?? ""}`).join("\n");
+      const effectiveSteps = effectiveInvocationSteps(doc, job, invocation);
+      if (!effectiveSteps) {
+        continue;
+      }
+      const allText = effectiveSteps.map((step) => `${step.type} ${step.command ?? ""}`).join("\n");
+      const opaque = effectiveSteps.some(
+        (step) =>
+          step.orbUnresolved === true ||
+          (step.type.includes("/") && !["checkout", "run"].includes(step.type)),
+      );
       if (
         (typeof job.parallelism === "number" &&
           job.parallelism >= 2 &&
           SPLIT_SIGNAL.test(allText)) ||
-        jobHasOpaqueOrb(job)
+        opaque
       ) {
         skipped.add(job.name);
         continue;
       }
       signaturesByJob.set(
         `${job.name}:${JSON.stringify([...invocation.parameters.entries()].sort(([a], [b]) => a.localeCompare(b)))}`,
-        await jobSignatures(job, doc, invocation.parameters, context),
+        await jobSignatures(effectiveSteps, job, doc, invocation.parameters, context),
       );
     }
 
@@ -279,6 +288,7 @@ export const circleciDuplicateTestAcrossJobsRule = {
         invocations: CircleCiWorkflowInvocation[];
         implied: boolean;
         uncertain: boolean;
+        conditional: boolean;
         hasClean: boolean;
       }
     >();
@@ -294,11 +304,13 @@ export const circleciDuplicateTestAcrossJobsRule = {
           invocations: [],
           implied: false,
           uncertain: false,
+          conditional: false,
           hasClean: false,
         };
         group.invocations.push(invocation);
         group.implied ||= signature.implied;
         group.uncertain ||= invocation.uncertain;
+        group.conditional ||= signature.conditional === true;
         group.hasClean ||= signature.hasClean;
         groups.set(key, group);
       }
@@ -333,7 +345,8 @@ export const circleciDuplicateTestAcrossJobsRule = {
       const job = jobs.get(first.jobName);
       findings.push(
         buildDiagnostic(doc, meta, first.node ?? job?.node, {
-          confidence: group.implied || group.uncertain ? "medium" : undefined,
+          confidence:
+            group.implied || group.uncertain ? "medium" : group.conditional ? "low" : undefined,
           message: `Jobs ${members.map((member) => `"${member.alias}"`).join(", ")} run the same test command on the same scope; the suite runs ${members.length} times per pipeline${group.hasClean ? " and at least one run starts with clean, so no cache can help" : ""}.`,
           why: "Identical test invocations on the same scope repeat the whole suite. The extra runs consume runner minutes without adding coverage.",
           suggestion:

@@ -21,6 +21,15 @@ export interface CircleCiWorkflowInvocation {
   requires: string[];
   filters: CircleCiInvocationFilters;
   matrix: boolean;
+  /** Pre/post steps attached to this specific workflow invocation. */
+  preSteps?: Node;
+  postSteps?: Node;
+  /** Orb job that replaces the local job body. */
+  overrideWith?: string;
+  /** Name of the job group this invocation was expanded from. */
+  groupName?: string;
+  /** CircleCI serial-group carried from the group invocation. */
+  serialGroup?: string;
   parameters: ReadonlyMap<string, string>;
   /** Expression-based conditions cannot be decided statically. */
   uncertain: boolean;
@@ -132,12 +141,70 @@ function invocationFromConfig(
     requires,
     filters: parseFilters(mapConfig?.get("filters", true)),
     matrix: mapConfig?.get("matrix", true) !== undefined,
+    preSteps: mapConfig ? (mapConfig.get("pre-steps", true) as Node | undefined) : undefined,
+    postSteps: mapConfig ? (mapConfig.get("post-steps", true) as Node | undefined) : undefined,
+    overrideWith: plainText(mapConfig?.get("override-with", true)),
+    serialGroup: plainText(mapConfig?.get("serial-group", true)),
     parameters,
     uncertain: /pipeline\.git\.|==/.test(
       JSON.stringify((mapConfig as { toJSON?: () => unknown } | undefined)?.toJSON?.() ?? ""),
     ),
     node,
   };
+}
+
+function parseJobsNode(
+  workflowName: string,
+  jobsNode: Node | undefined,
+): CircleCiWorkflowInvocation[] {
+  const invocations: CircleCiWorkflowInvocation[] = [];
+  if (!isSeq(jobsNode)) {
+    return invocations;
+  }
+  for (const item of jobsNode.items) {
+    const scalarJob = scalarText(item);
+    if (scalarJob) {
+      invocations.push({
+        workflowName,
+        jobName: scalarJob,
+        alias: scalarJob,
+        requires: [],
+        filters: {},
+        matrix: false,
+        preSteps: undefined,
+        postSteps: undefined,
+        overrideWith: undefined,
+        serialGroup: undefined,
+        parameters: new Map(),
+        uncertain: false,
+        node: undefined,
+      });
+      continue;
+    }
+    if (!isMap(item)) {
+      continue;
+    }
+    const explicitJob = plainText(item.get("job", true));
+    if (explicitJob) {
+      const invocation = invocationFromConfig(workflowName, explicitJob, item, item);
+      if (invocation) {
+        invocations.push(invocation);
+      }
+      continue;
+    }
+    for (const pair of item.items) {
+      const jobName = scalarText(pair.key);
+      if (!jobName || RESERVED_KEYS.has(jobName)) {
+        continue;
+      }
+      const invocation = invocationFromConfig(workflowName, jobName, pair.value, item);
+      if (invocation) {
+        invocations.push(invocation);
+      }
+      break;
+    }
+  }
+  return invocations;
 }
 
 /** Parse both `- job:` references and the standard `- <job-name>:` form. */
@@ -149,61 +216,83 @@ export function collectCircleCiWorkflowInvocations(
     return [];
   }
 
-  const invocations: CircleCiWorkflowInvocation[] = [];
+  const groupDefinitions = new Map<string, Node>();
+  const groupsNode = doc.root?.get("job-groups", true);
+  if (isMap(groupsNode)) {
+    for (const pair of groupsNode.items) {
+      const groupName = scalarText(pair.key);
+      if (!groupName || !isMap(pair.value)) {
+        continue;
+      }
+      const jobsNode = pair.value.get("jobs", true);
+      if (isSeq(jobsNode)) {
+        groupDefinitions.set(groupName, jobsNode);
+      }
+    }
+  }
+
+  const parsed: CircleCiWorkflowInvocation[] = [];
   for (const workflowPair of workflows.items) {
     const workflowName = scalarText(workflowPair.key);
     if (!workflowName || !isMap(workflowPair.value)) {
       continue;
     }
-    const jobsNode = workflowPair.value.get("jobs", true);
-    if (!isSeq(jobsNode)) {
+    parsed.push(
+      ...parseJobsNode(workflowName, workflowPair.value.get("jobs", true) as Node | undefined),
+    );
+  }
+  return expandJobGroups(parsed, groupDefinitions);
+}
+
+function expandJobGroups(
+  invocations: readonly CircleCiWorkflowInvocation[],
+  groupDefinitions: ReadonlyMap<string, Node>,
+): CircleCiWorkflowInvocation[] {
+  const result: CircleCiWorkflowInvocation[] = [];
+  const exitAliases = new Map<string, string[]>();
+
+  for (const invocation of invocations) {
+    if (!groupDefinitions.has(invocation.jobName)) {
+      result.push(invocation);
       continue;
     }
-
-    for (const item of jobsNode.items) {
-      const scalarJob = scalarText(item);
-      if (scalarJob) {
-        invocations.push({
-          workflowName,
-          jobName: scalarJob,
-          alias: scalarJob,
-          requires: [],
-          filters: {},
-          matrix: false,
-          parameters: new Map(),
-          uncertain: false,
-          node: undefined,
-        });
-        continue;
-      }
-      if (!isMap(item)) {
-        continue;
-      }
-
-      const explicitJob = plainText(item.get("job", true));
-      if (explicitJob) {
-        const invocation = invocationFromConfig(workflowName, explicitJob, item, item);
-        if (invocation) {
-          invocations.push(invocation);
-        }
-        continue;
-      }
-
-      // Standard CircleCI form: `- test-coverage-report:` with nested options.
-      for (const pair of item.items) {
-        const jobName = scalarText(pair.key);
-        if (!jobName || RESERVED_KEYS.has(jobName)) {
-          continue;
-        }
-        const invocation = invocationFromConfig(workflowName, jobName, pair.value, item);
-        if (invocation) {
-          invocations.push(invocation);
-        }
-        break;
-      }
+    const inner = parseJobsNode(invocation.workflowName, groupDefinitions.get(invocation.jobName));
+    const requiredInside = new Set(inner.flatMap((item) => item.requires));
+    const prefix = (alias: string) => `${invocation.alias}/${alias}`;
+    const expanded = inner.map((item) => ({
+      ...item,
+      alias: prefix(item.alias),
+      requires: item.requires.map(prefix),
+      filters: invocation.filters,
+      serialGroup: invocation.serialGroup ?? item.serialGroup,
+      groupName: invocation.jobName,
+      preSteps: item.preSteps ?? invocation.preSteps,
+      postSteps: item.postSteps ?? invocation.postSteps,
+      node: item.node ?? invocation.node,
+    }));
+    const exitAliasesForGroup = expanded
+      .filter((item) => !requiredInside.has(item.alias.replace(`${invocation.alias}/`, "")))
+      .map((item) => item.alias);
+    exitAliases.set(invocation.alias, exitAliasesForGroup);
+    for (const item of expanded) {
+      result.push({
+        ...item,
+        requires:
+          item.requires.length === 0
+            ? invocation.requires.flatMap(
+                (requirement) => exitAliases.get(requirement) ?? [requirement],
+              )
+            : item.requires,
+      });
     }
   }
-  return invocations;
+
+  return result.map((invocation) => ({
+    ...invocation,
+    requires: invocation.requires.flatMap(
+      (requirement) => exitAliases.get(requirement) ?? [requirement],
+    ),
+  }));
 }
 
 function isBranchRegex(value: string): boolean {

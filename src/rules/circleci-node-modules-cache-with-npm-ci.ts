@@ -8,6 +8,9 @@ import {
 import type { Node } from "../yaml.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { npmCiIsGuarded } from "./shared/npm-ci-guards.ts";
+import { downgradeCircleCiConfidence } from "./shared/circleci-conditions.ts";
+import { collectCircleCiWorkflowInvocations } from "../circleci-workflow-graph.ts";
+import { effectiveInvocationSteps } from "./shared/circleci-effective-steps.ts";
 
 const meta = {
   id: "circleci-node-modules-cache-with-npm-ci",
@@ -64,18 +67,28 @@ function findWastedRestore(jobSteps: readonly CircleCiStep[], allSaves: readonly
 export const circleciNodeModulesCacheWithNpmCiRule = {
   meta,
   check(doc: CircleCiDocument, _context: RuleContext) {
-    const allSaves = doc.jobs.flatMap((job) =>
-      job.steps.filter((step) => step.type === "save_cache"),
+    const jobsByName = new Map(doc.jobs.map((job) => [job.name, job]));
+    const invocations = collectCircleCiWorkflowInvocations(doc);
+    const effective = invocations.flatMap((invocation) => {
+      const job = jobsByName.get(invocation.jobName);
+      const steps = job ? effectiveInvocationSteps(doc, job, invocation) : undefined;
+      return steps ? [{ invocation, steps }] : [];
+    });
+    const allSaves = effective.flatMap(({ steps }) =>
+      steps.filter((step) => step.type === "save_cache"),
     );
     const npmCacheAlsoSaved = allSaves.some((step) => pathsMatchCache(step.cachePaths, NPM_CACHE));
-    const matches = new Map<string, { jobNames: string[]; node: Node | undefined }>();
+    const matches = new Map<
+      string,
+      { jobNames: string[]; node: Node | undefined; conditional: boolean }
+    >();
 
-    for (const job of doc.jobs) {
-      const wastedRestores = findWastedRestore(job.steps, allSaves);
+    for (const { invocation, steps } of effective) {
+      const wastedRestores = findWastedRestore(steps, allSaves);
       if (wastedRestores.length === 0) {
         continue;
       }
-      const unguardedCi = job.steps.find(
+      const unguardedCi = steps.find(
         (step) =>
           step.type === "run" &&
           NPM_CI.test(step.command ?? "") &&
@@ -88,11 +101,13 @@ export const circleciNodeModulesCacheWithNpmCiRule = {
         const locationNode = wasted.restore.restoreKeysNode ?? wasted.restore.node;
         const location = getCircleCiLocation(doc, locationNode);
         const key = `${location.path}:${location.line}:${location.column}`;
+        const conditional = wasted.restore.conditional === true || unguardedCi.conditional === true;
         const existing = matches.get(key);
         if (existing) {
-          existing.jobNames.push(job.name);
+          existing.jobNames.push(invocation.alias);
+          existing.conditional ||= conditional;
         } else {
-          matches.set(key, { jobNames: [job.name], node: locationNode });
+          matches.set(key, { jobNames: [invocation.alias], node: locationNode, conditional });
         }
       }
     }
@@ -105,6 +120,7 @@ export const circleciNodeModulesCacheWithNpmCiRule = {
       const jobNames = [...new Set(match.jobNames)];
       return buildDiagnostic(doc, meta, match.node, {
         severity: npmCacheAlsoSaved ? "suggestion" : undefined,
+        confidence: match.conditional ? downgradeCircleCiConfidence(meta.confidence) : undefined,
         message: `${jobNames.map((name) => `"${name}"`).join(", ")} restore a node_modules cache and then run npm ci, which deletes node_modules before installing.`,
         why: `The restored cache is wasted: npm ci removes node_modules first. CircleCI's dependency caching docs recommend caching ~/.npm instead. ${npmCacheAlsoSaved ? "A ~/.npm cache is already present, so the node_modules entry in the cache is redundant." : ""}`,
         suggestion: npmCacheAlsoSaved

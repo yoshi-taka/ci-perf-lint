@@ -1,0 +1,27 @@
+# Source: argotorg/solc-js (.circleci/config.yml)
+version: 2.1
+jobs:
+  test:
+    parameters:
+      cache:
+        type: boolean
+        default: true
+    docker:
+      - image: cimg/node:20.20
+    steps:
+      - checkout
+      - when:
+          condition: << parameters.cache >>
+          steps:
+            - restore_cache:
+                keys:
+                  - v1-npm-{{ checksum "package.json" }}
+            - run: npm ci
+            - save_cache:
+                key: v1-npm-{{ checksum "package.json" }}
+                paths:
+                  - ./node_modules
+workflows:
+  ci:
+    jobs:
+      - test:

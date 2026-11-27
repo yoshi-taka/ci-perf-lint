@@ -1,10 +1,12 @@
 import type { AnalysisWarning } from "./types.ts";
 import { isMap, isNode, isScalar, isSeq, type Node, type YAMLMap } from "./yaml.ts";
+import { evaluateCircleCiCondition } from "./rules/shared/circleci-conditions.ts";
 import {
   parseCircleCiSteps,
   type CircleCiDocument,
   type CircleCiStep,
 } from "./circleci-workflow.ts";
+import type { JsonValue } from "./rules/shared/circleci-conditions.ts";
 
 const MAX_EXPANSION_DEPTH = 12;
 const SPECIAL_ORBS = new Set(["circleci/continuation", "circleci/path-filtering"]);
@@ -31,6 +33,25 @@ function nodeAt(map: YAMLMap<unknown, unknown>, key: string): Node | undefined {
 function mapAt(map: YAMLMap<unknown, unknown>, key: string): YAMLMap<unknown, unknown> | undefined {
   const node = nodeAt(map, key);
   return node && isMap(node) ? node : undefined;
+}
+
+function parameterDefaults(node: YAMLMap<unknown, unknown> | undefined): Map<string, string> {
+  const defaults = new Map<string, string>();
+  const parameters = node ? mapAt(node, "parameters") : undefined;
+  for (const pair of parameters?.items ?? []) {
+    const name = scalarValue(pair.key);
+    const definition = isMap(pair.value) ? pair.value : undefined;
+    const value = definition ? scalarValue(definition.get("default", true)) : undefined;
+    if (name && value !== undefined) {
+      defaults.set(name, value);
+    }
+  }
+  return defaults;
+}
+
+function conditionValue(step: CircleCiStep): JsonValue | undefined {
+  const condition = step.node.get("condition", true) ?? step.node.items[0]?.value;
+  return (isNode(condition) ? condition.toJSON() : condition) as JsonValue | undefined;
 }
 
 function mapDefinition(
@@ -62,13 +83,19 @@ function cloneStepAt(step: CircleCiStep, invocationNode: Node | undefined): Circ
   };
 }
 
+interface ExpandOptions {
+  depth: number;
+  active: Set<string>;
+  parameters: ReadonlyMap<string, string>;
+  invocationNode?: Node;
+}
+
 function expandSteps(
   steps: CircleCiStep[],
   scope: CommandScope,
-  depth: number,
-  active: Set<string>,
-  invocationNode?: Node,
+  options: ExpandOptions,
 ): CircleCiStep[] {
+  const { depth, active, parameters, invocationNode } = options;
   if (depth > MAX_EXPANSION_DEPTH) {
     return steps;
   }
@@ -76,15 +103,27 @@ function expandSteps(
   for (const step of steps) {
     const node = invocationNode ?? step.node;
     if (step.type === "when" || step.type === "unless") {
-      const args = isMap(step.node.items[0]?.value) ? step.node.items[0].value : undefined;
-      const nestedSteps = args ? nodeAt(args, "steps") : undefined;
+      const condition = evaluateCircleCiCondition(conditionValue(step), parameters);
+      const include = step.type === "when" ? condition !== false : condition !== true;
+      if (!include) {
+        continue;
+      }
+      const nestedSteps = nodeAt(step.node, "steps");
       if (nestedSteps && isSeq(nestedSteps)) {
+        const nested = expandSteps(parseCircleCiSteps(nestedSteps), scope, {
+          depth: depth + 1,
+          active,
+          parameters,
+          invocationNode: node,
+        });
         expanded.push(
-          ...expandSteps(parseCircleCiSteps(nestedSteps), scope, depth + 1, active, node),
+          ...(condition === undefined
+            ? nested.map((nestedStep) => ({ ...nestedStep, conditional: true }))
+            : nested),
         );
         continue;
       }
-      expanded.push(cloneStepAt(step, node));
+      expanded.push({ ...cloneStepAt(step, node), conditional: true });
       continue;
     }
 
@@ -93,8 +132,14 @@ function expandSteps(
       const commandSteps = command ? nodeAt(command, "steps") : undefined;
       if (commandSteps && isSeq(commandSteps) && !active.has(step.type)) {
         active.add(step.type);
+        const commandParameters = new Map([...parameters, ...parameterDefaults(command)]);
         expanded.push(
-          ...expandSteps(parseCircleCiSteps(commandSteps), scope, depth + 1, active, node),
+          ...expandSteps(parseCircleCiSteps(commandSteps), scope, {
+            depth: depth + 1,
+            active,
+            parameters: commandParameters,
+            invocationNode: node,
+          }),
         );
         active.delete(step.type);
         continue;
@@ -145,6 +190,25 @@ function unresolvedOrbReferences(document: CircleCiDocument): string[] {
   return [...new Set(references)].sort();
 }
 
+/** Expand a step sequence (for example pre-steps/post-steps) with invocation parameters. */
+export function expandCircleCiStepNodes(
+  document: CircleCiDocument,
+  node: Node | undefined,
+  parameters: ReadonlyMap<string, string>,
+): CircleCiStep[] {
+  if (!node || !document.root || !isSeq(node)) {
+    return [];
+  }
+  const scope: CommandScope = {
+    commands: mapDefinition(mapAt(document.root, "commands")),
+  };
+  return expandSteps(parseCircleCiSteps(node), scope, {
+    depth: 0,
+    active: new Set(),
+    parameters,
+  });
+}
+
 export function expandCircleCiCommands(
   document: CircleCiDocument,
   warnings: AnalysisWarning[],
@@ -170,7 +234,11 @@ export function expandCircleCiCommands(
     ...document,
     jobs: document.jobs.map((job) => ({
       ...job,
-      steps: expandSteps(job.steps, scope, 0, new Set()),
+      steps: expandSteps(job.steps, scope, {
+        depth: 0,
+        active: new Set(),
+        parameters: parameterDefaults(job.node),
+      }),
     })),
   };
 }

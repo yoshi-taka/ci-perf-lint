@@ -23,6 +23,11 @@ import { dependencyCacheJobIsReleaseLike } from "./shared/dependency-cache-relea
 import { collectCommandEntries, type CIDocument } from "./shared/any-step.ts";
 import { detectInstallCommandFromText } from "./shared/tools-text.ts";
 import { isMap } from "../yaml.ts";
+import {
+  collectCircleCiWorkflowInvocations,
+  type CircleCiWorkflowInvocation,
+} from "../circleci-workflow-graph.ts";
+import { invocationCacheSteps } from "./shared/circleci-effective-steps.ts";
 
 export const FAMILY_CACHE_MATCHERS: Record<DependencyFamily, string[]> = {
   npm: [".npm", "npm-cache"],
@@ -99,10 +104,26 @@ const meta = {
 function circleCiCacheCovered(
   doc: Extract<CIDocument, { kind: "circleci" }>,
   jobName: string,
+  invocations: readonly CircleCiWorkflowInvocation[],
 ): boolean {
   const job = doc.jobs.find((candidate) => candidate.name === jobName);
-  return Boolean(
-    job?.steps.some((step) => step.type === "save_cache" || step.type === "restore_cache"),
+  if (!job) {
+    return false;
+  }
+  const relevant = invocations.filter(
+    (invocation) => invocation.jobName === jobName && !invocation.overrideWith,
+  );
+  if (relevant.length === 0 && invocations.some((inv) => inv.jobName === jobName)) {
+    // Every invocation replaces the local job body with an opaque orb job.
+    return true;
+  }
+  if (relevant.length === 0) {
+    return job.steps.some((step) => step.type === "save_cache" || step.type === "restore_cache");
+  }
+  return relevant.every((invocation) =>
+    (invocationCacheSteps(doc, job, invocation) ?? []).some(
+      (step) => step.type === "save_cache" || step.type === "restore_cache",
+    ),
   );
 }
 
@@ -125,6 +146,8 @@ function checkNonGitHubDependencies(doc: CIDocument, findings: Diagnostic[]): vo
   }
   const familiesByJob = new Map<string, Set<string>>();
   const firstNodeByJob = new Map<string, Parameters<typeof buildDiagnostic>[2]>();
+  const circleCiInvocations =
+    doc.kind === "circleci" ? collectCircleCiWorkflowInvocations(doc) : [];
   for (const entry of collectCommandEntries(doc)) {
     const family = detectInstallCommandFromText(entry.text);
     if (!family) {
@@ -141,7 +164,7 @@ function checkNonGitHubDependencies(doc: CIDocument, findings: Diagnostic[]): vo
   for (const [jobName, families] of familiesByJob) {
     const covered =
       doc.kind === "circleci"
-        ? circleCiCacheCovered(doc, jobName)
+        ? circleCiCacheCovered(doc, jobName, circleCiInvocations)
         : gitlabCacheCovered(doc, jobName);
     if (covered) {
       continue;

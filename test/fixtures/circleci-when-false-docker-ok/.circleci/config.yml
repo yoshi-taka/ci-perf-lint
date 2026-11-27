@@ -1,0 +1,17 @@
+# Source: argotorg/solc-js (.circleci/config.yml)
+version: 2.1
+jobs:
+  build:
+    docker:
+      - image: cimg/node:20.20
+    steps:
+      - checkout
+      - when:
+          condition: false
+          steps:
+            - run: docker build -t app .
+      - run: echo noop
+workflows:
+  ci:
+    jobs:
+      - build:
