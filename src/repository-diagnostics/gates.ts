@@ -16,6 +16,7 @@ import {
   repositoryLooksPytestHeavy,
 } from "./imports-shared.ts";
 import { meetsMinimum } from "../rules/shared/evidence.ts";
+import { circleCiHasElixirOrbEvidence } from "../circleci-elixir-evidence.ts";
 import { packageJsonHasCraDependency } from "../repository-package-helpers.ts";
 import { repositoryHasRenovateConfig } from "./renovate-rebase-when.ts";
 import type { RepositoryFeatureIndex } from "./repository-feature-index.ts";
@@ -464,6 +465,17 @@ export async function collectRepositoryDiagnosticGateState(
   Object.assign(state, signalGates);
   for (const [key, value] of Object.entries(signalGates) as [GateKey, boolean][]) {
     markResolved(results, key, value);
+  }
+
+  if (
+    !state.hasElixirHeavyWorkflow &&
+    ((context.repository.elixir.hasMixExs && context.repository.elixir.hasToolVersions) ||
+      (context.documents ?? []).some(
+        (doc) => doc.kind === "circleci" && circleCiHasElixirOrbEvidence(doc),
+      ))
+  ) {
+    state.hasElixirHeavyWorkflow = true;
+    markResolved(results, "hasElixirHeavyWorkflow", true);
   }
 
   if (

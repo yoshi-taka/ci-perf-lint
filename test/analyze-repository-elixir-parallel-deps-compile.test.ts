@@ -21,7 +21,12 @@ const circleCiConfig = (compile = "mix deps.compile") =>
     "    jobs: [build]",
   ].join("\n");
 
-async function finding(elixirVersion: string, config: string) {
+async function finding(
+  elixirVersion: string,
+  config: string,
+  workflowRun = "mix deps.compile",
+  extraFiles: Record<string, string> = {},
+) {
   const cwd = await tempDirs.create("apl-elixir-partition-");
   await writeRepositoryFiles(cwd, {
     ".tool-versions": `erlang 27.0\nelixir ${elixirVersion}\n`,
@@ -34,8 +39,9 @@ async function finding(elixirVersion: string, config: string) {
       "  build:",
       "    runs-on: ubuntu-latest",
       "    steps:",
-      "      - run: mix deps.compile",
+      `      - run: ${JSON.stringify(workflowRun)}`,
     ].join("\n"),
+    ...extraFiles,
   });
   const report = await analyzeRepositoryForRule(
     { cwd, targetPath: ".", topCount: 100, mode: "strict" },
@@ -84,4 +90,26 @@ test("no Elixir orb means no inferred finding", async () => {
   expect(
     await finding("1.19.0", circleCiConfig().replace(/orbs:[\s\S]*?jobs:/, "jobs:")),
   ).toBeUndefined();
+});
+
+test("make test compiles through its Makefile recipe", async () => {
+  const result = await finding("1.19.4", circleCiConfig("make test"), "make test", {
+    Makefile: "test:\n\tmix test\n",
+  });
+  expect(result).toBeDefined();
+});
+
+test("make deps only fetches dependencies and is not compile evidence", async () => {
+  expect(
+    await finding("1.19.4", circleCiConfig("make deps"), "make deps", {
+      Makefile: "deps:\n\tmix deps.get\n",
+    }),
+  ).toBeUndefined();
+});
+
+test("mix.exs plus .tool-versions opens the gate without direct mix commands", async () => {
+  const result = await finding("1.19.4", circleCiConfig("make test"), "echo nothing", {
+    Makefile: "test:\n\tmix test\n",
+  });
+  expect(result).toBeDefined();
 });
