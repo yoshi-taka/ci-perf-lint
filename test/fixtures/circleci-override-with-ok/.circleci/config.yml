@@ -1,0 +1,16 @@
+# Source: zer0-os/zAuction-SDK (.circleci/config.yml)
+version: 2.1
+jobs:
+  test:
+    parallelism: 4
+    docker:
+      - image: cimg/openjdk:21.0
+    steps:
+      - checkout
+      - run: ./gradlew clean test
+      - run: npm ci
+workflows:
+  ci:
+    jobs:
+      - test:
+          override-with: std/test
