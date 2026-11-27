@@ -10,7 +10,7 @@ function invocations(source: string) {
   return collectCircleCiWorkflowInvocations(doc);
 }
 
-test("parses job references, aliases, requires, filters, matrix and parameters", () => {
+test("parses the standard job-name form with requires, filters, matrix and parameters", () => {
   const result = invocations(
     [
       "version: 2.1",
@@ -20,32 +20,49 @@ test("parses job references, aliases, requires, filters, matrix and parameters",
       "workflows:",
       "  ci:",
       "    jobs:",
-      "      - test",
-      "      - job: coverage",
-      "        name: test-coverage-report",
-      "        requires: [test]",
-      "        filters:",
-      "          branches:",
-      "            only: [main]",
-      "      - job: test",
-      "        name: java-VERSION",
-      "        matrix:",
-      "          parameters:",
-      "            VERSION: [17, 21]",
-      "        java-version: 17",
+      "      - test:",
+      "      - test-coverage-report:",
+      "          name: report-coverage",
+      "          requires: [test]",
+      "          filters:",
+      "            branches:",
+      "              only: [main]",
+      "      - test:",
+      "          name: java-17",
+      "          matrix:",
+      "            parameters:",
+      "              java-version: [17]",
+      "          java-version: 17",
     ].join("\n"),
   );
 
   expect(result).toHaveLength(3);
   expect(result[0]).toMatchObject({ jobName: "test", alias: "test", matrix: false });
   expect(result[1]).toMatchObject({
-    jobName: "coverage",
-    alias: "test-coverage-report",
+    jobName: "test-coverage-report",
+    alias: "report-coverage",
     requires: ["test"],
   });
   expect(result[1]?.filters.branches?.only).toEqual(["main"]);
-  expect(result[2]).toMatchObject({ jobName: "test", alias: "java-VERSION", matrix: true });
+  expect(result[2]).toMatchObject({ jobName: "test", alias: "java-17", matrix: true });
   expect(result[2]?.parameters.get("java-version")).toBe("17");
+});
+
+test("still parses the explicit job: reference form", () => {
+  const result = invocations(
+    [
+      "version: 2.1",
+      "jobs:",
+      "  test: {}",
+      "workflows:",
+      "  ci:",
+      "    jobs:",
+      "      - job: test",
+      "        name: legacy-alias",
+    ].join("\n"),
+  );
+  expect(result).toHaveLength(1);
+  expect(result[0]).toMatchObject({ jobName: "test", alias: "legacy-alias" });
 });
 
 test("missing filters overlap and disjoint branches.only sets do not", () => {
@@ -57,15 +74,15 @@ test("missing filters overlap and disjoint branches.only sets do not", () => {
       "workflows:",
       "  ci:",
       "    jobs:",
-      "      - test",
-      "      - job: test",
-      "        filters:",
-      "          branches:",
-      "            only: [main]",
-      "      - job: test",
-      "        filters:",
-      "          branches:",
-      "            only: [develop]",
+      "      - test:",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: [main]",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: [develop]",
     ].join("\n"),
   );
   expect(circleCiInvocationsCanCoRun(plain!, mainOnly!)).toBe(true);

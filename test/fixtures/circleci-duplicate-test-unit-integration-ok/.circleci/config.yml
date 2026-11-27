@@ -12,4 +12,6 @@ jobs:
       - run: ./gradlew integrationTest
 workflows:
   ci:
-    jobs: [unit, integration]
+    jobs:
+      - unit:
+      - integration:

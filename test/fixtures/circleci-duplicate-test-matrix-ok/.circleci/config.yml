@@ -11,8 +11,8 @@ jobs:
 workflows:
   ci:
     jobs:
-      - job: test
-        name: java-<< matrix.java-version >>
-        matrix:
-          parameters:
-            java-version: [17, 21]
+      - test:
+          name: java-<< matrix.java-version >>
+          matrix:
+            parameters:
+              java-version: [17, 21]

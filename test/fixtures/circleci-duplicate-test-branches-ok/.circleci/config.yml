@@ -8,13 +8,13 @@ jobs:
 workflows:
   ci:
     jobs:
-      - job: test
-        name: dev-tests
-        filters:
-          branches:
-            only: [develop]
-      - job: test
-        name: prod-tests
-        filters:
-          branches:
-            only: [main]
+      - test:
+          name: dev-tests
+          filters:
+            branches:
+              only: [develop]
+      - test:
+          name: prod-tests
+          filters:
+            branches:
+              only: [main]

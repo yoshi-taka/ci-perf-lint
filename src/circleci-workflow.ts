@@ -194,8 +194,11 @@ function parseStepArgs(item: YAMLMap<unknown, unknown>, stepType: string): Circl
   } else if (stepType === "restore_cache") {
     step.name = getScalarString(getNode(item, "name"));
     step.nameNode = getNode(item, "name");
-    step.restoreKeys = getScalarArray(getNode(item, "keys"));
-    step.restoreKeysNode = getNode(item, "keys");
+    const restoreKeysNode = getNode(item, "keys") ?? getNode(item, "key");
+    const restoreKey = getScalarString(getNode(item, "key"));
+    step.restoreKeys =
+      getScalarArray(getNode(item, "keys")) ?? (restoreKey ? [restoreKey] : undefined);
+    step.restoreKeysNode = restoreKeysNode;
   } else if (stepType === "store_artifacts") {
     step.artifactPath = getScalarString(getNode(item, "path"));
     step.artifactPathNode = getNode(item, "path");

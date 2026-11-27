@@ -93,7 +93,39 @@ function parseFilters(value: unknown): CircleCiInvocationFilters {
   return filters;
 }
 
-/** Parse `workflows.<name>.jobs` invocations without changing normal job parsing. */
+function invocationFromConfig(
+  workflowName: string,
+  jobName: string,
+  config: unknown,
+  node: Node | undefined,
+): CircleCiWorkflowInvocation | undefined {
+  const mapConfig = isMap(config) ? config : undefined;
+  const alias = plainText(mapConfig?.get("name", true)) ?? jobName;
+  const requires = textArray(mapConfig?.get("requires", true)) ?? [];
+  const parameters = new Map<string, string>();
+  for (const pair of mapConfig?.items ?? []) {
+    const key = scalarText(pair.key);
+    if (!key || RESERVED_KEYS.has(key)) {
+      continue;
+    }
+    const value = plainText(pair.value);
+    if (value !== undefined) {
+      parameters.set(key, value);
+    }
+  }
+  return {
+    workflowName,
+    jobName,
+    alias,
+    requires,
+    filters: parseFilters(mapConfig?.get("filters", true)),
+    matrix: mapConfig?.get("matrix", true) !== undefined,
+    parameters,
+    node,
+  };
+}
+
+/** Parse both `- job:` references and the standard `- <job-name>:` form. */
 export function collectCircleCiWorkflowInvocations(
   doc: CircleCiDocument,
 ): CircleCiWorkflowInvocation[] {
@@ -131,33 +163,28 @@ export function collectCircleCiWorkflowInvocations(
       if (!isMap(item)) {
         continue;
       }
-      const jobName = plainText(item.get("job", true));
-      if (!jobName) {
+
+      const explicitJob = plainText(item.get("job", true));
+      if (explicitJob) {
+        const invocation = invocationFromConfig(workflowName, explicitJob, item, item);
+        if (invocation) {
+          invocations.push(invocation);
+        }
         continue;
       }
-      const alias = plainText(item.get("name", true)) ?? jobName;
-      const requires = textArray(item.get("requires", true)) ?? [];
-      const parameters = new Map<string, string>();
+
+      // Standard CircleCI form: `- test-coverage-report:` with nested options.
       for (const pair of item.items) {
-        const key = scalarText(pair.key);
-        if (!key || RESERVED_KEYS.has(key)) {
+        const jobName = scalarText(pair.key);
+        if (!jobName || RESERVED_KEYS.has(jobName)) {
           continue;
         }
-        const value = plainText(pair.value);
-        if (value !== undefined) {
-          parameters.set(key, value);
+        const invocation = invocationFromConfig(workflowName, jobName, pair.value, item);
+        if (invocation) {
+          invocations.push(invocation);
         }
+        break;
       }
-      invocations.push({
-        workflowName,
-        jobName,
-        alias,
-        requires,
-        filters: parseFilters(item.get("filters", true)),
-        matrix: item.get("matrix", true) !== undefined,
-        parameters,
-        node: item,
-      });
     }
   }
   return invocations;

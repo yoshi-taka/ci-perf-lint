@@ -40,12 +40,24 @@ function executableName(token: string | undefined): string {
   return (token ?? "").split(/[\\/]/).at(-1) ?? "";
 }
 
+/** Only explicit selectors count. Bare Gradle/Maven arguments are tasks, not scopes. */
 function selectionOf(args: readonly string[]): string[] {
-  return args.filter((arg) => SELECTION_FLAG.test(arg) || (!arg.startsWith("-") && !isTask(arg)));
+  const result: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]!;
+    if (!SELECTION_FLAG.test(arg)) {
+      continue;
+    }
+    result.push(arg);
+    if (!arg.includes("=") && args[index + 1] && !args[index + 1]!.startsWith("-")) {
+      result.push(args[++index]!);
+    }
+  }
+  return result;
 }
 
-function isTask(arg: string): boolean {
-  return /^(?:clean|test|build|check|verify|install|package|integrationTest|unitTest)$/.test(arg);
+function scopedArgsOf(args: readonly string[]): string[] {
+  return args.filter((arg) => !arg.startsWith("-") || SELECTION_FLAG.test(arg));
 }
 
 function signatureFromTokens(tokens: string[]): TestSignature | undefined {
@@ -92,25 +104,25 @@ function signatureFromTokens(tokens: string[]): TestSignature | undefined {
   }
 
   if (tool === "pytest" || (tool === "python" && args[0] === "-m" && args[1] === "pytest")) {
-    return { key: `pytest:${selectionOf(args).join(" ")}`, implied: false, hasClean };
+    return { key: `pytest:${scopedArgsOf(args).join(" ")}`, implied: false, hasClean };
   }
   if (tool === "mix" && args[0] === "test") {
-    return { key: `mix:test:${selectionOf(args.slice(1)).join(" ")}`, implied: false, hasClean };
+    return { key: `mix:test:${scopedArgsOf(args.slice(1)).join(" ")}`, implied: false, hasClean };
   }
   if (tool === "bundle" && args[0] === "exec" && executableName(args[1]) === "rspec") {
-    return { key: `rspec:${selectionOf(args.slice(2)).join(" ")}`, implied: false, hasClean };
+    return { key: `rspec:${scopedArgsOf(args.slice(2)).join(" ")}`, implied: false, hasClean };
   }
   if (tool === "go" && args[0] === "test") {
-    return { key: `go:${selectionOf(args.slice(1)).join(" ")}`, implied: false, hasClean };
+    return { key: `go:${scopedArgsOf(args.slice(1)).join(" ")}`, implied: false, hasClean };
   }
 
   if (tool === "npm") {
     if (args[0] === "test") {
-      return { key: `npm:test:${selectionOf(args.slice(1)).join(" ")}`, implied: false, hasClean };
+      return { key: `npm:test:${scopedArgsOf(args.slice(1)).join(" ")}`, implied: false, hasClean };
     }
     if (args[0] === "run" && ["test", "jest", "vitest"].includes(args[1] ?? "")) {
       return {
-        key: `npm:${args[1]}:${selectionOf(args.slice(2)).join(" ")}`,
+        key: `npm:${args[1]}:${scopedArgsOf(args.slice(2)).join(" ")}`,
         implied: false,
         hasClean,
       };
@@ -119,14 +131,14 @@ function signatureFromTokens(tokens: string[]): TestSignature | undefined {
   }
   if (tool === "npx" && ["jest", "vitest"].includes(args[0] ?? "")) {
     return {
-      key: `npm:${args[0]}:${selectionOf(args.slice(1)).join(" ")}`,
+      key: `npm:${args[0]}:${scopedArgsOf(args.slice(1)).join(" ")}`,
       implied: false,
       hasClean,
     };
   }
   if ((tool === "pnpm" || tool === "yarn") && /\b(?:jest|vitest)\b/.test(args.join(" "))) {
     return {
-      key: `npm:${args.includes("vitest") ? "vitest" : "jest"}:${selectionOf(args).join(" ")}`,
+      key: `npm:${args.includes("vitest") ? "vitest" : "jest"}:${scopedArgsOf(args).join(" ")}`,
       implied: false,
       hasClean,
     };

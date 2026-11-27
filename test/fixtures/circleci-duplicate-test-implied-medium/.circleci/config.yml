@@ -12,4 +12,6 @@ jobs:
       - run: ./gradlew test
 workflows:
   ci:
-    jobs: [build, test]
+    jobs:
+      - build:
+      - test:
