@@ -12,9 +12,9 @@ Reports when:
 
 - a CircleCI job has a `setup_remote_docker` step
 - no other visible step references Docker (`docker`, `docker-compose`, or `depot`)
-- the job has no opaque orb step that might invoke Docker
+- no indirect command can hide Docker: `make <target>`, repository shell scripts, package scripts (`npm run`, `yarn`, `pnpm`), or task runners (`just`, `task`, `rake`, `invoke`, `nox`, `tox`)
 
-The rule does not prove that a script or opaque orb never uses Docker; it only reports visible evidence.
+Referenced Makefiles, scripts, and package scripts are traced with the shared helpers; Docker in the traced text suppresses the finding. An untraceable reference (missing file, workflow-only mode, dynamic target, or opaque orb) also suppresses it. The rule only reports when indirect work is traceable and contains no Docker command.
 
 ## Suggested fix
 

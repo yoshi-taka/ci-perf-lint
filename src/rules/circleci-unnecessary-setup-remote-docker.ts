@@ -3,6 +3,7 @@ import type { RuleContext } from "../rule-engine.ts";
 import type { CircleCiDocument } from "../circleci-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { collectCommandEntries } from "./shared/any-step.ts";
+import { traceCommandReferences } from "./shared/command-reference-tracing.ts";
 
 const meta = {
   id: "circleci-unnecessary-setup-remote-docker",
@@ -13,10 +14,11 @@ const meta = {
 } satisfies RuleMeta;
 
 const DOCKER_COMMAND = /\b(?:docker(?:-compose)?|depot)\b/i;
+const OPAQUE_RUNNER = /\b(?:just|task|rake|invoke|nox|tox)\s/i;
 
 export const circleciUnnecessarySetupRemoteDockerRule = {
   meta,
-  check(doc: CircleCiDocument, _context: RuleContext): Diagnostic[] {
+  async check(doc: CircleCiDocument, context: RuleContext): Promise<Diagnostic[]> {
     const findings: Diagnostic[] = [];
     const commandsByJob = new Map<string, string[]>();
     for (const entry of collectCommandEntries(doc)) {
@@ -38,8 +40,24 @@ export const circleciUnnecessarySetupRemoteDockerRule = {
         // An opaque orb may invoke Docker; do not guess.
         continue;
       }
-      const commands = commandsByJob.get(job.name) ?? [];
-      if (commands.some((command) => DOCKER_COMMAND.test(command))) {
+
+      let possibleDocker = false;
+      for (const command of commandsByJob.get(job.name) ?? []) {
+        if (OPAQUE_RUNNER.test(command)) {
+          possibleDocker = true;
+          break;
+        }
+        if (DOCKER_COMMAND.test(command)) {
+          possibleDocker = true;
+          break;
+        }
+        const trace = await traceCommandReferences(command, context.scanContext);
+        if (trace.unresolved || DOCKER_COMMAND.test(trace.text)) {
+          possibleDocker = true;
+          break;
+        }
+      }
+      if (possibleDocker) {
         continue;
       }
 

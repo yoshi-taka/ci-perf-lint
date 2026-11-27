@@ -1,0 +1,20 @@
+# Source: Walkerbat/tabnet-develop (.circleci/config.yml)
+version: 2.1
+executors:
+  docker-executor:
+    docker:
+      - image: cimg/python:3.9
+jobs:
+  test-build-docker:
+    executor: docker-executor
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: build docker
+          command: |
+            make build
+workflows:
+  ci:
+    jobs:
+      - test-build-docker:
