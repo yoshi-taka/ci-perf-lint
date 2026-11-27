@@ -25,6 +25,7 @@ export const RULE_REGISTRY = {
   "cargo-build-before-test": { kind: "workflow" },
   "circleci-checkout-uses-full-clone": { kind: "workflow" },
   "circleci-duplicate-test-across-jobs": { kind: "workflow" },
+  "circleci-legacy-convenience-image": { kind: "workflow" },
   "circleci-node-modules-cache-with-npm-ci": { kind: "workflow" },
   "circleci-parallelism-without-test-splitting": { kind: "workflow" },
   "circleci-unnecessary-setup-remote-docker": { kind: "workflow" },

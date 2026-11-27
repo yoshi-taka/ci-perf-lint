@@ -1,0 +1,32 @@
+# Trimmed from aeternity/aeternity .circleci/config.yml
+version: 2.1
+setup: true
+orbs:
+  continuation: circleci/continuation@0.1.2
+jobs:
+  generate:
+    docker:
+      - image: circleci/circleci-cli:latest
+    steps:
+      - checkout
+      - run:
+          name: Generate config
+          command: |
+            mkdir -p .circleci/generated
+            circleci config pack .circleci/config/ > .circleci/generated/config.yml
+      - persist_to_workspace:
+          root: .circleci/generated
+          paths:
+            - config.yml
+  setup:
+    executor: continuation/default
+    steps:
+      - attach_workspace:
+          at: .circleci/generated
+workflows:
+  setup:
+    jobs:
+      - generate
+      - setup:
+          requires:
+            - generate

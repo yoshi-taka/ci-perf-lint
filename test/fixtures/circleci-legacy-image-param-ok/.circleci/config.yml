@@ -1,0 +1,16 @@
+# Trimmed from pytorch/tensorpipe .circleci/config.yml
+version: 2.1
+jobs:
+  build:
+    parameters:
+      docker_image:
+        type: string
+        default: ""
+    docker:
+      - image: << parameters.docker_image >>
+    steps:
+      - checkout
+workflows:
+  ci:
+    jobs:
+      - build

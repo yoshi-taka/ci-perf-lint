@@ -36,6 +36,7 @@ Current rule registry:
 - `cdk-duplicate-asset-hash`
 - `circleci-checkout-uses-full-clone`
 - `circleci-duplicate-test-across-jobs`
+- `circleci-legacy-convenience-image`
 - `circleci-node-modules-cache-with-npm-ci`
 - `circleci-parallelism-without-test-splitting`
 - `circleci-unnecessary-setup-remote-docker`

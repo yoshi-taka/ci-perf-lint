@@ -21,6 +21,7 @@ import { cacheTerraformProvidersRule } from "./cache-terraform-providers.ts";
 import { cargoBuildBeforeTestRule } from "./cargo-build-before-test.ts";
 import { circleciCheckoutUsesFullCloneRule } from "./circleci-checkout-uses-full-clone.ts";
 import { circleciDuplicateTestAcrossJobsRule } from "./circleci-duplicate-test-across-jobs.ts";
+import { circleciLegacyConvenienceImageRule } from "./circleci-legacy-convenience-image.ts";
 import { circleciNodeModulesCacheWithNpmCiRule } from "./circleci-node-modules-cache-with-npm-ci.ts";
 import { circleciParallelismWithoutTestSplittingRule } from "./circleci-parallelism-without-test-splitting.ts";
 import { circleciUnnecessarySetupRemoteDockerRule } from "./circleci-unnecessary-setup-remote-docker.ts";
@@ -183,6 +184,7 @@ export const allRules = [
   cargoBuildBeforeTestRule,
   circleciCheckoutUsesFullCloneRule,
   circleciDuplicateTestAcrossJobsRule,
+  circleciLegacyConvenienceImageRule,
   circleciNodeModulesCacheWithNpmCiRule,
   circleciParallelismWithoutTestSplittingRule,
   circleciUnnecessarySetupRemoteDockerRule,

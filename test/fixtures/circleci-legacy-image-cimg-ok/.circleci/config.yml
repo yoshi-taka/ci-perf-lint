@@ -1,0 +1,20 @@
+# Trimmed from duongdev/phosphor-react-native .circleci/config.yml
+version: 2.1
+executors:
+  default:
+    docker:
+      - image: cimg/node:22.0
+    working_directory: ~/project
+jobs:
+  lint:
+    executor: default
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run:
+          name: Lint files
+          command: yarn lint
+workflows:
+  build-and-test:
+    jobs:
+      - lint

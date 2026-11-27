@@ -1,0 +1,20 @@
+# Trimmed from evilmartians/terraforming-rails .circleci/config.yml
+version: 2.1
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - links_lint
+executors:
+  golang:
+    docker:
+      - image: circleci/golang:1.13
+    environment:
+      GO111MODULE: "on"
+jobs:
+  links_lint:
+    executor: golang
+    steps:
+      - run:
+          name: Check links
+          command: liche -r .
