@@ -6,7 +6,7 @@ Flags CircleCI jobs that restore a `node_modules` cache and later run an unguard
 
 ## When it stays silent
 
-- `npm ci` is guarded by a `node_modules` existence check
+- `npm ci` is guarded by a `node_modules` existence check, including multi-line `if [ ! -d ... ]; then ... fi`, `[[ -d ... ]] ||`, and parameterized paths matching the saved cache path
 - the job uses `npm install` instead
 - the restore key does not match a `node_modules` save
 

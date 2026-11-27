@@ -1,0 +1,36 @@
+# Source: help-me-mom/ng-mocks (.circleci/config.yml)
+version: 2.1
+parameters:
+  lockindex:
+    type: string
+    default: '3'
+executors:
+  core:
+    docker:
+      - image: satantime/puppeteer-node:24.22.3
+    resource_class: medium
+jobs:
+  Core:
+    executor: core
+    steps:
+      - checkout
+      - restore_cache:
+          key: root-<< pipeline.parameters.lockindex >>-{{ checksum "package.json" }}-{{ checksum "package-lock.json" }}
+      - run:
+          name: NPM Install
+          command: |
+            md5sum package-lock.json > package.md5
+            if [ ! -d "./node_modules/" ]; then
+              npm ci
+            fi
+            md5sum -c package.md5
+            rm package.md5
+      - save_cache:
+          key: root-<< pipeline.parameters.lockindex >>-{{ checksum "package.json" }}-{{ checksum "package-lock.json" }}
+          paths:
+            - ./node_modules
+            - ~/.cache/puppeteer
+workflows:
+  ci:
+    jobs:
+      - Core:

@@ -42,8 +42,13 @@ describe("CircleCI node_modules cache followed by npm ci", () => {
     expect(result[0]?.location.line).not.toBe(result[1]?.location.line);
   });
 
-  test("ignores guarded npm ci", async () => {
-    expect(await findings(fixtures.circleciNodeModulesCacheGuardOk, "exploratory")).toHaveLength(0);
+  test.each([
+    ["inline guard", fixtures.circleciNodeModulesCacheGuardOk],
+    ["multi-line if guard", fixtures.circleciNodeModulesMultilineGuardOk],
+    ["[[ -d ]] || guard", fixtures.circleciNodeModulesOrGuardOk],
+    ["parameterized path guard", fixtures.circleciNodeModulesParamGuardOk],
+  ])("ignores %s", async (_name, fixture) => {
+    expect(await findings(fixture, "exploratory")).toHaveLength(0);
   });
 
   test("ignores npm install", async () => {

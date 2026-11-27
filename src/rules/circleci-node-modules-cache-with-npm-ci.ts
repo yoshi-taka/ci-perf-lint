@@ -7,6 +7,7 @@ import {
 } from "../circleci-workflow.ts";
 import type { Node } from "../yaml.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
+import { npmCiIsGuarded } from "./shared/npm-ci-guards.ts";
 
 const meta = {
   id: "circleci-node-modules-cache-with-npm-ci",
@@ -19,7 +20,6 @@ const meta = {
 const NODE_MODULES = /(?:^|\/)node_modules\/?$/;
 const NPM_CACHE = /(?:^|\/)\.npm\/?$|~?\/?\.npm(?:\/|$)/i;
 const NPM_CI = /\bnpm\s+(?:ci|clean-install)\b/i;
-const NODE_MODULES_PATH = /"?(?:\.\/)?node_modules"?/;
 
 function staticKeyPrefix(key: string): string {
   return key
@@ -31,19 +31,6 @@ function staticKeyPrefix(key: string): string {
 
 function pathsMatchCache(paths: readonly string[] | undefined, pattern: RegExp): boolean {
   return (paths ?? []).some((candidate) => pattern.test(candidate.trim().replace(/\\/g, "/")));
-}
-
-function npmCiGuarded(command: string): boolean {
-  const normalized = command.replace(/\s+/g, " ").trim();
-  const missing = `\\[\\s*!\\s*-d\\s+${NODE_MODULES_PATH.source}\\s*\\]`;
-  const exists = `test\\s+-d\\s+${NODE_MODULES_PATH.source}`;
-  return (
-    new RegExp(`${missing}\\s*&&\\s*npm\\s+(?:ci|clean-install)\\b`, "i").test(normalized) ||
-    new RegExp(`${exists}\\s*\\|\\|\\s*npm\\s+(?:ci|clean-install)\\b`, "i").test(normalized) ||
-    new RegExp(`if\\s+${missing}\\s*;\\s*then[\\s\\S]*npm\\s+(?:ci|clean-install)\\b`, "i").test(
-      normalized,
-    )
-  );
 }
 
 interface CacheEvidence {
@@ -92,7 +79,7 @@ export const circleciNodeModulesCacheWithNpmCiRule = {
         (step) =>
           step.type === "run" &&
           NPM_CI.test(step.command ?? "") &&
-          !npmCiGuarded(step.command ?? ""),
+          !npmCiIsGuarded(step.command ?? "", wastedRestores[0]!.save.cachePaths ?? []),
       );
       if (!unguardedCi) {
         continue;

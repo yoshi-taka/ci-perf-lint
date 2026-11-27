@@ -1,0 +1,29 @@
+# Source: help-me-mom/ng-mocks (.circleci/config.yml)
+version: 2.1
+parameters:
+  dir:
+    type: string
+    default: 'a5es5'
+jobs:
+  test:
+    docker:
+      - image: cimg/node:22.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - << parameters.dir >>-v1-{{ checksum "package.json" }}
+      - run:
+          name: NPM Install
+          command: |
+            if [ ! -d "e2e/<< parameters.dir >>/node_modules/" ]; then
+              npm ci
+            fi
+      - save_cache:
+          key: << parameters.dir >>-v1-{{ checksum "package.json" }}
+          paths:
+            - ./e2e/<< parameters.dir >>/node_modules
+workflows:
+  ci:
+    jobs:
+      - test:
