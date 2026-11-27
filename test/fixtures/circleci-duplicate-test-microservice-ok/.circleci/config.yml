@@ -1,0 +1,20 @@
+# Source: RMIT-SEPT/majorproject-9-mon-1530-1 (.circleci/config.yml)
+version: 2
+jobs:
+  build-common:
+    docker:
+      - image: circleci/openjdk:8-jdk
+    steps:
+      - checkout
+      - run: cd BackEnd/Common && mvn package # run the actual tests
+  build-availability:
+    docker:
+      - image: circleci/openjdk:8-jdk
+    steps:
+      - checkout
+      - run: cd BackEnd/Availability && mvn package # run the actual tests and package
+workflows:
+  build_and_test:
+    jobs:
+      - build-common:
+      - build-availability:

@@ -6,6 +6,8 @@ Flags a CircleCI workflow where two or more job invocations that can run in the 
 
 The workflow graph (`workflows.<name>.jobs`) is parsed for aliases, `requires`, branch/tag filters, matrix invocations, and parameters. Filters are evaluated as two separate triggers: missing filters mean all branches but **no tags**, while `branches: {ignore: /.*/}` disables branches and a `tags` filter enables tag runs. Invocations co-run only when some branch or tag is allowed by both: it must match `only` and must not match `ignore`. `ignore` therefore removes ordinary names too, not just `/.*/`. `only` and `ignore` accept a single value or an array; regexes such as `/feature-.*/` are matched against representative names. Two regexes are treated as possibly overlapping. Expression conditions (`pipeline.git.branch == "develop"`) cannot be decided statically, so they are treated as overlapping but downgrade confidence to medium. Matrix invocations and jobs invoked with different parameters are skipped. Jobs split with `circleci tests run` / `circleci testsuite` belong to `circleci-parallelism-without-test-splitting` and are skipped here, as are opaque orb jobs.
 
+The comparison includes the effective working directory (step, job, executor, earlier `cd` / `pushd`, and project-root flags such as `npm --prefix`, `gradle -p`, `mvn -f`, `make -C`) and the primary runtime image or machine/macOS runtime. Service containers after the primary image are ignored. Unresolvable directories or runtime expressions keep invocations separate.
+
 A leading `clean` is ignored for equality but makes the finding stronger, because no cache can help those runs.
 
 ## Confidence

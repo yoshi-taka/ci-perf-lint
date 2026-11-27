@@ -9,6 +9,11 @@ import {
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { shellCommandSegments, shellCommands } from "./shared/command-patterns.ts";
 import { traceCommandReferences } from "./shared/command-reference-tracing.ts";
+import {
+  commandFlagDirectory,
+  commandWorkingDirectory,
+  resolveCircleCiExpression,
+} from "./shared/circleci-command-scope.ts";
 
 const meta = {
   id: "circleci-duplicate-test-across-jobs",
@@ -146,12 +151,50 @@ function signatureFromTokens(tokens: string[]): TestSignature | undefined {
   return undefined;
 }
 
-async function jobSignatures(job: CircleCiJob, context: RuleContext): Promise<TestSignature[]> {
+function runtimeIdentity(
+  job: CircleCiJob,
+  doc: CircleCiDocument,
+  parameters: ReadonlyMap<string, string>,
+): string {
+  const executor = job.executorName ? doc.executors?.get(job.executorName) : undefined;
+  const raw =
+    job.dockerImages?.[0] ??
+    executor?.dockerImages?.[0] ??
+    job.machineImage ??
+    executor?.machineImage ??
+    (job.macosXcode ? `xcode:${job.macosXcode}` : undefined) ??
+    (executor?.macosXcode ? `xcode:${executor.macosXcode}` : undefined);
+  if (!raw) {
+    return "default";
+  }
+  return (
+    resolveCircleCiExpression(raw, parameters) ??
+    `unresolved:${JSON.stringify([...parameters.entries()].sort(([a], [b]) => a.localeCompare(b)))}`
+  );
+}
+
+async function jobSignatures(
+  job: CircleCiJob,
+  doc: CircleCiDocument,
+  parameters: ReadonlyMap<string, string>,
+  context: RuleContext,
+): Promise<TestSignature[]> {
+  const executor = job.executorName ? doc.executors?.get(job.executorName) : undefined;
+  const initialDirectoryRaw = job.workingDirectory ?? executor?.workingDirectory ?? undefined;
+  const initialDirectory = initialDirectoryRaw
+    ? resolveCircleCiExpression(initialDirectoryRaw, parameters)
+    : undefined;
+  const runtime = runtimeIdentity(job, doc, parameters);
   const signatures = new Map<string, TestSignature>();
+
   for (const step of job.steps) {
     if (step.type !== "run") {
       continue;
     }
+    const stepDirectoryRaw = step.workingDirectory ?? initialDirectory;
+    const stepDirectory = stepDirectoryRaw
+      ? resolveCircleCiExpression(stepDirectoryRaw, parameters)
+      : undefined;
     const trace = await traceCommandReferences(step.command ?? "", context.scanContext);
     for (const segment of shellCommandSegments(trace.text)) {
       const tokens = shellCommands(segment)[0];
@@ -159,9 +202,16 @@ async function jobSignatures(job: CircleCiJob, context: RuleContext): Promise<Te
         continue;
       }
       const signature = signatureFromTokens(tokens);
-      if (signature) {
-        signatures.set(signature.key, signature);
+      if (!signature) {
+        continue;
       }
+      const afterCd = commandWorkingDirectory(step.command ?? "", stepDirectory, parameters);
+      const directory = commandFlagDirectory(tokens, afterCd, parameters);
+      const scope =
+        directory ??
+        `unresolved:${JSON.stringify([...parameters.entries()].sort(([a], [b]) => a.localeCompare(b)))}`;
+      const key = `${signature.key}|dir=${scope}|runtime=${runtime}`;
+      signatures.set(key, { ...signature, key });
     }
   }
   return [...signatures.values()];
@@ -212,7 +262,10 @@ export const circleciDuplicateTestAcrossJobsRule = {
         skipped.add(job.name);
         continue;
       }
-      signaturesByJob.set(job.name, await jobSignatures(job, context));
+      signaturesByJob.set(
+        `${job.name}:${JSON.stringify([...invocation.parameters.entries()].sort(([a], [b]) => a.localeCompare(b)))}`,
+        await jobSignatures(job, doc, invocation.parameters, context),
+      );
     }
 
     const groups = new Map<
@@ -229,7 +282,8 @@ export const circleciDuplicateTestAcrossJobsRule = {
       if (!job || skipped.has(job.name)) {
         continue;
       }
-      for (const signature of signaturesByJob.get(job.name) ?? []) {
+      const signatureKey = `${job.name}:${JSON.stringify([...invocation.parameters.entries()].sort(([a], [b]) => a.localeCompare(b)))}`;
+      for (const signature of signaturesByJob.get(signatureKey) ?? []) {
         const key = `${invocation.workflowName}::${signature.key}`;
         const group = groups.get(key) ?? {
           invocations: [],

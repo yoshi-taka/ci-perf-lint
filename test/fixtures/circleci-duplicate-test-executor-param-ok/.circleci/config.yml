@@ -1,0 +1,29 @@
+# Source: argotorg/solc-js (.circleci/config.yml)
+version: 2.1
+executors:
+  node:
+    parameters:
+      version:
+        type: string
+    docker:
+      - image: cimg/node:<< parameters.version >>
+jobs:
+  test:
+    parameters:
+      version:
+        type: string
+    executor:
+      name: node
+      version: << parameters.version >>
+    steps:
+      - checkout
+      - run: npm run test
+workflows:
+  ci:
+    jobs:
+      - test:
+          name: node-16
+          version: "16.20"
+      - test:
+          name: node-18
+          version: "18.18"

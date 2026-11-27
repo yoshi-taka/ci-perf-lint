@@ -68,6 +68,10 @@ export interface CircleCiJob {
   expandedFromOrb?: boolean;
   nameNode?: Node;
   dockerImages?: string[];
+  executorName?: string;
+  machineImage?: string;
+  macosXcode?: string;
+  workingDirectory?: string;
   resourceClass?: string;
   resourceClassNode?: Node;
   parallelism?: number;
@@ -88,6 +92,15 @@ export interface CircleCiDocument {
   name?: string;
   version?: string;
   jobs: CircleCiJob[];
+  executors?: ReadonlyMap<
+    string,
+    {
+      dockerImages?: string[];
+      machineImage?: string;
+      macosXcode?: string;
+      workingDirectory?: string;
+    }
+  >;
 }
 
 function getPairIndex(map: YAMLMap<unknown, unknown>): Map<string, Pair<unknown, unknown>> {
@@ -141,6 +154,19 @@ function getScalarArray(node: Node | undefined): string[] | undefined {
     }
   }
   return values.length > 0 ? values : undefined;
+}
+
+function collectDockerImages(node: Node | undefined): string[] {
+  const images: string[] = [];
+  if (node && isSeq(node)) {
+    for (const item of node.items) {
+      const image = isMap(item) ? getScalarString(getNode(item, "image")) : getScalarString(item);
+      if (image) {
+        images.push(image);
+      }
+    }
+  }
+  return images;
 }
 
 function getBool(node: Node | undefined): boolean | undefined {
@@ -331,6 +357,31 @@ export function parseCircleCi(
   const getParsed = lazyNodeRecord(root);
   const versionNode = getNode(root, "version");
   const jobsNode = getMap(getNode(root, "jobs"));
+  const executors = new Map<
+    string,
+    {
+      dockerImages?: string[];
+      machineImage?: string;
+      macosXcode?: string;
+      workingDirectory?: string;
+    }
+  >();
+  const executorsNode = getMap(getNode(root, "executors"));
+  for (const pair of executorsNode?.items ?? []) {
+    const name = getScalarString(pair.key);
+    if (!name || !isMap(pair.value)) {
+      continue;
+    }
+    const machineNode = getMap(getNode(pair.value, "machine"));
+    const macosNode = getMap(getNode(pair.value, "macos"));
+    const images = collectDockerImages(getNode(pair.value, "docker"));
+    executors.set(name, {
+      dockerImages: images.length > 0 ? images : undefined,
+      machineImage: machineNode ? getScalarString(getNode(machineNode, "image")) : undefined,
+      macosXcode: macosNode ? getScalarString(getNode(macosNode, "xcode")) : undefined,
+      workingDirectory: getScalarString(getNode(pair.value, "working_directory")),
+    });
+  }
 
   const jobs: CircleCiJob[] = [];
   const jobEntries = fragmentJobName
@@ -348,27 +399,16 @@ export function parseCircleCi(
 
     const node = item.value;
     const dockerNode = getNode(node, "docker");
+    const executorNode = getNode(node, "executor");
+    const executorMap = getMap(executorNode);
+    const machineNode = getMap(getNode(node, "machine"));
+    const macosNode = getMap(getNode(node, "macos"));
     const resourceClassNode = getNode(node, "resource_class");
     const parallelismNode = getNode(node, "parallelism");
     const environmentNode = getMap(getNode(node, "environment"));
     const stepsNode = getNode(node, "steps");
 
-    const dockerImages: string[] = [];
-    if (dockerNode && isSeq(dockerNode)) {
-      for (const imgItem of dockerNode.items) {
-        if (isMap(imgItem)) {
-          const img = getScalarString(getNode(imgItem, "image"));
-          if (img) {
-            dockerImages.push(img);
-          }
-        } else {
-          const img = getScalarString(imgItem);
-          if (img) {
-            dockerImages.push(img);
-          }
-        }
-      }
-    }
+    const dockerImages = collectDockerImages(dockerNode);
 
     const parallelismValue =
       parallelismNode && isScalar(parallelismNode) && typeof parallelismNode.value === "number"
@@ -385,6 +425,12 @@ export function parseCircleCi(
       name: jobName,
       nameNode: isNode(item.key) ? item.key : undefined,
       dockerImages: dockerImages.length > 0 ? dockerImages : undefined,
+      executorName:
+        getScalarString(executorNode) ??
+        (executorMap ? getScalarString(getNode(executorMap, "name")) : undefined),
+      machineImage: machineNode ? getScalarString(getNode(machineNode, "image")) : undefined,
+      macosXcode: macosNode ? getScalarString(getNode(macosNode, "xcode")) : undefined,
+      workingDirectory: getScalarString(getNode(node, "working_directory")),
       resourceClass: getScalarString(resourceClassNode),
       resourceClassNode,
       parallelism: isNaN(parallelismNum ?? NaN) ? undefined : parallelismNum,
@@ -407,6 +453,7 @@ export function parseCircleCi(
     root,
     version: getScalarString(versionNode),
     jobs,
+    executors,
   };
 }
 

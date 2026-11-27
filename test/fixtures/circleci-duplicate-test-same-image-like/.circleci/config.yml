@@ -1,0 +1,19 @@
+# Source: argotorg/solc-js (.circleci/config.yml)
+version: 2.1
+jobs:
+  node-a: &node-base
+    working_directory: ~/solc-js
+    docker:
+      - image: cimg/node:20.9
+    steps:
+      - checkout
+      - run:
+          name: test
+          command: npm run test
+  node-b:
+    <<: *node-base
+workflows:
+  ci:
+    jobs:
+      - node-a:
+      - node-b:

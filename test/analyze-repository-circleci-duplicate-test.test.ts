@@ -38,7 +38,17 @@ describe("CircleCI duplicate test across jobs", () => {
     expect(result[0]?.confidence).toBe("medium");
   });
 
+  test("same image and same command still reports", async () => {
+    const result = await findings(fixtures.circleciDuplicateTestSameImageLike);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.confidence).toBe("high");
+  });
+
   test.each([
+    ["different cd directories", fixtures.circleciDuplicateTestWorkdirOk],
+    ["microservice directories", fixtures.circleciDuplicateTestMicroserviceOk],
+    ["different runtime images", fixtures.circleciDuplicateTestRuntimeOk],
+    ["executor version parameter", fixtures.circleciDuplicateTestExecutorParamOk],
     ["disjoint branches", fixtures.circleciDuplicateTestBranchesOk],
     ["matrix", fixtures.circleciDuplicateTestMatrixOk],
     ["unit versus integration", fixtures.circleciDuplicateTestUnitIntegrationOk],
