@@ -36,6 +36,12 @@ describe("CircleCI node_modules cache followed by npm ci", () => {
     expect(result[0]?.message).toContain('"unit", "lint", "build", "deploy"');
   });
 
+  test("keeps separate findings for different restore_cache locations", async () => {
+    const result = await findings(fixtures.circleciNodeModulesCacheTwoLocations);
+    expect(result).toHaveLength(2);
+    expect(result[0]?.location.line).not.toBe(result[1]?.location.line);
+  });
+
   test("ignores guarded npm ci", async () => {
     expect(await findings(fixtures.circleciNodeModulesCacheGuardOk, "exploratory")).toHaveLength(0);
   });

@@ -217,7 +217,12 @@ export const circleciDuplicateTestAcrossJobsRule = {
 
     const groups = new Map<
       string,
-      { invocations: CircleCiWorkflowInvocation[]; implied: boolean; hasClean: boolean }
+      {
+        invocations: CircleCiWorkflowInvocation[];
+        implied: boolean;
+        uncertain: boolean;
+        hasClean: boolean;
+      }
     >();
     for (const invocation of invocations) {
       const job = jobs.get(invocation.jobName);
@@ -226,9 +231,15 @@ export const circleciDuplicateTestAcrossJobsRule = {
       }
       for (const signature of signaturesByJob.get(job.name) ?? []) {
         const key = `${invocation.workflowName}::${signature.key}`;
-        const group = groups.get(key) ?? { invocations: [], implied: false, hasClean: false };
+        const group = groups.get(key) ?? {
+          invocations: [],
+          implied: false,
+          uncertain: false,
+          hasClean: false,
+        };
         group.invocations.push(invocation);
         group.implied ||= signature.implied;
+        group.uncertain ||= invocation.uncertain;
         group.hasClean ||= signature.hasClean;
         groups.set(key, group);
       }
@@ -263,7 +274,7 @@ export const circleciDuplicateTestAcrossJobsRule = {
       const job = jobs.get(first.jobName);
       findings.push(
         buildDiagnostic(doc, meta, first.node ?? job?.node, {
-          confidence: group.implied ? "medium" : undefined,
+          confidence: group.implied || group.uncertain ? "medium" : undefined,
           message: `Jobs ${members.map((member) => `"${member.alias}"`).join(", ")} run the same test command on the same scope; the suite runs ${members.length} times per pipeline${group.hasClean ? " and at least one run starts with clean, so no cache can help" : ""}.`,
           why: "Identical test invocations on the same scope repeat the whole suite. The extra runs consume runner minutes without adding coverage.",
           suggestion:
@@ -271,7 +282,7 @@ export const circleciDuplicateTestAcrossJobsRule = {
           measurementHint:
             "Compare total pipeline duration and runner minutes after consolidating the duplicate test runs, and confirm reports still contain the same results.",
           aiHandoff: `Review ${doc.relativePath} workflow invocations ${members.map((member) => `"${member.alias}"`).join(", ")} (${key}). Keep one test run and share its artifacts with downstream jobs instead of rerunning the suite.`,
-          score: group.implied ? 54 : 66,
+          score: group.implied || group.uncertain ? 54 : 66,
         }),
       );
     }

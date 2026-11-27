@@ -121,6 +121,38 @@ test("scalar, array and regex only filters are compared correctly", () => {
   expect(circleCiInvocationsCanCoRun(regexFeature!, featureBranch!)).toBe(true);
 });
 
+test("tag-only jobs co-run on tags but not with jobs lacking a tag filter", () => {
+  const [tagOnlyA, tagOnlyB, noTagFilter] = invocations(
+    [
+      "version: 2.1",
+      "jobs:",
+      "  deploy: {}",
+      "  test: {}",
+      "workflows:",
+      "  ci:",
+      "    jobs:",
+      "      - deploy:",
+      "          filters:",
+      "            branches:",
+      "              ignore: /.*/",
+      "            tags:",
+      "              only: /v.*/",
+      "      - deploy:",
+      "          filters:",
+      "            branches:",
+      "              ignore: /.*/",
+      "            tags:",
+      "              only: /v.*/",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              ignore: /.*/",
+    ].join("\n"),
+  );
+  expect(circleCiInvocationsCanCoRun(tagOnlyA!, tagOnlyB!)).toBe(true);
+  expect(circleCiInvocationsCanCoRun(tagOnlyA!, noTagFilter!)).toBe(false);
+});
+
 test("missing filters overlap and disjoint branches.only sets do not", () => {
   const [plain, mainOnly, developOnly] = invocations(
     [

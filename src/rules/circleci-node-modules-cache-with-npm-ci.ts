@@ -1,6 +1,11 @@
 import type { RuleContext } from "../rule-engine.ts";
 import type { RuleMeta } from "../types.ts";
-import type { CircleCiDocument, CircleCiStep } from "../circleci-workflow.ts";
+import {
+  getCircleCiLocation,
+  type CircleCiDocument,
+  type CircleCiStep,
+} from "../circleci-workflow.ts";
+import type { Node } from "../yaml.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 
 const meta = {
@@ -76,7 +81,7 @@ export const circleciNodeModulesCacheWithNpmCiRule = {
       job.steps.filter((step) => step.type === "save_cache"),
     );
     const npmCacheAlsoSaved = allSaves.some((step) => pathsMatchCache(step.cachePaths, NPM_CACHE));
-    const matches: { jobName: string; restore: CircleCiStep }[] = [];
+    const matches = new Map<string, { jobNames: string[]; node: Node | undefined }>();
 
     for (const job of doc.jobs) {
       const wastedRestores = findWastedRestore(job.steps, allSaves);
@@ -92,17 +97,26 @@ export const circleciNodeModulesCacheWithNpmCiRule = {
       if (!unguardedCi) {
         continue;
       }
-      matches.push({ jobName: job.name, restore: wastedRestores[0]!.restore });
+      for (const wasted of wastedRestores) {
+        const locationNode = wasted.restore.restoreKeysNode ?? wasted.restore.node;
+        const location = getCircleCiLocation(doc, locationNode);
+        const key = `${location.path}:${location.line}:${location.column}`;
+        const existing = matches.get(key);
+        if (existing) {
+          existing.jobNames.push(job.name);
+        } else {
+          matches.set(key, { jobNames: [job.name], node: locationNode });
+        }
+      }
     }
 
-    if (matches.length === 0) {
+    if (matches.size === 0) {
       return [];
     }
 
-    const jobNames = [...new Set(matches.map((match) => match.jobName))];
-    const first = matches[0]!;
-    return [
-      buildDiagnostic(doc, meta, first.restore.restoreKeysNode ?? first.restore.node, {
+    return [...matches.entries()].map(([, match]) => {
+      const jobNames = [...new Set(match.jobNames)];
+      return buildDiagnostic(doc, meta, match.node, {
         severity: npmCacheAlsoSaved ? "suggestion" : undefined,
         message: `${jobNames.map((name) => `"${name}"`).join(", ")} restore a node_modules cache and then run npm ci, which deletes node_modules before installing.`,
         why: `The restored cache is wasted: npm ci removes node_modules first. CircleCI's dependency caching docs recommend caching ~/.npm instead. ${npmCacheAlsoSaved ? "A ~/.npm cache is already present, so the node_modules entry in the cache is redundant." : ""}`,
@@ -113,7 +127,7 @@ export const circleciNodeModulesCacheWithNpmCiRule = {
           "Compare restore time plus install time before and after the change, and confirm dependency resolution stays identical.",
         aiHandoff: `Review ${doc.relativePath} jobs ${jobNames.map((name) => `"${name}"`).join(", ")}. Match the restore_cache and save_cache key prefixes, then remove the wasted node_modules cache or guard the npm ci install. Verify the lockfile checksum key still invalidates correctly.`,
         score: npmCacheAlsoSaved ? 42 : 58,
-      }),
-    ];
+      });
+    });
   },
 };

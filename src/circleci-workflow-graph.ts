@@ -22,6 +22,8 @@ export interface CircleCiWorkflowInvocation {
   filters: CircleCiInvocationFilters;
   matrix: boolean;
   parameters: ReadonlyMap<string, string>;
+  /** Expression-based conditions cannot be decided statically. */
+  uncertain: boolean;
   node: Node | undefined;
 }
 
@@ -131,6 +133,9 @@ function invocationFromConfig(
     filters: parseFilters(mapConfig?.get("filters", true)),
     matrix: mapConfig?.get("matrix", true) !== undefined,
     parameters,
+    uncertain: /pipeline\.git\.|==/.test(
+      JSON.stringify((mapConfig as { toJSON?: () => unknown } | undefined)?.toJSON?.() ?? ""),
+    ),
     node,
   };
 }
@@ -166,6 +171,7 @@ export function collectCircleCiWorkflowInvocations(
           filters: {},
           matrix: false,
           parameters: new Map(),
+          uncertain: false,
           node: undefined,
         });
         continue;
@@ -213,40 +219,66 @@ function regexMatchesBranch(pattern: string, branch: string): boolean {
   }
 }
 
-function onlySetsOverlap(
-  a: CircleCiFilterSet | undefined,
-  b: CircleCiFilterSet | undefined,
-): boolean {
-  if (!a?.only || !b?.only) {
-    return true;
-  }
-  for (const left of a.only) {
-    for (const right of b.only) {
-      if (left === right) {
-        return true;
-      }
-      if (isBranchRegex(left) && !isBranchRegex(right) && regexMatchesBranch(left, right)) {
-        return true;
-      }
-      if (isBranchRegex(right) && !isBranchRegex(left) && regexMatchesBranch(right, left)) {
-        return true;
-      }
-      // Two regexes cannot be decided statically; stay conservative.
-      if (isBranchRegex(left) && isBranchRegex(right)) {
-        return true;
-      }
-    }
-  }
-  return false;
+function matchesPattern(pattern: string, value: string): boolean {
+  return isBranchRegex(pattern) ? regexMatchesBranch(pattern, value) : pattern === value;
 }
 
-/** Missing filters mean all branches/tags; disjoint explicit `only` sets cannot co-run. */
+function ignoresEverything(set: CircleCiFilterSet | undefined): boolean {
+  return (set?.ignore ?? []).some(
+    (pattern) => matchesPattern(pattern, ".*") || pattern === "/.*/" || pattern === "*",
+  );
+}
+
+function setAllowsValue(set: CircleCiFilterSet | undefined, value: string): boolean {
+  if ((set?.ignore ?? []).some((pattern) => matchesPattern(pattern, value))) {
+    return false;
+  }
+  const only = set?.only ?? [];
+  return only.length === 0 || only.some((pattern) => matchesPattern(pattern, value));
+}
+
+/**
+ * CircleCI runs a workflow on tags only when a tag filter is present, while
+ * branches are enabled by default. Jobs co-run when they share either trigger.
+ */
+function triggerOverlap(
+  a: CircleCiFilterSet | undefined,
+  b: CircleCiFilterSet | undefined,
+  enabledByDefault: boolean,
+): boolean {
+  if (!enabledByDefault && (!a || !b)) {
+    return false;
+  }
+  if (ignoresEverything(a) || ignoresEverything(b)) {
+    return false;
+  }
+
+  const onlyA = a?.only ?? [];
+  const onlyB = b?.only ?? [];
+  if (onlyA.length > 0 && onlyB.length > 0) {
+    return (
+      onlyA.some((value) => setAllowsValue(b, value)) ||
+      onlyB.some((value) => setAllowsValue(a, value))
+    );
+  }
+  const constrained = onlyA.length > 0 ? a : onlyB.length > 0 ? b : undefined;
+  if (!constrained) {
+    return true;
+  }
+  const other = constrained === a ? b : a;
+  return (
+    (constrained.only ?? []).some((value) => setAllowsValue(other, value)) ||
+    !ignoresEverything(other)
+  );
+}
+
+/** Missing filters mean all branches but no tags; disjoint `only` sets cannot co-run. */
 export function circleCiInvocationsCanCoRun(
   a: CircleCiWorkflowInvocation,
   b: CircleCiWorkflowInvocation,
 ): boolean {
   return (
-    onlySetsOverlap(a.filters.branches, b.filters.branches) &&
-    onlySetsOverlap(a.filters.tags, b.filters.tags)
+    triggerOverlap(a.filters.branches, b.filters.branches, true) ||
+    triggerOverlap(a.filters.tags, b.filters.tags, false)
   );
 }

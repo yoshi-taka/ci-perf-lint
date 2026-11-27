@@ -1,0 +1,19 @@
+version: 2.1
+jobs:
+  test:
+    docker: [{image: cimg/openjdk:21.0}]
+    steps:
+      - checkout
+      - run: ./gradlew test
+  verify:
+    docker: [{image: cimg/openjdk:21.0}]
+    steps:
+      - checkout
+      - run: ./gradlew test
+workflows:
+  ci:
+    jobs:
+      - test:
+          filters: pipeline.git.branch == "develop"
+      - verify:
+          filters: pipeline.git.branch == "develop"

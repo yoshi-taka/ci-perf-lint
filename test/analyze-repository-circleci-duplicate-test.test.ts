@@ -32,6 +32,12 @@ describe("CircleCI duplicate test across jobs", () => {
     expect(result[0]?.confidence).toBe("medium");
   });
 
+  test("expression filters downgrade confidence to medium", async () => {
+    const result = await findings(fixtures.circleciDuplicateTestExpressionMedium);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.confidence).toBe("medium");
+  });
+
   test.each([
     ["disjoint branches", fixtures.circleciDuplicateTestBranchesOk],
     ["matrix", fixtures.circleciDuplicateTestMatrixOk],

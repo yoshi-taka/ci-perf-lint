@@ -1,0 +1,22 @@
+version: 2.1
+jobs:
+  unit:
+    docker: [{image: cimg/node:22.0}]
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-npm-{{ checksum "package-lock.json" }}
+      - run: npm ci
+      - run: echo separate step
+      - restore_cache:
+          keys:
+            - v1-npm-{{ checksum "yarn.lock" }}
+      - run: npm ci
+      - save_cache:
+          key: v1-npm-{{ checksum "package-lock.json" }}
+          paths:
+            - node_modules
+workflows:
+  ci:
+    jobs: [unit]
