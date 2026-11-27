@@ -27,6 +27,9 @@ One diagnostic is emitted per distinct image reference location. An executor ima
 - `circleci/buildpack-deps` → `cimg/base`
 - `circleci/jruby`, `circleci/dynamodb`, `circleci/mongo` have no next-gen equivalent; use a third-party image or install the software on `cimg/base`
 - Tags ending in `-browsers`, `-browsers-legacy`, `-node-browsers`, or `-node-browsers-legacy` suggest `cimg/<name>:<version>-browsers` plus the `circleci/browser-tools` orb, because browsers are no longer preinstalled
+- Debian release suffixes (`-stretch`, `-buster`, `-jessie`, `-bullseye`) are removed; cimg images are Ubuntu-based
+- An untagged or `latest` image suggests `cimg/node:lts` (or `cimg/node:current`) for Node and `:current` for other languages
+- Major-only Node tags map to a published `major.minor` tag, for example `14` → `14.21` and `10` → `10.24`
 
 If the exact tag is not published by cimg, choose the nearest supported version instead of copying the legacy tag.
 

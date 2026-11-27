@@ -19,6 +19,8 @@ const meta = {
 const DEFAULT_PROJECT_DIR = "/home/circleci/project";
 const WHOLE_PROJECT_PATHS = new Set([".", "./", "*", "./*"]);
 const GIT_REMOTE_COMMAND = /\bgit\s+(?:push|fetch|pull|ls-remote)\b|\bgit\s+tag\b[^\n]*\bpush\b/i;
+const RELEASE_TOOL_COMMAND =
+  /\b(?:semantic-release|release-it|changesets?|lerna\s+(?:publish|version)|standard-version|goreleaser)\b/i;
 
 function normalizePath(value: string | undefined, base: string): string | undefined {
   if (value === undefined) {
@@ -82,10 +84,17 @@ function persistsWholeProject(
   return undefined;
 }
 
-function hasGitRemoteCommand(job: CircleCiJob): boolean {
-  return job.steps.some(
-    (step) => step.type === "run" && GIT_REMOTE_COMMAND.test(step.command ?? ""),
-  );
+function needsCheckoutForRelease(job: CircleCiJob): boolean {
+  return job.steps.some((step) => {
+    if (step.type === "add_ssh_keys") {
+      // The SSH key and known_hosts are needed by release tools that push tags.
+      return true;
+    }
+    return (
+      step.type === "run" &&
+      (GIT_REMOTE_COMMAND.test(step.command ?? "") || RELEASE_TOOL_COMMAND.test(step.command ?? ""))
+    );
+  });
 }
 
 function reachableUpstreams(
@@ -134,7 +143,7 @@ export const circleciCheckoutWithFullWorkspaceRule = {
         continue;
       }
       const attachSteps = job.steps.filter((step) => step.type === "attach_workspace");
-      if (attachSteps.length === 0 || hasGitRemoteCommand(job)) {
+      if (attachSteps.length === 0 || needsCheckoutForRelease(job)) {
         continue;
       }
 

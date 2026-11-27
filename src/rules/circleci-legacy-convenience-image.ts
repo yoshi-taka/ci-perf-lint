@@ -38,7 +38,19 @@ const NEXT_GEN_RENAMES = new Map([
 ]);
 const NO_NEXT_GEN = new Set(["jruby", "dynamodb", "mongo"]);
 const BROWSER_SUFFIX = /-(?:node-)?browsers(?:-legacy)?$/i;
+const OS_SUFFIX = /-(?:stretch|buster|jessie|bullseye)(?=-|$)/gi;
 const IMAGE_PATTERN = /^(?:docker\.io\/)?circleci\/([a-z0-9._-]+)(?::([^@\s]+))?(?:@[^\s]+)?$/i;
+// Latest published cimg/node major.minor tags, verified against Docker Hub.
+const NODE_MAJOR_MINOR = new Map([
+  ["10", "10.24"],
+  ["12", "12.22"],
+  ["14", "14.21"],
+  ["16", "16.20"],
+  ["18", "18.20"],
+  ["20", "20.20"],
+  ["22", "22.23"],
+  ["24", "24.22"],
+]);
 
 interface LegacyImage {
   readonly name: string;
@@ -198,12 +210,25 @@ function replacementText(image: LegacyImage): string {
     return `There is no next-gen equivalent; use a third-party image or install ${image.name} on cimg/base.`;
   }
   const target = NEXT_GEN_RENAMES.get(image.name) ?? image.name;
-  if (image.tag && BROWSER_SUFFIX.test(image.tag)) {
-    const version = image.tag.replace(BROWSER_SUFFIX, "");
-    return `Replace it with cimg/${target}:${version}-browsers and add the circleci/browser-tools orb; browsers are no longer preinstalled.`;
+  const browsers = image.tag ? BROWSER_SUFFIX.test(image.tag) : false;
+  let version = (image.tag ?? "").replace(OS_SUFFIX, "");
+  if (browsers) {
+    version = version.replace(BROWSER_SUFFIX, "");
   }
-  const tag = image.tag ? `:${image.tag}` : "";
-  return `Replace it with cimg/${target}${tag}. If cimg does not publish this tag, choose the nearest supported version.`;
+  if (!version || version.toLowerCase() === "latest") {
+    version = image.name === "node" ? "lts" : "current";
+  } else if (image.name === "node" && /^\d+$/.test(version)) {
+    version = NODE_MAJOR_MINOR.get(version) ?? `${version}.0`;
+  }
+  const tag = `${version}${browsers ? "-browsers" : ""}`;
+  const browserNote = browsers
+    ? " Add the circleci/browser-tools orb; browsers are no longer preinstalled."
+    : "";
+  const floatingNote =
+    image.name === "node" && version === "lts"
+      ? " cimg/node:current is another valid floating tag."
+      : "";
+  return `Replace it with cimg/${target}:${tag}.${browserNote}${floatingNote} If cimg does not publish this tag, choose the nearest supported version.`;
 }
 
 export const circleciLegacyConvenienceImageRule = {

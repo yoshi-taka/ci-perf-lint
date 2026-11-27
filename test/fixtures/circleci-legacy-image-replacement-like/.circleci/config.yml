@@ -1,0 +1,28 @@
+# Trimmed from apostrophecms-legacy/apostrophe-workflow .circleci/config.yml
+version: 2
+jobs:
+  untagged-node:
+    docker:
+      - image: circleci/node
+    steps:
+      - checkout
+      - run: npm test
+  ruby-stretch:
+    docker:
+      - image: circleci/ruby:2.6-stretch
+    steps:
+      - checkout
+      - run: bundle exec rspec
+  browsers-stretch:
+    docker:
+      - image: circleci/node:10-stretch-browsers
+    steps:
+      - checkout
+      - run: npm test
+workflows:
+  version: 2
+  build:
+    jobs:
+      - untagged-node
+      - ruby-stretch
+      - browsers-stretch

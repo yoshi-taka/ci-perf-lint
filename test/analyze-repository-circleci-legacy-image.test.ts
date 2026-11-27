@@ -24,7 +24,7 @@ test("reports legacy node browser images and service containers", async () => {
   expect(findings).toHaveLength(1);
   expect(findings[0]?.location.path).toBe(".circleci/config.yml");
   expect(findings[0]?.message).toContain("circleci/node:14-browsers");
-  expect(findings[0]?.message).toContain("cimg/node:14-browsers");
+  expect(findings[0]?.message).toContain("cimg/node:14.21-browsers");
   expect(findings[0]?.message).toContain("circleci/browser-tools orb");
   expect(findings[0]?.message).toContain('"build-node14-mongo44"');
   expect(findings[0]?.location.line).not.toBe(1);
@@ -34,10 +34,22 @@ test("groups a shared executor image into one finding with all jobs", async () =
   const findings = await findingsFor("circleciLegacyImageSharedExecutorLike");
   expect(findings).toHaveLength(1);
   expect(findings[0]?.message).toContain("circleci/ruby:2.6-stretch");
-  expect(findings[0]?.message).toContain("cimg/ruby:2.6-stretch");
+  expect(findings[0]?.message).toContain("cimg/ruby:2.6.");
   expect(findings[0]?.message).toContain('"checkout"');
   expect(findings[0]?.message).toContain('"md_lint"');
   expect(findings[0]?.message).toContain('"spelling"');
+});
+
+test("suggests published cimg tags for untagged, OS-suffixed and browser images", async () => {
+  const findings = await findingsFor("circleciLegacyImageReplacementLike");
+  expect(findings).toHaveLength(3);
+  const messages = findings.map((finding) => finding.message).join("\n");
+  expect(messages).toContain("cimg/node:lts");
+  expect(messages).toContain("cimg/node:current");
+  expect(messages).toContain("cimg/ruby:2.6");
+  expect(messages).not.toContain("cimg/ruby:2.6-stretch");
+  expect(messages).toContain("cimg/node:10.24-browsers");
+  expect(messages).toContain("circleci/browser-tools orb");
 });
 
 test("maps golang to cimg/go", async () => {

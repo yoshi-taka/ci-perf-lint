@@ -45,6 +45,10 @@ test("does not report when the downstream job pushes git changes", async () => {
   expect(findings).toHaveLength(0);
 });
 
+test("does not report release jobs that push tags or use SSH keys", async () => {
+  expect(await findingsFor("circleciFullWorkspaceReleaseToolOk")).toHaveLength(0);
+});
+
 test("does not report when the attach job is not reachable through requires", async () => {
   const findings = await findingsFor("circleciFullWorkspaceUnreachableOk");
   expect(findings).toHaveLength(0);
