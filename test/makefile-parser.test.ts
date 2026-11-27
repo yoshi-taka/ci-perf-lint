@@ -202,6 +202,23 @@ describe("makefile-parser", () => {
       expect(result.variables.get("GOTEST")).toBe("$(GOCMD) test");
       expect(result.includes).toContain("./Makefile.Common");
     });
+
+    test("comment and blank lines inside a recipe do not end the target", () => {
+      const source = [
+        "release:",
+        "# --overwrite ensures the release gets built even if we",
+        "# restored a cached earlier release.",
+        "",
+        "\tMIX_ENV=deploy mix release --overwrite",
+        "",
+        "clean:",
+        "\trm -rf _build",
+      ].join("\n");
+
+      const result = parseMakefile(source);
+      expect(result.targets.get("release")).toBe("\tMIX_ENV=deploy mix release --overwrite");
+      expect(result.targets.get("clean")).toBe("\trm -rf _build");
+    });
   });
 
   describe("collectRecipeChain and detectInternalParallelTool", () => {

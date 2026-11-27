@@ -21,7 +21,9 @@ export function circleCiElixirOrbCompilesDeps(doc: CircleCiDocument): boolean {
   return doc.jobs.some((job) =>
     job.steps.some((step) => {
       const type = step.type;
-      return /mix_get_and_compile_deps|\/compile\b/i.test(type) && /elixir|mix|beam/i.test(type);
+      return (
+        /mix_get_and_compile_deps|\/(?:compile|test)\b/i.test(type) && /elixir|mix|beam/i.test(type)
+      );
     }),
   );
 }

@@ -119,8 +119,9 @@ export function parseMakefile(source: string): ParsedMakefile {
   for (const rawLine of lines) {
     const trimmed = rawLine.trim();
 
+    // GNU make ignores blank and comment lines inside a recipe; they do not
+    // end the target. A following target definition or non-tab line still does.
     if (trimmed === "" || trimmed.startsWith("#")) {
-      flushRecipe();
       continue;
     }
 

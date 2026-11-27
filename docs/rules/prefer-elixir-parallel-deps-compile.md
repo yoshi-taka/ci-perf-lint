@@ -2,7 +2,7 @@
 
 Detects CI pipelines that use Elixir 1.19+ and run `mix` without enabling parallel dependency compilation.
 
-GitHub Actions gets a workflow-level finding from `erlef/setup-beam` or an `elixir:` container. A repository-level finding covers CircleCI: the Elixir version comes from `.tool-versions`, and a CircleCI Elixir/beam orb is present. Compile evidence is a visible `mix deps.compile` / `mix compile` / `mix test` / `mix release`, an orb call such as `elixir/mix_get_and_compile_deps` / `elixir/compile`, or a `make` target whose recipe (or prerequisite) runs one of those mix commands. That repository finding has medium confidence because the orb may already set the variable internally.
+GitHub Actions gets a workflow-level finding from `erlef/setup-beam` or an `elixir:` container. A repository-level finding covers CircleCI: the Elixir version comes from `.tool-versions`, and a CircleCI Elixir/beam orb is present. Compile evidence is a visible `mix deps.compile` / `mix compile` / `mix test` / `mix release`, an orb call such as `elixir/mix_get_and_compile_deps`, `elixir/compile`, or `elixir/test`, or a `make` target whose recipe (or prerequisite) runs one of those mix commands. That repository finding has medium confidence because the orb may already set the variable internally.
 
 The Elixir gate also accepts `elixir/*` orb usage and `mix.exs` plus `.tool-versions`, so projects that only call `make` or orbs still reach both this rule and `elixir-otp-version-performance`.
 

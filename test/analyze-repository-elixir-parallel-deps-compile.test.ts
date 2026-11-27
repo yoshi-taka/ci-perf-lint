@@ -59,6 +59,15 @@ test("CircleCI Elixir orb compile without partition count is flagged", async () 
   expect(result?.why).toContain("CircleCI orb may configure it internally");
 });
 
+test("elixir/test orb invocation is compile evidence", async () => {
+  const result = await finding(
+    "1.19.4",
+    circleCiConfig().replace("      - run: mix deps.compile", "      - elixir/test"),
+    "echo nothing",
+  );
+  expect(result).toBeDefined();
+});
+
 test("an orb compile invocation is evidence without a visible mix command", async () => {
   const result = await finding(
     "1.19.4",
@@ -95,6 +104,19 @@ test("no Elixir orb means no inferred finding", async () => {
 test("make test compiles through its Makefile recipe", async () => {
   const result = await finding("1.19.4", circleCiConfig("make test"), "make test", {
     Makefile: "test:\n\tmix test\n",
+  });
+  expect(result).toBeDefined();
+});
+
+test("make release with comment lines in the recipe is compile evidence", async () => {
+  const result = await finding("1.19.4", circleCiConfig("make release"), "make release", {
+    Makefile: [
+      "release:",
+      "# --overwrite ensures the release gets built even if we",
+      "# restored a cached earlier release.",
+      "",
+      "\tMIX_ENV=deploy mix release --overwrite",
+    ].join("\n"),
   });
   expect(result).toBeDefined();
 });
