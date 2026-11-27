@@ -62,6 +62,8 @@ const fixtureNames = {
   circleciRemoteDockerInlineLike: "circleci-remote-docker-inline-like",
   circleciAnchorCommentOk: "circleci-anchor-comment-ok",
   circleciDuplicateTestGradleLike: "circleci-duplicate-test-gradle-like",
+  circleciDuplicateTestDbVersionOk: "circleci-duplicate-test-db-version-ok",
+  circleciDuplicateTestDbVersionLike: "circleci-duplicate-test-db-version-like",
   circleciDuplicateTestWorkdirOk: "circleci-duplicate-test-workdir-ok",
   circleciDuplicateTestMicroserviceOk: "circleci-duplicate-test-microservice-ok",
   circleciDuplicateTestRuntimeOk: "circleci-duplicate-test-runtime-ok",

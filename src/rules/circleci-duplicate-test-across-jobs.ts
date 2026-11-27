@@ -157,9 +157,17 @@ function runtimeIdentity(
   parameters: ReadonlyMap<string, string>,
 ): string {
   const executor = job.executorName ? doc.executors?.get(job.executorName) : undefined;
+  const unresolved = `unresolved:${JSON.stringify(
+    [...parameters.entries()].sort(([a], [b]) => a.localeCompare(b)),
+  )}`;
+  const images = job.dockerImages ?? executor?.dockerImages;
+  if (images && images.length > 0) {
+    const resolved = images.map((image) => resolveCircleCiExpression(image, parameters));
+    return resolved.some((image) => image === undefined)
+      ? unresolved
+      : `docker:${resolved.join("|")}`;
+  }
   const raw =
-    job.dockerImages?.[0] ??
-    executor?.dockerImages?.[0] ??
     job.machineImage ??
     executor?.machineImage ??
     (job.macosXcode ? `xcode:${job.macosXcode}` : undefined) ??
@@ -167,10 +175,7 @@ function runtimeIdentity(
   if (!raw) {
     return "default";
   }
-  return (
-    resolveCircleCiExpression(raw, parameters) ??
-    `unresolved:${JSON.stringify([...parameters.entries()].sort(([a], [b]) => a.localeCompare(b)))}`
-  );
+  return resolveCircleCiExpression(raw, parameters) ?? unresolved;
 }
 
 async function jobSignatures(

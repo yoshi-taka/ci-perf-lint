@@ -44,7 +44,12 @@ describe("CircleCI duplicate test across jobs", () => {
     expect(result[0]?.confidence).toBe("high");
   });
 
+  test("same full docker image list still reports", async () => {
+    expect(await findings(fixtures.circleciDuplicateTestDbVersionLike)).toHaveLength(1);
+  });
+
   test.each([
+    ["different DB service versions", fixtures.circleciDuplicateTestDbVersionOk],
     ["different cd directories", fixtures.circleciDuplicateTestWorkdirOk],
     ["microservice directories", fixtures.circleciDuplicateTestMicroserviceOk],
     ["different runtime images", fixtures.circleciDuplicateTestRuntimeOk],
