@@ -3,7 +3,10 @@ import type { RuleMeta } from "../types.ts";
 import type { CircleCiDocument } from "../circleci-workflow.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { traceCommandReferences } from "./shared/command-reference-tracing.ts";
-import { jobIsFullyOverridden } from "./shared/circleci-effective-steps.ts";
+import {
+  effectiveInvocationSteps,
+  jobIsFullyOverridden,
+} from "./shared/circleci-effective-steps.ts";
 import { collectCircleCiWorkflowInvocations } from "../circleci-workflow-graph.ts";
 
 const meta = {
@@ -46,23 +49,32 @@ export const circleciParallelismWithoutTestSplittingRule = {
   meta,
   async check(doc: CircleCiDocument, context: RuleContext) {
     const findings: ReturnType<typeof buildDiagnostic>[] = [];
+    const jobsByName = new Map(doc.jobs.map((job) => [job.name, job]));
+    const invocations = collectCircleCiWorkflowInvocations(doc).filter(
+      (invocation) => !invocation.matrix && !invocation.overrideWith,
+    );
 
-    for (const job of doc.jobs) {
-      if (typeof job.parallelism !== "number" || job.parallelism < 2) {
+    for (const invocation of invocations) {
+      const job = jobsByName.get(invocation.jobName);
+      if (!job || typeof job.parallelism !== "number" || job.parallelism < 2) {
         continue;
       }
       if (jobIsFullyOverridden(doc, job.name)) {
         continue;
       }
+      const steps = effectiveInvocationSteps(doc, job, invocation);
+      if (!steps) {
+        continue;
+      }
       const nodes = job.parallelism;
-      const visibleText = job.steps.map((step) => `${step.type} ${step.command ?? ""}`).join("\n");
+      const visibleText = steps.map((step) => `${step.type} ${step.command ?? ""}`).join("\n");
       if (SPLIT_SIGNAL.test(visibleText)) {
         continue;
       }
 
       let lowConfidence = false;
       let tracedText = visibleText;
-      for (const step of job.steps) {
+      for (const step of steps) {
         if (step.orbUnresolved || (step.type.includes("/") && !isBuiltinStep(step.type))) {
           lowConfidence = true;
         }
@@ -78,15 +90,12 @@ export const circleciParallelismWithoutTestSplittingRule = {
       if (SPLIT_SIGNAL.test(tracedText)) {
         continue;
       }
-      if (!lowConfidence && job.steps.some((step) => !isBuiltinStep(step.type))) {
+      if (!lowConfidence && steps.some((step) => !isBuiltinStep(step.type))) {
         lowConfidence = true;
       }
 
       const resource = job.resourceClass ? ` on ${job.resourceClass}` : "";
-      const label =
-        collectCircleCiWorkflowInvocations(doc).find(
-          (invocation) => invocation.jobName === job.name && !invocation.overrideWith,
-        )?.alias ?? job.name;
+      const label = invocation.alias;
       findings.push(
         buildDiagnostic(doc, meta, job.parallelismNode ?? job.node, {
           severity: lowConfidence ? "suggestion" : undefined,

@@ -1,0 +1,15 @@
+# Synthetic (created for this test)
+version: 2.1
+jobs:
+  test:
+    parallelism: 4
+    docker:
+      - image: cimg/node:22.0
+    steps:
+      - run: npm test
+workflows:
+  ci:
+    jobs:
+      - test:
+          pre-steps:
+            - run: circleci tests glob "test/**/*.js" | circleci tests run --command "npm test"

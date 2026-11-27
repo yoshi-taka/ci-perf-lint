@@ -1,0 +1,21 @@
+# Source: manzanotti/geniushub-client (.circleci/config.yml)
+version: 2.1
+aliases:
+  - &restore_cache
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "requirements-dev.txt" }}
+jobs:
+  unit_tests:
+    docker:
+      - image: cimg/python:3.9
+    steps:
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+workflows:
+  build-and-test:
+    jobs:
+      - unit_tests:
+          pre-steps:
+            - *restore_cache

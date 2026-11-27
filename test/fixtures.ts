@@ -87,6 +87,8 @@ const fixtureNames = {
   circleciOverrideWithMixedLike: "circleci-override-with-mixed-like",
   circleciJobGroupDuplicateLike: "circleci-job-group-duplicate-like",
   circleciJobGroupScopeOk: "circleci-job-group-scope-ok",
+  circleciPreStepsAliasArrayOk: "circleci-pre-steps-alias-array-ok",
+  circleciParallelismPreStepsSplitOk: "circleci-parallelism-pre-steps-split-ok",
   circleciDuplicateTestGradleLike: "circleci-duplicate-test-gradle-like",
   circleciDuplicateTestDbVersionOk: "circleci-duplicate-test-db-version-ok",
   circleciDuplicateTestDbVersionLike: "circleci-duplicate-test-db-version-like",

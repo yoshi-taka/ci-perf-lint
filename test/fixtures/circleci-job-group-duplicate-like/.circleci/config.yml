@@ -1,4 +1,4 @@
-# Source: zer0-os/zAuction-SDK (.circleci/config.yml)
+# Synthetic (created for this test)
 version: 2.1
 jobs:
   checks:

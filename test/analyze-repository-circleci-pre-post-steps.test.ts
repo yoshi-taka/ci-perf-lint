@@ -16,6 +16,21 @@ test("pre/post cache steps suppress missing-dependency-cache", async () => {
   );
 });
 
+test("an anchored step array in pre-steps counts as a cache", async () => {
+  expect(
+    await findings(fixtures.circleciPreStepsAliasArrayOk, "missing-dependency-cache"),
+  ).toHaveLength(0);
+});
+
+test("a split signal in pre-steps suppresses parallelism", async () => {
+  expect(
+    await findings(
+      fixtures.circleciParallelismPreStepsSplitOk,
+      "circleci-parallelism-without-test-splitting",
+    ),
+  ).toHaveLength(0);
+});
+
 test("a restore in pre-steps is reported at the invocation location", async () => {
   const result = await findings(
     fixtures.circleciPreStepsNodeModulesLike,

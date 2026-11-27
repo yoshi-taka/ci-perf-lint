@@ -1,5 +1,7 @@
 import type { AnalysisWarning } from "./types.ts";
 import { isMap, isNode, isScalar, isSeq, type Node, type YAMLMap } from "./yaml.ts";
+import { Alias, YAMLSeq } from "./yaml-ast.ts";
+import { indexAliases } from "./yaml-document.ts";
 import { evaluateCircleCiCondition } from "./rules/shared/circleci-conditions.ts";
 import {
   parseCircleCiSteps,
@@ -190,19 +192,30 @@ function unresolvedOrbReferences(document: CircleCiDocument): string[] {
   return [...new Set(references)].sort();
 }
 
+function resolveAliasNode(document: CircleCiDocument, node: Node | undefined): Node | undefined {
+  if (!(node instanceof Alias) || !document.root) {
+    return node;
+  }
+  return indexAliases(document.root).get(node) ?? node;
+}
+
 /** Expand a step sequence (for example pre-steps/post-steps) with invocation parameters. */
 export function expandCircleCiStepNodes(
   document: CircleCiDocument,
   node: Node | undefined,
   parameters: ReadonlyMap<string, string>,
 ): CircleCiStep[] {
-  if (!node || !document.root || !isSeq(node)) {
+  const resolved = resolveAliasNode(document, node);
+  if (!resolved || !document.root || !isSeq(resolved)) {
     return [];
   }
+  // An alias pointing at a step array appears as a nested sequence; flatten it.
+  const flattened = new YAMLSeq<unknown>();
+  flattened.items = resolved.items.flatMap((item) => (isSeq(item) ? item.items : [item]));
   const scope: CommandScope = {
     commands: mapDefinition(mapAt(document.root, "commands")),
   };
-  return expandSteps(parseCircleCiSteps(node), scope, {
+  return expandSteps(parseCircleCiSteps(flattened), scope, {
     depth: 0,
     active: new Set(),
     parameters,
