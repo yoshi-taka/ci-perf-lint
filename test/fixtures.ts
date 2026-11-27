@@ -56,6 +56,11 @@ const fixtureNames = {
   gitlabCiTimeoutLike: "gitlab-ci-timeout-like",
   gitlabCiTimeoutOk: "gitlab-ci-timeout-ok",
   circleciFullCloneLike: "circleci-full-clone-like",
+  circleciFullWorkspaceRootLike: "circleci-full-workspace-root-like",
+  circleciFullWorkspaceCheckoutPathLike: "circleci-full-workspace-checkout-path-like",
+  circleciFullWorkspaceSubdirOk: "circleci-full-workspace-subdir-ok",
+  circleciFullWorkspaceGitPushOk: "circleci-full-workspace-git-push-ok",
+  circleciFullWorkspaceUnreachableOk: "circleci-full-workspace-unreachable-ok",
   circleciLegacyImageNodeBrowsersLike: "circleci-legacy-image-node-browsers-like",
   circleciLegacyImageSharedExecutorLike: "circleci-legacy-image-shared-executor-like",
   circleciLegacyImageGolangLike: "circleci-legacy-image-golang-like",
@@ -526,4 +531,3 @@ export const fixtures = new Proxy<{ [K in keyof typeof fixtureNames]: string }>(
     },
   },
 );
-

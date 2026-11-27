@@ -1,0 +1,47 @@
+# Trimmed from opensupports/opensupports .circleci/config.yml
+version: 2.1
+jobs:
+  install_composer_packages:
+    docker:
+      - image: circleci/php:7.0
+    steps:
+      - checkout
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+  install_node_packages:
+    docker:
+      - image: circleci/node:11.15.0-stretch
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Install dependencies
+          command: npm install
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+  add_release_commit:
+    docker:
+      - image: circleci/node:11.15.0-stretch
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Commit new version
+          command: |
+            git add .
+            git commit -m "Release"
+            git push origin release
+workflows:
+  release:
+    jobs:
+      - install_composer_packages
+      - install_node_packages:
+          requires:
+            - install_composer_packages
+      - add_release_commit:
+          requires:
+            - install_node_packages

@@ -169,6 +169,14 @@ function collectDockerImages(node: Node | undefined): string[] {
   return images;
 }
 
+function getScalarOrArray(node: Node | undefined): string[] | undefined {
+  const scalar = getScalarString(node);
+  if (scalar !== undefined) {
+    return [scalar];
+  }
+  return getScalarArray(node);
+}
+
 function getBool(node: Node | undefined): boolean | undefined {
   // CircleCI documents `background: true` and `docker_layer_caching: true`
   // as YAML booleans, not strings.
@@ -231,7 +239,7 @@ function parseStepArgs(item: YAMLMap<unknown, unknown>, stepType: string): Circl
   } else if (stepType === "persist_to_workspace") {
     step.workspaceRoot = getScalarString(getNode(item, "root"));
     step.workspaceRootNode = getNode(item, "root");
-    step.workspacePaths = getScalarArray(getNode(item, "paths"));
+    step.workspacePaths = getScalarOrArray(getNode(item, "paths"));
     step.workspacePathsNode = getNode(item, "paths");
   } else if (stepType === "attach_workspace") {
     step.attachAt = getScalarString(getNode(item, "at"));

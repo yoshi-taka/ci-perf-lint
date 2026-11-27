@@ -35,6 +35,7 @@ Current rule registry:
 - `cdk-bucket-deployment-memory-unconfigured`
 - `cdk-duplicate-asset-hash`
 - `circleci-checkout-uses-full-clone`
+- `circleci-checkout-with-full-workspace`
 - `circleci-duplicate-test-across-jobs`
 - `circleci-legacy-convenience-image`
 - `circleci-node-modules-cache-with-npm-ci`

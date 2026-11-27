@@ -1,0 +1,22 @@
+# Trimmed from ministryofjustice/ndelius-new-tech .circleci/config.yml
+defaults: &defaults
+  working_directory: ~/ndelius-new-tech
+  docker:
+    - image: cimg/openjdk:25.0-browsers
+version: 2.1
+jobs:
+  build:
+    <<: *defaults
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/ndelius-new-tech
+      - run: sbt compile
+      - persist_to_workspace:
+          root: .
+          paths: .
+workflows:
+  version: 2
+  build-deploy-test:
+    jobs:
+      - build

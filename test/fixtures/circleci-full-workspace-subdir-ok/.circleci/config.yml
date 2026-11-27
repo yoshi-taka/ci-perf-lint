@@ -1,0 +1,28 @@
+# Trimmed from scikit-learn/scikit-learn .circleci/config.yml
+version: 2.1
+jobs:
+  doc:
+    docker:
+      - image: cimg/python:3.12
+    steps:
+      - checkout
+      - run: ./build_tools/circle/build_doc.sh
+      - persist_to_workspace:
+          root: doc/_build/html
+          paths: .
+  deploy:
+    docker:
+      - image: cimg/base:current-22.04
+    steps:
+      - checkout
+      - attach_workspace:
+          at: doc/_build/html
+      - run: ls -ltrh doc/_build/html/stable
+workflows:
+  version: 2
+  build-doc-and-deploy:
+    jobs:
+      - doc
+      - deploy:
+          requires:
+            - doc
