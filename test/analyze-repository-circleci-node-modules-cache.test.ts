@@ -30,6 +30,12 @@ describe("CircleCI node_modules cache followed by npm ci", () => {
     expect(await findings(fixtures.circleciNodeModulesCacheCommandLike)).toHaveLength(1);
   });
 
+  test("aggregates a shared command used by four jobs into one finding", async () => {
+    const result = await findings(fixtures.circleciNodeModulesCacheSharedCommandLike);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.message).toContain('"unit", "lint", "build", "deploy"');
+  });
+
   test("ignores guarded npm ci", async () => {
     expect(await findings(fixtures.circleciNodeModulesCacheGuardOk, "exploratory")).toHaveLength(0);
   });

@@ -38,6 +38,12 @@ describe("CircleCI parallelism without test splitting", () => {
     expect(await findings(fixtures.circleciParallelismMvnLike)).toHaveLength(1);
   });
 
+  test("add_ssh_keys and generated venv activation stay high confidence", async () => {
+    const result = await findings(fixtures.circleciParallelismInlineLike);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.confidence).toBe("high");
+  });
+
   test.each([
     ["circleci tests run", fixtures.circleciParallelismSplitOk],
     ["node index", fixtures.circleciParallelismNodeIndexOk],

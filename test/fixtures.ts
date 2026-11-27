@@ -66,6 +66,8 @@ const fixtureNames = {
   circleciNodeModulesCacheNpmCacheOk: "circleci-node-modules-cache-npm-cache-ok",
   circleciNodeModulesCacheInstallOk: "circleci-node-modules-cache-install-ok",
   circleciNodeModulesCacheCommandLike: "circleci-node-modules-cache-command-like",
+  circleciNodeModulesCacheSharedCommandLike: "circleci-node-modules-cache-shared-command-like",
+  circleciParallelismInlineLike: "circleci-parallelism-inline-like",
   circleciParallelismDockerLike: "circleci-parallelism-docker-like",
   circleciParallelismLintLike: "circleci-parallelism-lint-like",
   circleciParallelismMvnLike: "circleci-parallelism-mvn-like",

@@ -2,7 +2,7 @@
 
 ## What it flags
 
-Flags a CircleCI job that restores a `node_modules` cache and later runs an unguarded `npm ci` (including `npm clean-install`). The install deletes `node_modules`, so the restore was wasted. Save and restore keys are matched by their static prefix, including saves in another job. Commands defined in reusable `commands:` blocks are expanded before checking.
+Flags CircleCI jobs that restore a `node_modules` cache and later run an unguarded `npm ci` (including `npm clean-install`). Jobs sharing one reusable `commands:` block are reported as a single finding with the job names listed. The install deletes `node_modules`, so the restore was wasted. Save and restore keys are matched by their static prefix, including saves in another job. Commands defined in reusable `commands:` blocks are expanded before checking.
 
 ## When it stays silent
 

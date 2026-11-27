@@ -57,9 +57,19 @@ function textArray(value: unknown): string[] | undefined {
   return items?.map(plainText).filter((item): item is string => item !== undefined);
 }
 
+function filterValues(value: unknown): string[] | undefined {
+  const array = textArray(value);
+  if (array) {
+    return array;
+  }
+  const single = plainText(value);
+  return single ? [single] : undefined;
+}
+
 function parseFilterSet(value: unknown): CircleCiFilterSet | undefined {
-  if (typeof value === "string") {
-    return { only: [value] };
+  const single = plainText(value);
+  if (single && !isMap(value)) {
+    return { only: [single] };
   }
   if (!isMap(value)) {
     return undefined;
@@ -67,7 +77,7 @@ function parseFilterSet(value: unknown): CircleCiFilterSet | undefined {
   const result: CircleCiFilterSet = {};
   for (const pair of value.items) {
     const key = scalarText(pair.key);
-    const values = textArray(pair.value);
+    const values = filterValues(pair.value);
     if (key === "only" && values) {
       result.only = values;
     } else if (key === "ignore" && values) {
@@ -190,14 +200,44 @@ export function collectCircleCiWorkflowInvocations(
   return invocations;
 }
 
-function onlySetsDisjoint(
+function isBranchRegex(value: string): boolean {
+  return value.length > 1 && value.startsWith("/") && value.slice(1).includes("/");
+}
+
+function regexMatchesBranch(pattern: string, branch: string): boolean {
+  const lastSlash = pattern.lastIndexOf("/");
+  try {
+    return new RegExp(pattern.slice(1, lastSlash)).test(branch);
+  } catch {
+    return false;
+  }
+}
+
+function onlySetsOverlap(
   a: CircleCiFilterSet | undefined,
   b: CircleCiFilterSet | undefined,
 ): boolean {
   if (!a?.only || !b?.only) {
-    return false;
+    return true;
   }
-  return !a.only.some((value) => b.only!.includes(value));
+  for (const left of a.only) {
+    for (const right of b.only) {
+      if (left === right) {
+        return true;
+      }
+      if (isBranchRegex(left) && !isBranchRegex(right) && regexMatchesBranch(left, right)) {
+        return true;
+      }
+      if (isBranchRegex(right) && !isBranchRegex(left) && regexMatchesBranch(right, left)) {
+        return true;
+      }
+      // Two regexes cannot be decided statically; stay conservative.
+      if (isBranchRegex(left) && isBranchRegex(right)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /** Missing filters mean all branches/tags; disjoint explicit `only` sets cannot co-run. */
@@ -206,7 +246,7 @@ export function circleCiInvocationsCanCoRun(
   b: CircleCiWorkflowInvocation,
 ): boolean {
   return (
-    !onlySetsDisjoint(a.filters.branches, b.filters.branches) &&
-    !onlySetsDisjoint(a.filters.tags, b.filters.tags)
+    onlySetsOverlap(a.filters.branches, b.filters.branches) &&
+    onlySetsOverlap(a.filters.tags, b.filters.tags)
   );
 }

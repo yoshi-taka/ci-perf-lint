@@ -24,6 +24,10 @@ function scriptReferences(command: string): string[] {
   for (const segment of shellCommandSegments(command)) {
     const words = shellCommands(segment)[0] ?? [];
     const executable = words[0] ?? "";
+    // `source venv/bin/activate` is generated inside the job, not a repository script.
+    if (/bin\/activate$/.test(words[1] ?? "") || /bin\/activate$/.test(executable)) {
+      continue;
+    }
     if (["bash", "sh", "zsh", "dash", "source", "."].includes(executable)) {
       let index = 1;
       while (/^-[eux]+$/.test(words[index] ?? "")) {

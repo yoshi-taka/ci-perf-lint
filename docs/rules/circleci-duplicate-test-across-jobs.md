@@ -4,7 +4,7 @@
 
 Flags a CircleCI workflow where two or more job invocations that can run in the same pipeline execute the same test command on the same scope. npm scripts and Makefile targets are expanded before comparison. Supported tools: Gradle, Maven, npm test / jest / vitest, pytest, mix test, RSpec, and `go test`.
 
-The workflow graph (`workflows.<name>.jobs`) is parsed for aliases, `requires`, branch/tag filters, matrix invocations, and parameters. Missing filters mean all branches/tags; disjoint `branches.only` sets cannot co-run. Matrix invocations and jobs invoked with different parameters are skipped. Jobs split with `circleci tests run` / `circleci testsuite` belong to `circleci-parallelism-without-test-splitting` and are skipped here, as are opaque orb jobs.
+The workflow graph (`workflows.<name>.jobs`) is parsed for aliases, `requires`, branch/tag filters, matrix invocations, and parameters. Missing filters mean all branches/tags. `only` accepts a single value or an array; CircleCI regex values such as `/feature-.*/` are matched against plain branch names. Disjoint sets cannot co-run; two regexes are treated as possibly overlapping. Matrix invocations and jobs invoked with different parameters are skipped. Jobs split with `circleci tests run` / `circleci testsuite` belong to `circleci-parallelism-without-test-splitting` and are skipped here, as are opaque orb jobs.
 
 A leading `clean` is ignored for equality but makes the finding stronger, because no cache can help those runs.
 

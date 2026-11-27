@@ -4,7 +4,7 @@
 
 Flags CircleCI jobs with `parallelism >= 2` where no step divides the work: no `circleci tests split` / `circleci tests run` / `circleci tests glob`, no `circleci testsuite`, and no `CIRCLE_NODE_INDEX` / `CIRCLE_NODE_TOTAL`. Unresolved `<< parameters.* >>` parallelism values are skipped.
 
-High confidence requires only built-in steps with inline `run` commands. A repo script, Makefile target, package script, or unresolved orb step makes the finding low confidence (exploratory only). Those referenced bodies are traced first; a split signal inside them suppresses the finding.
+High confidence requires only built-in steps (including `add_ssh_keys`) with inline `run` commands. Generated `venv/bin/activate` sourcing stays inline. A repo script, Makefile target, package script, or unresolved orb step makes the finding low confidence (exploratory only). Those referenced bodies are traced first; a split signal inside them suppresses the finding.
 
 ## Why it matters
 

@@ -75,14 +75,14 @@ export const circleciNodeModulesCacheWithNpmCiRule = {
     const allSaves = doc.jobs.flatMap((job) =>
       job.steps.filter((step) => step.type === "save_cache"),
     );
-    const findings: ReturnType<typeof buildDiagnostic>[] = [];
+    const npmCacheAlsoSaved = allSaves.some((step) => pathsMatchCache(step.cachePaths, NPM_CACHE));
+    const matches: { jobName: string; restore: CircleCiStep }[] = [];
 
     for (const job of doc.jobs) {
       const wastedRestores = findWastedRestore(job.steps, allSaves);
       if (wastedRestores.length === 0) {
         continue;
       }
-
       const unguardedCi = job.steps.find(
         (step) =>
           step.type === "run" &&
@@ -92,27 +92,28 @@ export const circleciNodeModulesCacheWithNpmCiRule = {
       if (!unguardedCi) {
         continue;
       }
-
-      const npmCacheAlsoSaved = allSaves.some((step) =>
-        pathsMatchCache(step.cachePaths, NPM_CACHE),
-      );
-      const first = wastedRestores[0]!;
-      findings.push(
-        buildDiagnostic(doc, meta, first.restore.restoreKeysNode ?? first.restore.node, {
-          severity: npmCacheAlsoSaved ? "suggestion" : undefined,
-          message: `Job "${job.name}" restores a node_modules cache and then runs npm ci, which deletes node_modules before installing.`,
-          why: `The restored cache is wasted: npm ci removes node_modules first. CircleCI's dependency caching docs recommend caching ~/.npm instead. ${npmCacheAlsoSaved ? "A ~/.npm cache is already present, so the node_modules entry in the cache is redundant." : ""}`,
-          suggestion: npmCacheAlsoSaved
-            ? "Drop node_modules from the saved cache paths and keep the ~/.npm cache keyed on package-lock.json; npm ci then reuses downloaded packages."
-            : "Cache ~/.npm keyed on package-lock.json and keep npm ci, or keep a node_modules cache only with a guarded install such as `[ ! -d node_modules ] && npm ci`.",
-          measurementHint:
-            "Compare restore time plus install time before and after the change, and confirm dependency resolution stays identical.",
-          aiHandoff: `Review job "${job.name}" in ${doc.relativePath}. Match the restore_cache and save_cache key prefixes, then remove the wasted node_modules cache or guard the npm ci install. Verify the lockfile checksum key still invalidates correctly.`,
-          score: npmCacheAlsoSaved ? 42 : 58,
-        }),
-      );
+      matches.push({ jobName: job.name, restore: wastedRestores[0]!.restore });
     }
 
-    return findings;
+    if (matches.length === 0) {
+      return [];
+    }
+
+    const jobNames = [...new Set(matches.map((match) => match.jobName))];
+    const first = matches[0]!;
+    return [
+      buildDiagnostic(doc, meta, first.restore.restoreKeysNode ?? first.restore.node, {
+        severity: npmCacheAlsoSaved ? "suggestion" : undefined,
+        message: `${jobNames.map((name) => `"${name}"`).join(", ")} restore a node_modules cache and then run npm ci, which deletes node_modules before installing.`,
+        why: `The restored cache is wasted: npm ci removes node_modules first. CircleCI's dependency caching docs recommend caching ~/.npm instead. ${npmCacheAlsoSaved ? "A ~/.npm cache is already present, so the node_modules entry in the cache is redundant." : ""}`,
+        suggestion: npmCacheAlsoSaved
+          ? "Drop node_modules from the saved cache paths and keep the ~/.npm cache keyed on package-lock.json; npm ci then reuses downloaded packages."
+          : "Cache ~/.npm keyed on package-lock.json and keep npm ci, or keep a node_modules cache only with a guarded install such as `[ ! -d node_modules ] && npm ci`.",
+        measurementHint:
+          "Compare restore time plus install time before and after the change, and confirm dependency resolution stays identical.",
+        aiHandoff: `Review ${doc.relativePath} jobs ${jobNames.map((name) => `"${name}"`).join(", ")}. Match the restore_cache and save_cache key prefixes, then remove the wasted node_modules cache or guard the npm ci install. Verify the lockfile checksum key still invalidates correctly.`,
+        score: npmCacheAlsoSaved ? 42 : 58,
+      }),
+    ];
   },
 };

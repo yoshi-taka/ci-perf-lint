@@ -65,6 +65,62 @@ test("still parses the explicit job: reference form", () => {
   expect(result[0]).toMatchObject({ jobName: "test", alias: "legacy-alias" });
 });
 
+test("scalar, array and regex only filters are compared correctly", () => {
+  const [
+    scalarDevelop,
+    scalarMain,
+    arrayDevelop,
+    arrayMain,
+    regexFeature,
+    plainMain,
+    featureBranch,
+  ] = invocations(
+    [
+      "version: 2.1",
+      "jobs:",
+      "  test: {}",
+      "workflows:",
+      "  ci:",
+      "    jobs:",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: develop",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: main",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: [develop]",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: [main]",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: /feature-.*/",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: main",
+      "      - test:",
+      "          filters:",
+      "            branches:",
+      "              only: feature-foo",
+    ].join("\n"),
+  );
+
+  expect(scalarDevelop?.filters.branches?.only).toEqual(["develop"]);
+  expect(arrayDevelop?.filters.branches?.only).toEqual(["develop"]);
+  expect(circleCiInvocationsCanCoRun(scalarDevelop!, scalarMain!)).toBe(false);
+  expect(circleCiInvocationsCanCoRun(arrayDevelop!, arrayMain!)).toBe(false);
+  expect(circleCiInvocationsCanCoRun(regexFeature!, plainMain!)).toBe(false);
+  expect(circleCiInvocationsCanCoRun(regexFeature!, featureBranch!)).toBe(true);
+});
+
 test("missing filters overlap and disjoint branches.only sets do not", () => {
   const [plain, mainOnly, developOnly] = invocations(
     [

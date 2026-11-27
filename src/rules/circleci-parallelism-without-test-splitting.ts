@@ -23,6 +23,7 @@ const BUILTIN_STEPS = new Set([
   "setup_remote_docker",
   "persist_to_workspace",
   "attach_workspace",
+  "add_ssh_keys",
 ]);
 
 function isBuiltinStep(type: string): boolean {
