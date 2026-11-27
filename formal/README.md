@@ -67,6 +67,14 @@ bun run --cwd formal verify:models
   and fresh facts across contexts. Rejection is abstracted as settlement; hanging
   I/O, cancellation, multiple worker threads and reentrant callbacks are excluded.
 
+### CircleCI branch/tag trigger overlap (local, optional)
+
+`bun run verify:circleci-filters` runs `CircleCiFilters.lean` and compares 17
+branch/tag filter combinations with the real workflow-graph helper. Lean proves
+ignore precedence, only-set restriction, symmetry, tag-filter requirement, and
+that ignoring `ignore` is unsound. It is model evidence plus differential
+testing, not a proof of CircleCI behavior or YAML parsing.
+
 ### npm script expansion / duplicate Prettier check (local, optional)
 
 `bun run verify:npm-scripts` runs `NpmScriptExpansion.lean` and compares its

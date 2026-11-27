@@ -223,24 +223,26 @@ function matchesPattern(pattern: string, value: string): boolean {
   return isBranchRegex(pattern) ? regexMatchesBranch(pattern, value) : pattern === value;
 }
 
-function ignoresEverything(set: CircleCiFilterSet | undefined): boolean {
-  return (set?.ignore ?? []).some(
-    (pattern) => matchesPattern(pattern, ".*") || pattern === "/.*/" || pattern === "*",
-  );
-}
-
-function setAllowsValue(set: CircleCiFilterSet | undefined, value: string): boolean {
-  if ((set?.ignore ?? []).some((pattern) => matchesPattern(pattern, value))) {
+function setAllowsValue(set: CircleCiFilterSet, value: string): boolean {
+  if (set.ignore?.some((pattern) => matchesPattern(pattern, value))) {
     return false;
   }
-  const only = set?.only ?? [];
+  const only = set.only ?? [];
   return only.length === 0 || only.some((pattern) => matchesPattern(pattern, value));
 }
 
-/**
- * CircleCI runs a workflow on tags only when a tag filter is present, while
- * branches are enabled by default. Jobs co-run when they share either trigger.
- */
+/** Representative branch/tag names shared with the formal model. */
+const TRIGGER_CANDIDATES: string[] = [
+  "main",
+  "develop",
+  "feature-1",
+  "v1",
+  "v1.0",
+  "v11",
+  "v2.0",
+  "release-1",
+];
+
 function triggerOverlap(
   a: CircleCiFilterSet | undefined,
   b: CircleCiFilterSet | undefined,
@@ -249,27 +251,19 @@ function triggerOverlap(
   if (!enabledByDefault && (!a || !b)) {
     return false;
   }
-  if (ignoresEverything(a) || ignoresEverything(b)) {
-    return false;
+  // Branch and tag triggers are independent: an all-branches ignore must not
+  // stop the tag comparison.
+  const left = a ?? {};
+  const right = b ?? {};
+  const candidates = [...TRIGGER_CANDIDATES];
+  for (const set of [left, right]) {
+    for (const pattern of set.only ?? []) {
+      if (!isBranchRegex(pattern)) {
+        candidates.push(pattern);
+      }
+    }
   }
-
-  const onlyA = a?.only ?? [];
-  const onlyB = b?.only ?? [];
-  if (onlyA.length > 0 && onlyB.length > 0) {
-    return (
-      onlyA.some((value) => setAllowsValue(b, value)) ||
-      onlyB.some((value) => setAllowsValue(a, value))
-    );
-  }
-  const constrained = onlyA.length > 0 ? a : onlyB.length > 0 ? b : undefined;
-  if (!constrained) {
-    return true;
-  }
-  const other = constrained === a ? b : a;
-  return (
-    (constrained.only ?? []).some((value) => setAllowsValue(other, value)) ||
-    !ignoresEverything(other)
-  );
+  return candidates.some((value) => setAllowsValue(left, value) && setAllowsValue(right, value));
 }
 
 /** Missing filters mean all branches but no tags; disjoint `only` sets cannot co-run. */

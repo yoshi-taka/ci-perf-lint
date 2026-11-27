@@ -3,6 +3,8 @@ import { parseCircleCi } from "../src/circleci-workflow.ts";
 import {
   circleCiInvocationsCanCoRun,
   collectCircleCiWorkflowInvocations,
+  type CircleCiInvocationFilters,
+  type CircleCiWorkflowInvocation,
 } from "../src/circleci-workflow-graph.ts";
 
 function invocations(source: string) {
@@ -63,6 +65,116 @@ test("still parses the explicit job: reference form", () => {
   );
   expect(result).toHaveLength(1);
   expect(result[0]).toMatchObject({ jobName: "test", alias: "legacy-alias" });
+});
+
+function invocation(filters: CircleCiInvocationFilters): CircleCiWorkflowInvocation {
+  return {
+    workflowName: "ci",
+    jobName: "deploy",
+    alias: "deploy",
+    requires: [],
+    filters,
+    matrix: false,
+    parameters: new Map(),
+    uncertain: false,
+    node: undefined,
+  };
+}
+
+test("17 branch/tag filter combinations match the documented co-run rules", () => {
+  const tagOnlyV: CircleCiInvocationFilters = { tags: { only: ["/^v./"] } };
+  const noBranchesTagOnlyV: CircleCiInvocationFilters = {
+    branches: { ignore: ["/.*/"] },
+    tags: { only: ["/^v./"] },
+  };
+  const noBranchesTagOnlyV1: CircleCiInvocationFilters = {
+    branches: { ignore: ["/.*/"] },
+    tags: { only: ["/^v1.*/"] },
+  };
+
+  const cases: [string, CircleCiInvocationFilters, CircleCiInvocationFilters, boolean][] = [
+    [
+      "ignore main / only main",
+      { branches: { ignore: ["main"] } },
+      { branches: { only: ["main"] } },
+      false,
+    ],
+    [
+      "ignore [main] / only [main]",
+      { branches: { ignore: ["main"] } },
+      { branches: { only: ["main"] } },
+      false,
+    ],
+    [
+      "only develop / ignore develop",
+      { branches: { only: ["develop"] } },
+      { branches: { ignore: ["develop"] } },
+      false,
+    ],
+    [
+      "ignore all / ignore all",
+      { branches: { ignore: ["/.*/"] } },
+      { branches: { ignore: ["/.*/"] } },
+      false,
+    ],
+    ["tag only regex twice", noBranchesTagOnlyV, noBranchesTagOnlyV, true],
+    ["all branches + tag / tag only", tagOnlyV, noBranchesTagOnlyV1, true],
+    ["tag only / no tag filter", noBranchesTagOnlyV, { branches: { ignore: ["/.*/"] } }, false],
+    [
+      "feature regex / main",
+      { branches: { only: ["/feature-.*/"] } },
+      { branches: { only: ["main"] } },
+      false,
+    ],
+    [
+      "feature regex / feature-foo",
+      { branches: { only: ["/feature-.*/"] } },
+      { branches: { only: ["feature-foo"] } },
+      true,
+    ],
+    ["main / main", { branches: { only: ["main"] } }, { branches: { only: ["main"] } }, true],
+    [
+      "main / develop",
+      { branches: { only: ["main"] } },
+      { branches: { only: ["develop"] } },
+      false,
+    ],
+    [
+      "ignore main / only develop",
+      { branches: { ignore: ["main"] } },
+      { branches: { only: ["develop"] } },
+      true,
+    ],
+    [
+      "ignore all / only main",
+      { branches: { ignore: ["/.*/"] } },
+      { branches: { only: ["main"] } },
+      false,
+    ],
+    [
+      "main + tag overlap",
+      { branches: { only: ["main"] }, tags: { only: ["/v1.*/"] } },
+      { branches: { only: ["main"] }, tags: { only: ["/v1.*/"] } },
+      true,
+    ],
+    [
+      "disjoint tags",
+      noBranchesTagOnlyV1,
+      { branches: { ignore: ["/.*/"] }, tags: { only: ["/v2.*/"] } },
+      false,
+    ],
+    [
+      "ignore [main] / only [main] arrays",
+      { branches: { ignore: ["main"] } },
+      { branches: { only: ["main"] } },
+      false,
+    ],
+    ["no filters", {}, {}, true],
+  ];
+
+  for (const [name, a, b, expected] of cases) {
+    expect(circleCiInvocationsCanCoRun(invocation(a), invocation(b)), name).toBe(expected);
+  }
 });
 
 test("scalar, array and regex only filters are compared correctly", () => {
