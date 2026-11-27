@@ -1,0 +1,15 @@
+version: 2.1
+jobs:
+  unit:
+    docker: [{image: cimg/openjdk:21.0}]
+    steps:
+      - checkout
+      - run: ./gradlew test
+  integration:
+    docker: [{image: cimg/openjdk:21.0}]
+    steps:
+      - checkout
+      - run: ./gradlew integrationTest
+workflows:
+  ci:
+    jobs: [unit, integration]

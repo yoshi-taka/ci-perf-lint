@@ -1,0 +1,27 @@
+version: 2.1
+jobs:
+  test:
+    docker: [{image: cimg/openjdk:21.0}]
+    steps:
+      - checkout
+      - run: ./gradlew clean test
+  test-coverage-verification:
+    docker: [{image: cimg/openjdk:21.0}]
+    steps:
+      - checkout
+      - run: ./gradlew clean test
+  test-coverage-report:
+    docker: [{image: cimg/openjdk:21.0}]
+    steps:
+      - checkout
+      - run: ./gradlew test
+workflows:
+  ci:
+    jobs:
+      - test
+      - job: test-coverage-verification
+        name: verify-coverage
+        requires: [test]
+      - job: test-coverage-report
+        name: report-coverage
+        requires: [test]

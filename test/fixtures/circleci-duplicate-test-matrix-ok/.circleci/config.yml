@@ -1,0 +1,18 @@
+version: 2.1
+jobs:
+  test:
+    parameters:
+      java-version:
+        type: string
+    docker: [{image: cimg/openjdk:21.0}]
+    steps:
+      - checkout
+      - run: ./gradlew test
+workflows:
+  ci:
+    jobs:
+      - job: test
+        name: java-<< matrix.java-version >>
+        matrix:
+          parameters:
+            java-version: [17, 21]
