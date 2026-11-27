@@ -4,7 +4,7 @@
 
 Flags Dockerfiles that copy or add files to a path and then run `chown` on that same path in a later layer. The example is `ADD _build/deploy/rel /opt/app` followed by `RUN chown -R ... /opt/app`.
 
-A copy that already uses `--chown` is not flagged.
+All matching copy/chown pairs in a Dockerfile are reported; whole-directory copies are listed first. `ENV` values and `ARG` defaults declared earlier in the same stage are expanded when comparing paths, so `$APP_INSTALL_DIRECTORY` and `/opt/app` count as the same destination. A copy that already uses `--chown` is not flagged.
 
 ## Why it matters
 

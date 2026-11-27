@@ -53,6 +53,18 @@ test("CircleCI Elixir orb compile without partition count is flagged", async () 
   expect(result?.why).toContain("CircleCI orb may configure it internally");
 });
 
+test("an orb compile invocation is evidence without a visible mix command", async () => {
+  const result = await finding(
+    "1.19.4",
+    circleCiConfig().replace(
+      "      - run: mix deps.compile",
+      "      - elixir/mix_get_and_compile_deps",
+    ),
+  );
+  expect(result).toBeDefined();
+  expect(result?.confidence).toBe("medium");
+});
+
 test("a visible partition count in CircleCI suppresses the finding", async () => {
   expect(
     await finding(

@@ -30,6 +30,15 @@ function circleCiHasElixirOrb(doc: CircleCiDocument): boolean {
   return /orbs:[\s\S]*?(?:erlef\/|elixir|beam)/i.test(doc.source ?? "");
 }
 
+function circleCiOrbCompilesDeps(doc: CircleCiDocument): boolean {
+  return doc.jobs.some((job) =>
+    job.steps.some((step) => {
+      const type = step.type;
+      return /mix_get_and_compile_deps|\/compile\b/i.test(type) && /elixir|mix|beam/i.test(type);
+    }),
+  );
+}
+
 function configureParallelCompile(doc: CircleCiDocument): boolean {
   const count = new RegExp(`${PARTITION_ENV}\\s*[:=]\\s*(?:[2-9]|\\d{2,})`, "i");
   return count.test(doc.source ?? "");
@@ -61,8 +70,10 @@ export async function collectElixirParallelDepsCompileDiagnostics(
     return [];
   }
 
-  const compiles = circleDocs.some((doc) =>
-    collectCommandEntries(doc).some((entry) => MIX_COMPILE.test(entry.text)),
+  const compiles = circleDocs.some(
+    (doc) =>
+      circleCiOrbCompilesDeps(doc) ||
+      collectCommandEntries(doc).some((entry) => MIX_COMPILE.test(entry.text)),
   );
   if (!compiles) {
     return [];
