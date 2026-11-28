@@ -1,0 +1,12 @@
+name: depot swiftpm cache only
+on: push
+jobs:
+  build:
+    runs-on: depot-macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/org.swift.swiftpm
+          key: swiftpm-${{ github.sha }}
+      - run: xcodebuild -scheme App -destination generic/platform=iOS build

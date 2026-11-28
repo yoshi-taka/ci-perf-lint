@@ -4,7 +4,7 @@ Explicit Blacksmith Sticky Disk mounts of dependency-cache paths are recognized
 when placed before dependency installation on a static Blacksmith runner.
 Container mounts require visible privileged mounting and the documented forwarded
 environment. This is visible persistence wiring, not proof of a cache hit.
-Run-scoped disks may intentionally transfer state between jobs.
+Run-scoped disks may intentionally transfer state between jobs. In `.depot/workflows/` only, a literal `depot/cache-mount@v1` with `name` and `path` before the install also counts; the same YAML under `.github/workflows/` does not. Public fork PRs skip the mount. See [Depot cache disks](https://depot.dev/docs/ci/how-to-guides/cache-disks).
 
 Actions cache policy is respected: job-level `cache-mode` overrides workflow-level policy. `read` permits restore; `none`, `write-only`, and dynamic/unknown modes suppress cache-enablement advice. Disabled restore is not counted as working cache coverage. Existing event defaults remain unchanged; this rule does not recommend loosening cache access.
 

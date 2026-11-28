@@ -9,6 +9,7 @@ Why this rule exists:
 - stale PR runs often continue after a new commit lands
 - that wastes runner minutes and slows the signal people actually care about
 - this is especially useful for long-lived AI or agentic PR/comment workflows where stale runs are rarely worth keeping
+- Depot CI keeps earlier `pull_request` runs running after a new push since [2026-08-19](https://depot.dev/changelog/2026-08-19-depot-ci-pr-run-cancellation); on Depot, `concurrency` with `cancel-in-progress: true` is required to cancel them
 
 Current MVP heuristic:
 

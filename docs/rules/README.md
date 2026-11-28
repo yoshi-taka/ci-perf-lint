@@ -60,6 +60,8 @@ Current rule registry:
 - `deep-checkout-excessive-depth`
 - `deep-checkout-without-need`
 - `depot-build-gha-cache-export`
+- `depot-xcode-deriveddata-restore`
+- `depot-xcode-xcconfig-override`
 - `detected-large-barrel-file`
 - `detected-large-files`
 - `docker-bake-file-unused-in-ci`

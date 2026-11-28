@@ -1,0 +1,11 @@
+name: depot xcode cache opt out
+on: push
+jobs:
+  build:
+    runs-on: depot-macos-26
+    env:
+      XCODE_XCCONFIG_FILE: .github/Custom.xcconfig
+      DEPOT_XCODE_CACHE_ENABLED: 0
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcodebuild -scheme App -destination generic/platform=iOS build

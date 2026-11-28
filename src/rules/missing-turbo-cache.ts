@@ -13,6 +13,7 @@ import { declaredShellEnvironmentNames } from "./shared/shell-environment-eviden
 import { shellExecutionTexts } from "./shared/shell-execution-text.ts";
 import { shellCommandSegments } from "./shared/command-patterns.ts";
 import { isBlacksmithStickyDiskCacheStep } from "./shared/blacksmith-caches.ts";
+import { isDepotCacheMountStep } from "./shared/depot-caches.ts";
 import { jobRunsOnBlacksmithRunner, jobRunsOnDepotRunner } from "./shared/runs-on-facts.ts";
 
 const meta = {
@@ -50,6 +51,16 @@ function jobHasBlacksmithTurboCache(job: WorkflowJob): boolean {
   );
 }
 
+function jobHasDepotTurboCache(workflow: WorkflowDocument, job: WorkflowJob): boolean {
+  const firstTask = job.steps.findIndex(stepRunsTurboTasks);
+  return job.steps.some(
+    (step, index) =>
+      isDepotCacheMountStep(workflow, job, step) &&
+      /\.turbo\b|node_modules\/\.cache\/turbo\b/i.test(turboCachePathText(step)) &&
+      index < firstTask,
+  );
+}
+
 function turboCachePathText(step: WorkflowStep): string {
   const pathValue = step.with?.path;
   return Array.isArray(pathValue)
@@ -79,7 +90,7 @@ function workflowHasTurboLocalCache(workflow: WorkflowDocument): boolean {
         if (isTurboCacheArtifactStep(step)) {
           return true;
         }
-        if (!isManualCacheStep(step)) {
+        if (!isManualCacheStep(step) && !isDepotCacheMountStep(workflow, job, step)) {
           return false;
         }
         return /\.turbo\b|node_modules\/\.cache\/turbo\b/i.test(turboCachePathText(step));
@@ -137,6 +148,7 @@ export const missingTurboCacheRule = {
           jobAllowsActionsCacheRestore(workflow, job) &&
           jobRunsTurboTasks(job) &&
           !jobHasBlacksmithTurboCache(job) &&
+          !jobHasDepotTurboCache(workflow, job) &&
           !jobHasTurboRemoteCacheWiring(workflow, job),
       )
       .map((job) => {

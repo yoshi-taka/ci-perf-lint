@@ -16,6 +16,8 @@ Visible `rharkor/caching-for-turbo` setup before the first task is remote wiring
 when unconditional or guarded by the same condition as that task. A later setup
 does not retroactively cover an earlier task.
 
+In `.depot/workflows/` only, a literal `depot/cache-mount@v1` with `name` and `path` before the Turbo task counts as local cache evidence for `.turbo`; the same YAML under `.github/workflows/` does not. See [Depot cache disks](https://depot.dev/docs/ci/how-to-guides/cache-disks).
+
 Workload evidence comes from executed Turbo commands. Remote-cache intent comes from the consuming job's structured environment, actual shell declarations or recognized prior `$GITHUB_ENV` writes, not printed variable names or another job's environment. Existing local/artifact-cache gates are retained.
 
 Flags workflows that visibly run `turbo run ...` tasks while no local Turbo cache path or remote-cache wiring is visible.

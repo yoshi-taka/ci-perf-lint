@@ -261,8 +261,10 @@ test.each([
   "docker compose build",
   "docker compose -f compose.yml build",
   "docker compose --profile dev -f compose.yml build",
+  "docker compose --env-file .env.local --project-directory app build",
   "docker-compose build",
   "docker-compose -f compose.yml build app",
+  "docker-compose --env-file .env -p app build",
 ])("non-Depot compose build keeps the generic QEMU advice: %s", async (run) => {
   const findings = await scan(
     [

@@ -1,7 +1,8 @@
 import type { Diagnostic, RuleMeta } from "../types.ts";
 import type { RuleContext } from "../rule-engine.ts";
-import type { WorkflowJob, WorkflowStep } from "../workflow.ts";
+import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../workflow.ts";
 import { isBlacksmithStickyDiskCacheStep } from "./shared/blacksmith-caches.ts";
+import { isDepotCacheMountStep } from "./shared/depot-caches.ts";
 import { type DependencyFamily, detectInstallCommand } from "./shared/tools.ts";
 import { buildDiagnostic } from "./shared/diagnostics.ts";
 import { pipe } from "./shared/diagnostic-transform.ts";
@@ -70,19 +71,21 @@ function manualCacheMatchesFamily(step: WorkflowStep, family: DependencyFamily):
 }
 
 function computeManualCacheCoverage(
+  workflow: WorkflowDocument,
   job: WorkflowJob,
   families: Set<DependencyFamily>,
 ): Set<DependencyFamily> {
   const covered = new Set<DependencyFamily>();
   for (const [index, step] of job.steps.entries()) {
     const sticky = isBlacksmithStickyDiskCacheStep(job, step);
-    if (!isManualCacheStep(step) && !sticky) {
+    const depotMount = isDepotCacheMountStep(workflow, job, step);
+    if (!isManualCacheStep(step) && !sticky && !depotMount) {
       continue;
     }
     for (const family of families) {
       if (
         manualCacheMatchesFamily(step, family) &&
-        (!sticky ||
+        ((!sticky && !depotMount) ||
           index < job.steps.findIndex((candidate) => detectInstallCommand(candidate) === family))
       ) {
         covered.add(family);
@@ -213,7 +216,7 @@ export const missingDependencyCacheRule = {
         continue;
       }
 
-      const cachedByManual = computeManualCacheCoverage(job, installFamilies);
+      const cachedByManual = computeManualCacheCoverage(workflow, job, installFamilies);
 
       for (const step of job.steps) {
         const action = getSetupActionKind(step);

@@ -124,7 +124,7 @@ runtime本体の調査とは別に、**Action側の実装・入力・内包runti
 | □ | [Buildkite](https://buildkite.com/resources/changelog/) | timeout / concurrency / cache / checkout設定 | Buildkite scope、`missing-timeout-in-minutes-buildkite` |
 | □ | [CircleCI](https://circleci.com/changelog/) | checkout方式、cache、resource class、並列化 | `circleci-checkout-uses-full-clone`、CircleCI scope |
 | □ | [GitLab CI](https://about.gitlab.com/releases/) | timeout / cache / clone / runner設定 | `missing-timeout-in-minutes-gitlab-ci`、GitLab scope |
-| □ | [Depot](https://depot.dev/docs) | build cache永続性、CI互換構文、runner・料金・backend変更 | Docker cache / runner系 |
+| □ | [Depot](https://depot.dev/docs)（必須チェック: [changelog RSS](https://depot.dev/changelog/rss.xml)） | build cache永続性、CI互換構文、runner・料金・backend変更 | Docker cache / runner系 |
 | □ | [Homebrew](https://github.com/Homebrew/brew/releases) / [hosted macOS images](https://github.com/actions/runner-images) | brew update / Xcode installの必要条件、preinstalled版 | hosted macOS / preinstalled CLI系 |
 
 ### 4a. OSイメージ更新 — 独立した調査対象
