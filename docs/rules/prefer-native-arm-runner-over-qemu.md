@@ -17,7 +17,8 @@ On a job whose builds go through Depot, the suggestion changes: Depot routes
 each requested platform to a native builder, so `docker/setup-qemu-action` is
 likely redundant. Depot does not explicitly say QEMU setup is unnecessary; the
 advice is conditional on every build in the job using Depot without
-`buildx-fallback`. See
+`buildx-fallback`; a plain Docker action, `docker build`, `docker compose build`,
+or Buildx build keeps the generic advice. See
 [Depot Arm containers](https://depot.dev/docs/container-builds/how-to-guides/arm-containers)
 and [runner types](https://depot.dev/docs/github-actions/runner-types).
 

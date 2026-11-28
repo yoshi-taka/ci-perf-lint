@@ -167,6 +167,54 @@ test("Depot builds do not get advice to add a GHA or registry cache", async () =
   ).toBe(false);
 });
 
+test("a Depot action does not suppress a Docker action missing layer cache in the same job", async () => {
+  const cwd = await tempDirs.create("apl-depot-mixed-job-");
+  await writeRepositoryFiles(cwd, {
+    ".github/workflows/ci.yml": stringify({
+      name: "Mixed",
+      on: "push",
+      jobs: {
+        build: {
+          "runs-on": "depot-ubuntu-24.04",
+          steps: [
+            { uses: "depot/build-push-action@v1", with: { project: "example" } },
+            { uses: "docker/build-push-action@v6", with: { context: "." } },
+          ],
+        },
+      },
+    }),
+  });
+  const report = await analyzeRepositoryForRule(
+    { cwd, targetPath: ".", mode: "strict", topCount: 1000 },
+    { id: "docker-build-without-layer-cache", severity: "warning" },
+  );
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "docker-build-without-layer-cache",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain("docker/build-push-action");
+});
+
+test("depot bake beside docker build keeps the Buildkite layer-cache finding", async () => {
+  const cwd = await tempDirs.create("apl-depot-mixed-script-");
+  await writeRepositoryFiles(cwd, {
+    ".buildkite/pipeline.yml": [
+      "steps:",
+      "  - label: build",
+      "    command: |",
+      "      depot bake",
+      "      docker build -t app .",
+    ].join("\n"),
+  });
+  const report = await analyzeRepositoryForRule(
+    { cwd, targetPath: ".", mode: "strict", topCount: 1000 },
+    { id: "docker-build-without-layer-cache", severity: "warning" },
+  );
+  expect(
+    report.findings.filter((finding) => finding.ruleId === "docker-build-without-layer-cache"),
+  ).toHaveLength(1);
+});
+
 test.each([
   { runner: "depot-ubuntu-24.04", count: 1 },
   { runner: "depot-ubuntu-24.04-arm", count: 0 },
@@ -202,6 +250,19 @@ test("a non-Depot build in the same job keeps the generic QEMU advice", async ()
       { uses: "docker/setup-qemu-action@v4" },
       { uses: "depot/build-push-action@v1", with: { platforms: "linux/arm64" } },
       { uses: "docker/build-push-action@v6", with: { platforms: "linux/arm64" } },
+    ],
+    "prefer-native-arm-runner-over-qemu",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.suggestion).toContain("native arm64 runner");
+});
+
+test("docker compose build keeps the generic QEMU advice", async () => {
+  const findings = await scan(
+    [
+      { uses: "docker/setup-qemu-action@v4" },
+      { uses: "depot/build-push-action@v1", with: { platforms: "linux/arm64" } },
+      { run: "docker compose build" },
     ],
     "prefer-native-arm-runner-over-qemu",
   );

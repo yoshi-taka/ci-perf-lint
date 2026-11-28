@@ -39,6 +39,7 @@ function usesNonDepotBuild(step: WorkflowStep): boolean {
       ([tool, action, subcommand]) =>
         tool === "docker" &&
         (action === "build" ||
+          (action === "compose" && subcommand === "build") ||
           (action === "buildx" && ["build", "bake"].includes(subcommand ?? ""))),
     )
   );

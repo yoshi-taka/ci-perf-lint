@@ -9,7 +9,8 @@ import {
   jobAllowsActionsCacheSave,
 } from "./shared/workflow-caches.ts";
 import { collectCommandEntries, type CIDocument } from "./shared/any-step.ts";
-import { depotCommandArguments, depotUsesPersistentBuilder } from "./shared/depot-docker.ts";
+import { depotCommandArguments } from "./shared/depot-docker.ts";
+import { shellInvocations } from "./shared/shell-invocations.ts";
 import {
   dockerBuildArguments,
   dockerBuildFlag,
@@ -35,13 +36,15 @@ function stepUsesDockerBuildPushAction(step: WorkflowStep): boolean {
   return uses.startsWith("docker/build-push-action@");
 }
 
-function stepUsesPersistentDepotAction(step: WorkflowStep): boolean {
-  return /^depot\/build-push-action@/i.test(step.uses ?? "") && depotUsesPersistentBuilder(step);
+function hasNonDepotBuildCommand(text: string): boolean {
+  return shellInvocations(text).some(
+    ([tool, action, subcommand]) =>
+      tool === "docker" && (action === "build" || (action === "buildx" && subcommand === "build")),
+  );
 }
 
 function usesOnlyDepotCommands(text: string): boolean {
-  const depotCount = depotCommandArguments(text).length;
-  return depotCount > 0 && dockerBuildArguments(text).length === depotCount;
+  return depotCommandArguments(text).length > 0 && !hasNonDepotBuildCommand(text);
 }
 
 function stepHasCacheFrom(step: WorkflowStep): boolean {
@@ -77,11 +80,7 @@ function checkGitHubWorkflow(workflow: WorkflowDocument, findings: Diagnostic[])
       .map(({ step }) => step),
   );
   for (const job of workflow.jobs) {
-    if (
-      job.usesReusableWorkflow ||
-      !jobAllowsActionsCacheRestore(workflow, job) ||
-      job.steps.some(stepUsesPersistentDepotAction)
-    ) {
+    if (job.usesReusableWorkflow || !jobAllowsActionsCacheRestore(workflow, job)) {
       continue;
     }
 

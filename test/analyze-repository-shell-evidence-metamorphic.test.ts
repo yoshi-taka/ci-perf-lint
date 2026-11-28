@@ -192,6 +192,37 @@ const scenarios: ShellEvidenceScenario[] = [
     ],
   },
   {
+    name: "adding a Depot step does not remove an existing Docker layer-cache finding",
+    command: "npm ci",
+    build: (run) =>
+      files(
+        workflow(
+          [
+            { uses: "depot/setup-action@v1" },
+            { uses: "depot/build-push-action@v1", with: { project: "example" } },
+            { uses: "docker/build-push-action@v6", with: { context: "." } },
+            { run },
+          ],
+          { "runs-on": "depot-ubuntu-24.04" },
+        ),
+      ),
+    expectations: [
+      { id: "docker-build-without-layer-cache", severity: "warning", count: 1, literalCount: 1 },
+    ],
+  },
+  {
+    name: "depot bake beside docker build keeps the Docker layer-cache finding",
+    command: "npm ci",
+    build: (run) => ({
+      ".buildkite/pipeline.yml": stringify({
+        steps: [{ label: "build", command: `depot bake\ndocker build -t app .\n${run}` }],
+      }),
+    }),
+    expectations: [
+      { id: "docker-build-without-layer-cache", severity: "warning", count: 1, literalCount: 1 },
+    ],
+  },
+  {
     name: "component scope uses execution paths, not labels or logs",
     command: "npm run build",
     build: (run) => {
