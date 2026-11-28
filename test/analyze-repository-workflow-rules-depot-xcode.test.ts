@@ -68,6 +68,10 @@ test.each<ScanCase>([
     options: { steps: [{ run: `export XCODE_XCCONFIG_FILE=Custom.xcconfig\n${xcodeRun}` }] },
   },
   {
+    name: "env prefix on the command",
+    options: { steps: [{ run: `env XCODE_XCCONFIG_FILE=Custom.xcconfig ${xcodeRun}` }] },
+  },
+  {
     name: "GITHUB_ENV",
     options: {
       steps: [
@@ -85,6 +89,29 @@ test.each<ScanCase>([
   expect(findings).toHaveLength(1);
   expect(findings[0]?.message).toContain("XCODE_XCCONFIG_FILE");
   expect(findings[0]?.why).toContain("Depot Cache");
+});
+
+test("the finding points at the earlier GITHUB_ENV write, not the xcodebuild step", async () => {
+  const cwd = await tempDirs.create("apl-depot-xcode-location-");
+  await writeRepositoryFiles(cwd, {
+    ".depot/workflows/ci.yml": [
+      "name: Xcode",
+      "on: push",
+      "jobs:",
+      "  build:",
+      "    runs-on: depot-macos-26",
+      "    steps:",
+      '      - run: echo "XCODE_XCCONFIG_FILE=Custom.xcconfig" >> $GITHUB_ENV',
+      "      - run: xcodebuild build",
+    ].join("\n"),
+  });
+  const report = await analyzeRepositoryForRule(
+    { cwd, targetPath: ".", mode: "strict", topCount: 1000 },
+    { id: overrideId, severity: "warning" },
+  );
+  const findings = report.findings.filter((finding) => finding.ruleId === overrideId);
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.location.line).toBe(7);
 });
 
 test.each<ScanCase>([
@@ -143,6 +170,34 @@ test.each<ScanCase>([
       job: { "runs-on": "${{ matrix.runner }}" },
       steps: [{ run: xcodeRun, env: { XCODE_XCCONFIG_FILE: "Custom.xcconfig" } }],
     },
+  },
+  {
+    name: "step env on another step",
+    options: {
+      steps: [
+        { run: "echo ready", env: { XCODE_XCCONFIG_FILE: "Custom.xcconfig" } },
+        { run: xcodeRun },
+      ],
+    },
+  },
+  {
+    name: "export on another step",
+    options: {
+      steps: [{ run: "export XCODE_XCCONFIG_FILE=Custom.xcconfig" }, { run: xcodeRun }],
+    },
+  },
+  {
+    name: "GITHUB_ENV after the build",
+    options: {
+      steps: [
+        { run: xcodeRun },
+        { run: `echo "XCODE_XCCONFIG_FILE=Custom.xcconfig" >> $GITHUB_ENV` },
+      ],
+    },
+  },
+  {
+    name: "export after xcodebuild in the same script",
+    options: { steps: [{ run: `${xcodeRun}\nexport XCODE_XCCONFIG_FILE=Custom.xcconfig` }] },
   },
 ])("override rule excludes $name", async ({ options }) => {
   expect(

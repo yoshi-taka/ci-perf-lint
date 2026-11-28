@@ -15,9 +15,13 @@ References:
 
 ## What it flags
 
-A job on a `depot-macos-*` runner that runs `xcodebuild` and sets
-`XCODE_XCCONFIG_FILE` through workflow, job or step `env`, an assignment or
-`export` in a run script, or a `$GITHUB_ENV` write. Jobs that opt out with
+A job on a `depot-macos-*` runner where an `xcodebuild` step sees
+`XCODE_XCCONFIG_FILE` through workflow, job or that step's `env`, through an
+assignment or `export` **before the command in the same script**, or through a
+`$GITHUB_ENV` write in an **earlier** step. The finding points at the step
+that actually sets the value. An override in a different step's `env`, an
+`export` in another step, or a `$GITHUB_ENV` write after the build does not
+affect that build and is not flagged. Jobs that opt out with
 `DEPOT_XCODE_CACHE_ENABLED: 0` (or `0` written to `$GITHUB_ENV`) are excluded;
 that is an intentional choice, not a misconfiguration.
 
@@ -38,4 +42,5 @@ after removing the override.
 ## What the scanner does
 
 `xcodebuild` must be a literal command (including `xcrun xcodebuild`). A label
-given by an expression is not treated as a Depot macOS runner.
+given by an expression is not treated as a Depot macOS runner. Each xcodebuild
+step is evaluated with its own effective scope, not the whole job.
