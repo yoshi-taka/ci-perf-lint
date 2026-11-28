@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { createTempDirTracker, memoizedAnalyzeRepository } from "./helpers.ts";
+import { fixtures } from "./fixtures.ts";
+import {
+  createTempDirTracker,
+  memoizedAnalyzeRepository,
+  writeRepositoryFiles,
+} from "./helpers.ts";
 
 const tempDirs = createTempDirTracker();
 
@@ -219,6 +224,83 @@ describe("missing-if-changed", () => {
   test("does not flag light steps", async () => {
     const root = await tempDirs.create("apl-bk-ifchanged-light-");
     await writePipeline(root, ["  - label: ':memo: Note'", "    command: echo done"]);
+    expect(await findings(root)).toHaveLength(0);
+  });
+
+  test("does not flag a script whose only work is a buildkite annotation", async () => {
+    expect(await findings(fixtures.buildkiteIfChangedAnnotateScriptOk)).toHaveLength(0);
+  });
+
+  test("does not flag a deploy step that installs, tests, then runs a deploy script", async () => {
+    expect(await findings(fixtures.buildkiteIfChangedDeployScriptOk)).toHaveLength(0);
+  });
+
+  test("does not flag trigger, block, or input steps", async () => {
+    expect(await findings(fixtures.buildkiteIfChangedTriggerOk)).toHaveLength(0);
+  });
+
+  test("still flags a heavy step when if_changed is used elsewhere", async () => {
+    const found = await findings(fixtures.buildkiteIfChangedHeavyLike);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toContain(":golang: Tests");
+  });
+
+  test("does not flag an untraceable repository script", async () => {
+    const root = await tempDirs.create("apl-bk-ifchanged-missing-script-");
+    await writePipeline(root, [
+      "  - label: ':memo: Annotate build'",
+      "    command: .buildkite/scripts/annotate.sh",
+    ]);
+    expect(await findings(root)).toHaveLength(0);
+  });
+
+  test("flags a repository script whose traced body contains heavy work", async () => {
+    const root = await tempDirs.create("apl-bk-ifchanged-heavy-script-");
+    await writeRepositoryFiles(root, {
+      [path.join(".buildkite", "pipeline.yml")]: [
+        "steps:",
+        "  - label: ':go: Tests'",
+        "    command: .buildkite/scripts/tests.sh",
+      ].join("\n"),
+      [path.join(".buildkite", "scripts", "tests.sh")]: "go test ./...\n",
+    });
+    const found = await findings(root);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toContain(":go: Tests");
+  });
+
+  test.each([
+    "kubectl apply -f deploy.yml",
+    "kubectl rollout restart deployment/app",
+    "helm upgrade --install app chart",
+    "helm install app chart",
+    "terraform apply -auto-approve",
+    "npm publish",
+    "npx semantic-release",
+    "goreleaser release --clean",
+    "serverless deploy --stage prod",
+    "cdk deploy --all",
+    "buildkite-agent pipeline upload other.yml",
+  ])("does not flag the step running a deploy command (%s)", async (command) => {
+    const root = await tempDirs.create("apl-bk-ifchanged-deploy-command-");
+    await writePipeline(root, [
+      "  - label: ':go: Tests'",
+      "    command: npm test",
+      "  - label: ':rocket: DEPLOY_STEP'",
+      `    command: ${command}`,
+    ]);
+    const found = await findings(root);
+    expect(found.some((finding) => finding.message.includes("DEPLOY_STEP"))).toBe(false);
+  });
+
+  test("does not flag steps whose only commands annotate or set metadata", async () => {
+    const root = await tempDirs.create("apl-bk-ifchanged-annotate-only-");
+    await writePipeline(root, [
+      "  - label: ':memo: Annotate build'",
+      "    command: |",
+      "      buildkite-agent meta-data set version 1",
+      "      buildkite-agent annotate --style=info done",
+    ]);
     expect(await findings(root)).toHaveLength(0);
   });
 });

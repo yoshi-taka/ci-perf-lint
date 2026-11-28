@@ -1,0 +1,27 @@
+# Adapted from segment-services-eng/destination-function-template
+steps:
+  - label: ':rocket: DEV'
+    key: DEV
+    branches: '!main'
+    env:
+      DEPLOY_ENV: DEV
+    plugins:
+      - aws-assume-role-with-web-identity#v1.6.0:
+          role-arn: arn:aws:iam::058449100246:role/example
+    command: |
+      set -euo pipefail
+      source .buildkite/fetch-secrets.sh
+      docker run --rm \
+        -v "$$PWD":/workdir -w /workdir \
+        -e DEPLOY_ENV \
+        registry.example.com/library/base-node/22:22 \
+        sh -c 'npm ci --no-audit --no-fund --loglevel=error && npm test && node ./scripts/deployDestinationFunction.js --unhandled-rejections=strict'
+  - label: ':rocket: QA'
+    key: QA
+    if: build.pull_request.labels includes "!!_RELEASE_TO_QA"
+    env:
+      DEPLOY_ENV: QA
+    command: |
+      set -euo pipefail
+      source .buildkite/fetch-secrets.sh
+      sh -c 'npm ci && npm test && node ./scripts/deployDestinationFunction.js'

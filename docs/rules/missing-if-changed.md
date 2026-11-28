@@ -22,8 +22,10 @@ A step is flagged when all of these hold:
 3. It is not pinned to specific bare branch names. The default branch is a repository setting that a pipeline file never states, so `branches: "main"` and `branches: "master"` (or any other bare names) both count as pinned; negated restrictions (`branches: "!main"`, `if: build.branch != "…"`) and glob filters (`feature/*`) do not. On the default branch, changed-file detection compares only with the previous commit, and a multi-commit push can produce an incomplete diff.
 4. Its pipeline has no deployment evidence: deployment commands or labels, deploy plugins, metadata declaring `type: deploy`, TestFlight/App Store distribution, image publication (`docker push`, `docker image push`, or a supported build tool with `--push` enabled), uploads to S3, or CloudFront invalidations. Tests in a deployment pipeline are excluded too: skipping a deployment prerequisite on an incomplete diff is a correctness risk, not a performance saving.
 5. It does not use a plugin with its own changed-file detection (`monorepo-diff`).
+6. It is not a trigger, block, input, or wait step, and it does not deploy or release: a plugin whose name contains `deploy`, `release`, or `publish`, `buildkite-agent pipeline upload`, or a command such as `kubectl apply|rollout`, `helm upgrade|install`, `terraform apply`, `npm publish`, `semantic-release`, `goreleaser`, `serverless deploy`, `cdk deploy`, or a `deploy*.js`-style script.
+7. Its commands are not limited to `buildkite-agent annotate` or `buildkite-agent meta-data`, and its only work is not a repository script that cannot be shown to do heavy work. A `.buildkite/scripts/*.sh` step is traced with the bounded script tracer first: a missing script, or a script whose traced body has no heavy command, is not reported.
 
-Skipped steps and container steps are ignored; group inner steps are checked after flattening.
+Skipped steps and container steps are ignored; group inner steps are checked after flattening. Labels and keys are never used as deployment evidence; deployment decisions come from plugin names and command positions only.
 
 ## Why this matters
 

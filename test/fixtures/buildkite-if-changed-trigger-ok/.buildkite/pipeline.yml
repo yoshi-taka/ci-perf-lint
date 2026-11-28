@@ -1,0 +1,16 @@
+# Synthetic (created for this test)
+steps:
+  - label: ':golang: Tests'
+    command: go test ./...
+    if_changed: "{**.go,go.mod}"
+  - wait
+  - label: ':pipeline: Trigger downstream'
+    trigger: downstream-pipeline
+    command: echo deploy
+    build:
+      message: build test
+  - block: ':shipit: Approve'
+  - input: 'Choose a target'
+    fields:
+      - text: 'Target'
+        key: target

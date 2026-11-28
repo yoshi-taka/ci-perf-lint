@@ -10,6 +10,7 @@ import {
 import { buildkitePluginBaseNames } from "./shared/buildkite-plugins.ts";
 import { buildkitePipelineDeploys } from "./shared/buildkite-deployment.ts";
 import { buildkiteScriptDeploymentEvidence } from "./shared/buildkite-script-deployment.ts";
+import { traceCommandReferences } from "./shared/command-reference-tracing.ts";
 
 const meta = {
   id: "missing-if-changed",
@@ -27,8 +28,7 @@ const heavyName =
 /** These plugins already provide their own changed-file detection. */
 const OWN_DETECTION_PLUGINS = ["monorepo-diff"];
 
-function stepCommandsHeavy(step: PipelineStep): boolean {
-  const source = [step.command ?? "", ...(step.commands ?? [])].join("\n");
+function commandsHeavy(source: string, label?: string): boolean {
   if (!source.trim()) {
     return false;
   }
@@ -47,9 +47,89 @@ function stepCommandsHeavy(step: PipelineStep): boolean {
     return (
       heavyName.test(invocationWorkName(words)) ||
       (["make", "just", "task"].includes(tool ?? "") && heavyName.test(action ?? "")) ||
-      (invocationHasNativeOrOpaqueWork(words) && heavyName.test(step.label ?? ""))
+      (invocationHasNativeOrOpaqueWork(words) && heavyName.test(label ?? ""))
     );
   });
+}
+
+function stepCommandsHeavy(step: PipelineStep): boolean {
+  return commandsHeavy(stepCommandSource(step), step.label);
+}
+
+function stepCommandSource(step: PipelineStep): string {
+  return [step.command ?? "", ...(step.commands ?? [])].join("\n");
+}
+
+const DEPLOY_COMMANDS: readonly (readonly string[])[] = [
+  ["kubectl", "apply"],
+  ["kubectl", "rollout"],
+  ["helm", "upgrade"],
+  ["helm", "install"],
+  ["terraform", "apply"],
+  ["npm", "publish"],
+  ["semantic-release"],
+  ["goreleaser"],
+  ["serverless", "deploy"],
+  ["cdk", "deploy"],
+];
+const DEPLOY_SCRIPT =
+  /\b(?:deploy|publish|release)[A-Za-z0-9_-]*\.(?:js|mjs|cjs|ts|sh|py|rb|pl)\b/i;
+const CHECKOUT_SCRIPT = /^\.buildkite\/scripts\/[^/\s]+\.sh$/;
+
+function stepInvocations(step: PipelineStep): string[][] {
+  const source = stepCommandSource(step);
+  return [...shellNonDisplayInvocations(source), ...shellNonDisplayInvocations(source, true)];
+}
+
+function isInputStep(step: PipelineStep): boolean {
+  const raw = step.node.toJSON();
+  return typeof raw === "object" && raw !== null && !Array.isArray(raw) && "input" in raw;
+}
+
+/** Deployment evidence from plugin names and command positions only; labels
+ * and keys are never used as deployment evidence. */
+function stepDeploys(step: PipelineStep): boolean {
+  if (buildkitePluginBaseNames(step).some((name) => /(?:deploy|release|publish)/i.test(name))) {
+    return true;
+  }
+  return stepInvocations(step).some((words) => {
+    if (words[0] === "buildkite-agent" && words[1] === "pipeline" && words[2] === "upload") {
+      return true;
+    }
+    if (DEPLOY_COMMANDS.some((command) => command.every((part, index) => words[index] === part))) {
+      return true;
+    }
+    return words.some((word) => DEPLOY_SCRIPT.test(word));
+  });
+}
+
+function onlyAnnotatesOrSetsMetadata(step: PipelineStep): boolean {
+  const invocations = stepInvocations(step);
+  return (
+    invocations.length > 0 &&
+    invocations.every(
+      (words) =>
+        words[0] === "buildkite-agent" && ["annotate", "meta-data"].includes(words[1] ?? ""),
+    )
+  );
+}
+
+async function onlyUntraceableScript(step: PipelineStep, context: RuleContext): Promise<boolean> {
+  const source = stepCommandSource(step);
+  const invocations = shellNonDisplayInvocations(source);
+  if (invocations.length === 0) {
+    return false;
+  }
+  const scriptOnly = invocations.every((words) => {
+    const executable = words[0] ?? "";
+    const reference = ["bash", "sh", "source", "."].includes(executable) ? words[1] : executable;
+    return typeof reference === "string" && CHECKOUT_SCRIPT.test(reference);
+  });
+  if (!scriptOnly) {
+    return false;
+  }
+  const trace = await traceCommandReferences(source, context.scanContext);
+  return trace.unresolved || !trace.delegates || !commandsHeavy(trace.text);
 }
 
 /** A step pinned to specific bare branch names (main, master, or any
@@ -98,13 +178,19 @@ export const missingIfChangedRule = {
     const findings: Diagnostic[] = [];
 
     for (const step of pipeline.steps) {
-      if (step.isWait || step.isBlock || step.isTrigger || step.isGroup) {
+      if (step.isWait || step.isBlock || step.isTrigger || step.isGroup || isInputStep(step)) {
         continue;
       }
       if (step.skip === true || step.skip === "true") {
         continue;
       }
       if (step.ifChanged !== undefined || step.ifChangedNode !== undefined) {
+        continue;
+      }
+      if (stepDeploys(step) || onlyAnnotatesOrSetsMetadata(step)) {
+        continue;
+      }
+      if (await onlyUntraceableScript(step, context)) {
         continue;
       }
       if (!stepCommandsHeavy(step)) {

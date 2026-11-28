@@ -1,0 +1,13 @@
+# Adapted from elastic/beats
+steps:
+  - label: ':memo: Annotate DRA build (${WORKFLOW})'
+    if: build.env('DRY_RUN') != "true"
+    depends_on: dra-prep-${WORKFLOW}
+    command: ".buildkite/scripts/dra-annotate.sh ${WORKFLOW}"
+    agents:
+      provider: k8s
+    timeout_in_minutes: 5
+  - label: ':pipeline: DRA processing for beats (${WORKFLOW})'
+    if: build.env('DRY_RUN') != "true"
+    trigger: unified-release-dra-processing
+    depends_on: dra-prep-${WORKFLOW}

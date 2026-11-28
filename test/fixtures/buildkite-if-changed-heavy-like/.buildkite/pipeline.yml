@@ -1,0 +1,7 @@
+# Synthetic (created for this test)
+steps:
+  - label: ':golang: Tests'
+    command: go test ./...
+  - label: ':golang: Vet'
+    command: go vet ./...
+    if_changed: "{**.go,go.mod}"
