@@ -2945,8 +2945,17 @@ class Parser {
       if (this.i >= this.n || this.isLineBreak(this.i) || this.src[this.i] === "#") {
         this.collectTrivia();
         const nextCol = this.i < this.n ? this.lineIndent() : -1;
-        if (nextCol > indent && this.i < this.n && !this.atDocMarker()) {
-          const node = this.parseBlockNode(indent + 1, true);
+        // A block sequence may start at the same indentation as its parent
+        // mapping key (an "indentless" sequence). That also holds for a
+        // compact key inside a sequence item, and for anchored/tagged values.
+        const indentlessSeq =
+          seqItem === false &&
+          this.i < this.n &&
+          this.src[this.i] === "-" &&
+          this.isSep(this.i + 1) &&
+          nextCol === indent;
+        if ((nextCol > indent || indentlessSeq) && this.i < this.n && !this.atDocMarker()) {
+          const node = this.parseBlockNode(indentlessSeq ? indent : indent + 1, true);
           if (node) {
             this.applyProperties(node, props);
             return node;
