@@ -114,6 +114,32 @@ test("the finding points at the earlier GITHUB_ENV write, not the xcodebuild ste
   expect(findings[0]?.location.line).toBe(7);
 });
 
+test("job-level env is located at the job env, not an unrelated step env", async () => {
+  const cwd = await tempDirs.create("apl-depot-xcode-jobenv-");
+  await writeRepositoryFiles(cwd, {
+    ".depot/workflows/ci.yml": [
+      "name: Xcode",
+      "on: push",
+      "jobs:",
+      "  build:",
+      "    runs-on: depot-macos-26",
+      "    env:",
+      "      XCODE_XCCONFIG_FILE: Custom.xcconfig",
+      "    steps:",
+      "      - run: xcodebuild build",
+      "        env:",
+      '          CI: "true"',
+    ].join("\n"),
+  });
+  const report = await analyzeRepositoryForRule(
+    { cwd, targetPath: ".", mode: "strict", topCount: 1000 },
+    { id: overrideId, severity: "warning" },
+  );
+  const findings = report.findings.filter((finding) => finding.ruleId === overrideId);
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.location.line).toBeLessThan(9);
+});
+
 test.each<ScanCase>([
   { name: "no override", options: { steps: [{ run: xcodeRun }] } },
   {

@@ -25,7 +25,7 @@ export function isDepotCacheMountStep(
   if (step.ifNode) {
     return false;
   }
-  if (!/^depot\/cache-mount@v1(?:\.|$)/i.test(step.uses ?? "")) {
+  if (!/^depot\/cache-mount@(?:v1(?:\.\d+)*|[0-9a-f]{40})$/i.test(step.uses ?? "")) {
     return false;
   }
   const inputs = step.with;

@@ -1,6 +1,6 @@
 import type { Node } from "../../yaml.ts";
 import type { WorkflowDocument, WorkflowJob, WorkflowStep } from "../../workflow.ts";
-import { getNode } from "../../workflow.ts";
+import { getMapValue, getNode } from "../../workflow.ts";
 import { getRunsOnSpec, jobRunsOnDepotRunner } from "./runs-on-facts.ts";
 import { shellInvocations } from "./shell-invocations.ts";
 import { effectiveStepEnvironment } from "./workflow-env.ts";
@@ -87,12 +87,20 @@ export function xcconfigOverrideForStep(
   step: WorkflowStep,
 ): { node: Node | undefined } | undefined {
   if ("XCODE_XCCONFIG_FILE" in effectiveStepEnvironment(workflow, job, step)) {
-    const node =
-      getNode(step.node, "env") ??
-      (job.node.get("env", true) as Node | undefined) ??
-      (workflow.root?.get("env", true) as Node | undefined) ??
-      step.node;
-    return { node };
+    const key = "XCODE_XCCONFIG_FILE";
+    const defines = (env: Record<string, unknown> | undefined) =>
+      Boolean(env && Object.prototype.hasOwnProperty.call(env, key));
+    const stepEnv = getMapValue(step.node, "env");
+    const jobEnv = getMapValue(job.node, "env");
+    const workflowEnv = workflow.root ? getMapValue(workflow.root, "env") : undefined;
+    const node = defines(stepEnv)
+      ? getNode(step.node, "env")
+      : defines(jobEnv)
+        ? (job.node.get("env", true) as Node | undefined)
+        : defines(workflowEnv)
+          ? (workflow.root?.get("env", true) as Node | undefined)
+          : undefined;
+    return { node: node ?? step.node };
   }
   if (assignsBeforeXcodebuild(step.run ?? "", "XCODE_XCCONFIG_FILE")) {
     return { node: step.runNode ?? step.node };

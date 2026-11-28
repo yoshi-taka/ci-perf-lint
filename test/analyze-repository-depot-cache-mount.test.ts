@@ -18,6 +18,8 @@ const mount = (extra: Record<string, unknown> = {}) => ({
   with: { name: "org-npm-cache", path: "~/.npm", ...extra },
 });
 
+const sha = "a".repeat(40);
+
 async function findings(
   directory: ".depot" | ".github",
   steps: readonly Record<string, unknown>[],
@@ -40,6 +42,20 @@ test("depot/cache-mount before install is dependency cache evidence in Depot CI"
     await findings(
       ".depot",
       [mount(), { uses: "actions/setup-node@v6" }, { run: "npm ci" }],
+      "missing-dependency-cache",
+    ),
+  ).toHaveLength(0);
+});
+
+test("a SHA-pinned cache mount is dependency cache evidence in Depot CI", async () => {
+  expect(
+    await findings(
+      ".depot",
+      [
+        { ...mount(), uses: `depot/cache-mount@${sha}` },
+        { uses: "actions/setup-node@v6" },
+        { run: "npm ci" },
+      ],
       "missing-dependency-cache",
     ),
   ).toHaveLength(0);
