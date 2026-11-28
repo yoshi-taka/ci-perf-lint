@@ -10,11 +10,11 @@
       "line": 2,
       "column": 12
     },
-    "message": "Step \":hammer: Tests\" does not define timeout_in_minutes.",
+    "message": "1 steps in .buildkite/pipeline.yml do not define timeout_in_minutes: :hammer: Tests.",
     "why": "No explicit step timeout is visible. Pipeline or organization defaults and maximums may already bound the whole job; those settings are not available in workflow YAML.",
     "suggestion": "Check pipeline and organization timeout settings first. Add timeout_in_minutes only if the effective job limit is missing or unsuitable. A plugin's internal timeout may bound only one operation, not hooks or other commands; allow headroom above that internal limit.",
     "measurementHint": "Monitor the step's typical duration and allow for normal variance. Plugin steps need headroom above the plugin's own internal limit.",
-    "aiHandoff": "Review effective pipeline/organization and plugin timeout coverage for .buildkite/pipeline.yml step \":hammer: Tests\" before adding a step timeout.",
+    "aiHandoff": "Review effective pipeline/organization and plugin timeout coverage for .buildkite/pipeline.yml before adding step timeouts.",
     "score": 95
   },
   {

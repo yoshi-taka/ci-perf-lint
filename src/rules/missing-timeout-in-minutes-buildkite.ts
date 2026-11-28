@@ -59,8 +59,8 @@ function stepHasTimeout(step: PipelineStep): boolean {
 
 export const missingTimeoutInMinutesBuildkiteRule = {
   meta,
-  check(pipeline: PipelineDocument, _context: RuleContext) {
-    const findings: Diagnostic[] = [];
+  check(pipeline: PipelineDocument, _context: RuleContext): Diagnostic[] {
+    const delinquent: PipelineStep[] = [];
 
     for (const step of pipeline.steps) {
       if (step.isWait || step.isBlock || step.isTrigger || step.isGroup) {
@@ -72,22 +72,32 @@ export const missingTimeoutInMinutesBuildkiteRule = {
       }
 
       if (!stepHasTimeout(step) && stepLooksHeavy(step)) {
-        const node = step.labelNode ?? step.commandNode ?? step.node;
-        findings.push(
-          buildDiagnostic(pipeline, meta, node, {
-            message: `Step "${step.label ?? step.key ?? "unnamed"}" does not define timeout_in_minutes.`,
-            why: "No explicit step timeout is visible. Pipeline or organization defaults and maximums may already bound the whole job; those settings are not available in workflow YAML.",
-            suggestion:
-              "Check pipeline and organization timeout settings first. Add timeout_in_minutes only if the effective job limit is missing or unsuitable. A plugin's internal timeout may bound only one operation, not hooks or other commands; allow headroom above that internal limit.",
-            measurementHint:
-              "Monitor the step's typical duration and allow for normal variance. Plugin steps need headroom above the plugin's own internal limit.",
-            aiHandoff: `Review effective pipeline/organization and plugin timeout coverage for ${pipeline.relativePath} step "${step.label ?? step.key}" before adding a step timeout.`,
-            score: 65,
-          }),
-        );
+        delinquent.push(step);
       }
     }
 
-    return findings;
+    if (delinquent.length === 0) {
+      return [];
+    }
+
+    const first = delinquent[0]!;
+    const labels = delinquent
+      .slice(0, 5)
+      .map((step) => step.label ?? step.key ?? "unnamed")
+      .join(", ");
+    const extra = delinquent.length - 5;
+    const summary = extra > 0 ? `${labels}, and ${extra} more` : labels;
+    return [
+      buildDiagnostic(pipeline, meta, first.labelNode ?? first.commandNode ?? first.node, {
+        message: `${delinquent.length} steps in ${pipeline.relativePath} do not define timeout_in_minutes: ${summary}.`,
+        why: "No explicit step timeout is visible. Pipeline or organization defaults and maximums may already bound the whole job; those settings are not available in workflow YAML.",
+        suggestion:
+          "Check pipeline and organization timeout settings first. Add timeout_in_minutes only if the effective job limit is missing or unsuitable. A plugin's internal timeout may bound only one operation, not hooks or other commands; allow headroom above that internal limit.",
+        measurementHint:
+          "Monitor the step's typical duration and allow for normal variance. Plugin steps need headroom above the plugin's own internal limit.",
+        aiHandoff: `Review effective pipeline/organization and plugin timeout coverage for ${pipeline.relativePath} before adding step timeouts.`,
+        score: 65,
+      }),
+    ];
   },
 };

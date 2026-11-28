@@ -1,6 +1,6 @@
 # missing-timeout-in-minutes-buildkite
 
-Reported as a suggestion in exploratory mode, not default strict mode.
+Reported as a suggestion in exploratory mode, not default strict mode. One finding is emitted per pipeline file, located at the first affected step; its message lists up to five affected labels (or keys) and the number of remaining steps.
 
 Heavy-work and pipeline-upload evidence use shared shell extraction. Printed commands and text-search arguments are not heavy work or upload exemptions. An actual `buildkite-agent pipeline upload` exempts only that invocation, not a build/test elsewhere in the same step. Existing timeout/skip/control-step guards are retained.
 

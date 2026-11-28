@@ -1,5 +1,5 @@
 1. missing-timeout-in-minutes-buildkite (.buildkite/pipeline.yml:2:12)
-   Step ":hammer: Tests" does not define timeout_in_minutes.
+   1 steps in .buildkite/pipeline.yml do not define timeout_in_minutes: :hammer: Tests.
    Why it matters: No explicit step timeout is visible. Pipeline or organization defaults and maximums may already bound the whole job; those settings are not available in workflow YAML.
    Suggested action: Check pipeline and organization timeout settings first. Add timeout_in_minutes only if the effective job limit is missing or unsuitable. A plugin's internal timeout may bound only one operation, not hooks or other commands; allow headroom above that internal limit.
    Measurement hint: Monitor the step's typical duration and allow for normal variance. Plugin steps need headroom above the plugin's own internal limit.

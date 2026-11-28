@@ -66,11 +66,14 @@ describe("analyzeRepository Buildkite pipeline rules", () => {
       (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
     );
 
-    expect(ruleFindings.length).toBe(2);
+    expect(ruleFindings.length).toBe(1);
+    expect(ruleFindings[0]?.message).toContain(
+      "2 steps in .buildkite/pipeline.yml do not define timeout_in_minutes: :hammer: Tests, :lint: Lint.",
+    );
     expect(aggregated).toBeDefined();
-    expect(aggregated?.locations.length).toBe(2);
+    expect(aggregated?.locations.length).toBe(1);
     expect(aggregated?.jobs.length).toBe(0);
-    expect(aggregated?.messages.length).toBe(2);
+    expect(aggregated?.messages.length).toBe(1);
     expect(aggregated?.locations[0]).toContain("pipeline.yml");
   });
 
@@ -148,7 +151,7 @@ test("does not treat a .buildkite path substring as a heavy build step", async (
     (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
   );
   expect(findings).toHaveLength(1);
-  expect(findings[0]?.message).toContain('Step "Build"');
+  expect(findings[0]?.message).toContain("timeout_in_minutes: Build.");
 });
 
 test("does not treat a release pipeline upload step as a heavy build", async () => {
@@ -174,7 +177,7 @@ test("does not treat a release pipeline upload step as a heavy build", async () 
     (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
   );
   expect(findings).toHaveLength(1);
-  expect(findings[0]?.message).toContain('Step "Build Release"');
+  expect(findings[0]?.message).toContain("timeout_in_minutes: Build Release.");
 });
 
 test("parses plugins in sequence and map form", () => {
@@ -231,7 +234,7 @@ test("flags plugin-only heavy steps without timeout_in_minutes", async () => {
     (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
   );
   expect(findings).toHaveLength(1);
-  expect(findings[0]?.message).toContain('Step ":rocket: Deploy!"');
+  expect(findings[0]?.message).toContain("timeout_in_minutes: :rocket: Deploy!.");
   expect(findings[0]?.why).toContain("Pipeline or organization defaults");
   expect(findings[0]?.suggestion).toContain(
     "Check pipeline and organization timeout settings first",
@@ -271,7 +274,7 @@ test("flattens group steps so inner steps are visible to rules", async () => {
     (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
   );
   expect(findings).toHaveLength(1);
-  expect(findings[0]?.message).toContain('Step ":rocket: Deploy!"');
+  expect(findings[0]?.message).toContain("timeout_in_minutes: :rocket: Deploy!.");
 });
 
 test("does not flag steps skipped with the documented boolean form", async () => {
@@ -298,7 +301,7 @@ test("does not flag steps skipped with the documented boolean form", async () =>
     (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
   );
   expect(findings).toHaveLength(1);
-  expect(findings[0]?.message).toContain('Step ":fire: Real Heavy"');
+  expect(findings[0]?.message).toContain("timeout_in_minutes: :fire: Real Heavy.");
 });
 
 test("normalizes documented bool and int step scalars", () => {
@@ -389,9 +392,39 @@ test("flags heavy plugins regardless of step label", async () => {
   const findings = report.findings.filter(
     (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
   );
-  expect(findings).toHaveLength(2);
-  expect(findings[0]?.message).toContain('Step "Security scan"');
-  expect(findings[1]?.message).toContain('Step "Lint"');
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain(
+    "2 steps in .buildkite/pipeline.yml do not define timeout_in_minutes: Security scan, Lint.",
+  );
+});
+
+test("summarizes more than five affected steps in one finding", async () => {
+  const root = await tempDirs.create("apl-buildkite-timeout-summary-");
+  const dir = path.join(root, ".buildkite");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "pipeline.yml"),
+    [
+      "steps:",
+      ...Array.from({ length: 7 }, (_, index) => [
+        `  - label: Step ${index + 1}`,
+        "    command: npm test",
+      ]).flat(),
+    ].join("\n"),
+  );
+  const report = await getFixtureReport(root, {
+    targetPath: ".",
+    topCount: 10,
+    mode: "exploratory",
+  });
+  const findings = report.findings.filter(
+    (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.message).toContain(
+    "7 steps in .buildkite/pipeline.yml do not define timeout_in_minutes: Step 1, Step 2, Step 3, Step 4, Step 5, and 2 more.",
+  );
+  expect(findings[0]?.location.line).toBe(2);
 });
 
 test("falls back to the label hint only for unknown plugins", async () => {
@@ -419,5 +452,5 @@ test("falls back to the label hint only for unknown plugins", async () => {
     (finding) => finding.ruleId === "missing-timeout-in-minutes-buildkite",
   );
   expect(findings).toHaveLength(1);
-  expect(findings[0]?.message).toContain('Step "Build artifacts"');
+  expect(findings[0]?.message).toContain("timeout_in_minutes: Build artifacts.");
 });
