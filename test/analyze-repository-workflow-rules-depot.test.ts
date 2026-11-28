@@ -257,17 +257,36 @@ test("a non-Depot build in the same job keeps the generic QEMU advice", async ()
   expect(findings[0]?.suggestion).toContain("native arm64 runner");
 });
 
-test("docker compose build keeps the generic QEMU advice", async () => {
+test.each([
+  "docker compose build",
+  "docker compose -f compose.yml build",
+  "docker compose --profile dev -f compose.yml build",
+  "docker-compose build",
+  "docker-compose -f compose.yml build app",
+])("non-Depot compose build keeps the generic QEMU advice: %s", async (run) => {
   const findings = await scan(
     [
       { uses: "docker/setup-qemu-action@v4" },
       { uses: "depot/build-push-action@v1", with: { platforms: "linux/arm64" } },
-      { run: "docker compose build" },
+      { run },
     ],
     "prefer-native-arm-runner-over-qemu",
   );
   expect(findings).toHaveLength(1);
   expect(findings[0]?.suggestion).toContain("native arm64 runner");
+});
+
+test("a compose flag value named build is not mistaken for a build", async () => {
+  const findings = await scan(
+    [
+      { uses: "docker/setup-qemu-action@v4" },
+      { uses: "depot/build-push-action@v1", with: { platforms: "linux/arm64" } },
+      { run: "docker compose -p build up" },
+    ],
+    "prefer-native-arm-runner-over-qemu",
+  );
+  expect(findings).toHaveLength(1);
+  expect(findings[0]?.suggestion).toContain("Depot builds each platform natively");
 });
 
 test("buildx-fallback path keeps the generic QEMU advice", async () => {

@@ -31,17 +31,57 @@ function usesDepotBuildAction(step: WorkflowStep): boolean {
   return typeof step.uses === "string" && /^depot\/(?:build-push|bake)-action@/i.test(step.uses);
 }
 
+const composeValueFlags = new Set([
+  "-f",
+  "--file",
+  "-p",
+  "--project-name",
+  "--project-directory",
+  "--env-file",
+  "--profile",
+]);
+
+/** Compose flags may precede `build`; a flag value that happens to be "build" is not a build. */
+function isComposeBuild(words: string[]): boolean {
+  const args =
+    words[0] === "docker" && words[1] === "compose"
+      ? words.slice(2)
+      : words[0] === "docker-compose"
+        ? words.slice(1)
+        : undefined;
+  if (!args) {
+    return false;
+  }
+  for (let index = 0; index < args.length; index++) {
+    const word = args[index]!;
+    if (word === "build") {
+      return true;
+    }
+    if (composeValueFlags.has(word)) {
+      index++;
+      continue;
+    }
+    if (word.startsWith("-")) {
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
 function usesNonDepotBuild(step: WorkflowStep): boolean {
   return (
     usesDockerBuildPushAction(step) ||
     /^docker\/bake-action@/i.test(step.uses ?? "") ||
-    shellInvocations(step.run ?? "").some(
-      ([tool, action, subcommand]) =>
-        tool === "docker" &&
-        (action === "build" ||
-          (action === "compose" && subcommand === "build") ||
-          (action === "buildx" && ["build", "bake"].includes(subcommand ?? ""))),
-    )
+    shellInvocations(step.run ?? "").some((words) => {
+      const [tool, action, subcommand] = words;
+      return (
+        (tool === "docker" &&
+          (action === "build" ||
+            (action === "buildx" && ["build", "bake"].includes(subcommand ?? "")))) ||
+        isComposeBuild(words)
+      );
+    })
   );
 }
 
