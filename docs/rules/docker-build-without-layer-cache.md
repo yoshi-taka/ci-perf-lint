@@ -6,7 +6,7 @@ no intervening opaque setup, shell step or explicit builder override is visible.
 
 Detects `docker/build-push-action` steps that do not configure `cache-from` and `cache-to`.
 
-Depot actions are excluded: their normal builds automatically persist the project's layer cache, without GHA cache exports.
+Depot actions and literal `depot build` commands are excluded: their normal builds automatically persist the project's layer cache, without GHA cache exports. The separate `depot-build-gha-cache-export` rule reviews Depot builds that do export `type=gha`. See [the Depot action README](https://github.com/depot/build-push-action) and [the cache conflict report](https://depot.dev/docs/container-builds/troubleshooting).
 
 The GHA-cache recommendation respects effective job/workflow `cache-mode`. Restore-disabled or unknown policies suppress this advice. Under `read`, a visible `cache-from: type=gha` is sufficient without requiring a prohibited cache export.
 

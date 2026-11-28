@@ -15,7 +15,7 @@ const meta = {
 
 function stepHasLoadTrue(step: WorkflowStep): boolean {
   const uses = step.uses?.toLowerCase() ?? "";
-  if (!/^(?:docker|useblacksmith)\/build-push-action@/.test(uses)) {
+  if (!/^(?:docker|depot|useblacksmith)\/build-push-action@/.test(uses)) {
     return false;
   }
   const load = step.with?.load;
@@ -116,9 +116,12 @@ export const dockerBuildLoadTrueUnnecessaryRule = {
         }
 
         const tagsHint = tags.length > 0 ? `tags: ${tags.join(", ")}` : "no tags set";
-        const action = step.uses?.toLowerCase().startsWith("useblacksmith/")
-          ? "useblacksmith/build-push-action"
-          : "docker/build-push-action";
+        const uses = step.uses?.toLowerCase() ?? "";
+        const action = uses.startsWith("depot/")
+          ? "depot/build-push-action"
+          : uses.startsWith("useblacksmith/")
+            ? "useblacksmith/build-push-action"
+            : "docker/build-push-action";
 
         findings.push(
           buildDiagnostic(workflow, meta, step.withNode ?? step.usesNode ?? step.node, {

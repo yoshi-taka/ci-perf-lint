@@ -1,0 +1,34 @@
+name: depot cache export ok
+
+on: push
+
+jobs:
+  registry:
+    runs-on: depot-ubuntu-24.04
+    steps:
+      - uses: depot/setup-action@v1
+      - uses: depot/build-push-action@v1
+        with:
+          project: example
+          push: true
+          cache-from: type=registry,ref=example/app:cache
+          cache-to: type=registry,ref=example/app:cache,mode=max
+
+  fallback:
+    runs-on: depot-ubuntu-24.04
+    steps:
+      - uses: depot/setup-action@v1
+      - uses: depot/build-push-action@v1
+        with:
+          project: example
+          buildx-fallback: true
+          cache-to: type=gha,mode=max
+
+  dynamic:
+    runs-on: depot-macos-15
+    steps:
+      - uses: depot/setup-action@v1
+      - uses: depot/bake-action@v1
+        with:
+          cache-to: ${{ inputs.cache-backend }}
+      - run: echo "depot build --cache-to type=gha ."

@@ -13,7 +13,7 @@ import { declaredShellEnvironmentNames } from "./shared/shell-environment-eviden
 import { shellExecutionTexts } from "./shared/shell-execution-text.ts";
 import { shellCommandSegments } from "./shared/command-patterns.ts";
 import { isBlacksmithStickyDiskCacheStep } from "./shared/blacksmith-caches.ts";
-import { jobRunsOnBlacksmithRunner } from "./shared/runs-on-facts.ts";
+import { jobRunsOnBlacksmithRunner, jobRunsOnDepotRunner } from "./shared/runs-on-facts.ts";
 
 const meta = {
   id: "missing-turbo-cache",
@@ -140,7 +140,9 @@ export const missingTurboCacheRule = {
           !jobHasTurboRemoteCacheWiring(workflow, job),
       )
       .map((job) => {
-        const automaticCachePossible = jobRunsOnBlacksmithRunner(job) && !job.raw.container;
+        const onDepot = jobRunsOnDepotRunner(job) && !job.raw.container;
+        const automaticCachePossible =
+          onDepot || (jobRunsOnBlacksmithRunner(job) && !job.raw.container);
         return buildDiagnostic(workflow, meta, job.idNode ?? job.node, {
           message: `Job "${job.id}" runs Turbo tasks without visible local or remote cache wiring.`,
           why: "Turbo is most effective in CI when task cache reuse is visible, but this workflow does not show a `.turbo` cache path or remote-cache environment wiring.",
@@ -153,11 +155,21 @@ export const missingTurboCacheRule = {
           ...(automaticCachePossible
             ? {
                 severity: "suggestion" as const,
-                message: `Job "${job.id}" runs Turbo on Blacksmith; cache coverage cannot be resolved from the visible workflow.`,
-                why: "Blacksmith can provide Turborepo remote caching without YAML wiring, and local composite actions may also configure caching. Dashboard settings, hidden setup and fork-PR restrictions are not resolved by this scanner.",
-                suggestion:
-                  "Check Blacksmith's Turborepo cache setting and the job log for `Remote caching enabled` and cache hits before adding another cache. Preserve existing remote-cache providers; verify outputs declarations before enabling task caching.",
-                aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Verify Blacksmith's Turborepo cache setting and same-job logs before adding local or remote cache wiring. Do not assume the cache is enabled, and do not remove another provider or cache external-state tasks blindly.`,
+                ...(onDepot
+                  ? {
+                      message: `Job "${job.id}" runs Turbo on a Depot runner; Depot runners may configure Turbo remote cache automatically.`,
+                      why: "Depot runners can provide Turborepo remote caching without YAML wiring, but an organization setting can disable it. The workflow cannot resolve that setting, actual cache hits or fork-PR restrictions.",
+                      suggestion:
+                        "Depot runners may configure Turbo remote cache automatically. Check the organization cache setting and the job log for remote cache hits before adding another cache. Preserve existing remote providers; verify outputs declarations before enabling task caching.",
+                      aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Check Depot's organization cache setting and same-job logs for remote cache hits before adding local or remote cache wiring. Do not assume the cache is enabled, and do not remove another provider or cache external-state tasks blindly.`,
+                    }
+                  : {
+                      message: `Job "${job.id}" runs Turbo on Blacksmith; cache coverage cannot be resolved from the visible workflow.`,
+                      why: "Blacksmith can provide Turborepo remote caching without YAML wiring, and local composite actions may also configure caching. Dashboard settings, hidden setup and fork-PR restrictions are not resolved by this scanner.",
+                      suggestion:
+                        "Check Blacksmith's Turborepo cache setting and the job log for `Remote caching enabled` and cache hits before adding another cache. Preserve existing remote-cache providers; verify outputs declarations before enabling task caching.",
+                      aiHandoff: `Review ${workflow.relativePath} job "${job.id}". Verify Blacksmith's Turborepo cache setting and same-job logs before adding local or remote cache wiring. Do not assume the cache is enabled, and do not remove another provider or cache external-state tasks blindly.`,
+                    }),
                 score: 32,
               }
             : {}),

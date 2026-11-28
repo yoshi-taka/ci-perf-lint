@@ -59,6 +59,7 @@ Current rule registry:
 - `db-io-reduce`
 - `deep-checkout-excessive-depth`
 - `deep-checkout-without-need`
+- `depot-build-gha-cache-export`
 - `detected-large-barrel-file`
 - `detected-large-files`
 - `docker-bake-file-unused-in-ci`

@@ -1,6 +1,8 @@
 # Docker build loads image into daemon unnecessarily
 
-Both `docker/build-push-action` and `useblacksmith/build-push-action` are supported.
+`docker/build-push-action`, `depot/build-push-action`, and
+`useblacksmith/build-push-action` are supported; the action name in the finding
+follows the step.
 Image consumers such as local tests, saves and tag/push sequences prevent the
 finding; dynamic tags and opaque downstream actions are not assumed unused.
 

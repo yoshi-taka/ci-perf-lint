@@ -158,6 +158,40 @@ const scenarios: ShellEvidenceScenario[] = [
     }),
   ),
   {
+    name: "Depot action GHA export is configuration evidence, not printed command text",
+    command: "depot build --cache-to type=gha .",
+    build: (run) =>
+      files(
+        workflow(
+          [
+            { uses: "depot/setup-action@v1" },
+            {
+              uses: "depot/build-push-action@v1",
+              with: { project: "example", "cache-to": "type=gha,mode=max" },
+            },
+            { run },
+          ],
+          { "runs-on": "depot-ubuntu-24.04" },
+        ),
+      ),
+    expectations: [
+      { id: "depot-build-gha-cache-export", severity: "warning", count: 1, literalCount: 1 },
+    ],
+  },
+  {
+    name: "literal depot CLI cache export executes, printed examples do not",
+    command: "depot build --cache-to type=gha,mode=max .",
+    build: (run) =>
+      files(
+        workflow([{ uses: "depot/setup-action@v1" }, { run }], {
+          "runs-on": "depot-ubuntu-24.04",
+        }),
+      ),
+    expectations: [
+      { id: "depot-build-gha-cache-export", severity: "warning", count: 1, literalCount: 0 },
+    ],
+  },
+  {
     name: "component scope uses execution paths, not labels or logs",
     command: "npm run build",
     build: (run) => {

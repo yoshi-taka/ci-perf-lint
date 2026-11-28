@@ -1,0 +1,33 @@
+name: depot cache export
+
+on: push
+
+jobs:
+  action:
+    runs-on: depot-ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: depot/setup-action@v1
+      - uses: depot/build-push-action@v1
+        with:
+          project: example
+          push: true
+          tags: example/app:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  bake:
+    runs-on: depot-ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: depot/setup-action@v1
+      - uses: depot/bake-action@v1
+        with:
+          files: ./docker-bake.hcl
+          cache-to: type=gha
+
+  cli:
+    runs-on: depot-ubuntu-24.04
+    steps:
+      - uses: depot/setup-action@v1
+      - run: depot build --cache-from=type=gha --push .

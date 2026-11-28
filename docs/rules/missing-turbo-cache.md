@@ -1,11 +1,15 @@
 # missing-turbo-cache
 
 On a statically identified Blacksmith host runner, automatic remote caching may
-already cover Turbo without YAML wiring. The finding becomes an exploratory
-suggestion to verify organization settings and actual cache-hit logs before
-adding another cache. Containers are not assumed to reach that automatic cache;
-fork PRs do not receive it. Explicit remote providers and valid Sticky Disk mounts
-before the Turbo command are respected.
+already cover Turbo without YAML wiring. Depot runners are treated the same way:
+they may configure the Turbo remote cache (TURBO_API) automatically, and an
+organization setting can disable it. In both cases the finding becomes an
+exploratory suggestion (score 32) to verify organization settings and actual
+cache-hit logs before adding another cache. Containers are not assumed to reach
+that automatic cache; fork PRs do not receive it. Explicit remote providers and
+valid Sticky Disk mounts before the Turbo command are respected. See
+[Depot Cache overview](https://depot.dev/docs/cache/overview) and
+[Depot runner types](https://depot.dev/docs/github-actions/runner-types).
 
 Turbo dry-run/hash-inspection commands do not establish executed task work.
 Visible `rharkor/caching-for-turbo` setup before the first task is remote wiring

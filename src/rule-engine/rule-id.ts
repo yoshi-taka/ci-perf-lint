@@ -43,6 +43,7 @@ export const RULE_REGISTRY = {
   "db-io-reduce": { kind: "workflow" },
   "deep-checkout-excessive-depth": { kind: "workflow" },
   "deep-checkout-without-need": { kind: "workflow" },
+  "depot-build-gha-cache-export": { kind: "workflow" },
   "docker-bake-file-unused-in-ci": { kind: "workflow" },
   "docker-build-cache-disabled-in-ci": { kind: "workflow" },
   "docker-build-load-true-unnecessary": { kind: "workflow" },

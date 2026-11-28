@@ -152,6 +152,8 @@ const fixtureNames = {
   circleciFullCloneOk: "circleci-full-clone-ok",
   circleciFullCloneOkUsesHistory: "circleci-full-clone-ok-uses-history",
   depotCiLike: "depot-ci-like",
+  depotGhaCacheExportLike: "depot-gha-cache-export-like",
+  depotGhaCacheExportOk: "depot-gha-cache-export-ok",
   dispatchRunDiscoveryLike: "dispatch-run-discovery-like",
   dispatchRunDiscoveryOk: "dispatch-run-discovery-ok",
   cargoBuildBeforeTestLike: "cargo-build-before-test-like",

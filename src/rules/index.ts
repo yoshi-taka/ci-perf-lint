@@ -44,6 +44,7 @@ import { duplicateCheckoutInSameWorkflowRule } from "./duplicate-checkout-in-sam
 import { duplicateInstallOrLintRule } from "./duplicate-install-or-lint.ts";
 import { deepCheckoutExcessiveDepthRule } from "./deep-checkout-excessive-depth.ts";
 import { deepCheckoutWithoutNeedRule } from "./deep-checkout-without-need.ts";
+import { depotBuildGhaCacheExportRule } from "./depot-build-gha-cache-export.ts";
 import { elixirOtpVersionPerformanceRule } from "./elixir-otp-version-performance.ts";
 import { hatchWithoutUvInstallerRule } from "./hatch-without-uv-installer.ts";
 import { ineffectiveConcurrencyGroupRule } from "./ineffective-concurrency-group.ts";
@@ -240,6 +241,7 @@ export const allRules = [
   unnecessaryCheckoutWhenOnlyUsingArtifactsRule,
   deepCheckoutExcessiveDepthRule,
   deepCheckoutWithoutNeedRule,
+  depotBuildGhaCacheExportRule,
   missingTimeoutInMinutesBuildkiteRule,
   missingTimeoutInMinutesGitlabCiRule,
   missingTimeoutMinutesRule,
