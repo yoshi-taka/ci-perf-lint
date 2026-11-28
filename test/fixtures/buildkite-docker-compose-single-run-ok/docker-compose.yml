@@ -1,0 +1,4 @@
+# Synthetic (created for this test)
+services:
+  app:
+    build: .

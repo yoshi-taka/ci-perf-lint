@@ -1,0 +1,4 @@
+# Adapted from readysettech/readyset
+services:
+  app:
+    image: "example/readyset-build:${BUILDKITE_COMMIT}"

@@ -1,0 +1,13 @@
+# Adapted from readysettech/readyset
+steps:
+  - label: ':linux: Build app: arm'
+    command: .buildkite/steps/build.sh
+    parallelism: 2
+    plugins:
+      - docker-compose#v5.12.1:
+          run: app
+  - label: ':linux: Test app'
+    command: .buildkite/steps/test.sh
+    plugins:
+      - docker-compose#v5.12.1:
+          run: app

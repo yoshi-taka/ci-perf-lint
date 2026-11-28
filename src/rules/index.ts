@@ -14,6 +14,7 @@ import { avoidEslintPluginPrettierRule } from "./avoid-eslint-plugin-prettier.ts
 import { avoidPrettierEslintRule } from "./avoid-prettier-eslint.ts";
 import { repeatedBootstrapSetupRule } from "./repeated-bootstrap-setup.ts";
 import { avoidXcodeInstallOnHostedMacosRule } from "./avoid-xcode-install-on-hosted-macos.ts";
+import { buildkiteDockerComposeRunWithoutPrebuildRule } from "./buildkite-docker-compose-run-without-prebuild.ts";
 import { blacksmithDockerBuilderMissingRule } from "./blacksmith-docker-builder-missing.ts";
 import { blacksmithDockerCacheExportRule } from "./blacksmith-docker-cache-export.ts";
 import { blacksmithStickyDiskCacheOverlapRule } from "./blacksmith-sticky-disk-cache-overlap.ts";
@@ -182,6 +183,7 @@ export const allRules = [
   blacksmithDockerBuilderMissingRule,
   blacksmithDockerCacheExportRule,
   blacksmithStickyDiskCacheOverlapRule,
+  buildkiteDockerComposeRunWithoutPrebuildRule,
   cacheTerraformProvidersRule,
   cargoBuildBeforeTestRule,
   circleciCheckoutUsesFullCloneRule,

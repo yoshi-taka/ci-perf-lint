@@ -28,6 +28,7 @@ Current rule registry:
 - `blacksmith-docker-builder-missing`
 - `blacksmith-docker-cache-export`
 - `blacksmith-sticky-disk-cache-overlap`
+- `buildkite-docker-compose-run-without-prebuild`
 - `bundler-external-subpath-leak`
 - `cache-terraform-providers`
 - `cargo-build-before-test`

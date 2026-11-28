@@ -1,0 +1,15 @@
+# Synthetic (created for this test)
+steps:
+  - label: ':go: test'
+    key: test
+    command: go test ./...
+    plugins:
+      - docker-compose#v5.12.1:
+          run: app
+          run-image: registry.example.com/team/app:latest
+  - label: ':go: vet'
+    key: vet
+    command: go vet ./...
+    plugins:
+      - docker-compose#v5.12.1:
+          run: app

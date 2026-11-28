@@ -1,0 +1,6 @@
+# Adapted from buildkite/rails-docker-parallel-example
+services:
+  app:
+    build: .
+    volumes:
+      - "./:/app"

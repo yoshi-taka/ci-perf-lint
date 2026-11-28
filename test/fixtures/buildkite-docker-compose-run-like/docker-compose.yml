@@ -1,0 +1,5 @@
+# Adapted from buildkite/golang-docker-example
+services:
+  app:
+    build: .
+    working_dir: /work

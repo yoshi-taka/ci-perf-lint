@@ -1,0 +1,7 @@
+# Adapted from buildkite/agent
+services:
+  agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile-compile
+    working_dir: /work

@@ -1,0 +1,21 @@
+# Synthetic (created for this test)
+steps:
+  - label: ':docker: prebuild app'
+    key: prebuild
+    plugins:
+      - docker-compose#v5.4.1:
+          build: app
+          push: app
+  - wait
+  - label: ':go: test'
+    key: test
+    command: go test ./...
+    plugins:
+      - docker-compose#v5.4.1:
+          run: app
+  - label: ':go: vet'
+    key: vet
+    command: go vet ./...
+    plugins:
+      - docker-compose#v5.4.1:
+          run: app

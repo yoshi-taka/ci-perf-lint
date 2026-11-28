@@ -1,0 +1,23 @@
+# Adapted from buildkite/golang-docker-example
+steps:
+  - group: ':mag: QA'
+    id: quality_assurance
+    steps:
+      - key: lint
+        label: ':golang: vet'
+        command: go vet ./...
+        plugins:
+          - docker-compose#v5.12.1:
+              run: app
+      - key: test
+        label: ':golang: test'
+        command: go test -v -count=1 -cover ./...
+        plugins:
+          - docker-compose#v5.12.1:
+              run: app
+  - key: build
+    label: ':golang: build'
+    command: go build -o dist/app
+    plugins:
+      - docker-compose#v5.12.1:
+          run: app

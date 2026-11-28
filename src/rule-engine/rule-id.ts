@@ -21,6 +21,7 @@ export const RULE_REGISTRY = {
   "blacksmith-docker-builder-missing": { kind: "workflow" },
   "blacksmith-docker-cache-export": { kind: "workflow" },
   "blacksmith-sticky-disk-cache-overlap": { kind: "workflow" },
+  "buildkite-docker-compose-run-without-prebuild": { kind: "workflow" },
   "cache-terraform-providers": { kind: "workflow" },
   "cargo-build-before-test": { kind: "workflow" },
   "circleci-checkout-uses-full-clone": { kind: "workflow" },
